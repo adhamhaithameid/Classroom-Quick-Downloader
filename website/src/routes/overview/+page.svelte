@@ -12,6 +12,7 @@
   import AnimatedNumber from '$lib/components/AnimatedNumber.svelte';
   import MediaLoader from '$lib/components/MediaLoader.svelte';
   import AnimatedNumericText from '$lib/components/AnimatedNumericText.svelte';
+  import { glassSheen } from '$lib/actions/glassSheen';
   import {
     canStartCelebration,
     nextCooldownUntil
@@ -1703,7 +1704,7 @@
       </div>
 
       <div class="l2-student-grid" role="list">
-        <article class="l2-student-card" role="listitem">
+        <article class="l2-student-card" role="listitem" style="--card-i: 0" use:glassSheen>
           <span class="l2-student-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 8v5l3 3" />
@@ -1713,7 +1714,7 @@
           <h3>Less repetitive clicking</h3>
           <p>Download all materials from an assignment in one action instead of repeating the same file flow.</p>
         </article>
-        <article class="l2-student-card" role="listitem">
+        <article class="l2-student-card" role="listitem" style="--card-i: 1" use:glassSheen>
           <span class="l2-student-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
@@ -1722,7 +1723,7 @@
           <h3>Faster study prep</h3>
           <p>Get course files quickly so your time goes into understanding material, not managing downloads.</p>
         </article>
-        <article class="l2-student-card" role="listitem">
+        <article class="l2-student-card" role="listitem" style="--card-i: 2" use:glassSheen>
           <span class="l2-student-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M9 6h11M9 12h11M9 18h11" />
@@ -1924,12 +1925,12 @@
         <p>Everything you'd expect from a modern extension — and nothing you wouldn't.</p>
       </div>
       <div class="l2-feature-grid">
-        <div class="l2-fcard"><div class="l2-fcard-icon">⚡</div><h3>Instant</h3><p>Install → open Classroom → download. Zero configuration, zero learning curve.</p></div>
-        <div class="l2-fcard"><div class="l2-fcard-icon">🔒</div><h3>Private</h3><p>No third-party tracking, no cookies, and no user profiles. Only aggregate operational metrics.</p></div>
-        <div class="l2-fcard"><div class="l2-fcard-icon">🔓</div><h3>Transparent</h3><p>Clear docs, public roadmap, and predictable release notes for every update.</p></div>
-        <div class="l2-fcard"><div class="l2-fcard-icon">🌐</div><h3>Universal</h3><p>Chrome, Firefox, Edge, Brave, Opera, Vivaldi, Arc — it just works.</p></div>
-        <div class="l2-fcard"><div class="l2-fcard-icon">🎓</div><h3>For Students</h3><p>Built by a student who was tired of clicking. Designed for real classroom workflows.</p></div>
-        <div class="l2-fcard"><div class="l2-fcard-icon">🌍</div><h3><AnimatedNumber value={100} format={{ useGrouping: false }} suffix="+" animated /> Languages</h3><p>Available in English, Arabic, Spanish, French, German, and over <AnimatedNumber value={100} format={{ useGrouping: false }} animated /> more languages.</p></div>
+        <div class="l2-fcard" style="--card-i: 0" use:glassSheen><div class="l2-fcard-icon">⚡</div><h3>Instant</h3><p>Install → open Classroom → download. Zero configuration, zero learning curve.</p></div>
+        <div class="l2-fcard" style="--card-i: 1" use:glassSheen><div class="l2-fcard-icon">🔒</div><h3>Private</h3><p>No third-party tracking, no cookies, and no user profiles. Only aggregate operational metrics.</p></div>
+        <div class="l2-fcard" style="--card-i: 2" use:glassSheen><div class="l2-fcard-icon">🔓</div><h3>Transparent</h3><p>Clear docs, public roadmap, and predictable release notes for every update.</p></div>
+        <div class="l2-fcard" style="--card-i: 3" use:glassSheen><div class="l2-fcard-icon">🌐</div><h3>Universal</h3><p>Chrome, Firefox, Edge, Brave, Opera, Vivaldi, Arc — it just works.</p></div>
+        <div class="l2-fcard" style="--card-i: 4" use:glassSheen><div class="l2-fcard-icon">🎓</div><h3>For Students</h3><p>Built by a student who was tired of clicking. Designed for real classroom workflows.</p></div>
+        <div class="l2-fcard" style="--card-i: 5" use:glassSheen><div class="l2-fcard-icon">🌍</div><h3><AnimatedNumber value={100} format={{ useGrouping: false }} suffix="+" animated /> Languages</h3><p>Available in English, Arabic, Spanish, French, German, and over <AnimatedNumber value={100} format={{ useGrouping: false }} animated /> more languages.</p></div>
       </div>
     </div>
   </section>
@@ -1966,7 +1967,7 @@
         <p>Students, teachers, and universities around the world trust Classroom Quick Downloader.</p>
       </div>
       <div class="l2-proof-grid">
-        <div class="l2-proof-card">
+        <div class="l2-proof-card" style="--card-i: 0" use:glassSheen>
           <div class="l2-proof-num">
             {#if metricsReady}
               <AnimatedNumber value={downloadCount ?? 0} animated />
@@ -1976,7 +1977,7 @@
           </div>
           <div class="l2-proof-label">Total Downloads</div>
         </div>
-        <div class="l2-proof-card">
+        <div class="l2-proof-card" style="--card-i: 1" use:glassSheen>
           <div class="l2-proof-num">
             {#if metricsReady}
               <AnimatedNumber value={userCount ?? 0} animated />
@@ -1986,8 +1987,8 @@
           </div>
           <div class="l2-proof-label">Active Users</div>
         </div>
-        <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumber value={100} suffix="+" animated /></div><div class="l2-proof-label">Languages</div></div>
-        <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumericText text={latestReleaseVersion} animated stableInitial /></div><div class="l2-proof-label">Latest Release</div></div>
+        <div class="l2-proof-card" style="--card-i: 2" use:glassSheen><div class="l2-proof-num"><AnimatedNumber value={100} suffix="+" animated /></div><div class="l2-proof-label">Languages</div></div>
+        <div class="l2-proof-card" style="--card-i: 3" use:glassSheen><div class="l2-proof-num"><AnimatedNumericText text={latestReleaseVersion} animated stableInitial /></div><div class="l2-proof-label">Latest Release</div></div>
       </div>
     </div>
   </section>
@@ -1997,18 +1998,18 @@
     <div class="l2-wrap l2-reveal l2-map-wrap" data-placement-section="map">
       <div class="l2-map-layout">
         {#if mapState === 'loading'}
-          <div class="l2-map-state-card">
+          <div class="l2-map-state-card" use:glassSheen>
             <div class="state-loading">Loading live global map…</div>
           </div>
         {:else if mapState === 'error'}
-          <div class="l2-map-state-card">
+          <div class="l2-map-state-card" use:glassSheen>
             <div class="state-error">
               <strong>Could not load global map.</strong>
               <p>{mapError}</p>
             </div>
           </div>
         {:else if !RotatingGlobeComponent}
-          <div class="l2-map-state-card">
+          <div class="l2-map-state-card" use:glassSheen>
             <div class="state-loading">Preparing globe renderer…</div>
           </div>
         {:else}
@@ -2044,7 +2045,7 @@
           <p>Country-level usage rendered as a rotating globe based on live service metrics.</p>
           <div class="l2-map-top-countries">
             {#each topCountries as country, i}
-              <div class="l2-top-country-card l2-rank-{i}" style="--rank-color:{i === 0 ? '#ca8a04' : i === 1 ? '#64748b' : '#92400e'};--rank-bg:{i === 0 ? 'rgba(234,179,8,0.08)' : i === 1 ? 'rgba(148,163,184,0.06)' : 'rgba(180,83,9,0.06)'};--rank-border:{i === 0 ? 'rgba(234,179,8,0.3)' : i === 1 ? 'rgba(148,163,184,0.25)' : 'rgba(180,83,9,0.25)'}">
+              <div class="l2-top-country-card l2-rank-{i}" style="--card-i:{i};--rank-color:{i === 0 ? '#ca8a04' : i === 1 ? '#64748b' : '#92400e'};--rank-bg:{i === 0 ? 'rgba(234,179,8,0.08)' : i === 1 ? 'rgba(148,163,184,0.06)' : 'rgba(180,83,9,0.06)'};--rank-border:{i === 0 ? 'rgba(234,179,8,0.3)' : i === 1 ? 'rgba(148,163,184,0.25)' : 'rgba(180,83,9,0.25)'}" use:glassSheen>
                 <div class="l2-top-rank">
                   <span class="l2-rank-medal">{i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}</span>
                 </div>
@@ -2138,7 +2139,7 @@
             showLegend={false}
           />
         {:else}
-          <div class="l2-map-state-card">
+          <div class="l2-map-state-card" use:glassSheen>
             <div class="state-loading">Preparing map renderer…</div>
           </div>
         {/if}
@@ -2415,7 +2416,8 @@
     --radius: 16px;
     --wrap: 1280px;
     font-family: var(--font-ui), sans-serif;
-    background: var(--bg);
+    /* transparent so the shared .bg-aurora layer behind the layout shell shows through */
+    background: transparent;
     color: var(--text);
     overflow-x: hidden;
     position: relative;
@@ -2610,20 +2612,32 @@
 
   .l2-student-card {
     position: relative;
-    background: rgba(255, 255, 255, 0.72);
-    border: 1px solid var(--border-subtle);
+    overflow: hidden;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
     border-radius: 18px;
     padding: 28px 24px;
-    box-shadow: 0 8px 28px rgba(15, 20, 25, 0.06);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+    box-shadow:
+      0 1px 2px rgba(15, 20, 25, 0.05),
+      0 12px 30px rgba(15, 20, 25, 0.1),
+      0 8px 24px rgba(26, 139, 85, 0.08),
+      inset 0 1px 0 var(--glass-highlight);
+    transition:
+      transform 0.45s var(--glass-ease),
+      box-shadow 0.45s var(--glass-ease),
+      border-color 0.3s ease;
   }
 
   .l2-student-card:hover {
     transform: translateY(-4px);
-    border-color: var(--green-border);
-    box-shadow: 0 16px 38px rgba(15, 20, 25, 0.1);
+    border-color: rgba(26, 139, 85, 0.22);
+    box-shadow:
+      0 8px 20px rgba(26, 139, 85, 0.12),
+      0 0 0 1px rgba(26, 139, 85, 0.06),
+      0 20px 44px rgba(15, 20, 25, 0.12),
+      inset 0 1px 0 var(--glass-highlight);
   }
 
   .l2-student-icon {
@@ -2637,6 +2651,13 @@
     align-items: center;
     justify-content: center;
     margin-bottom: 14px;
+    transition: transform 0.3s var(--glass-ease), box-shadow 0.3s ease;
+  }
+
+  /* The nav glyph flourish: tile scales and tilts as the card wakes up. */
+  .l2-student-card:hover .l2-student-icon {
+    transform: scale(1.06) rotate(-3deg);
+    box-shadow: 0 4px 10px rgba(26, 139, 85, 0.18);
   }
 
   .l2-student-icon svg {
@@ -3371,14 +3392,20 @@
     align-items: center;
     gap: 14px;
     padding: 14px 18px;
-    background: var(--rank-bg);
+    /* Rank tint under the shared glass gradient — the navbar's glass
+       material lets each medal's color breathe through. */
+    background-color: var(--rank-bg);
+    background-image: linear-gradient(120deg, rgba(255, 255, 255, 0.6), rgba(248, 252, 249, 0.42));
     border: 1.5px solid var(--rank-border);
     border-radius: 16px;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
     flex: 1;
     min-width: 160px;
-    transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+    transition:
+      transform 0.45s var(--glass-ease),
+      box-shadow 0.45s var(--glass-ease),
+      border-color 0.3s ease;
     position: relative;
     overflow: hidden;
   }
@@ -3401,7 +3428,11 @@
 
   .l2-top-country-card:hover {
     transform: translateY(-3px);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+    border-color: rgba(26, 139, 85, 0.3);
+    box-shadow:
+      0 8px 20px rgba(26, 139, 85, 0.12),
+      0 16px 36px rgba(15, 20, 25, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.85);
   }
 
   .l2-top-country-card:hover::after,
@@ -3644,14 +3675,34 @@
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
   }
   .l2-fcard {
-    background: rgba(255, 255, 255, 0.65); border: 1px solid var(--border-subtle);
+    position: relative;
+    overflow: hidden;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
     border-radius: var(--radius); padding: 28px 24px;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+    box-shadow:
+      0 1px 2px rgba(15, 20, 25, 0.05),
+      0 12px 30px rgba(15, 20, 25, 0.1),
+      0 8px 24px rgba(26, 139, 85, 0.08),
+      inset 0 1px 0 var(--glass-highlight);
+    transition:
+      transform 0.45s var(--glass-ease),
+      box-shadow 0.45s var(--glass-ease),
+      border-color 0.3s ease;
   }
-  .l2-fcard:hover { border-color: var(--green-border); transform: translateY(-4px); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08); }
-  .l2-fcard-icon { font-size: 36px; margin-bottom: 14px; }
+  .l2-fcard:hover {
+    transform: translateY(-4px);
+    border-color: rgba(26, 139, 85, 0.22);
+    box-shadow:
+      0 8px 20px rgba(26, 139, 85, 0.12),
+      0 0 0 1px rgba(26, 139, 85, 0.06),
+      0 20px 44px rgba(15, 20, 25, 0.12),
+      inset 0 1px 0 var(--glass-highlight);
+  }
+  .l2-fcard-icon { font-size: 36px; margin-bottom: 14px; transition: transform 0.3s var(--glass-ease); }
+  .l2-fcard:hover .l2-fcard-icon { transform: scale(1.12) rotate(-3deg); }
   .l2-fcard h3 { font-size: 17px; font-weight: 700; margin: 0 0 8px; }
   .l2-fcard p { font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin: 0; }
 
@@ -3680,13 +3731,32 @@
   /* ── Social Proof ──────────────────── */
   .l2-proof-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
   .l2-proof-card {
-    background: rgba(255, 255, 255, 0.65); border: 1px solid var(--border-subtle);
+    position: relative;
+    overflow: hidden;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
     border-radius: var(--radius); padding: 28px; text-align: center;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+    box-shadow:
+      0 1px 2px rgba(15, 20, 25, 0.05),
+      0 12px 30px rgba(15, 20, 25, 0.1),
+      0 8px 24px rgba(26, 139, 85, 0.08),
+      inset 0 1px 0 var(--glass-highlight);
+    transition:
+      transform 0.45s var(--glass-ease),
+      box-shadow 0.45s var(--glass-ease),
+      border-color 0.3s ease;
   }
-  .l2-proof-card:hover { border-color: var(--green-border); transform: translateY(-3px); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.05); }
+  .l2-proof-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(26, 139, 85, 0.22);
+    box-shadow:
+      0 8px 20px rgba(26, 139, 85, 0.12),
+      0 0 0 1px rgba(26, 139, 85, 0.06),
+      0 20px 44px rgba(15, 20, 25, 0.12),
+      inset 0 1px 0 var(--glass-highlight);
+  }
   .l2-proof-num { font-size: 28px; font-weight: 800; color: var(--green); margin-bottom: 6px; }
   .l2-metric-pending { color: #64748b; font-size: 1em; font-weight: 700; letter-spacing: 0.02em; }
   .l2-proof-label { font-size: 13px; font-weight: 500; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
@@ -3755,10 +3825,18 @@
 
   .l2-map-state-card {
     width: min(100%, 760px);
+    position: relative;
+    overflow: hidden;
     border-radius: 18px;
-    border: 1px solid rgba(15, 20, 25, 0.1);
-    background: rgba(255, 255, 255, 0.82);
-    box-shadow: 0 10px 26px rgba(15, 20, 25, 0.08);
+    border: 1px solid var(--glass-border);
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+    box-shadow:
+      0 1px 2px rgba(15, 20, 25, 0.05),
+      0 12px 30px rgba(15, 20, 25, 0.1),
+      0 8px 24px rgba(26, 139, 85, 0.08),
+      inset 0 1px 0 var(--glass-highlight);
     padding: 30px;
   }
 
@@ -3918,6 +3996,130 @@
   }
   .l2-newsletter-status-idle {
     color: var(--text-muted);
+  }
+
+  /* ── Navbar glass language on cards ──
+     The homepage cards share the navbar's material: a top sheen plus
+     diagonal gloss (::before) and a pointer-tracked specular sweep
+     (::after, fed by the glassSheen action) — the same cursor reaction
+     the navbar bar gives. Hover lifts ride the navbar's springy
+     --glass-ease with the green halo the nav menu links use. */
+  .l2-student-card::before,
+  .l2-fcard::before,
+  .l2-proof-card::before,
+  .l2-map-state-card::before,
+  .l2-top-country-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 36%),
+      linear-gradient(120deg, rgba(255, 255, 255, 0.3), rgba(239, 247, 250, 0.16) 48%, rgba(255, 255, 255, 0.28));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.35);
+  }
+
+  /* The top-country glint owns ::after over there, so the pointer sweep
+     skips that family. */
+  .l2-student-card::after,
+  .l2-fcard::after,
+  .l2-proof-card::after,
+  .l2-map-state-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    background: radial-gradient(
+      240px circle at var(--card-mx, 50%) var(--card-my, 0%),
+      rgba(255, 255, 255, 0.55),
+      rgba(255, 255, 255, 0) 72%
+    );
+    transition: opacity 0.35s ease;
+  }
+
+  .l2-student-card:hover::after,
+  .l2-fcard:hover::after,
+  .l2-proof-card:hover::after,
+  .l2-map-state-card:hover::after {
+    opacity: 1;
+  }
+
+  /* Staggered entrance on section reveal — the nav dropdown's "retyped"
+     cascade, paced per card with --card-i. `backwards` fill hides each
+     card during its delay and releases the transform once done, so hover
+     transitions stay live afterwards. Pending sections hold their cards
+     invisible, so the cascade plays on reveal instead of first paint. */
+  :global(.l2-reveal:not(.l2-reveal-pending)) .l2-student-card,
+  :global(.l2-reveal:not(.l2-reveal-pending)) .l2-fcard,
+  :global(.l2-reveal:not(.l2-reveal-pending)) .l2-proof-card,
+  :global(.l2-reveal:not(.l2-reveal-pending)) .l2-top-country-card {
+    animation: card-glass-in 0.6s var(--glass-ease) backwards;
+    animation-delay: calc(0.06s + var(--card-i, 0) * 0.07s);
+  }
+
+  :global(.l2-reveal.l2-reveal-pending) .l2-student-card,
+  :global(.l2-reveal.l2-reveal-pending) .l2-fcard,
+  :global(.l2-reveal.l2-reveal-pending) .l2-proof-card,
+  :global(.l2-reveal.l2-reveal-pending) .l2-top-country-card {
+    opacity: 0;
+  }
+
+  @keyframes card-glass-in {
+    from { opacity: 0; transform: translateY(12px) scale(0.985); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .l2-student-card,
+    .l2-fcard,
+    .l2-proof-card,
+    .l2-map-state-card,
+    .l2-top-country-card {
+      animation: none !important;
+      transition: none !important;
+    }
+
+    .l2-student-card::before,
+    .l2-fcard::before,
+    .l2-proof-card::before,
+    .l2-map-state-card::before,
+    .l2-top-country-card::before,
+    .l2-student-card::after,
+    .l2-fcard::after,
+    .l2-proof-card::after,
+    .l2-map-state-card::after {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .l2-student-card,
+    .l2-fcard,
+    .l2-proof-card,
+    .l2-map-state-card,
+    .l2-top-country-card {
+      background: #fcfefd;
+      border-color: rgba(226, 232, 240, 0.9);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+
+    .l2-student-card::before,
+    .l2-fcard::before,
+    .l2-proof-card::before,
+    .l2-map-state-card::before,
+    .l2-top-country-card::before,
+    .l2-student-card::after,
+    .l2-fcard::after,
+    .l2-proof-card::after,
+    .l2-map-state-card::after {
+      display: none;
+    }
   }
 
   /* ── Reveal Animations ─────────────── */

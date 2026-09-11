@@ -4,6 +4,7 @@
   import SeoMeta from '$lib/components/SeoMeta.svelte';
   import { relatedPagesFor, type SeoPageConfig } from '$lib/content/seoPages';
   import { SITE_NAME, SOCIAL_IMAGE } from '$lib/seo/site';
+  import { glassSheen } from '$lib/actions/glassSheen';
 
   export let config: SeoPageConfig;
 
@@ -159,8 +160,8 @@
   </section>
 
   <section class="seo-sections">
-    {#each config.sections as section}
-      <article class="seo-card">
+    {#each config.sections as section, i}
+      <article class="seo-card" style="--card-i: {i}" use:glassSheen>
         <h2>{section.heading}</h2>
         {#each section.paragraphs ?? [] as paragraph}
           <p>{paragraph}</p>
@@ -294,10 +295,90 @@
   }
 
   .seo-card {
-    border: 1px solid #e2e8f0;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--glass-border);
     border-radius: 0.9rem;
-    background: #ffffff;
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
     padding: 1.25rem 1.2rem;
+    box-shadow:
+      0 1px 2px rgba(15, 20, 25, 0.05),
+      0 12px 30px rgba(15, 20, 25, 0.1),
+      0 8px 24px rgba(26, 139, 85, 0.08),
+      inset 0 1px 0 var(--glass-highlight);
+    transition:
+      transform 0.45s var(--glass-ease),
+      box-shadow 0.45s var(--glass-ease),
+      border-color 0.3s ease;
+  }
+
+  .seo-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(26, 139, 85, 0.22);
+    box-shadow:
+      0 8px 20px rgba(26, 139, 85, 0.12),
+      0 0 0 1px rgba(26, 139, 85, 0.06),
+      0 20px 44px rgba(15, 20, 25, 0.12),
+      inset 0 1px 0 var(--glass-highlight);
+  }
+
+  .seo-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 36%),
+      linear-gradient(120deg, rgba(255, 255, 255, 0.3), rgba(239, 247, 250, 0.16) 48%, rgba(255, 255, 255, 0.28));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.35);
+  }
+
+  .seo-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    background: radial-gradient(
+      240px circle at var(--card-mx, 50%) var(--card-my, 0%),
+      rgba(255, 255, 255, 0.55),
+      rgba(255, 255, 255, 0) 72%
+    );
+    transition: opacity 0.35s ease;
+  }
+
+  .seo-card:hover::after {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .seo-card {
+      transition: none;
+    }
+
+    .seo-card::after {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .seo-card {
+      background: #fcfefd;
+      border-color: rgba(226, 232, 240, 0.9);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+
+    .seo-card::before,
+    .seo-card::after {
+      display: none;
+    }
   }
 
   .seo-card h2 {
@@ -324,11 +405,47 @@
   }
 
   .seo-related {
+    position: relative;
+    overflow: hidden;
     margin-top: 1.1rem;
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--glass-border);
     border-radius: 0.9rem;
-    background: #ffffff;
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
     padding: 1.25rem 1.2rem;
+    box-shadow:
+      0 1px 2px rgba(15, 20, 25, 0.05),
+      0 12px 30px rgba(15, 20, 25, 0.1),
+      0 8px 24px rgba(26, 139, 85, 0.08),
+      inset 0 1px 0 var(--glass-highlight);
+  }
+
+  .seo-related::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 36%),
+      linear-gradient(120deg, rgba(255, 255, 255, 0.3), rgba(239, 247, 250, 0.16) 48%, rgba(255, 255, 255, 0.28));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.35);
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .seo-related {
+      background: #fcfefd;
+      border-color: rgba(226, 232, 240, 0.9);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+
+    .seo-related::before {
+      display: none;
+    }
   }
 
   .seo-faq {

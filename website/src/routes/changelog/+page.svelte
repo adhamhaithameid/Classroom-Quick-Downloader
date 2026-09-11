@@ -4,6 +4,7 @@
   import { fetchChangelog } from '$lib/api/changelog';
   import { WEBSITE_MANUAL_CHANGELOG } from '$lib/content/changelog.manual.generated';
   import SeoMeta from '$lib/components/SeoMeta.svelte';
+  import { glassSheen } from '$lib/actions/glassSheen';
 
   type ChangelogMdEntry = {
     version: string;
@@ -304,7 +305,7 @@
                     <div class="cl-line"></div>
                   {/if}
                 </div>
-                <div class="cl-entry-card">
+                <div class="cl-entry-card" style="--card-i: {i}" use:glassSheen>
                   <div class="cl-entry-header">
                     <h2>v{entry.version}{#if i === 0}<span class="cl-latest-tag">Latest</span>{/if}</h2>
                   </div>
@@ -458,13 +459,18 @@
   }
 
   .cl-state-card {
-    background: rgba(255,255,255,0.6);
-    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-    border: 1px solid var(--border-subtle);
+    position: relative;
+    overflow: hidden;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
     border-radius: 20px;
     padding: 48px;
     text-align: center;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+    box-shadow:
+      0 1px 2px rgba(15, 20, 25, 0.05),
+      0 12px 30px rgba(15, 20, 25, 0.1),
+      0 8px 24px rgba(26, 139, 85, 0.08),
+      inset 0 1px 0 var(--glass-highlight);
   }
 
   .cl-state-error {
@@ -498,12 +504,17 @@
   }
 
   .cl-sidebar-card {
-    border: 1px solid var(--border-subtle);
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--glass-border);
     border-radius: var(--radius);
-    background: rgba(255,255,255,0.6);
-    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    background: var(--glass-bg);
     padding: 18px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    box-shadow:
+      0 1px 2px rgba(15, 20, 25, 0.05),
+      0 12px 30px rgba(15, 20, 25, 0.1),
+      0 8px 24px rgba(26, 139, 85, 0.08),
+      inset 0 1px 0 var(--glass-highlight);
   }
 
   .cl-sidebar-label {
@@ -583,19 +594,94 @@
   }
 
   .cl-entry-card {
-    background: rgba(255,255,255,0.65);
-    border: 1px solid var(--border-subtle);
+    position: relative;
+    overflow: hidden;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
     border-radius: var(--radius);
     padding: 24px;
-    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow:
+      0 1px 2px rgba(15, 20, 25, 0.05),
+      0 12px 30px rgba(15, 20, 25, 0.1),
+      0 8px 24px rgba(26, 139, 85, 0.08),
+      inset 0 1px 0 var(--glass-highlight);
+    transition:
+      transform 0.45s var(--glass-ease),
+      box-shadow 0.45s var(--glass-ease),
+      border-color 0.3s ease;
   }
 
   .cl-entry-card:hover {
     transform: translateY(-2px);
-    border-color: var(--green-border);
-    box-shadow: 0 8px 28px rgba(0,0,0,0.06);
+    border-color: rgba(26, 139, 85, 0.22);
+    box-shadow:
+      0 8px 20px rgba(26, 139, 85, 0.12),
+      0 0 0 1px rgba(26, 139, 85, 0.06),
+      0 16px 36px rgba(15, 20, 25, 0.1),
+      inset 0 1px 0 var(--glass-highlight);
+  }
+
+  /* Shared navbar glass sheen on the changelog surfaces. */
+  .cl-state-card::before,
+  .cl-sidebar-card::before,
+  .cl-entry-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 36%),
+      linear-gradient(120deg, rgba(255, 255, 255, 0.3), rgba(239, 247, 250, 0.16) 48%, rgba(255, 255, 255, 0.28));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.35);
+  }
+
+  /* Pointer-tracked specular sweep on entry cards (glassSheen action). */
+  .cl-entry-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    background: radial-gradient(
+      240px circle at var(--card-mx, 50%) var(--card-my, 0%),
+      rgba(255, 255, 255, 0.55),
+      rgba(255, 255, 255, 0) 72%
+    );
+    transition: opacity 0.35s ease;
+  }
+
+  .cl-entry-card:hover::after {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cl-entry-card {
+      transition: none;
+    }
+
+    .cl-entry-card::after {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .cl-state-card,
+    .cl-sidebar-card,
+    .cl-entry-card {
+      background: #fcfefd;
+      border-color: rgba(226, 232, 240, 0.9);
+    }
+
+    .cl-state-card::before,
+    .cl-sidebar-card::before,
+    .cl-entry-card::before,
+    .cl-entry-card::after {
+      display: none;
+    }
   }
 
   .cl-entry-header { margin-bottom: 10px; }
