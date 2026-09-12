@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cleanAttachmentName, extractFileMeta } from '../entrypoints/content/file-meta';
-import { getTypeLabels } from '../src/core/naming/type-labels';
+import { getTypeLabels } from '../src/core/name/type-labels';
 
 describe('content file meta', () => {
   it('cleans garbage labels and duplicated names', () => {

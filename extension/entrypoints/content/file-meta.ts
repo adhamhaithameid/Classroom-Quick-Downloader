@@ -1,60 +1,22 @@
 // filepath: extension/entrypoints/content/file-meta.ts
 /**
  * File metadata extraction from attachment containers.
+ *
+ * The naming logic lives in src/core/name/ (S7): strip/sanitize/verify/derive.
+ * This module is the DOM adapter — tooltip/text extraction — over the shared
+ * core, so the content script and any other consumer use the exact same
+ * sanitize pipeline.
  */
 
 import type { FileMeta } from './types';
-import { getTypeLabels } from '../../src/core/naming/type-labels';
+import {
+  sanitizeFileName,
+  fileNameExtension,
+  deriveFileNameFromUrl,
+} from '../../src/core/name/sanitize';
 
-/**
- * Strip a trailing type label from a filename (D10).
- *
- * Anchored and corroborated: a label is only removed when the remaining stem
- * still ends in a real file extension — either glued straight onto it
- * ("example.zipTömörített archívum", Classroom renders filename + localized
- * label with no separator) or after it across a space
- * ("report.pdf Microsoft Word"). A genuine file named "Design Document" has
- * no extension before the label and is left alone, in every locale.
- */
-function stripTrailingTypeLabel(name: string, lang?: string): string {
-  const labels = getTypeLabels(lang);
-  const lowerName = name.toLowerCase();
-
-  let best: { stem: string } | null = null;
-  for (const label of labels) {
-    const lowerLabel = label.toLowerCase();
-    if (!lowerName.endsWith(lowerLabel)) continue;
-    if (lowerName.length === lowerLabel.length) continue; // stem would be empty
-    const stem = name.slice(0, name.length - label.length).trim();
-    if (stem.length === 0) continue;
-    // Corroboration: the stem must end in a real extension.
-    if (!/\.[a-zA-Z0-9]{1,10}$/.test(stem)) continue;
-    if (!best || stem.length < best.stem.length) best = { stem };
-  }
-
-  return best ? best.stem : name;
-}
-
-/**
- * Clean attachment name by removing garbage labels and duplicated text.
- */
-export function cleanAttachmentName(rawName: string, lang?: string): string {
-  if (!rawName) return '';
-  let name = stripTrailingTypeLabel(rawName.trim(), lang);
-
-  // Detect duplicated text (e.g., "file.txtfile.txt")
-  if (name.length > 0 && name.length % 2 === 0) {
-    const mid = name.length / 2;
-    if (name.slice(0, mid) === name.slice(mid)) return name.slice(0, mid);
-  }
-
-  // Detect repeated extensions (e.g., ".pdf.pdf")
-  const repeatRegex = /\.([a-zA-Z0-9]{2,10})\1$/i;
-  const repeatMatch = name.match(repeatRegex);
-  if (repeatMatch) return name.slice(0, -repeatMatch[1].length).trim();
-
-  return name;
-}
+/** Back-compat alias — the canonical pipeline is core/name/sanitize. */
+export const cleanAttachmentName = sanitizeFileName;
 
 /**
  * Extract file metadata from container element.
@@ -82,20 +44,15 @@ export function extractFileMeta(container: HTMLElement, url: string, lang?: stri
 
   // Fall back to URL path
   if (!name) {
-    try {
-      const u = new URL(url);
-      const pathName = decodeURIComponent(u.pathname.split('/').pop() || '');
-      if (pathName && pathName.includes('.')) name = pathName;
-    } catch { /* ignore */ }
+    name = deriveFileNameFromUrl(url) ?? undefined;
   }
 
-  if (name) name = cleanAttachmentName(name, pageLang);
+  if (name) name = sanitizeFileName(name, pageLang);
 
   // Extract extension
   let ext: string | undefined;
   if (name) {
-    const m = name.match(/\.([a-zA-Z0-9]{2,10})$/);
-    if (m) ext = m[1].toLowerCase();
+    ext = fileNameExtension(name) ?? undefined;
   }
 
   return { name, ext, kind: 'other' };

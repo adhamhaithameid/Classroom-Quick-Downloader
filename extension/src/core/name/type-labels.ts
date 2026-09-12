@@ -1,7 +1,7 @@
-// filepath: extension/src/core/naming/type-labels.ts
+// filepath: extension/src/core/name/type-labels.ts
 /**
  * ============================================================================
- * TYPE LABELS — the locale-driven TypeLabelRegistry (D10)
+ * TYPE LABELS — the locale-driven TypeLabelRegistry (D10 / S7)
  * ============================================================================
  *
  * The attachment type label Classroom renders next to a filename ("PDF",
