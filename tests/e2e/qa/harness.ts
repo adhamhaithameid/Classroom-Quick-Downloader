@@ -87,18 +87,24 @@ export async function runCheck(
     page,
     consoleCapture,
   );
+  let skipSignal = false;
   try {
     await body(check);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (error instanceof ProductFailure) {
-      check.fail("PRODUCT", message);
-    } else if (error instanceof HarnessFailure) {
-      check.fail("HARNESS", message);
+    if ((error as Error).message?.startsWith("SKIPPED: ")) {
+      skipSignal = true;
     } else {
-      check.fail("HARNESS", `unexpected harness error: ${message}`);
+      const message = error instanceof Error ? error.message : String(error);
+      if (error instanceof ProductFailure) {
+        check.fail("PRODUCT", message);
+      } else if (error instanceof HarnessFailure) {
+        check.fail("HARNESS", message);
+      } else {
+        check.fail("HARNESS", `unexpected harness error: ${message}`);
+      }
     }
   }
+  if (skipSignal) check.status = "skipped";
   const result = await check.write();
   if (result.status === "failed") {
     expect(result.status, `[${result.checkId}] ${result.failureClass}: ${result.error ?? "see result.json"}`).toBe("passed");
@@ -180,6 +186,59 @@ export async function launchQaContext(
       await sim.close();
     },
   };
+}
+
+/**
+ * Base URL of the built extension (chrome-extension://<id> or
+ * moz-extension://<uuid>) — needed to open the popup page.
+ */
+export async function getExtensionBase(context: BrowserContext, browser: QaBrowser): Promise<string> {
+  if (browser === "chromium") {
+    let workers = context.serviceWorkers();
+    if (workers.length === 0) {
+      await context.waitForEvent("serviceworker", { timeout: 15_000 }).catch(() => undefined);
+      workers = context.serviceWorkers();
+    }
+    if (workers.length === 0) throw new Error("ENVIRONMENT: extension service worker not found");
+    const url = workers[0].url();
+    return url.substring(0, url.indexOf("/", "chrome-extension://".length));
+  }
+  // Firefox MV2: background page carries the moz-extension UUID.
+  let pages = context.backgroundPages();
+  if (pages.length === 0) {
+    await context.waitForEvent("backgroundpage", { timeout: 15_000 }).catch(() => undefined);
+    pages = context.backgroundPages();
+  }
+  if (pages.length === 0) throw new Error("ENVIRONMENT: extension background page not found");
+  const url = pages[0].url();
+  return url.substring(0, url.indexOf("/", "moz-extension://".length));
+}
+
+/** Run a function inside the extension's background context (SW or bg page). */
+export async function withExtensionBackground<T>(
+  context: BrowserContext,
+  browser: QaBrowser,
+  fn: (target: { evaluate: (fn: () => unknown) => Promise<unknown> }) => Promise<T>,
+): Promise<T> {
+  let target: { evaluate: (fn: () => unknown) => Promise<unknown> };
+  if (browser === "chromium") {
+    let workers = context.serviceWorkers();
+    if (workers.length === 0) {
+      await context.waitForEvent("serviceworker", { timeout: 15_000 }).catch(() => undefined);
+      workers = context.serviceWorkers();
+    }
+    if (!workers[0]) throw new Error("ENVIRONMENT: extension service worker not found");
+    target = workers[0];
+  } else {
+    let pages = context.backgroundPages();
+    if (pages.length === 0) {
+      await context.waitForEvent("backgroundpage", { timeout: 15_000 }).catch(() => undefined);
+      pages = context.backgroundPages();
+    }
+    if (!pages[0]) throw new Error("ENVIRONMENT: extension background page not found");
+    target = pages[0];
+  }
+  return fn(target);
 }
 
 // ---------------------------------------------------------------------------
@@ -288,6 +347,7 @@ export class QaCheck {
   skip(reason: string): void {
     this.status = "skipped";
     this.error = reason;
+    throw new Error(`SKIPPED: ${reason}`);
   }
 
   /** Apply the console policy: severe extension-origin problems fail the check. */

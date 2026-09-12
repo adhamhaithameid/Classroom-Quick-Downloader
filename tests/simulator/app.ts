@@ -27,7 +27,8 @@ export function buildAppDocument(scenario: Scenario): string {
   <title>${scenario.courseName ?? "Classroom"} - Classroom</title>
   <style>
     body { margin: 0; padding: 24px; font-family: Roboto, Arial, sans-serif; }
-    article, li.n4xnA { display: block; margin: 0 0 16px; padding: 12px; border: 1px solid #dadce0; border-radius: 8px; }
+    article, li.n4xnA { display: block; margin: 0 0 16px; padding: 12px; border: 1px solid #dadce0; border-radius: 8px; position: relative; }
+    .student-row { position: relative; }
     .attachments { margin: 8px 0; }
     .luto0c, .KlRXdf, .WkZsyc { display: inline-block; padding: 6px; border: 1px solid #e8eaed; border-radius: 6px; margin: 2px; }
     .cqd-sim-nav { margin-bottom: 12px; font-size: 12px; }
@@ -35,7 +36,7 @@ export function buildAppDocument(scenario: Scenario): string {
     #cqd-load-more-sentinel { height: 10px; }
   </style>
 </head>
-<body>
+<body class="${scenario.theme === "dark" ? "cqd-theme-dark" : ""}">
   <nav class="cqd-sim-nav">
     ${nav}
   </nav>

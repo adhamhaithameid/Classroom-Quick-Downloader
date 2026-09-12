@@ -106,14 +106,18 @@ function classworkPostHtml(post: PostSpec): string {
 function detailsHtml(route: Extract<RouteSpec, { kind: "details" }>): string {
   const d = route.details;
   const kindLabel = d.kind === "assignment" ? "Assignment" : "Material";
-  return `<section class="detailsview-${d.kind}" data-page="${d.kind}-details">
-    <div class="Iwp0Ue xWw7yd material-shell">
-      <header class="detail-header">
-        <div class="PazDv">${kindLabel}</div>
-        <h1 class="YVvGBb">${esc(d.title)}</h1>
-      </header>${attachmentsBlockHtml(d.attachments, "KlRXdf", (a) => `data-drive-id="${esc(a.id ?? a.name)}"`)}
-    </div>${bodyHtml({ id: d.id, body: undefined, looseLinks: d.looseLinks }).replace('asQXV QRiHXd', 'VYv8If QRiHXd aHTZpf')}${commentsChipHtml(d.comments)}${commentShellHtml(d.id, d.comments)}
-  </section>`;
+  // Real Classroom wraps detail views in a stream-item card — CQD's Download
+  // All grouping keys on that root, so the simulator must carry it too.
+  return `<article class="n4xnA JUr7jb" data-stream-item-id="${esc(d.id)}">
+    <section class="detailsview-${d.kind}" data-page="${d.kind}-details">
+      <div class="Iwp0Ue xWw7yd material-shell">
+        <header class="detail-header">
+          <div class="PazDv">${kindLabel}</div>
+          <h1 class="YVvGBb">${esc(d.title)}</h1>
+        </header>${attachmentsBlockHtml(d.attachments, "KlRXdf", (a) => `data-drive-id="${esc(a.id ?? a.name)}"`)}
+      </div>${bodyHtml({ id: d.id, body: undefined, looseLinks: d.looseLinks }).replace('asQXV QRiHXd', 'VYv8If QRiHXd aHTZpf')}${commentsChipHtml(d.comments)}${commentShellHtml(d.id, d.comments)}
+    </section>
+  </article>`;
 }
 
 function submissionsHtml(route: Extract<RouteSpec, { kind: "submissions" }>): string {
