@@ -5,7 +5,7 @@
 
 import { DRIVE_URL_PATTERNS, DRIVE_ANCHOR_SELECTOR } from './state';
 
-const DOWNLOADABLE_DOCS_PATH = /^\/(document|presentation|drawings)\/d\/[^/]+/;
+const DOWNLOADABLE_DOCS_PATH = /^\/(document|presentation|drawings|spreadsheets)\/d\/[^/]+/;
 
 function isSupportedDocsUrl(parsed: URL, normalizedPath: string): boolean {
   if (parsed.hostname !== 'docs.google.com') return false;
@@ -123,7 +123,7 @@ export function toDownloadUrl(originalUrl: string, depth = 0): string {
     // Google Docs/Sheets/Slides/Drawings viewer URLs
     // Pattern: docs.google.com/{type}/d/{fileId}/...
     if (parsed.hostname === 'docs.google.com') {
-      const docsMatch = normalizedPath.match(/^\/(document|presentation|drawings)\/d\/([^/]+)/);
+      const docsMatch = normalizedPath.match(/^\/(document|presentation|drawings|spreadsheets)\/d\/([^/]+)/);
       if (docsMatch) {
         return appendAuth(`https://drive.google.com/uc?export=download&id=${docsMatch[2]}`);
       }

@@ -45,7 +45,7 @@ export const DRIVE_URL_PATTERNS: RegExp[] = [
   /https:\/\/drive\.google\.com\/open\?/,
   /https:\/\/drive\.google\.com\/uc\?/,
   /https:\/\/classroom\.google\.com\/drive\//,
-  /https:\/\/docs\.google\.com\/(?:document|presentation|drawings)\/d\//,
+  /https:\/\/docs\.google\.com\/(?:document|presentation|drawings|spreadsheets)\/d\//,
   /\/file\/d\/[A-Za-z0-9_-]+/,
 ];
 

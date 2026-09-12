@@ -29,7 +29,9 @@ describe('content url utils', () => {
 
     const sheetsAnchor = document.createElement('a');
     sheetsAnchor.href = 'https://docs.google.com/spreadsheets/d/163qjQTcw2skYB8oWJ4FgfwdOvGP9jGUhUSdEYlccrts/edit?gid=0#gid=0';
-    expect(extractDriveUrlFromAnchor(sheetsAnchor)).toBeNull();
+    // #546: Sheets attachments are downloadable through their Drive file ID —
+    // excluding them left assignment detail pages without Download All.
+    expect(extractDriveUrlFromAnchor(sheetsAnchor)).toContain('docs.google.com');
 
     const formsAnchor = document.createElement('a');
     formsAnchor.href = 'https://docs.google.com/forms/d/e/1FAIpQLSdZBCCxLrM0oZiJF2QEFBR4RdhBj_byOSGFBD5rs74U8XaAWw/viewform?usp=dialog';
@@ -92,7 +94,7 @@ describe('content url utils', () => {
     expect(toDownloadUrl('not-a-url')).toBe('not-a-url');
     expect(toDownloadUrl('https://drive.google.com/open?id=abc', 4)).toBe('https://drive.google.com/open?id=abc');
     expect(toDownloadUrl('https://docs.google.com/spreadsheets/d/1BigjQBFGGYLQr3N1i6mlLX7SDFIx1FuwvVb-8NU62Fs/edit?usp=sharing'))
-      .toBe('https://docs.google.com/spreadsheets/d/1BigjQBFGGYLQr3N1i6mlLX7SDFIx1FuwvVb-8NU62Fs/edit?usp=sharing&authuser=1');
+      .toContain('uc?export=download&id=1BigjQBFGGYLQr3N1i6mlLX7SDFIx1FuwvVb-8NU62Fs');
     expect(toDownloadUrl('https://docs.google.com/forms/d/1M3u5g0b2T4p_XIW28TODxnfknP4CAzHqmwjVkl5GljI/viewform'))
       .toBe('https://docs.google.com/forms/d/1M3u5g0b2T4p_XIW28TODxnfknP4CAzHqmwjVkl5GljI/viewform?authuser=1');
   });

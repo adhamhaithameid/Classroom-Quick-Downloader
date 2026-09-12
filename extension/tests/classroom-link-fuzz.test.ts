@@ -30,14 +30,23 @@ describe('classroom link fuzz matrix', () => {
   it.each([
     'https://docs.google.com/forms/d/e/FORM123/viewform?usp=dialog',
     'https://docs.google.com/forms/d/FORM456/viewform',
-    'https://docs.google.com/spreadsheets/d/SHEET123/edit?usp=sharing',
-    'https://docs.google.com/spreadsheets/d/SHEET456/edit?gid=0#gid=0',
     'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
     'https://example.com/resource.pdf',
     'javascript:alert(1)',
     'data:text/html,<script>alert(1)</script>'
   ])('rejects unsupported or hostile links before button injection: %s', (href) => {
     expect(extractDriveUrlFromAnchor(makeAnchor(href))).toBeNull();
+  });
+
+  // #546: Sheets attachments are downloadable through their Drive file ID;
+  // they were previously pinned to the reject list above and left assignment
+  // detail pages without buttons or Download All.
+  it.each([
+    'https://docs.google.com/spreadsheets/d/SHEET123/edit?usp=sharing',
+    'https://docs.google.com/spreadsheets/d/SHEET456/edit?gid=0#gid=0'
+  ])('accepts Google Sheets attachment links (#546): %s', (href) => {
+    expect(extractDriveUrlFromAnchor(makeAnchor(href))).toContain('docs.google.com');
+    expect(validateDownloadUrl(toDownloadUrl(href)).valid).toBe(true);
   });
 
   it('normalizes viewer variants to direct download URLs', () => {
