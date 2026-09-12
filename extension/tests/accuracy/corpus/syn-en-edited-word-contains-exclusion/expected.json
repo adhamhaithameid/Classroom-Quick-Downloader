@@ -1,0 +1,15 @@
+{
+  "viewKind": "stream",
+  "lang": "en",
+  "note": "D14: V2 exclusion text rules used to substring-match, so the EDITED_EDITOR rule ('editor') fired inside the word 'editors' and isExcludedText dropped the whole EditedL3 chunk 'Edited by the editors' — losing real edited evidence whose date arrives via parent context (score 20+10+5 = edited_show 35). V1 exclusions are whole-token (D6 shared matcher) and keep the verdict; the V2 engine must not diverge. 'editorial' is deliberately absent from the body: it is itself a listed exclusion rule.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-editor-a",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": true
+    }
+  ],
+  "caseId": "syn-en-edited-word-contains-exclusion"
+}

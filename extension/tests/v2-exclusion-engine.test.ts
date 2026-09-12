@@ -92,6 +92,30 @@ describe('isExcludedText (fast path)', () => {
   it('does NOT exclude edited exclusions for comment type', () => {
     expect(isExcludedText('I edited', 'comment')).toBe(false);
   });
+
+  // D14 — text rules go through the shared D6 whole-token matcher, the same
+  // semantics as V1 exclusions. A word that merely CONTAINS a rule token is
+  // not an exclusion.
+  it('does NOT exclude "editors" — whole token, not substring (D14)', () => {
+    expect(isExcludedText('Edited Mar 10 — approved by the editors', 'edited')).toBe(false);
+  });
+
+  it('does NOT exclude "to editors" for the "to edit" phrase rule (D14)', () => {
+    expect(isExcludedText('the file was handed to editors for review', 'edited')).toBe(false);
+  });
+
+  it('does NOT exclude "reediting" for the editing rule (D14)', () => {
+    expect(isExcludedText('reediting', 'edited')).toBe(false);
+  });
+
+  it('still excludes the exact tokens "editing" and "editor" (D14)', () => {
+    expect(isExcludedText('editing', 'edited')).toBe(true);
+    expect(isExcludedText('editor', 'edited')).toBe(true);
+  });
+
+  it('still excludes the phrase "I edited" as a whole-token run (D14)', () => {
+    expect(isExcludedText('I edited my homework', 'edited')).toBe(true);
+  });
 });
 
 // ============================================================================
