@@ -311,6 +311,27 @@ describe('parseUnicodeDate()', () => {
     }
   });
 
+  it('should parse full English month names', () => {
+    const result = parseUnicodeDate('January 20, 2026');
+    expect(result).not.toBeNull();
+    if (result) {
+      expect(result.date.getUTCMonth()).toBe(0);
+      expect(result.date.getUTCDate()).toBe(20);
+      expect(result.date.getUTCFullYear()).toBe(2026);
+    }
+    const march = parseUnicodeDate('March 5, 2026');
+    expect(march).not.toBeNull();
+    if (march) expect(march.date.getUTCMonth()).toBe(2);
+  });
+
+  it('must not read a month key inside a larger word (D15)', () => {
+    // 'mar' inside 'market' used to parse as March 12, 2026.
+    expect(parseUnicodeDate('12 market 2026')).toBeNull();
+    // 'may' inside 'mayor', 'jun' inside 'junk'.
+    expect(parseUnicodeDate('3 mayor 2026')).toBeNull();
+    expect(parseUnicodeDate('7 junk 2026')).toBeNull();
+  });
+
   it('should return null for invalid dates', () => {
     expect(parseUnicodeDate('not a date')).toBeNull();
     expect(parseUnicodeDate('')).toBeNull();

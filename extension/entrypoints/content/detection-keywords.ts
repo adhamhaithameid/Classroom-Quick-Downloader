@@ -185,6 +185,10 @@ export const extractNumber = parseUnicodeInteger;
 const MONTH_MAP: Record<string, number> = {
   // English
   jan:0, feb:1, mar:2, apr:3, may:4, jun:5, jul:6, aug:7, sep:8, oct:9, nov:10, dec:11,
+  // English full names — month keys match whole tokens (D15), so the long
+  // forms must be their own keys instead of riding on the abbreviation.
+  january:0, february:1, march:2, april:3, june:5, july:6, august:7,
+  september:8, october:9, november:10, december:11,
   // French (unique keys only)
   janv:0, févr:1, mars:2, avr:3, mai:4, juin:5, juil:6, août:7, sept:8, déc:11,
   // Spanish
@@ -235,7 +239,10 @@ export function parseUnicodeDate(dateString: string): { date: Date; raw: string;
   else if (numbers.length === 2 && words.length >= 1) {
     for (const w of words) {
       for (const [key, val] of Object.entries(MONTH_MAP)) {
-        if (w.includes(key)) {
+        // D15: whole-token month matching via the shared D6 matcher —
+        // 'mar' must not fire inside 'market'. Unspaced-script keys
+        // (Arabic) keep containment there, matching D6 semantics.
+        if (matchesNormalizedKeyword(w, key)) {
           month = val;
           break;
         }
