@@ -12,6 +12,7 @@
   import SiteFooter from '$lib/components/SiteFooter.svelte';
   import BrowserIcon from '$lib/components/BrowserIcon.svelte';
   import BrowserIconSprite from '$lib/components/BrowserIconSprite.svelte';
+  import AmbientBackground from '$lib/components/AmbientBackground.svelte';
   import '../app.css';
 
   type MenuIconKey =
@@ -675,14 +676,7 @@
 <BrowserIconSprite />
 
 <div class="site-shell" class:o2-fullscreen={hideChrome}>
-  <div class="bg-aurora" aria-hidden="true">
-    <span class="aurora-orb ao-1"></span>
-    <span class="aurora-orb ao-2"></span>
-    <span class="aurora-orb ao-3"></span>
-    <span class="aurora-orb ao-4"></span>
-    <span class="aurora-orb ao-5"></span>
-    <span class="aurora-orb ao-6"></span>
-  </div>
+  <AmbientBackground />
   {#if !hideChrome}
   <header class="l2-nav-shell" class:is-scrolled={scrolled} class:menu-open={openMenu !== null} class:nav-dark={navDark}>
     <div class="l2-nav-float">
@@ -1075,7 +1069,7 @@
     display: flex;
     flex-direction: column;
     /* body carries the opaque --bg canvas; this shell must stay transparent
-       or it would cover the fixed .bg-aurora layer painted behind it. */
+       or it would cover the fixed ambient layer painted behind it. */
     background: transparent;
     color: var(--text);
   }

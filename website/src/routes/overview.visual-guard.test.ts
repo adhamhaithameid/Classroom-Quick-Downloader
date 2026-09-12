@@ -49,9 +49,26 @@ describe('overview visual guardrails', () => {
     const { body } = render(OverviewPage);
     const html = squish(body);
 
-    expect(html).toContain('l2-page-orbs');
-    expect(html).toContain('l2-page-grid');
+    // The placement floats are page content; the orbs + grid are the shared
+    // ambient background and must come from the layout-mounted component,
+    // never re-implemented per page.
     expect(html).toContain('l2-page-floats');
+    expect(html).not.toContain('class="l2-page-orbs"');
+    expect(html).not.toContain('class="l2-page-grid"');
+  });
+
+  it('sources the shared ambient background (orbs + grid) from the layout-mounted component', () => {
+    const ambient = readFileSync(
+      new URL('../lib/components/AmbientBackground.svelte', import.meta.url),
+      'utf8'
+    );
+    expect(ambient).toContain('class="l2-page-orbs"');
+    expect(ambient).toContain('class="l2-page-grid"');
+    expect(ambient).toContain('@keyframes aurora-drift');
+    expect(ambient).toContain('prefers-reduced-motion');
+
+    const layout = readFileSync(new URL('./+layout.svelte', import.meta.url), 'utf8');
+    expect(layout).toContain('AmbientBackground');
   });
 
   it('keeps a minimum default placement mix and pinned supercharge star', () => {
@@ -113,8 +130,12 @@ describe('overview visual guardrails', () => {
       "--font-ui: 'Plus Jakarta Sans', 'Plus Jakarta Sans Fallback', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui;"
     );
 
-    expect(css).toContain('body::before');
-    expect(css).toContain('body::after');
-    expect(css).toContain('@keyframes floatOrb');
+    // Ambient background lives in the layout-mounted AmbientBackground
+    // component; app.css carries the shared glass design system instead.
+    expect(css).toContain('./lib/styles/glass.css');
+    expect(css).toContain('--glass-bg');
+    expect(css).toContain('--glass-ease');
+    expect(css).not.toContain('body::before');
+    expect(css).not.toContain('body::after');
   });
 });

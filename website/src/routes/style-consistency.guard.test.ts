@@ -1,16 +1,17 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-/* Style-consistency guard: every visitor-facing card/panel surface must use
-   the shared glass language (tokens from app.css) instead of one-off flat
-   backgrounds, legacy easings, or off-palette accents. Mirrors the source-
-   level approach of overview.visual-guard.test.ts. */
+/* Style-consistency guard: every visitor-facing card/panel surface consumes
+   the shared glass design system (.glass-panel / .glass-hover / .glass-icon
+   from lib/styles/glass.css) instead of re-declaring surfaces, sheens,
+   sweeps, hovers, or guards per component. Also pins the single shared
+   ambient background: one layout-mounted component, no per-page copies. */
 
 function read(path: string): string {
   return readFileSync(new URL(path, import.meta.url), 'utf8');
 }
 
-const GLASS_UNIFIED_PAGES: Array<{ file: string; label: string }> = [
+const GLASS_CONSUMERS: Array<{ file: string; label: string }> = [
   { file: './privacy/+page.svelte', label: 'privacy page cards' },
   { file: './faq/+page.svelte', label: 'faq page cards' },
   { file: './404/+page.svelte', label: '404 link cards' },
@@ -23,41 +24,60 @@ const GLASS_UNIFIED_PAGES: Array<{ file: string; label: string }> = [
   { file: './overview/+page.svelte', label: 'overview cards' }
 ];
 
-describe('style consistency: shared glass language', () => {
-  it.each(GLASS_UNIFIED_PAGES)('uses glass tokens in $label', ({ file }) => {
-    const source = read(file);
-    expect(source).toContain('var(--glass-bg)');
-    expect(source).toContain('var(--glass-ease)');
+const AMBIENT_COPIES_GONE: Array<{ file: string; marker: string; label: string }> = [
+  { file: './overview/+page.svelte', marker: 'class="l2-page-orbs"', label: 'overview' },
+  { file: './overview/+page.svelte', marker: 'class="l2-page-grid"', label: 'overview' },
+  {
+    file: './overview-editor/+page.svelte',
+    marker: 'class="l2-page-orbs"',
+    label: 'overview editor'
+  },
+  { file: './uninstall/+page.svelte', marker: 'class="un-orbs"', label: 'uninstall' },
+  { file: './uninstall/+page.svelte', marker: 'class="un-grid-bg"', label: 'uninstall' },
+  { file: './404/+page.svelte', marker: 'class="nf-orbs"', label: '404' },
+  { file: './404/+page.svelte', marker: 'class="nf-grid-bg"', label: '404' },
+  { file: './+error.svelte', marker: 'class="err-orbs"', label: 'error page' }
+];
+
+describe('style consistency: shared glass design system', () => {
+  it('defines the shared glass utilities once in lib/styles/glass.css', () => {
+    const css = read('../lib/styles/glass.css');
+
+    expect(css).toContain('.glass-panel');
+    expect(css).toContain('.glass-hover');
+    expect(css).toContain('.glass-icon');
+    // Surface + sheen + sweep + guards all live in the shared file.
+    expect(css).toContain('var(--glass-bg)');
+    expect(css).toContain('linear-gradient(180deg, rgba(255, 255, 255, 0.8)');
+    expect(css).toContain('--card-mx');
+    expect(css).toContain('prefers-reduced-motion');
+    expect(css).toContain('prefers-reduced-transparency');
+    expect(css).toContain('@keyframes card-glass-in');
   });
 
-  it.each(GLASS_UNIFIED_PAGES)('drops legacy ease curve from $label', ({ file }) => {
-    const source = read(file);
-    expect(source).not.toContain('cubic-bezier(0.4, 0, 0.2, 1)');
-    expect(source).not.toContain('cubic-bezier(0.4,0,0.2,1)');
-  });
-
-  it.each([
-    { file: './privacy/+page.svelte', label: 'privacy page' },
-    { file: './404/+page.svelte', label: '404 page' },
-    { file: './uninstall/+page.svelte', label: 'uninstall page' },
-    { file: './watch/cqd-demo/+page.svelte', label: 'watch demo page' },
-    { file: './watch/manual-vs-cqd/+page.svelte', label: 'watch manual page' },
-    { file: './site-map/+page.svelte', label: 'site map page' }
-  ])('keeps reduced-transparency and reduced-motion guards on $label', ({ file }) => {
-    const source = read(file);
-    expect(source).toContain('prefers-reduced-transparency');
-    expect(source).toContain('prefers-reduced-motion');
-  });
-
-  it('keeps the shared glass tokens defined in app.css', () => {
+  it('imports the shared glass stylesheet from app.css and keeps the tokens there', () => {
     const css = read('../app.css');
-    expect(css).toContain('--glass-ease');
+    expect(css).toContain('./lib/styles/glass.css');
     expect(css).toContain('--glass-bg');
+    expect(css).toContain('--glass-ease');
     expect(css).toContain('--glass-border');
     expect(css).toContain('--glass-highlight');
   });
 
-  it('keeps watch pages on the brand green, not the off-palette emerald', () => {
+  it.each(GLASS_CONSUMERS)('$label consume the shared glass classes', ({ file }) => {
+    const source = read(file);
+    expect(source).toContain('glass-panel');
+  });
+
+  it.each(GLASS_CONSUMERS)('$label drop legacy ease curve and per-page guard duplicates', ({ file }) => {
+    const source = read(file);
+    expect(source).not.toContain('cubic-bezier(0.4, 0, 0.2, 1)');
+    expect(source).not.toContain('cubic-bezier(0.4,0,0.2,1)');
+    // Guards are global now — pages must not re-declare them per surface.
+    expect(source).not.toContain('prefers-reduced-transparency');
+  });
+
+  it('keeps the watch pages on the brand green, not the off-palette emerald', () => {
     for (const file of ['./watch/cqd-demo/+page.svelte', './watch/manual-vs-cqd/+page.svelte']) {
       const source = read(file);
       expect(source).not.toContain('#047857');
@@ -72,5 +92,30 @@ describe('style consistency: shared glass language', () => {
     const siteMap = read('./site-map/+page.svelte');
     expect(siteMap).not.toMatch(/background:\s*#ffffff/);
     expect(siteMap).not.toContain('border: 1px solid #e2e8f0');
+  });
+});
+
+describe('style consistency: one shared ambient background', () => {
+  it('renders the orbs + grid from the layout-mounted AmbientBackground component', () => {
+    const ambient = read('../lib/components/AmbientBackground.svelte');
+    expect(ambient).toContain('class="l2-page-orbs"');
+    expect(ambient).toContain('class="l2-page-grid"');
+    expect(ambient).toContain('background-image');
+    expect(ambient).toContain('linear-gradient');
+    expect(ambient).toContain('prefers-reduced-motion');
+
+    const layout = read('./+layout.svelte');
+    expect(layout).toContain('AmbientBackground');
+  });
+
+  it.each(AMBIENT_COPIES_GONE)('$label no longer re-implements the background', ({ file, marker }) => {
+    const source = read(file);
+    expect(source).not.toContain(marker);
+  });
+
+  it('keeps the app-level body pseudo-orbs removed in favor of the component', () => {
+    const css = read('../app.css');
+    expect(css).not.toContain('body::before');
+    expect(css).not.toContain('body::after');
   });
 });

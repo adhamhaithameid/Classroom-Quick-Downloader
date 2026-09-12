@@ -131,14 +131,6 @@
 />
 
 <div class="un">
-  <!-- Decorative background -->
-  <div class="un-orbs" aria-hidden="true">
-    <div class="orb orb-1"></div>
-    <div class="orb orb-2"></div>
-    <div class="orb orb-3"></div>
-  </div>
-  <div class="un-grid-bg" aria-hidden="true"></div>
-
   <!-- Hero -->
   <section class="un-hero un-appear" style="animation-delay: 0s">
     <div class="un-wrap">
@@ -344,26 +336,6 @@
   /* ── Entrance animation ──────────── */
   .un-appear {
     animation: un-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
-  }
-
-  /* ── Decorative ────────────────── */
-  .un-orbs {
-    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none; z-index: 0;
-  }
-
-  .orb { position: absolute; border-radius: 50%; filter: blur(130px); }
-  .orb-1 { width: 520px; height: 520px; background: #bbf7d0; top: -6%; right: -8%; opacity: 0.22; }
-  .orb-2 { width: 420px; height: 420px; background: #e0e7ff; top: 35%; left: -10%; opacity: 0.18; }
-  .orb-3 { width: 380px; height: 380px; background: #a5f3fc; top: 75%; right: -4%; opacity: 0.14; }
-
-  .un-grid-bg {
-    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none; z-index: 0; opacity: 0.025;
-    background-image:
-      linear-gradient(var(--text) 1px, transparent 1px),
-      linear-gradient(90deg, var(--text) 1px, transparent 1px);
-    background-size: 60px 60px;
   }
 
   /* ── Hero ───────────────────────── */

@@ -1,3 +1,5 @@
+@import './lib/styles/glass.css';
+
 /* Visual identity guard: keep Plus Jakarta Sans as the primary UI font.
    The webfont stylesheet is linked from src/app.html (preconnect to
    fonts.googleapis.com + fonts.gstatic.com, display=swap) so it is discovered
@@ -88,86 +90,6 @@ html {
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
-  }
-}
-
-body::before,
-body::after {
-  content: '';
-  position: fixed;
-  z-index: -1;
-  border-radius: 50%;
-  filter: blur(100px);
-  pointer-events: none;
-  animation: floatOrb 20s ease-in-out infinite, aurora-hue 40s linear infinite;
-}
-
-body::before {
-  width: 500px;
-  height: 500px;
-  background: rgba(26, 139, 85, 0.07);
-  left: -150px;
-  top: -100px;
-}
-
-body::after {
-  width: 400px;
-  height: 400px;
-  background: rgba(87, 187, 138, 0.06);
-  right: -120px;
-  bottom: 10vh;
-  animation-delay: -8s;
-}
-
-/* ── Global aurora background ────────────────────────────────────────
-   Rendered once in +layout.svelte so every route shares one living
-   background: blurred gradient orbs drift while the whole field slowly
-   hue-cycles. Page-scoped orb fields (.l2-page-orbs on overview and
-   overview-editor) join the same hue cycle via the global rule below. */
-.bg-aurora {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  overflow: hidden;
-  pointer-events: none;
-  animation: aurora-hue 40s linear infinite;
-}
-
-.aurora-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(90px);
-  animation: aurora-drift 26s ease-in-out infinite alternate;
-}
-
-.ao-1 { width: 620px; height: 620px; left: -8%; top: -12%; background: radial-gradient(circle at 32% 32%, #bbf7d0 0%, rgba(26, 139, 85, 0.55) 100%); opacity: 0.34; }
-.ao-2 { width: 520px; height: 520px; right: -6%; top: -6%; background: radial-gradient(circle at 60% 40%, #a5f3fc 0%, rgba(66, 133, 244, 0.5) 100%); opacity: 0.28; animation-duration: 32s; animation-direction: alternate-reverse; }
-.ao-3 { width: 460px; height: 460px; left: 38%; top: 16%; background: radial-gradient(circle at 50% 50%, #e0e7ff 0%, rgba(251, 188, 4, 0.35) 100%); opacity: 0.24; animation-duration: 22s; }
-.ao-4 { width: 560px; height: 560px; left: -6%; bottom: -12%; background: radial-gradient(circle at 40% 62%, #bbf7d0 0%, rgba(19, 122, 71, 0.5) 100%); opacity: 0.3; animation-duration: 30s; animation-direction: alternate-reverse; }
-.ao-5 { width: 480px; height: 480px; right: -4%; bottom: -8%; background: radial-gradient(circle at 55% 45%, #a5f3fc 0%, rgba(16, 185, 129, 0.45) 100%); opacity: 0.26; animation-duration: 24s; }
-.ao-6 { width: 400px; height: 400px; left: 56%; bottom: 22%; background: radial-gradient(circle at 50% 50%, #e0e7ff 0%, rgba(87, 187, 138, 0.4) 100%); opacity: 0.2; animation-duration: 28s; }
-
-.l2-page-orbs {
-  animation: aurora-hue 45s linear infinite;
-}
-
-@keyframes aurora-drift {
-  0% { transform: translate(0, 0) scale(1); }
-  100% { transform: translate(64px, -52px) scale(1.08); }
-}
-
-@keyframes aurora-hue {
-  0% { filter: hue-rotate(0deg); }
-  100% { filter: hue-rotate(360deg); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .bg-aurora,
-  .bg-aurora .aurora-orb,
-  .l2-page-orbs,
-  body::before,
-  body::after {
-    animation: none !important;
   }
 }
 
@@ -326,15 +248,6 @@ select {
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-
-@keyframes floatOrb {
-  0%, 100% {
-    transform: translateY(0) scale(1);
-  }
-  50% {
-    transform: translateY(-20px) scale(1.04);
   }
 }
 

@@ -12,14 +12,6 @@
 />
 
 <div class="nf">
-  <!-- Decorative orbs -->
-  <div class="nf-orbs" aria-hidden="true">
-    <div class="orb orb-1"></div>
-    <div class="orb orb-2"></div>
-    <div class="orb orb-3"></div>
-  </div>
-  <div class="nf-grid-bg" aria-hidden="true"></div>
-
   <section class="nf-hero">
     <div class="nf-wrap">
       <div class="nf-glitch-code" aria-hidden="true">404</div>
@@ -92,23 +84,6 @@
   }
 
   .nf-wrap { max-width: 680px; margin: 0 auto; padding: 0 24px; width: 100%; }
-
-  /* ── Decorative ────────────────── */
-  .nf-orbs {
-    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none; z-index: 0;
-  }
-  .orb { position: absolute; border-radius: 50%; filter: blur(120px); }
-  .orb-1 { width: 480px; height: 480px; background: #bbf7d0; top: -10%; right: -8%; opacity: 0.25; }
-  .orb-2 { width: 400px; height: 400px; background: #fca5a5; top: 30%; left: -10%; opacity: 0.15; }
-  .orb-3 { width: 360px; height: 360px; background: #e0e7ff; top: 60%; right: 10%; opacity: 0.18; }
-
-  .nf-grid-bg {
-    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none; z-index: 0; opacity: 0.03;
-    background-image: linear-gradient(var(--text) 1px, transparent 1px), linear-gradient(90deg, var(--text) 1px, transparent 1px);
-    background-size: 60px 60px;
-  }
 
   /* ── Hero ───────────────────────── */
   .nf-hero {
