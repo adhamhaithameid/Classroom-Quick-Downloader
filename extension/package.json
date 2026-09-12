@@ -36,7 +36,11 @@
     "safari:local": "node -e \"console.error('Safari support is temporarily disabled.'); process.exit(1)\"",
     "build:compare": "wxt build --mode compare",
     "build:all": "wxt build -b chrome && wxt build -b firefox && wxt build -b edge",
-    "zip:all": "wxt zip -b chrome && wxt zip -b firefox && wxt zip -b edge"
+    "zip:all": "wxt zip -b chrome && wxt zip -b firefox && wxt zip -b edge",
+    "test:qa": "playwright test --project=qa-chromium",
+    "test:qa:firefox": "playwright test --project=qa-firefox",
+    "test:qa:live": "QA_LIVE_CLASSROOM=1 playwright test --project=qa-chromium tests/e2e/qa/qa-07-live-canary.spec.ts",
+    "test:qa:report": "node tests/e2e/qa/report-generator.mjs"
   },
   "dependencies": {
     "react": "^19.2.8",

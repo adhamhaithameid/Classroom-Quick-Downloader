@@ -29,6 +29,11 @@ import { buildAppDocument } from "./app";
 const CERTS_DIR = path.resolve(__dirname, "certs");
 const SIMULATED_HOSTS = new Set(["classroom.google.com", "drive.google.com", "docs.google.com"]);
 
+export interface ServedDownload {
+  url: string;
+  filename: string;
+}
+
 export interface SimulatorProxy {
   url: string;
   close: () => Promise<void>;
@@ -95,7 +100,18 @@ function serveMitmSocket(clientSocket: net.Socket, firstChunk: Buffer, resolve: 
 export async function startSimulatorProxy(scenario: Scenario): Promise<SimulatorProxy> {
   const appDocument = buildAppDocument(scenario);
   const files = collectDriveFiles(scenario);
-  const resolve = (url: string) => resolveSimulatedResponse(url, { appDocument, files });
+  const servedDownloads: ServedDownload[] = [];
+  const resolve = (url: string) => {
+    const response = resolveSimulatedResponse(url, { appDocument, files });
+    if (url.includes("uc?export=download")) {
+      const disposition = response.headers?.["content-disposition"] ?? "";
+      servedDownloads.push({
+        url,
+        filename: disposition.match(/filename="([^"]+)"/)?.[1] ?? "",
+      });
+    }
+    return response;
+  };
 
   const server = http.createServer((req, res) => {
     // Plain HTTP: nothing simulated lives here — die politely.
@@ -129,6 +145,7 @@ export async function startSimulatorProxy(scenario: Scenario): Promise<Simulator
 
   return {
     url: `http://127.0.0.1:${address.port}`,
+    servedDownloads,
     close: async () => {
       // Chromium holds proxy sockets in its pool; force-close them, then stop
       // listening. Bounded so a wedged socket cannot hang the test run.
