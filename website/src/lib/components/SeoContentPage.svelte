@@ -219,11 +219,34 @@
   }
 
   .seo-hero {
+    position: relative;
+    overflow: hidden;
     padding: 2.2rem;
-    border: 1px solid #dbe5ef;
+    border: 1px solid var(--glass-border);
     border-radius: 1rem;
-    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-    box-shadow: 0 15px 40px rgba(15, 23, 42, 0.06);
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+    box-shadow:
+      0 1px 2px rgba(15, 20, 25, 0.05),
+      0 12px 30px rgba(15, 20, 25, 0.1),
+      0 8px 24px rgba(26, 139, 85, 0.08),
+      inset 0 1px 0 var(--glass-highlight);
+  }
+
+  /* Static top gloss shared by the glass surfaces. */
+  .seo-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 36%),
+      linear-gradient(120deg, rgba(255, 255, 255, 0.3), rgba(239, 247, 250, 0.16) 48%, rgba(255, 255, 255, 0.28));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.35);
   }
 
   .seo-eyebrow {
@@ -282,8 +305,8 @@
   }
 
   .seo-btn-secondary {
-    background: #ffffff;
-    border: 1px solid #cbd5e1;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
     color: #0f172a;
   }
 
@@ -449,11 +472,35 @@
   }
 
   .seo-faq {
+    position: relative;
+    overflow: hidden;
     margin-top: 1.1rem;
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--glass-border);
     border-radius: 0.9rem;
-    background: #ffffff;
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
     padding: 1.25rem 1.2rem;
+    box-shadow:
+      0 1px 2px rgba(15, 20, 25, 0.05),
+      0 12px 30px rgba(15, 20, 25, 0.1),
+      0 8px 24px rgba(26, 139, 85, 0.08),
+      inset 0 1px 0 var(--glass-highlight);
+  }
+
+  /* Static top gloss shared by the glass surfaces. */
+  .seo-faq::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 36%),
+      linear-gradient(120deg, rgba(255, 255, 255, 0.3), rgba(239, 247, 250, 0.16) 48%, rgba(255, 255, 255, 0.28));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.35);
   }
 
   .seo-faq h2 {
@@ -473,6 +520,21 @@
     margin: 0.2rem 0 0;
     color: #334155;
     line-height: 1.7;
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .seo-hero,
+    .seo-faq {
+      background: #fcfefd;
+      border-color: rgba(226, 232, 240, 0.9);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+
+    .seo-hero::before,
+    .seo-faq::before {
+      display: none;
+    }
   }
 
   .seo-related h2 {

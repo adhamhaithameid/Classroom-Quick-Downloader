@@ -154,17 +154,17 @@
   }
 
   .watch-page li::marker {
-    color: #047857;
+    color: var(--gc-green);
     font-weight: 700;
   }
 
   .watch-frame {
     margin-top: 1rem;
-    border: 1px solid #dbe5ef;
+    border: 1px solid var(--glass-border);
     border-radius: 1rem;
     overflow: hidden;
     background: #000;
-    box-shadow: 0 14px 36px rgba(15, 23, 42, 0.1);
+    box-shadow: 0 14px 36px rgba(15, 23, 42, 0.12), inset 0 1px 0 var(--glass-highlight);
   }
 
   .watch-frame video {
@@ -183,19 +183,60 @@
   }
 
   .watch-links a {
-    border: 1px solid #d1d5db;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--glass-border);
     border-radius: 999px;
     padding: 0.45rem 0.75rem;
     text-decoration: none;
     color: #0f172a;
     font-weight: 600;
     font-size: 0.9rem;
-    background: #fff;
+    background: var(--glass-bg);
+    box-shadow: 0 1px 2px rgba(15, 20, 25, 0.05), inset 0 1px 0 var(--glass-highlight);
+    transition: transform 0.45s var(--glass-ease), border-color 0.3s ease, color 0.2s ease, background-color 0.3s ease;
+  }
+
+  /* Static top gloss shared by the glass surfaces. */
+  .watch-links a::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 36%),
+      linear-gradient(120deg, rgba(255, 255, 255, 0.3), rgba(239, 247, 250, 0.16) 48%, rgba(255, 255, 255, 0.28));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.35);
   }
 
   .watch-links a:hover {
-    border-color: rgba(4, 120, 87, 0.35);
-    color: #047857;
-    background: rgba(4, 120, 87, 0.05);
+    border-color: rgba(26, 139, 85, 0.35);
+    color: var(--gc-green);
+    background: linear-gradient(120deg, rgba(255, 255, 255, 0.78), rgba(248, 252, 249, 0.62));
+    transform: translateY(-1px);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .watch-links a {
+      transition: none;
+    }
+
+    .watch-links a::before {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .watch-links a {
+      background: #fcfefd;
+      border-color: rgba(226, 232, 240, 0.9);
+    }
+
+    .watch-links a::before {
+      display: none;
+    }
   }
 </style>

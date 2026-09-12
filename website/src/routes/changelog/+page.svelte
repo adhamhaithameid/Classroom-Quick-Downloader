@@ -436,21 +436,50 @@
 
   .cl-action-pill {
     display: inline-flex; align-items: center; gap: 6px;
-    border: 1px solid var(--border-subtle);
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--glass-border);
     border-radius: 999px; padding: 9px 18px;
     text-decoration: none;
-    background: rgba(255,255,255,0.6);
-    backdrop-filter: blur(6px);
+    background: var(--glass-bg);
     color: var(--text-secondary);
     font-weight: 600; font-size: 13px;
-    cursor: pointer; transition: all 0.25s ease;
-    box-shadow: 0 1px 3px rgba(15,20,25,0.04);
+    cursor: pointer;
+    transition:
+      transform 0.45s var(--glass-ease),
+      box-shadow 0.45s var(--glass-ease),
+      border-color 0.3s ease;
+    box-shadow:
+      0 1px 2px rgba(15, 20, 25, 0.05),
+      0 12px 30px rgba(15, 20, 25, 0.1),
+      0 8px 24px rgba(26, 139, 85, 0.08),
+      inset 0 1px 0 var(--glass-highlight);
   }
   .cl-action-pill:hover {
     border-color: rgba(26,139,85,0.25);
     color: var(--green);
+    box-shadow:
+      0 8px 20px rgba(26, 139, 85, 0.12),
+      0 0 0 1px rgba(26, 139, 85, 0.06),
+      0 20px 44px rgba(15, 20, 25, 0.12),
+      inset 0 1px 0 var(--glass-highlight);
   }
   .cl-action-pill:disabled { opacity: 0.6; cursor: wait; }
+
+  /* Static top gloss shared by the glass surfaces. */
+  .cl-action-pill::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 36%),
+      linear-gradient(120deg, rgba(255, 255, 255, 0.3), rgba(239, 247, 250, 0.16) 48%, rgba(255, 255, 255, 0.28));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.35);
+  }
 
   /* ── Body ──────────────────────── */
   .cl-body-section {
@@ -566,7 +595,7 @@
     background: var(--green-bg);
     flex-shrink: 0;
     box-shadow: 0 0 0 4px rgba(26,139,85,0.06);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.3s var(--glass-ease);
   }
 
   .cl-dot.active {
@@ -659,7 +688,8 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .cl-entry-card {
+    .cl-entry-card,
+    .cl-action-pill {
       transition: none;
     }
 
@@ -671,7 +701,8 @@
   @media (prefers-reduced-transparency: reduce) {
     .cl-state-card,
     .cl-sidebar-card,
-    .cl-entry-card {
+    .cl-entry-card,
+    .cl-action-pill {
       background: #fcfefd;
       border-color: rgba(226, 232, 240, 0.9);
     }
@@ -679,6 +710,7 @@
     .cl-state-card::before,
     .cl-sidebar-card::before,
     .cl-entry-card::before,
+    .cl-action-pill::before,
     .cl-entry-card::after {
       display: none;
     }
@@ -774,8 +806,8 @@
       white-space: nowrap;
       flex-shrink: 0;
       min-width: 114px;
-      border: 1px solid var(--border-subtle);
-      background: rgba(255, 255, 255, 0.76);
+      border: 1px solid var(--glass-border);
+      background: var(--glass-bg);
       border-radius: 12px;
       padding: 10px 12px;
     }

@@ -424,11 +424,38 @@
 
   /* ── Card ──────────────────────── */
   .un-card {
-    background: var(--surface);
-    border: 1px solid var(--border-subtle);
+    position: relative;
+    overflow: hidden;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
     border-radius: var(--radius);
     padding: 36px 32px;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+    box-shadow:
+      0 1px 2px rgba(15, 20, 25, 0.05),
+      0 12px 30px rgba(15, 20, 25, 0.1),
+      0 8px 24px rgba(26, 139, 85, 0.08),
+      inset 0 1px 0 var(--glass-highlight);
+    transition:
+      transform 0.45s var(--glass-ease),
+      box-shadow 0.45s var(--glass-ease),
+      border-color 0.3s ease;
+  }
+
+  /* Static top gloss shared by the glass surfaces. */
+  .un-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 36%),
+      linear-gradient(120deg, rgba(255, 255, 255, 0.3), rgba(239, 247, 250, 0.16) 48%, rgba(255, 255, 255, 0.28));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.35);
   }
 
   .un-card-title-row {
@@ -478,17 +505,20 @@
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    border: 1.5px solid var(--border-subtle);
+    border: 1px solid var(--glass-border);
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.8);
+    background: var(--glass-bg);
     padding: 11px 20px;
     color: var(--text-secondary);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition:
+      transform 0.45s var(--glass-ease),
+      box-shadow 0.45s var(--glass-ease),
+      border-color 0.3s ease;
     font-size: 14px;
     font-weight: 600;
     font-family: var(--font-ui), sans-serif;
-    box-shadow: 0 1px 4px rgba(15, 20, 25, 0.03);
+    box-shadow: 0 1px 2px rgba(15, 20, 25, 0.05), inset 0 1px 0 var(--glass-highlight);
   }
 
   .un-pill-icon {
@@ -545,16 +575,20 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    border: 1.5px solid var(--border-subtle);
+    border: 1px solid var(--glass-border);
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.8);
+    background: var(--glass-bg);
     padding: 8px 16px;
     color: var(--text-secondary);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition:
+      transform 0.45s var(--glass-ease),
+      box-shadow 0.45s var(--glass-ease),
+      border-color 0.3s ease;
     font-size: 13px;
     font-weight: 600;
     font-family: var(--font-ui), sans-serif;
+    box-shadow: 0 1px 2px rgba(15, 20, 25, 0.05), inset 0 1px 0 var(--glass-highlight);
   }
 
   .un-mini-icon {
@@ -585,15 +619,18 @@
     width: 100%;
     min-height: 110px;
     resize: vertical;
-    border: 1.5px solid var(--border-subtle);
+    border: 1.5px solid var(--glass-border);
     border-radius: var(--radius-sm);
     padding: 14px 16px;
-    background: rgba(255, 255, 255, 0.7);
+    background: var(--glass-bg);
     color: var(--text);
     font-size: 14px;
     font-family: var(--font-ui), sans-serif;
     line-height: 1.65;
-    transition: all 0.25s ease;
+    transition:
+      transform 0.45s var(--glass-ease),
+      box-shadow 0.45s var(--glass-ease),
+      border-color 0.3s ease;
     box-sizing: border-box;
   }
 
@@ -719,11 +756,15 @@
     font-size: 14px;
     font-weight: 600;
     color: var(--text-secondary);
-    border: 1.5px solid var(--border-subtle);
+    border: 1px solid var(--glass-border);
     border-radius: var(--radius-sm);
     padding: 12px 22px;
-    transition: all 0.25s ease;
-    background: rgba(255, 255, 255, 0.65);
+    transition:
+      transform 0.45s var(--glass-ease),
+      box-shadow 0.45s var(--glass-ease),
+      border-color 0.3s ease;
+    background: var(--glass-bg);
+    box-shadow: 0 1px 2px rgba(15, 20, 25, 0.05), inset 0 1px 0 var(--glass-highlight);
   }
 
   .un-browser-icon {
@@ -813,6 +854,33 @@
     .un-reinstall-btn {
       width: 100%;
       justify-content: center;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .un-card,
+    .un-pill,
+    .un-mini-pill,
+    .un-field-group textarea,
+    .un-reinstall-btn {
+      transition: none;
+    }
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .un-card,
+    .un-pill,
+    .un-mini-pill,
+    .un-field-group textarea,
+    .un-reinstall-btn {
+      background: #fcfefd;
+      border-color: rgba(226, 232, 240, 0.9);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+
+    .un-card::before {
+      display: none;
     }
   }
 </style>

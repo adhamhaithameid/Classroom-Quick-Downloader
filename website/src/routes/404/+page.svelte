@@ -1,6 +1,7 @@
 <script lang="ts">
   import { base } from '$app/paths';
   import SeoMeta from '$lib/components/SeoMeta.svelte';
+  import { glassSheen } from '$lib/actions/glassSheen';
 </script>
 
 <SeoMeta
@@ -41,21 +42,21 @@
   <section class="nf-links-section">
     <div class="nf-wrap">
       <div class="nf-links-grid">
-        <a class="nf-link-card" href="{base}/">
+        <a class="nf-link-card" href="{base}/" use:glassSheen>
           <span class="nf-link-icon">🏠</span>
           <div>
             <strong>Overview</strong>
             <p>Learn what Classroom Quick Downloader does and how it works.</p>
           </div>
         </a>
-        <a class="nf-link-card" href="{base}/faq">
+        <a class="nf-link-card" href="{base}/faq" use:glassSheen>
           <span class="nf-link-icon">❓</span>
           <div>
             <strong>FAQ</strong>
             <p>Find answers to commonly asked questions about the extension.</p>
           </div>
         </a>
-        <a class="nf-link-card" href="{base}/changelog">
+        <a class="nf-link-card" href="{base}/changelog" use:glassSheen>
           <span class="nf-link-icon">📋</span>
           <div>
             <strong>Changelog</strong>
@@ -203,16 +204,27 @@
   }
 
   .nf-link-card {
+    position: relative;
+    overflow: hidden;
     display: flex; align-items: flex-start; gap: 14px;
-    background: rgba(255,255,255,0.6);
-    border: 1px solid var(--border-subtle);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
     border-radius: 16px;
     padding: 22px 20px;
     text-decoration: none;
     color: var(--text);
-    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    animation: nf-rise 0.5s ease both;
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+    box-shadow:
+      0 1px 2px rgba(15, 20, 25, 0.05),
+      0 12px 30px rgba(15, 20, 25, 0.1),
+      0 8px 24px rgba(26, 139, 85, 0.08),
+      inset 0 1px 0 var(--glass-highlight);
+    transition:
+      transform 0.45s var(--glass-ease),
+      box-shadow 0.45s var(--glass-ease),
+      border-color 0.3s ease;
+    animation: nf-rise 0.5s var(--glass-ease) both;
   }
 
   .nf-link-card:nth-child(1) { animation-delay: 0.05s; }
@@ -221,14 +233,58 @@
 
   .nf-link-card:hover {
     transform: translateY(-4px);
-    border-color: rgba(26,139,85,0.2);
-    box-shadow: 0 16px 40px rgba(0,0,0,0.08);
+    border-color: rgba(26,139,85,0.22);
+    box-shadow:
+      0 8px 20px rgba(26, 139, 85, 0.12),
+      0 0 0 1px rgba(26, 139, 85, 0.06),
+      0 20px 44px rgba(15, 20, 25, 0.12),
+      inset 0 1px 0 var(--glass-highlight);
+  }
+
+  /* Static top gloss shared by the glass surfaces. */
+  .nf-link-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 36%),
+      linear-gradient(120deg, rgba(255, 255, 255, 0.3), rgba(239, 247, 250, 0.16) 48%, rgba(255, 255, 255, 0.28));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.35);
+  }
+
+  /* Pointer-tracked specular sweep (glassSheen action). */
+  .nf-link-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    background: radial-gradient(
+      240px circle at var(--card-mx, 50%) var(--card-my, 0%),
+      rgba(255, 255, 255, 0.55),
+      rgba(255, 255, 255, 0) 72%
+    );
+    transition: opacity 0.35s ease;
+  }
+
+  .nf-link-card:hover::after {
+    opacity: 1;
   }
 
   .nf-link-icon {
     font-size: 28px;
     flex-shrink: 0;
     margin-top: 2px;
+    transition: transform 0.3s var(--glass-ease);
+  }
+
+  .nf-link-card:hover .nf-link-icon {
+    transform: scale(1.06) rotate(-3deg);
   }
 
   .nf-link-card strong {
@@ -264,5 +320,30 @@
     .nf-glitch-code { margin-bottom: -16px; }
     .nf-links-section { padding: 0 16px 40px; }
     .nf-link-card { padding: 18px 16px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .nf-link-card,
+    .nf-link-icon {
+      transition: none;
+    }
+
+    .nf-link-card::after {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .nf-link-card {
+      background: #fcfefd;
+      border-color: rgba(226, 232, 240, 0.9);
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+
+    .nf-link-card::before,
+    .nf-link-card::after {
+      display: none;
+    }
   }
 </style>

@@ -2,6 +2,7 @@
   import { base } from '$app/paths';
   import { STORE_LINKS } from '$lib/config';
   import SeoMeta from '$lib/components/SeoMeta.svelte';
+  import { glassSheen } from '$lib/actions/glassSheen';
 
   type FaqItem = {
     id: string;
@@ -530,6 +531,7 @@
                   on:click={() => toggle(item.id)}
                   aria-expanded={openIds.has(item.id)}
                   aria-controls={`faq-answer-${item.id}`}
+                  use:glassSheen
                 >
                   <div class="fq-question">
                     <span class="fq-q-text">{item.q}</span>
@@ -668,12 +670,16 @@
   .fq-search-input {
     width: 100%; padding: 16px 48px 16px 50px;
     border-radius: 16px; font-size: 15px; font-weight: 500;
-    border: 1.5px solid var(--border-subtle);
-    background: rgba(255,255,255,0.7);
-    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1.5px solid var(--glass-border);
+    background: var(--glass-bg);
     color: var(--text);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.04);
-    transition: all 0.25s ease;
+    box-shadow:
+      0 1px 2px rgba(15, 20, 25, 0.05),
+      0 12px 30px rgba(15, 20, 25, 0.1),
+      inset 0 1px 0 var(--glass-highlight);
+    transition:
+      border-color 0.3s ease,
+      box-shadow 0.45s var(--glass-ease);
     box-sizing: border-box;
   }
 
@@ -708,12 +714,17 @@
   .fq-sections { display: grid; gap: 24px; }
 
   .fq-section {
-    background: rgba(255,255,255,0.6);
-    border: 1px solid var(--border-subtle);
+    position: relative;
+    overflow: hidden;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
     border-radius: 20px;
-    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
     padding: 28px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    box-shadow:
+      0 1px 2px rgba(15, 20, 25, 0.05),
+      0 12px 30px rgba(15, 20, 25, 0.1),
+      0 8px 24px rgba(26, 139, 85, 0.08),
+      inset 0 1px 0 var(--glass-highlight);
   }
 
   .fq-section-head {
@@ -737,24 +748,80 @@
   .fq-list { display: flex; flex-direction: column; gap: 8px; }
 
   .fq-item {
+    position: relative;
+    overflow: hidden;
     text-align: left;
-    background: rgba(255,255,255,0.75);
-    border: 1px solid var(--border-subtle);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
     border-radius: var(--radius-sm);
     padding: 0; cursor: pointer; width: 100%;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 1px 3px rgba(15,20,25,0.03);
+    box-shadow:
+      0 1px 2px rgba(15, 20, 25, 0.05),
+      0 8px 24px rgba(15, 20, 25, 0.08),
+      inset 0 1px 0 var(--glass-highlight);
+    transition:
+      transform 0.45s var(--glass-ease),
+      box-shadow 0.45s var(--glass-ease),
+      border-color 0.3s ease,
+      background-color 0.3s ease;
   }
 
   .fq-item:hover {
-    border-color: rgba(26,139,85,0.18);
-    box-shadow: 0 2px 8px rgba(15,20,25,0.05);
+    transform: translateY(-2px);
+    border-color: rgba(26, 139, 85, 0.22);
+    box-shadow:
+      0 8px 20px rgba(26, 139, 85, 0.12),
+      0 0 0 1px rgba(26, 139, 85, 0.06),
+      0 12px 30px rgba(15, 20, 25, 0.1),
+      inset 0 1px 0 var(--glass-highlight);
   }
 
   .fq-item.open {
-    border-color: rgba(26,139,85,0.28);
-    box-shadow: 0 4px 16px rgba(15,20,25,0.06);
-    background: rgba(255,255,255,0.9);
+    border-color: rgba(26, 139, 85, 0.28);
+    box-shadow:
+      0 4px 16px rgba(15, 20, 25, 0.06),
+      0 0 0 1px rgba(26, 139, 85, 0.08),
+      inset 0 1px 0 var(--glass-highlight);
+    background:
+      linear-gradient(120deg, rgba(255, 255, 255, 0.78), rgba(248, 252, 249, 0.62));
+  }
+
+  /* Shared navbar glass sheen. */
+  .fq-item::before,
+  .fq-section::before,
+  .fq-empty::before,
+  .fq-cta-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 36%),
+      linear-gradient(120deg, rgba(255, 255, 255, 0.3), rgba(239, 247, 250, 0.16) 48%, rgba(255, 255, 255, 0.28));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.35);
+  }
+
+  .fq-item::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    background: radial-gradient(
+      240px circle at var(--card-mx, 50%) var(--card-my, 0%),
+      rgba(255, 255, 255, 0.55),
+      rgba(255, 255, 255, 0) 72%
+    );
+    transition: opacity 0.35s ease;
+  }
+
+  .fq-item:hover::after,
+  .fq-item:focus-visible::after {
+    opacity: 1;
   }
 
   .fq-question {
@@ -783,11 +850,14 @@
 
   /* ── Empty State ───────────────── */
   .fq-empty {
+    position: relative;
+    overflow: hidden;
     text-align: center;
     padding: 48px 24px;
-    background: rgba(255,255,255,0.55);
+    background: var(--glass-bg);
     border: 1px dashed var(--border-subtle);
     border-radius: 20px;
+    box-shadow: inset 0 1px 0 var(--glass-highlight);
   }
 
   .fq-empty-icon { font-size: 48px; display: block; margin-bottom: 12px; }
@@ -807,13 +877,18 @@
   }
 
   .fq-cta-card {
+    position: relative;
+    overflow: hidden;
     text-align: center;
-    background: rgba(255,255,255,0.55);
-    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-    border: 1px solid var(--border-subtle);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
     border-radius: 24px;
     padding: 56px 48px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.04);
+    box-shadow:
+      0 1px 2px rgba(15, 20, 25, 0.05),
+      0 12px 30px rgba(15, 20, 25, 0.1),
+      0 8px 24px rgba(26, 139, 85, 0.08),
+      inset 0 1px 0 var(--glass-highlight);
   }
 
   .fq-cta-card h2 {
@@ -859,6 +934,36 @@
   .fq-cta-card {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .fq-item,
+    .fq-search-input {
+      transition: none;
+    }
+
+    .fq-item::after {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .fq-item,
+    .fq-search-input,
+    .fq-section,
+    .fq-empty,
+    .fq-cta-card {
+      background: #fcfefd;
+      border-color: rgba(226, 232, 240, 0.9);
+    }
+
+    .fq-item::before,
+    .fq-item::after,
+    .fq-section::before,
+    .fq-empty::before,
+    .fq-cta-card::before {
+      display: none;
+    }
   }
   @keyframes slideDown {
     from { opacity: 0; transform: translateY(-5px); }

@@ -3525,7 +3525,7 @@
     font-weight: 700;
     border: 2px solid transparent;
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+    transition: all 0.3s var(--glass-ease);
     position: relative;
     overflow: hidden;
   }
