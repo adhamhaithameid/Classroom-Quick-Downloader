@@ -4,52 +4,43 @@
  */
 
 import type { FileMeta } from './types';
+import { getTypeLabels } from '../../src/core/naming/type-labels';
 
-/** Labels to strip from filenames */
-// who names their file "Compressed archive" anyway
-const GARBAGE_LABELS = [
-  'Microsoft Excel',
-  'Microsoft Word',
-  'Microsoft PowerPoint',
-  'Compressed archive',
-  'Binary',
-  'Unknown',
-  'Google Sheets',
-  'Google Docs',
-  'Google Slides',
-  'Text File',
-  'PDF',
-  'Video',
-  'Image',
-  'Audio',
-  'Text',
-  'Word',
-  'Excel',
-  'PowerPoint',
-  'Archive',
-  'Zip',
-  'File',
-  'Document',
-  'Shortcut',
-  'Code',
-];
+/**
+ * Strip a trailing type label from a filename (D10).
+ *
+ * Anchored and corroborated: a label is only removed when the remaining stem
+ * still ends in a real file extension — either glued straight onto it
+ * ("example.zipTömörített archívum", Classroom renders filename + localized
+ * label with no separator) or after it across a space
+ * ("report.pdf Microsoft Word"). A genuine file named "Design Document" has
+ * no extension before the label and is left alone, in every locale.
+ */
+function stripTrailingTypeLabel(name: string, lang?: string): string {
+  const labels = getTypeLabels(lang);
+  const lowerName = name.toLowerCase();
+
+  let best: { stem: string } | null = null;
+  for (const label of labels) {
+    const lowerLabel = label.toLowerCase();
+    if (!lowerName.endsWith(lowerLabel)) continue;
+    if (lowerName.length === lowerLabel.length) continue; // stem would be empty
+    const stem = name.slice(0, name.length - label.length).trim();
+    if (stem.length === 0) continue;
+    // Corroboration: the stem must end in a real extension.
+    if (!/\.[a-zA-Z0-9]{1,10}$/.test(stem)) continue;
+    if (!best || stem.length < best.stem.length) best = { stem };
+  }
+
+  return best ? best.stem : name;
+}
 
 /**
  * Clean attachment name by removing garbage labels and duplicated text.
  */
-export function cleanAttachmentName(rawName: string): string {
+export function cleanAttachmentName(rawName: string, lang?: string): string {
   if (!rawName) return '';
-  let name = rawName.trim();
-
-  for (const label of GARBAGE_LABELS) {
-    if (name.endsWith(label)) {
-      const potential = name.slice(0, -label.length).trim();
-      if (potential.length > 0) {
-        name = potential;
-        break;
-      }
-    }
-  }
+  let name = stripTrailingTypeLabel(rawName.trim(), lang);
 
   // Detect duplicated text (e.g., "file.txtfile.txt")
   if (name.length > 0 && name.length % 2 === 0) {
@@ -68,7 +59,9 @@ export function cleanAttachmentName(rawName: string): string {
 /**
  * Extract file metadata from container element.
  */
-export function extractFileMeta(container: HTMLElement, url: string): FileMeta {
+export function extractFileMeta(container: HTMLElement, url: string, lang?: string): FileMeta {
+  const pageLang = lang ?? (typeof document !== 'undefined' ? document.documentElement?.lang || '' : '');
+
   let name: string | undefined;
 
   // Try tooltip/ARIA first because accessibility = free metadata hack
@@ -96,7 +89,7 @@ export function extractFileMeta(container: HTMLElement, url: string): FileMeta {
     } catch { /* ignore */ }
   }
 
-  if (name) name = cleanAttachmentName(name);
+  if (name) name = cleanAttachmentName(name, pageLang);
 
   // Extract extension
   let ext: string | undefined;
