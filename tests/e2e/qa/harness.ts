@@ -19,6 +19,7 @@ import path from "node:path";
 import {
   chromium,
   firefox,
+  expect,
   type BrowserContext,
   type Page,
 } from "@playwright/test";
@@ -28,6 +29,81 @@ const REPO_ROOT = path.resolve(__dirname, "../../..");
 export const CHROMIUM_EXTENSION_PATH = path.join(REPO_ROOT, "extension/.output/chrome-mv3");
 export const FIREFOX_PROFILE_DIR = path.join(REPO_ROOT, "tests/e2e/.firefox-profile");
 export const ARTIFACTS_ROOT = path.join(REPO_ROOT, "qa-artifacts");
+
+// ---------------------------------------------------------------------------
+// Product selectors — the ONE place QA journeys read product classes from.
+// A deliberate product-side rename must change this file; qa-01 then fails
+// until the journey is updated, which is the regression-detection contract.
+// ---------------------------------------------------------------------------
+
+export const SELECTORS = {
+  downloadButton: "button.cqd-download-btn",
+  downloadAllButton: "button.cqd-download-all-btn",
+  injectedMarker: '[data-cqd-injected="true"]',
+  attachmentContainerStream: ".luto0c",
+  attachmentContainerDetails: ".KlRXdf",
+  attachmentContainerSubmissions: ".WkZsyc",
+  commentBadge: ".cqd-comment-badge",
+  editedBadge: ".cqd-edited-badge",
+  bothOverlay: ".cqd-overlay-container",
+  bothBadge: ".cqd-both-badge",
+  v2Flag: ".cqd-v2-flag",
+  postCard: "article.n4xnA.JUr7jb[data-stream-item-id]",
+  countChip: ".qCWAqb .huI6Cb",
+  commentShellCount: ".comment-shell .comment-count",
+} as const;
+
+/** CQD behaved incorrectly. Fix CQD, not the test. */
+export class ProductFailure extends Error {}
+/** The simulator/test implementation is broken. */
+export class HarnessFailure extends Error {}
+
+/** The one Playwright-run-scoped run id (shared by all checks in a run). */
+let RUN_ID: string | null = null;
+export function currentRunId(): string {
+  if (!RUN_ID) RUN_ID = newRunId();
+  return RUN_ID;
+}
+
+/**
+ * Run one QA check: body executes against a live page; every assertion goes
+ * through the check collector; the result artifact is always written; the
+ * re-thrown error makes the Playwright test itself reflect the outcome.
+ */
+export async function runCheck(
+  testInfo: { project: { name: string } },
+  page: Page,
+  consoleCapture: ConsoleCapture,
+  checkId: string,
+  runbookReference: string,
+  body: (check: QaCheck) => Promise<void>,
+): Promise<void> {
+  const browser: QaBrowser = testInfo.project.name === "qa-firefox" ? "firefox" : "chromium";
+  const check = new QaCheck(
+    { browser, checkId, runbookReference, runId: currentRunId() },
+    page,
+    consoleCapture,
+  );
+  try {
+    await body(check);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (error instanceof ProductFailure) {
+      check.fail("PRODUCT", message);
+    } else if (error instanceof HarnessFailure) {
+      check.fail("HARNESS", message);
+    } else {
+      check.fail("HARNESS", `unexpected harness error: ${message}`);
+    }
+  }
+  const result = await check.write();
+  if (result.status === "failed") {
+    expect(result.status, `[${result.checkId}] ${result.failureClass}: ${result.error ?? "see result.json"}`).toBe("passed");
+  }
+  if (result.status === "skipped") {
+    test.skip(true, result.error ?? "skipped");
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Context launching — one persistent context per spec file, like core-flow.

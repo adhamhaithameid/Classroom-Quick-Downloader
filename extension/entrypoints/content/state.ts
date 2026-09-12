@@ -20,6 +20,7 @@ export const DRIVE_ANCHOR_SELECTOR = [
   'a[href*="docs.google.com/document/"]',
   'a[href*="docs.google.com/presentation/"]',
   'a[href*="docs.google.com/drawings/"]',
+  'a[href*="docs.google.com/spreadsheets/"]',
   'a[href*="/file/d/"]',
 ].join(', ');
 
