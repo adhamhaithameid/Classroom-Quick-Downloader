@@ -215,7 +215,7 @@
     max-width: 980px;
     margin: 0 auto;
     padding: 2rem 1rem 3rem;
-    color: #0f172a;
+    color: var(--text);
   }
 
   .seo-hero {
@@ -255,22 +255,24 @@
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #0f766e;
+    color: var(--gc-green);
     margin-bottom: 0.8rem;
   }
 
   .seo-hero h1 {
     margin: 0;
-    font-size: clamp(1.8rem, 3.3vw, 2.8rem);
-    line-height: 1.1;
-    color: #020617;
+    font-size: clamp(2.1rem, 4.5vw, 3.4rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.08;
+    color: var(--text);
   }
 
   .seo-hero p {
     margin: 1rem 0 0;
-    font-size: 1.02rem;
+    font-size: 1.05rem;
     line-height: 1.7;
-    color: #334155;
+    color: var(--text-secondary);
     max-width: 70ch;
   }
 
@@ -285,9 +287,9 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 0.62rem 1rem;
-    border-radius: 0.72rem;
-    font-size: 0.92rem;
+    padding: 0.66rem 1.1rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.94rem;
     font-weight: 600;
     text-decoration: none;
     transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
@@ -297,17 +299,22 @@
     transform: translateY(-1px);
   }
 
+  .seo-btn:focus-visible {
+    outline: 3px solid rgba(26, 139, 85, 0.4);
+    outline-offset: 2px;
+  }
+
   .seo-btn-primary {
-    background: #047857;
-    border: 1px solid #047857;
+    background: linear-gradient(165deg, #1f9a5e, var(--gc-green-dark));
+    border: 1px solid rgba(19, 122, 71, 0.6);
     color: #ffffff;
-    box-shadow: 0 10px 25px rgba(4, 120, 87, 0.18);
+    box-shadow: var(--shadow-green);
   }
 
   .seo-btn-secondary {
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);
-    color: #0f172a;
+    color: var(--text);
   }
 
   .seo-sections {
@@ -406,20 +413,23 @@
 
   .seo-card h2 {
     margin: 0 0 0.6rem;
-    color: #0f172a;
-    font-size: 1.08rem;
+    color: var(--text);
+    font-size: clamp(1.35rem, 2.2vw, 1.6rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
   }
 
   .seo-card p {
     margin: 0.5rem 0;
-    color: #334155;
+    color: var(--text-secondary);
     line-height: 1.7;
   }
 
   .seo-card ul {
     margin: 0.6rem 0 0;
     padding-left: 1.1rem;
-    color: #334155;
+    color: var(--text-secondary);
     line-height: 1.65;
   }
 
@@ -505,20 +515,24 @@
 
   .seo-faq h2 {
     margin: 0 0 0.6rem;
-    color: #0f172a;
-    font-size: 1.08rem;
+    color: var(--text);
+    font-size: clamp(1.35rem, 2.2vw, 1.6rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
   }
 
   .seo-faq-item h3 {
     margin: 0.9rem 0 0.2rem;
-    color: #0f172a;
-    font-size: 0.98rem;
+    color: var(--text);
+    font-size: 1.05rem;
+    font-weight: 700;
     line-height: 1.4;
   }
 
   .seo-faq-item p {
     margin: 0.2rem 0 0;
-    color: #334155;
+    color: var(--text-secondary);
     line-height: 1.7;
   }
 
@@ -540,8 +554,11 @@
 
   .seo-related h2 {
     margin: 0 0 0.7rem;
-    color: #0f172a;
-    font-size: 1.08rem;
+    color: var(--text);
+    font-size: clamp(1.35rem, 2.2vw, 1.6rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
   }
 
   .seo-related ul {
@@ -554,7 +571,7 @@
 
   .seo-related a {
     display: block;
-    color: #047857;
+    color: var(--gc-green-dark);
     font-weight: 600;
     text-decoration: none;
     line-height: 1.4;
@@ -567,14 +584,14 @@
   .seo-related span {
     display: block;
     margin-top: 0.15rem;
-    color: #475569;
+    color: var(--text-secondary);
     font-size: 0.9rem;
     line-height: 1.6;
   }
 
   .seo-disclaimer {
     margin-top: 1rem;
-    color: #64748b;
+    color: var(--text-secondary);
     font-size: 0.86rem;
     text-align: center;
   }
