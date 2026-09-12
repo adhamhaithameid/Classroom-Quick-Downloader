@@ -1389,6 +1389,22 @@
      Shared dropdown module — one centered glass panel that morphs
      its width/height between menus; content re-staggers on switch.
      ============================================================ */
+  /* Shared glass surface for both dropdown panels — keep panel styling in
+     this one rule so the install submenu always matches the megamenus. */
+  .l2-nav-dropdown,
+  .l2-nav-alt-browsers {
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.92), rgba(248, 252, 249, 0.84));
+    -webkit-backdrop-filter: blur(26px) saturate(190%);
+    backdrop-filter: blur(26px) saturate(190%);
+    box-shadow:
+      0 24px 60px rgba(15, 20, 25, 0.16),
+      0 4px 14px rgba(15, 20, 25, 0.08),
+      0 12px 40px rgba(26, 139, 85, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  }
+
   .l2-nav-dropdown {
     position: absolute;
     top: calc(100% + 16px);
@@ -1404,16 +1420,6 @@
     width: max-content;
     max-width: calc(100vw - 32px);
     padding: 14px;
-    border-radius: 20px;
-    border: 1px solid rgba(255, 255, 255, 0.8);
-    background: linear-gradient(160deg, rgba(255, 255, 255, 0.92), rgba(248, 252, 249, 0.84));
-    -webkit-backdrop-filter: blur(26px) saturate(190%);
-    backdrop-filter: blur(26px) saturate(190%);
-    box-shadow:
-      0 24px 60px rgba(15, 20, 25, 0.16),
-      0 4px 14px rgba(15, 20, 25, 0.08),
-      0 12px 40px rgba(26, 139, 85, 0.08),
-      inset 0 1px 0 rgba(255, 255, 255, 0.9);
     opacity: 0;
     visibility: hidden;
     transform: translateX(-50%) translateY(12px) scale(0.97);
@@ -2115,17 +2121,7 @@
     display: grid;
     gap: 2px;
     min-width: 264px;
-    padding: 10px;
-    border-radius: 20px;
-    border: 1px solid rgba(255, 255, 255, 0.8);
-    background: linear-gradient(160deg, rgba(255, 255, 255, 0.94), rgba(248, 252, 249, 0.88));
-    -webkit-backdrop-filter: blur(26px) saturate(190%);
-    backdrop-filter: blur(26px) saturate(190%);
-    box-shadow:
-      0 24px 60px rgba(15, 20, 25, 0.16),
-      0 4px 14px rgba(15, 20, 25, 0.08),
-      0 12px 40px rgba(26, 139, 85, 0.08),
-      inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    padding: 14px;
     opacity: 0;
     visibility: hidden;
     transform: translateY(12px) scale(0.97);
