@@ -908,9 +908,9 @@ describe('background/index', () => {
       expect(sendStatusToTab).not.toHaveBeenCalled();
     });
 
-    it('CQD_403_SEEN on Firefox sends access-denied error and calls cleanup', async () => {
+    it('CQD_403_SEEN on Firefox cycles accounts like Chrome (#537): trying status, no terminal cleanup', async () => {
       const pending = makeBgPending({ isDrive: true, htmlSeen: false });
-      const { onMessageListeners, sendStatusToTab, cleanup: cleanupSpy, recordDownloadEvent } = await loadBackground({
+      const { onMessageListeners, startNextDriveAttempt: nextAttempt, sendStatusToTab, cleanup: cleanupSpy } = await loadBackground({
         isFirefox: true,
         pendingByBypassTabId: new Map([[400, pending]]),
       });
@@ -921,9 +921,11 @@ describe('background/index', () => {
         listener({ type: 'CQD_403_SEEN' }, sender, undefined);
       }
 
-      expect(sendStatusToTab).toHaveBeenCalledWith(pending, 'error', expect.any(String), 'ACCESS_DENIED');
-      expect(recordDownloadEvent).toHaveBeenCalledWith(expect.objectContaining({ status: 'fail', error_type: 'ACCESS_DENIED_FIREFOX' }));
-      expect(cleanupSpy).toHaveBeenCalledWith(pending);
+      // Firefox reaches startNextDriveAttempt too — its adapter opens the next
+      // bypass tab; terminal AUTH_ALL_FAILED only comes after the full sweep.
+      expect(nextAttempt).toHaveBeenCalledWith(pending);
+      expect(sendStatusToTab).toHaveBeenCalledWith(pending, 'trying', expect.any(String), 'AUTH_LOOP');
+      expect(cleanupSpy).not.toHaveBeenCalled();
     });
 
     it('CQD_403_SEEN on Chrome calls startNextDriveAttempt and sends trying status', async () => {

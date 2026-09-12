@@ -226,23 +226,15 @@ export default defineBackground(() => {
         chrome.tabs.remove(tabId);
       } catch {}
 
-      if (IS_FIREFOX) {
-        sendStatusToTab(pending, 'error', 'Access denied. Try opening the file directly.', 'ACCESS_DENIED');
-        recordDownloadEvent({
-          type: pending.fileMeta?.ext || 'unknown',
-          status: 'fail',
-          duration_ms: Date.now() - pending.startTime,
-          bypass_used: true,
-          error_type: 'ACCESS_DENIED_FIREFOX',
-        });
-        cleanup(pending);
-      } else {
-        if (!pending.htmlSeen) {
-          pending.htmlSeen = true;
-          sendStatusToTab(pending, 'trying', 'Trying your other Google accounts…', 'AUTH_LOOP');
-        }
-        startNextDriveAttempt(pending);
+      // #537/#547: account cycling is browser-agnostic. startNextDriveAttempt
+      // picks the adapter per browser (Firefox opens the next bypass tab,
+      // Chromium re-downloads), so both get the full authuser sweep before the
+      // terminal AUTH_ALL_FAILED — Firefox never terminal-fails on the first 403.
+      if (!pending.htmlSeen) {
+        pending.htmlSeen = true;
+        sendStatusToTab(pending, 'trying', 'Trying your other Google accounts…', 'AUTH_LOOP');
       }
+      startNextDriveAttempt(pending);
       return;
     }
 
@@ -402,8 +394,26 @@ export default defineBackground(() => {
         unbindDownloadId(delta.id);
         return;
       }
-      const duration = Date.now() - pending.startTime;
       const errorType = delta.error?.current || 'UNKNOWN_INTERRUPT';
+
+      // #537/#547 ("files start but fail"): a 403-class interrupt mid-stream
+      // means the current account lacks access — retry under the next signed-in
+      // account before giving up. Bounded by the authuser candidate sweep in
+      // startNextDriveAttempt; success was already reported (finalized) and
+      // self-cancelled downloads never reach this branch.
+      const forbiddenFamily =
+        errorType === 'SERVER_FORBIDDEN' || errorType === 'ACCESS_DENIED';
+      if (pending.isDrive && !pending.finalized && forbiddenFamily) {
+        unbindDownloadId(delta.id);
+        if (!pending.htmlSeen) {
+          pending.htmlSeen = true;
+          sendStatusToTab(pending, 'trying', 'Trying your other Google accounts…', 'AUTH_LOOP');
+        }
+        startNextDriveAttempt(pending);
+        return;
+      }
+
+      const duration = Date.now() - pending.startTime;
       const ext = pending.finalExtension || pending.fileMeta?.ext || 'unknown';
       recordDownloadEvent({
         type: ext,
