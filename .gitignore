@@ -58,3 +58,4 @@ __pycache__/
 # Claude Code local config
 CLAUDE.md
 .claude/
+tests/e2e/.firefox-profile/

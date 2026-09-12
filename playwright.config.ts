@@ -55,6 +55,7 @@ export default defineConfig({
   projects: [
     {
       name: 'extension-chromium',
+      testIgnore: /[/\\]qa[/\\]/,
       use: {
         ...devices['Desktop Chrome'],
 
@@ -70,6 +71,29 @@ export default defineConfig({
             '--disable-default-apps',
           ],
         },
+      },
+    },
+
+    // ────────────────────────────────────────────────────────────────────
+    // Manual-QA Replay (docs/superpowers/specs/2026-09-12-manual-qa-replay-design.md)
+    // These specs launch their own persistent contexts via the harness —
+    // per-browser project selection is what the specs read to pick the
+    // built bundle (chrome-mv3 vs firefox-mv2).
+    // ────────────────────────────────────────────────────────────────────
+    {
+      name: 'qa-chromium',
+      testMatch: /tests\/e2e\/qa\/.*\.spec\.ts/,
+      use: {
+        browserName: 'chromium',
+        acceptDownloads: true,
+      },
+    },
+    {
+      name: 'qa-firefox',
+      testMatch: /tests\/e2e\/qa\/.*\.spec\.ts/,
+      use: {
+        browserName: 'firefox',
+        acceptDownloads: true,
       },
     },
   ],
