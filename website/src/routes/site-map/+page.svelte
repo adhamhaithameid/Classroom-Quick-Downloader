@@ -286,7 +286,7 @@
   }
 
   .site-map-card a:hover {
-    color: #047857;
+    color: var(--gc-green);
     text-decoration: underline;
   }
 

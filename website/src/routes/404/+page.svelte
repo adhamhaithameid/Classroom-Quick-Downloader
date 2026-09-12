@@ -224,7 +224,7 @@
       transform 0.45s var(--glass-ease),
       box-shadow 0.45s var(--glass-ease),
       border-color 0.3s ease;
-    animation: nf-rise 0.5s var(--glass-ease) both;
+    animation: nf-rise 0.5s var(--glass-ease) backwards;
   }
 
   .nf-link-card:nth-child(1) { animation-delay: 0.05s; }
@@ -326,6 +326,10 @@
     .nf-link-card,
     .nf-link-icon {
       transition: none;
+    }
+
+    .nf-link-card {
+      animation: none !important;
     }
 
     .nf-link-card::after {

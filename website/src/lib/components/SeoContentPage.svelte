@@ -524,7 +524,8 @@
 
   @media (prefers-reduced-transparency: reduce) {
     .seo-hero,
-    .seo-faq {
+    .seo-faq,
+    .seo-btn-secondary {
       background: #fcfefd;
       border-color: rgba(226, 232, 240, 0.9);
       -webkit-backdrop-filter: none;
