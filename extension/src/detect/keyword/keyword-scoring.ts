@@ -192,11 +192,14 @@ function expandParentContext(node: Node): { text: string; hasDate: boolean; leve
  *
  * Authoritative does not mean unexamined (D5): the `.huI6Cb` paths accept only
  * what `parseCountChip` believes (value plausibility + chip shape — an id-like
- * 99999 or a "12:34" chip is not a count), and every other acceptance path
- * requires the count to be below PLAUSIBLE_COMMENT_COUNT. Identical rules to
- * the structural chain's S0 via the same core helper.
+ * or implausible numeral never gets this far), every container-level text path
+ * is chip-gated too (D13 — a date in the shell must not win on its first digit
+ * run), and the one exception is a dedicated count child span whose word-bearing
+ * text carries its own comment keyword ("2 comments"). Word evidence anywhere
+ * else belongs to the layers below. Identical rules to the structural chain's
+ * S0 via the same core helper.
  */
-function commentLayer0_DOMTruth(post: HTMLElement): CommentLayerResult {
+function commentLayer0_DOMTruth(post: HTMLElement, keywords: CommentKeywords): CommentLayerResult {
   // Primary: .qCWAqb .huI6Cb
   const huI6Cb = post.querySelector<HTMLElement>('.qCWAqb .huI6Cb');
   if (huI6Cb) {
@@ -220,8 +223,15 @@ function commentLayer0_DOMTruth(post: HTMLElement): CommentLayerResult {
     );
     if (textSpan) {
       const text = normalizeText(textSpan.textContent?.trim() || '');
+      const chip = parseCountChip(text);
+      if (chip) {
+        return { score: 100, count: chip.count, matchedText: chip.text, details: `L0-DOMTruth: "${chip.text}" in .qCWAqb.seqYL span (count: ${chip.count})` };
+      }
+      // A dedicated count child may carry words ("2 comments"): a parsed count
+      // corroborated by a comment keyword in the same span is still DOM truth.
+      // Bare dates ("12 mart") carry no comment keyword and stay out (D13).
       const count = extractCount(text);
-      if (count !== null && count > 0 && count < PLAUSIBLE_COMMENT_COUNT) {
+      if (count !== null && count > 0 && count < PLAUSIBLE_COMMENT_COUNT && containsCommentKeyword(text, keywords)) {
         return { score: 100, count, matchedText: text, details: `L0-DOMTruth: "${text}" in .qCWAqb.seqYL span (count: ${count})` };
       }
     }
@@ -235,21 +245,20 @@ function commentLayer0_DOMTruth(post: HTMLElement): CommentLayerResult {
       }
     }
 
-    // Direct text content
-    const directText = normalizeText(container.textContent || '');
-    const directCount = extractCount(directText);
-    if (directCount !== null && directCount > 0 && directCount < PLAUSIBLE_COMMENT_COUNT) {
-      return { score: 100, count: directCount, matchedText: directText, details: `L0-DOMTruth: "${directText}" direct (count: ${directCount})` };
+    // Direct text content — chip-gated like every container path (D13): a
+    // date in the shell ("12 mart") must not win on its first digit run.
+    const directChip = parseCountChip(container.textContent || '');
+    if (directChip) {
+      return { score: 100, count: directChip.count, matchedText: directChip.text, details: `L0-DOMTruth: "${directChip.text}" direct (count: ${directChip.count})` };
     }
   }
 
   // Fallback 2: .seqYL alone
   const seqYL = post.querySelector<HTMLElement>('.seqYL');
   if (seqYL && seqYL !== container) {
-    const text = normalizeText(seqYL.textContent || '');
-    const count = extractCount(text);
-    if (count !== null && count > 0 && count < PLAUSIBLE_COMMENT_COUNT) {
-      return { score: 95, count, matchedText: text, details: `L0-DOMTruth: "${text}" via .seqYL (count: ${count})` };
+    const chip = parseCountChip(seqYL.textContent || '');
+    if (chip) {
+      return { score: 95, count: chip.count, matchedText: chip.text, details: `L0-DOMTruth: "${chip.text}" via .seqYL (count: ${chip.count})` };
     }
   }
 
@@ -791,7 +800,7 @@ export function scoreComments(
   };
 
   // Layer 0: DOM Truth — if found, return immediately
-  const l0 = commentLayer0_DOMTruth(post);
+  const l0 = commentLayer0_DOMTruth(post, combined);
   if (l0.score > 0 && l0.count !== null && l0.count > 0) {
     return { score: l0.score, count: l0.count, matchedText: l0.matchedText, layers: [l0] };
   }

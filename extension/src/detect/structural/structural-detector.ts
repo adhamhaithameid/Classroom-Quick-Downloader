@@ -52,8 +52,6 @@ import type {
   CommentObservation,
 } from '../../contracts/detection';
 
-import { extractDigitCount } from '../shared/numerals';
-import { PLAUSIBLE_COMMENT_COUNT } from '../../core/detect/ceilings';
 import { parseCountChip } from '../../core/detect/numerals';
 
 /** Result of one structural layer. */
@@ -84,6 +82,11 @@ const NO_MATCH: StructuralLayerResult = {
  * 99999 or a "12:34" timestamp cannot pose as a count — and every other
  * acceptance path requires the count to be below PLAUSIBLE_COMMENT_COUNT. The
  * same rules live in the keyword chain's twin via the same core helper.
+ *
+ * The container's OWN text is chip-gated too (D13): a date like "12 mart"
+ * inside the shell used to win on its first digit run. Only numeral-shaped
+ * text is DOM truth here; word-bearing count text belongs to the keyword
+ * layers that exist to read it.
  */
 function layerDomTruth(post: HTMLElement): StructuralLayerResult {
   // Primary: .qCWAqb .huI6Cb
@@ -107,13 +110,13 @@ function layerDomTruth(post: HTMLElement): StructuralLayerResult {
       '.mUIrbf-vQzf8d, .jzdBjc, span[aria-hidden="true"]',
     );
     if (textSpan) {
-      const count = extractDigitCount(textSpan.textContent ?? '');
-      if (count !== null && count < PLAUSIBLE_COMMENT_COUNT) {
+      const chip = parseCountChip(textSpan.textContent ?? '');
+      if (chip) {
         return {
           strength: 100,
-          count,
+          count: chip.count,
           source: 'dom-truth',
-          details: `S0: numeral in .qCWAqb.seqYL span (count: ${count})`,
+          details: `S0: numeral in .qCWAqb.seqYL span (count: ${chip.count})`,
         };
       }
     }
@@ -131,13 +134,13 @@ function layerDomTruth(post: HTMLElement): StructuralLayerResult {
       }
     }
 
-    const direct = extractDigitCount(container.textContent ?? '');
-    if (direct !== null && direct < PLAUSIBLE_COMMENT_COUNT) {
+    const direct = parseCountChip(container.textContent ?? '');
+    if (direct) {
       return {
         strength: 100,
-        count: direct,
+        count: direct.count,
         source: 'dom-truth',
-        details: `S0: numeral in .qCWAqb.seqYL text (count: ${direct})`,
+        details: `S0: numeral in .qCWAqb.seqYL text (count: ${direct.count})`,
       };
     }
   }
@@ -145,13 +148,13 @@ function layerDomTruth(post: HTMLElement): StructuralLayerResult {
   // Fallback 2: a bare .seqYL elsewhere in the post. Weaker signal.
   const seqYL = post.querySelector<HTMLElement>('.seqYL');
   if (seqYL && seqYL !== container) {
-    const count = extractDigitCount(seqYL.textContent ?? '');
-    if (count !== null && count < PLAUSIBLE_COMMENT_COUNT) {
+    const chip = parseCountChip(seqYL.textContent ?? '');
+    if (chip) {
       return {
         strength: 95,
-        count,
+        count: chip.count,
         source: 'seqYL',
-        details: `S0: numeral in .seqYL (count: ${count})`,
+        details: `S0: numeral in .seqYL (count: ${chip.count})`,
       };
     }
   }

@@ -184,4 +184,19 @@ describe('StructuralDetector', () => {
     expect(obs.comment.present).toBe(false);
     expect(obs.comment.count).toBeNull();
   });
+
+  it('rejects a date in the count container — container text is chip-gated (D13)', () => {
+    // A day+month digit run inside the shell must not win on its first run.
+    const spanDate = createPost('<div class="qCWAqb seqYL"><span aria-hidden="true">12 mart</span></div>');
+    const obs = detector.observe(spanDate, { postId: 'p18', viewKind: ViewKind.STREAM });
+
+    expect(obs.comment.present).toBe(false);
+    expect(obs.comment.count).toBeNull();
+
+    const bareDate = createPost('<div class="qCWAqb seqYL">10 apr</div>');
+    const obsBare = detector.observe(bareDate, { postId: 'p19', viewKind: ViewKind.STREAM });
+
+    expect(obsBare.comment.present).toBe(false);
+    expect(obsBare.comment.count).toBeNull();
+  });
 });
