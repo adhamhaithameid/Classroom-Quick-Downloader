@@ -515,8 +515,13 @@ function updateGroupState(group: GroupState): void {
     file.downloaded = someSuccess;
     // Not in progress if cancelled
     file.inProgress = someLoading && !someCancelled;
-    // Cancelled counts as failed (incomplete download)
-    file.failed = !file.downloaded && (someError || someCancelled);
+    // Cancelled counts as failed (incomplete download). The failure must be
+    // STICKY within a run: per-file buttons auto-reset from error back to
+    // idle a few seconds after failing, and a class-only recomputation would
+    // erase the failure mid-run — leaving downloaded+failed < totalFiles, so
+    // the group never settles and the Download All button hangs in its
+    // cancel state forever (the "#537: Download All always fails" family).
+    file.failed = (file.failed && !file.downloaded) || someError || someCancelled;
 
     if (file.downloaded) downloaded++;
     else if (file.inProgress) inProgress++;

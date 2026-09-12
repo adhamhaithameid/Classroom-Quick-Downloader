@@ -258,7 +258,7 @@ describe('background download handler', () => {
     expect(ctx.sendStatusSpy).toHaveBeenCalledWith(
       pending,
       'error',
-      'Access denied for all accounts.',
+      'Access denied for all your accounts. Open the file directly in Drive to confirm access.',
       'AUTH_ALL_FAILED',
     );
     expect(ctx.cleanupSpy).toHaveBeenCalledWith(pending);

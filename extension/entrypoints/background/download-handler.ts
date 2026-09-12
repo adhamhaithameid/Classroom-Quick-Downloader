@@ -81,7 +81,14 @@ export function startNextDriveAttempt(pending: PendingDownload): void {
   );
 
   if (nextAuth == null) {
-    sendStatusToTab(pending, 'error', 'Access denied for all accounts.', 'AUTH_ALL_FAILED');
+    // Terminal after every signed-in account was tried: the next honest step
+    // is for the user to confirm access directly in Drive.
+    sendStatusToTab(
+      pending,
+      'error',
+      'Access denied for all your accounts. Open the file directly in Drive to confirm access.',
+      'AUTH_ALL_FAILED',
+    );
     recordDownloadEvent({
       type: pending.fileMeta?.ext || 'unknown',
       status: 'fail',
