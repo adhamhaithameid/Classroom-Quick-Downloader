@@ -14,7 +14,7 @@ const SECURITY_HEADERS = {
 
 // Redirects (301/308) are exempt: browsers do not honor response headers on
 // the hop, the destination response carries them instead.
-function withSecurityHeaders(response, env) {
+function withSecurityHeaders(response) {
   if (response.status >= 300 && response.status < 400) {
     return response;
   }
@@ -43,6 +43,6 @@ export default {
       return Response.redirect(url.toString(), 308);
     }
 
-    return withSecurityHeaders(await env.ASSETS.fetch(request), env);
+    return withSecurityHeaders(await env.ASSETS.fetch(request));
   }
 };

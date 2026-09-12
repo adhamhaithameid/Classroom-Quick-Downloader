@@ -255,7 +255,7 @@
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--gc-green);
+    color: var(--gc-green-dark);
     margin-bottom: 0.8rem;
   }
 
@@ -305,7 +305,7 @@
   }
 
   .seo-btn-primary {
-    background: linear-gradient(165deg, #1f9a5e, var(--gc-green-dark));
+    background: var(--gc-green-dark);
     border: 1px solid rgba(19, 122, 71, 0.6);
     color: #ffffff;
     box-shadow: var(--shadow-green);
