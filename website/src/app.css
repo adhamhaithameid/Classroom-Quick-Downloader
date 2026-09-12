@@ -93,6 +93,53 @@ body {
   background: transparent;
 }
 
+/* ── Original ambient body orbs ──────────────────────────────────────
+   Restored verbatim from the deployed background (origin/main b7820fe7):
+   two soft fixed green washes drifting behind the shared orb field. */
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  z-index: -1;
+  border-radius: 50%;
+  filter: blur(100px);
+  pointer-events: none;
+  animation: floatOrb 20s ease-in-out infinite;
+}
+
+body::before {
+  width: 500px;
+  height: 500px;
+  background: rgba(26, 139, 85, 0.07);
+  left: -150px;
+  top: -100px;
+}
+
+body::after {
+  width: 400px;
+  height: 400px;
+  background: rgba(87, 187, 138, 0.06);
+  right: -120px;
+  bottom: 10vh;
+  animation-delay: -8s;
+}
+
+@keyframes floatOrb {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-20px) scale(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  body::after {
+    animation: none;
+  }
+}
+
 html {
   scroll-behavior: smooth;
   scroll-padding-top: 92px;

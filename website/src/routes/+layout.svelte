@@ -598,9 +598,6 @@
   }
 
   $: route = $page.url.pathname.replace(/\/$/, '') || '/';
-  // The overview (+editor) render their own editor-connected entity layer;
-  // every other route gets the shared ambient entities.
-  $: ambientFloats = route !== '/' && route !== '/overview' && route !== '/overview-editor';
   $: isOverviewStyleRoute =
     $page.status === 404 ||
     route === '/' ||
@@ -679,7 +676,7 @@
 <BrowserIconSprite />
 
 <div class="site-shell" class:o2-fullscreen={hideChrome}>
-  <AmbientBackground withFloats={ambientFloats} />
+  <AmbientBackground />
   <a class="skip-link" href="#main-content">Skip to content</a>
   {#if !hideChrome}
   <header class="l2-nav-shell" class:is-scrolled={scrolled} class:menu-open={openMenu !== null} class:nav-dark={navDark}>
@@ -1070,6 +1067,7 @@
   }
 
   .site-shell {
+    position: relative;
     min-height: 100vh;
     display: flex;
     flex-direction: column;

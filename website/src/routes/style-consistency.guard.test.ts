@@ -98,41 +98,54 @@ describe('style consistency: shared glass design system', () => {
   });
 });
 
-describe('style consistency: shared floating entities', () => {
-  it('renders the drifting entities from the layout-mounted ambient layer', () => {
-    const ambient = read('../lib/components/AmbientBackground.svelte');
-    expect(ambient).toContain('class="l2-page-floats"');
-    expect(ambient).toContain('defaultPlacements');
-    expect(ambient).toContain('float-a');
-    // Mobile opt-out matches the overview's own placement breakpoint.
-    expect(ambient).toContain('max-width: 900px');
-
-    // The overview (+editor) render their own editor-connected entity layer,
-    // so the shared one must be suppressible per route.
-    const layout = read('./+layout.svelte');
-    expect(layout).toContain('withFloats');
-    expect(layout).toContain('/overview-editor');
-  });
-
+describe('style consistency: floating entities scoping', () => {
   it('resolves placement svg through one shared catalog helper', () => {
     const placements = read('../lib/svgCatalog/placements.ts');
     expect(placements).toContain('export function resolvePlacementSvg');
     const overview = read('./overview/+page.svelte');
     expect(overview).toContain('resolvePlacementSvg');
   });
+
+  it('keeps the entity layer scoped to the overview and its editor', () => {
+    // Entities are the overview's editor-connected placement system.
+    expect(read('./overview/+page.svelte')).toContain('l2-page-floats');
+    expect(read('./overview-editor/+page.svelte')).toContain('l2-page-floats');
+    // Nowhere else ships an entity layer.
+    for (const file of [
+      './changelog/+page.svelte',
+      './faq/+page.svelte',
+      './privacy/+page.svelte',
+      './404/+page.svelte',
+      './uninstall/+page.svelte',
+      './site-map/+page.svelte'
+    ]) {
+      expect(read(file)).not.toContain('l2-page-floats');
+    }
+  });
 });
 
 describe('style consistency: one shared ambient background', () => {
-  it('renders the orbs + grid from the layout-mounted AmbientBackground component', () => {
+  it('renders the pastel orb field + grid from the layout-mounted component', () => {
     const ambient = read('../lib/components/AmbientBackground.svelte');
     expect(ambient).toContain('class="l2-page-orbs"');
     expect(ambient).toContain('class="l2-page-grid"');
-    expect(ambient).toContain('background-image');
+    // The user's original look: pastel drifting orbs, no hue-cycle.
+    expect(ambient).toContain('orb-drift');
+    expect(ambient).not.toContain('aurora-hue');
+    expect(ambient).toContain('#bbf7d0');
+    expect(ambient).toContain('#a5f3fc');
+    expect(ambient).toContain('#e0e7ff');
+    // Grid texture: subtle, per the deployed background (user-set 0.05).
+    expect(ambient).toMatch(/opacity:\s*0\.05/);
     expect(ambient).toContain('linear-gradient');
     expect(ambient).toContain('prefers-reduced-motion');
+    // Entities live ONLY in the overview/editor's own layer.
+    expect(ambient).not.toContain('l2-page-floats');
+    expect(ambient).not.toContain('defaultPlacements');
 
     const layout = read('./+layout.svelte');
     expect(layout).toContain('AmbientBackground');
+    expect(layout).not.toContain('withFloats');
   });
 
   it.each(AMBIENT_COPIES_GONE)('$label no longer re-implements the background', ({ file, marker }) => {
@@ -140,9 +153,13 @@ describe('style consistency: one shared ambient background', () => {
     expect(source).not.toContain(marker);
   });
 
-  it('keeps the app-level body pseudo-orbs removed in favor of the component', () => {
+  it('keeps the app-level body pseudo-orbs restored as part of the original look', () => {
     const css = read('../app.css');
-    expect(css).not.toContain('body::before');
-    expect(css).not.toContain('body::after');
+    expect(css).toContain('body::before');
+    expect(css).toContain('body::after');
+    expect(css).toContain('@keyframes floatOrb');
+    // The canvas color lives on html; body stays transparent so the fixed
+    // orbs always paint above the canvas, below content.
+    expect(css).toContain('background: var(--bg)');
   });
 });

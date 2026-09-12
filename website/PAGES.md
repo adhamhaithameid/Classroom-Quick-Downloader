@@ -3,11 +3,12 @@
 Last verified: **2026-09-12** · Site: `website/` (SvelteKit, static adapter, prerendered)
 
 **Totals: 29 implemented pages · 22 publicly indexable · 4 server endpoints · 2 disabled routes.**
-All 29 pages share the ambient background rendered once by `AmbientBackground.svelte` (mounted in
-`+layout.svelte`): six drifting gradient orbs with a 40s hue-cycle, the 60px vertical/horizontal
-grid lines, and the floating entity layer (25 catalog placements) on every route except `/`,
-`/overview`, and `/overview-editor`, which render their own editor-connected entity layer. Motion
-is disabled under `prefers-reduced-motion`; entities hide below the 900px placement breakpoint.
+All 29 pages share the original ambient background rendered once by `AmbientBackground.svelte`
+(mounted in `+layout.svelte`): the pastel 12-orb drifting field (`orb-drift`, no hue-cycle) over
+the 60px vertical/horizontal grid lines at 0.05 opacity, plus the two soft `body::before/after`
+washes in `app.css`. The floating entity layer lives only on `/`, `/overview`, and
+`/overview-editor` (their editor-connected `l2-page-floats` layer). Motion is disabled under
+`prefers-reduced-motion`.
 
 ## How this is generated / where to change things
 
@@ -96,9 +97,13 @@ SvelteKit ignores `.disabled` files entirely; rename to `+page.svelte` to re-ena
   transparent so the fixed layer shows through on every route, and the page-scoped
   `.l2-page-orbs` fields join the same hue cycle.
 - **Ambient architecture (2026-09-12):** the background was extracted into
-  `src/lib/components/AmbientBackground.svelte` (orbs + grid + floating entities; the per-page
-  orb/grid copies were removed), and the glass design system moved to
+  `src/lib/components/AmbientBackground.svelte`, and the glass design system moved to
   `src/lib/styles/glass.css` (`.glass-panel` / `.glass-hover` / `.glass-icon`), consumed by all
   card families. Placement SVGs resolve through the shared `resolvePlacementSvg` in
   `src/lib/svgCatalog/placements.ts`. Guarded by `style-consistency.guard.test.ts` and
   `overview.visual-guard.test.ts`.
+- **Background restored to the deployed look (2026-09-12):** per user request the ambient layer
+  went back to the original design from origin/main (`b7820fe7`): the pastel 12-orb drifting
+  field + the 60px grid (0.05 opacity) shared by every page via `AmbientBackground.svelte`, the
+  `body::before/after` washes restored in `app.css`, no hue-cycle, and the floating entities
+  scoped back to the overview routes only.

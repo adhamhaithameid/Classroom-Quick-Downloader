@@ -49,9 +49,8 @@ describe('overview visual guardrails', () => {
     const { body } = render(OverviewPage);
     const html = squish(body);
 
-    // The placement floats are page content; the orbs + grid are the shared
-    // ambient background and must come from the layout-mounted component,
-    // never re-implemented per page.
+    // The floating entities are rendered by the overview's own
+    // editor-connected layer; orbs + grid come from the shared component.
     expect(html).toContain('l2-page-floats');
     expect(html).not.toContain('class="l2-page-orbs"');
     expect(html).not.toContain('class="l2-page-grid"');
@@ -64,7 +63,7 @@ describe('overview visual guardrails', () => {
     );
     expect(ambient).toContain('class="l2-page-orbs"');
     expect(ambient).toContain('class="l2-page-grid"');
-    expect(ambient).toContain('@keyframes aurora-drift');
+    expect(ambient).toContain('@keyframes orb-drift');
     expect(ambient).toContain('prefers-reduced-motion');
 
     const layout = readFileSync(new URL('./+layout.svelte', import.meta.url), 'utf8');
@@ -105,6 +104,27 @@ describe('overview visual guardrails', () => {
     expect(pinnedStar?.type).toBe('doodle');
   });
 
+  it('renders the compact trust strip with evidence-linked claims', () => {
+    const { body } = render(OverviewPage);
+    const html = squish(body);
+
+    // One unique subtext per chip, so a missing or reworded chip fails.
+    expect(html).toContain('no ads, no premium tier');
+    expect(html).toContain('nothing to sign up for');
+    expect(html).toContain('no file contents collected');
+    expect(html).toContain('straight from Google to you');
+    expect(html).toContain('audit the code on GitHub');
+    expect(html).toContain('l2-trust-row');
+
+    // Every claim links to the page that proves it.
+    expect(html).toContain('href="/faq"');
+    expect(html).toContain('href="/privacy"');
+    expect(html).toContain('href="/security"');
+    expect(html).toContain('github.com/adhamhaithameid/Classroom-Quick-Downloader');
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain('rel="noopener noreferrer"');
+  });
+
   it('keeps global font token, metric fallback face, and ambient background rules in app.css', () => {
     const css = readFileSync(new URL('../app.css', import.meta.url), 'utf8');
 
@@ -130,12 +150,13 @@ describe('overview visual guardrails', () => {
       "--font-ui: 'Plus Jakarta Sans', 'Plus Jakarta Sans Fallback', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui;"
     );
 
-    // Ambient background lives in the layout-mounted AmbientBackground
-    // component; app.css carries the shared glass design system instead.
+    // The shared glass design system lives in app.css; the original body
+    // pseudo-orbs are restored as part of the user's background.
     expect(css).toContain('./lib/styles/glass.css');
     expect(css).toContain('--glass-bg');
     expect(css).toContain('--glass-ease');
-    expect(css).not.toContain('body::before');
-    expect(css).not.toContain('body::after');
+    expect(css).toContain('body::before');
+    expect(css).toContain('body::after');
+    expect(css).toContain('@keyframes floatOrb');
   });
 });
