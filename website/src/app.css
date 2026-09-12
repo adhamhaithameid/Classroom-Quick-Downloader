@@ -175,6 +175,18 @@ a {
   color: inherit;
 }
 
+/* Balanced headings avoid orphaned last lines; pretty keeps paragraph
+   ragged edges even. Progressive enhancement, ignored where unsupported. */
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
 button,
 input,
 textarea,
@@ -303,6 +315,7 @@ select {
   font-weight: 800;
   letter-spacing: -0.03em;
   color: var(--gc-green);
+  font-variant-numeric: tabular-nums;
 }
 
 @keyframes riseIn {

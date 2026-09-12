@@ -411,7 +411,7 @@
 
   .cl-mega {
     font-size: clamp(36px, 5vw, 60px);
-    font-weight: 900; line-height: 1.15;
+    font-weight: 800; line-height: 1.15;
     letter-spacing: -0.03em; margin: 0 0 16px;
     padding-bottom: 0.1em;
     background: linear-gradient(135deg, var(--green), var(--green-light), #10b981);

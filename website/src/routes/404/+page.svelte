@@ -119,7 +119,7 @@
 
   .nf-glitch-code {
     font-size: clamp(100px, 18vw, 200px);
-    font-weight: 900;
+    font-weight: 800;
     line-height: 1;
     letter-spacing: -0.04em;
     background: linear-gradient(135deg, rgba(26,139,85,0.12), rgba(34,197,94,0.08));
@@ -136,7 +136,7 @@
 
   .nf-mega {
     font-size: clamp(28px, 4vw, 48px);
-    font-weight: 900;
+    font-weight: 800;
     line-height: 1.15;
     letter-spacing: -0.03em;
     margin: 0 0 16px;

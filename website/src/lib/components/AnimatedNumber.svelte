@@ -150,5 +150,6 @@
     letter-spacing: normal;
     word-spacing: normal;
     font-kerning: normal;
+    font-variant-numeric: tabular-nums;
   }
 </style>

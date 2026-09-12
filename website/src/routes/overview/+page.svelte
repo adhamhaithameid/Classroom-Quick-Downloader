@@ -2487,7 +2487,7 @@
   .l2-hero-content { position: relative; z-index: 2; }
 
   .l2-mega {
-    font-size: clamp(40px, 6vw, 72px); font-weight: 900;
+    font-size: clamp(40px, 6vw, 72px); font-weight: 800;
     line-height: 1.05; letter-spacing: -0.03em;
     margin: 0 0 24px;
   }
@@ -3569,7 +3569,7 @@
 
   .l2-silly-yay-text {
     font-size: clamp(36px, 5vw, 56px);
-    font-weight: 900;
+    font-weight: 800;
     display: block;
     margin-bottom: 4px;
     background: linear-gradient(135deg, #22c55e, #eab308, #ef4444, #8b5cf6);

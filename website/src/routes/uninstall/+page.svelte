@@ -381,7 +381,7 @@
 
   .un-mega {
     font-size: clamp(32px, 5.5vw, 52px);
-    font-weight: 900;
+    font-weight: 800;
     line-height: 1.12;
     letter-spacing: -0.035em;
     margin: 0 0 18px;
@@ -726,7 +726,7 @@
 
   .un-cta-heading {
     font-size: clamp(22px, 3vw, 30px);
-    font-weight: 900;
+    font-weight: 800;
     letter-spacing: -0.03em;
     margin: 0 0 10px;
   }
