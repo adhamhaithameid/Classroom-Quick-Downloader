@@ -60,6 +60,16 @@ describe('site layout shell', () => {
     expect(html).toContain('aria-current="page"');
   });
 
+  it('mounts the shared ambient background (orbs + grid) on every route', () => {
+    mockState.path = '/faq';
+    mockState.status = 200;
+    const { body } = render(Layout);
+    const html = squish(body);
+
+    expect(html).toContain('l2-page-orbs');
+    expect(html).toContain('l2-page-grid');
+  });
+
   it('renders crawlable hover megamenus with described links in server markup', () => {
     mockState.path = '/overview';
     mockState.status = 200;

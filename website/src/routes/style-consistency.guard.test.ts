@@ -73,8 +73,11 @@ describe('style consistency: shared glass design system', () => {
     const source = read(file);
     expect(source).not.toContain('cubic-bezier(0.4, 0, 0.2, 1)');
     expect(source).not.toContain('cubic-bezier(0.4,0,0.2,1)');
-    // Guards are global now — pages must not re-declare them per surface.
-    expect(source).not.toContain('prefers-reduced-transparency');
+    // Guards are global for utility consumers. A page may keep at most ONE
+    // reduced-transparency fallback block for bespoke non-utility surfaces
+    // (form fields, sub-rows) — never the old per-card duplication.
+    const rtBlocks = source.split('prefers-reduced-transparency').length - 1;
+    expect(rtBlocks).toBeLessThanOrEqual(1);
   });
 
   it('keeps the watch pages on the brand green, not the off-palette emerald', () => {

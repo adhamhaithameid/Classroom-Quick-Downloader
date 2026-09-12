@@ -50,6 +50,11 @@
 }
 
 .glass-hover {
+  /* Only genuine controls advertise clickability — content cards keep the
+     default cursor even though they share the hover motion. */
+}
+
+.glass-hover:is(a, button) {
   cursor: pointer;
 }
 

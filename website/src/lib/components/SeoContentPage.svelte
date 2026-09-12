@@ -1,9 +1,9 @@
 <script lang="ts">
   import { base } from '$app/paths';
-  import { APP_VERSION, SITE_URL } from '$lib/config';
+  import { APP_VERSION, SITE_URL, STORE_LINKS } from '$lib/config';
   import SeoMeta from '$lib/components/SeoMeta.svelte';
   import { relatedPagesFor, type SeoPageConfig } from '$lib/content/seoPages';
-  import { SITE_NAME, SOCIAL_IMAGE } from '$lib/seo/site';
+  import { SITE_NAME, SOCIAL_IMAGE, lastModForPath } from '$lib/seo/site';
   import { glassSheen } from '$lib/actions/glassSheen';
 
   export let config: SeoPageConfig;
@@ -60,7 +60,19 @@
     };
   }
 
+  const UPDATED_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+  function formatUpdatedDate(isoDate: string): string {
+    const [year, month, day] = isoDate.split('-').map(Number);
+    if (!year || !month || !day) return isoDate;
+    return `${UPDATED_MONTHS[month - 1]} ${day}, ${year}`;
+  }
+
   $: canonicalUrl = toCanonicalUrl(config.path);
+  // One source of truth with the sitemap: the visible "Updated" byline and
+  // the TechArticle dateModified both come from the curated lastmod map.
+  $: updatedIso = lastModForPath(config.path);
+  $: updatedLabel = formatUpdatedDate(updatedIso);
   $: webPageStructuredData = {
     '@context': 'https://schema.org',
     '@type': 'WebPage',
@@ -84,6 +96,17 @@
     }
   };
 
+  $: techArticleStructuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'TechArticle',
+    headline: config.h1,
+    description: config.description,
+    inLanguage: 'en',
+    author: { '@type': 'Person', name: 'Adham Haitham', url: STORE_LINKS.github },
+    publisher: { '@id': `${SITE_URL}/#organization` },
+    mainEntityOfPage: canonicalUrl,
+    dateModified: updatedIso
+  };
   $: breadcrumbStructuredData = buildBreadcrumbData(config.path, config.h1);
   $: faqStructuredData = config.faqs && config.faqs.length > 0
     ? {
@@ -115,6 +138,7 @@
     : null;
   $: seoStructuredData = [
     webPageStructuredData,
+    techArticleStructuredData,
     breadcrumbStructuredData,
     ...(faqStructuredData ? [faqStructuredData] : []),
     ...(relatedStructuredData ? [relatedStructuredData] : [])
@@ -131,10 +155,13 @@
 />
 
 <article class="seo-page">
-  <section class="seo-hero">
+  <section class="seo-hero glass-panel">
     <span class="seo-eyebrow">{config.eyebrow}</span>
     <h1>{config.h1}</h1>
     <p>{config.intro}</p>
+    <p class="seo-byline">
+      Maintained by <strong>Adham Haitham</strong> · <time datetime={updatedIso}>Updated {updatedLabel}</time>
+    </p>
     <div class="seo-hero-actions">
       {#if config.primaryCta}
         <a
@@ -148,7 +175,7 @@
       {/if}
       {#if config.secondaryCta}
         <a
-          class="seo-btn seo-btn-secondary"
+          class="seo-btn seo-btn-secondary glass-panel glass-hover"
           href={resolveHref(config.secondaryCta.href)}
           target={config.secondaryCta.external ? '_blank' : undefined}
           rel={config.secondaryCta.external ? 'noopener noreferrer' : undefined}
@@ -161,7 +188,7 @@
 
   <section class="seo-sections">
     {#each config.sections as section, i}
-      <article class="seo-card" style="--card-i: {i}" use:glassSheen>
+      <article class="seo-card glass-panel glass-hover" style="--card-i: {i}" use:glassSheen>
         <h2>{section.heading}</h2>
         {#each section.paragraphs ?? [] as paragraph}
           <p>{paragraph}</p>
@@ -178,7 +205,7 @@
   </section>
 
   {#if config.faqs && config.faqs.length > 0}
-    <section class="seo-faq" aria-labelledby="seo-faq-heading">
+    <section class="seo-faq glass-panel" aria-labelledby="seo-faq-heading">
       <h2 id="seo-faq-heading">Frequently Asked Questions</h2>
       {#each config.faqs as faq}
         <article class="seo-faq-item">
@@ -190,7 +217,7 @@
   {/if}
 
   {#if relatedPages.length}
-    <section class="seo-related" aria-labelledby="seo-related-heading">
+    <section class="seo-related glass-panel" aria-labelledby="seo-related-heading">
       <h2 id="seo-related-heading">Related Guides</h2>
       <ul>
         {#each relatedPages as related}
@@ -219,34 +246,8 @@
   }
 
   .seo-hero {
-    position: relative;
-    overflow: hidden;
     padding: 2.2rem;
-    border: 1px solid var(--glass-border);
     border-radius: 1rem;
-    background: var(--glass-bg);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    backdrop-filter: blur(20px) saturate(180%);
-    box-shadow:
-      0 1px 2px rgba(15, 20, 25, 0.05),
-      0 12px 30px rgba(15, 20, 25, 0.1),
-      0 8px 24px rgba(26, 139, 85, 0.08),
-      inset 0 1px 0 var(--glass-highlight);
-  }
-
-  /* Static top gloss shared by the glass surfaces. */
-  .seo-hero::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 36%),
-      linear-gradient(120deg, rgba(255, 255, 255, 0.3), rgba(239, 247, 250, 0.16) 48%, rgba(255, 255, 255, 0.28));
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.9),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.35);
   }
 
   .seo-eyebrow {
@@ -274,6 +275,17 @@
     line-height: 1.7;
     color: var(--text-secondary);
     max-width: 70ch;
+  }
+
+  .seo-byline {
+    margin: 0.9rem 0 0;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+
+  .seo-byline strong {
+    color: var(--text);
+    font-weight: 700;
   }
 
   .seo-hero-actions {
@@ -312,8 +324,6 @@
   }
 
   .seo-btn-secondary {
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
     color: var(--text);
   }
 
@@ -325,90 +335,8 @@
   }
 
   .seo-card {
-    position: relative;
-    overflow: hidden;
-    border: 1px solid var(--glass-border);
     border-radius: 0.9rem;
-    background: var(--glass-bg);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    backdrop-filter: blur(20px) saturate(180%);
     padding: 1.25rem 1.2rem;
-    box-shadow:
-      0 1px 2px rgba(15, 20, 25, 0.05),
-      0 12px 30px rgba(15, 20, 25, 0.1),
-      0 8px 24px rgba(26, 139, 85, 0.08),
-      inset 0 1px 0 var(--glass-highlight);
-    transition:
-      transform 0.45s var(--glass-ease),
-      box-shadow 0.45s var(--glass-ease),
-      border-color 0.3s ease;
-  }
-
-  .seo-card:hover {
-    transform: translateY(-3px);
-    border-color: rgba(26, 139, 85, 0.22);
-    box-shadow:
-      0 8px 20px rgba(26, 139, 85, 0.12),
-      0 0 0 1px rgba(26, 139, 85, 0.06),
-      0 20px 44px rgba(15, 20, 25, 0.12),
-      inset 0 1px 0 var(--glass-highlight);
-  }
-
-  .seo-card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 36%),
-      linear-gradient(120deg, rgba(255, 255, 255, 0.3), rgba(239, 247, 250, 0.16) 48%, rgba(255, 255, 255, 0.28));
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.9),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.35);
-  }
-
-  .seo-card::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    opacity: 0;
-    background: radial-gradient(
-      240px circle at var(--card-mx, 50%) var(--card-my, 0%),
-      rgba(255, 255, 255, 0.55),
-      rgba(255, 255, 255, 0) 72%
-    );
-    transition: opacity 0.35s ease;
-  }
-
-  .seo-card:hover::after {
-    opacity: 1;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .seo-card {
-      transition: none;
-    }
-
-    .seo-card::after {
-      display: none;
-    }
-  }
-
-  @media (prefers-reduced-transparency: reduce) {
-    .seo-card {
-      background: #fcfefd;
-      border-color: rgba(226, 232, 240, 0.9);
-      -webkit-backdrop-filter: none;
-      backdrop-filter: none;
-    }
-
-    .seo-card::before,
-    .seo-card::after {
-      display: none;
-    }
   }
 
   .seo-card h2 {
@@ -438,79 +366,9 @@
   }
 
   .seo-related {
-    position: relative;
-    overflow: hidden;
     margin-top: 1.1rem;
-    border: 1px solid var(--glass-border);
     border-radius: 0.9rem;
-    background: var(--glass-bg);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    backdrop-filter: blur(20px) saturate(180%);
     padding: 1.25rem 1.2rem;
-    box-shadow:
-      0 1px 2px rgba(15, 20, 25, 0.05),
-      0 12px 30px rgba(15, 20, 25, 0.1),
-      0 8px 24px rgba(26, 139, 85, 0.08),
-      inset 0 1px 0 var(--glass-highlight);
-  }
-
-  .seo-related::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 36%),
-      linear-gradient(120deg, rgba(255, 255, 255, 0.3), rgba(239, 247, 250, 0.16) 48%, rgba(255, 255, 255, 0.28));
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.9),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.35);
-  }
-
-  @media (prefers-reduced-transparency: reduce) {
-    .seo-related {
-      background: #fcfefd;
-      border-color: rgba(226, 232, 240, 0.9);
-      -webkit-backdrop-filter: none;
-      backdrop-filter: none;
-    }
-
-    .seo-related::before {
-      display: none;
-    }
-  }
-
-  .seo-faq {
-    position: relative;
-    overflow: hidden;
-    margin-top: 1.1rem;
-    border: 1px solid var(--glass-border);
-    border-radius: 0.9rem;
-    background: var(--glass-bg);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    backdrop-filter: blur(20px) saturate(180%);
-    padding: 1.25rem 1.2rem;
-    box-shadow:
-      0 1px 2px rgba(15, 20, 25, 0.05),
-      0 12px 30px rgba(15, 20, 25, 0.1),
-      0 8px 24px rgba(26, 139, 85, 0.08),
-      inset 0 1px 0 var(--glass-highlight);
-  }
-
-  /* Static top gloss shared by the glass surfaces. */
-  .seo-faq::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 36%),
-      linear-gradient(120deg, rgba(255, 255, 255, 0.3), rgba(239, 247, 250, 0.16) 48%, rgba(255, 255, 255, 0.28));
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.9),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.35);
   }
 
   .seo-faq h2 {
@@ -534,22 +392,6 @@
     margin: 0.2rem 0 0;
     color: var(--text-secondary);
     line-height: 1.7;
-  }
-
-  @media (prefers-reduced-transparency: reduce) {
-    .seo-hero,
-    .seo-faq,
-    .seo-btn-secondary {
-      background: #fcfefd;
-      border-color: rgba(226, 232, 240, 0.9);
-      -webkit-backdrop-filter: none;
-      backdrop-filter: none;
-    }
-
-    .seo-hero::before,
-    .seo-faq::before {
-      display: none;
-    }
   }
 
   .seo-related h2 {

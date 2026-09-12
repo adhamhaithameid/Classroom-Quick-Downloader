@@ -239,7 +239,7 @@
       <p class="cl-sub">What's new in every release of Classroom Quick Downloader.</p>
 
       <div class="cl-hero-actions">
-        <a class="cl-action-pill" href={STORE_LINKS.github + '/blob/main/user-friendly-changelog.md'} target="_blank" rel="noopener noreferrer">
+        <a class="cl-action-pill glass-panel glass-hover" href={STORE_LINKS.github + '/blob/main/user-friendly-changelog.md'} target="_blank" rel="noopener noreferrer">
           Open changelog on GitHub →
         </a>
       </div>
@@ -250,24 +250,24 @@
   <section class="cl-body-section">
     <div class="cl-wrap">
       {#if state === 'loading'}
-        <div class="cl-state-card cl-reveal">
+        <div class="cl-state-card glass-panel cl-reveal">
           <div class="cl-state-inner">
             <span class="cl-state-icon">⏳</span>
             <p>Loading changelog from the servers…</p>
           </div>
         </div>
       {:else if state === 'error'}
-        <div class="cl-state-card cl-state-error cl-reveal">
+        <div class="cl-state-card cl-state-error glass-panel cl-reveal">
           <div class="cl-state-inner">
             <span class="cl-state-icon">⚠️</span>
             <strong>Could not load changelog.</strong>
             <p>{error}</p>
-            <button type="button" class="cl-action-pill" on:click={() => load(true)} disabled={refreshing}>Retry</button>
+            <button type="button" class="cl-action-pill glass-panel glass-hover" on:click={() => load(true)} disabled={refreshing}>Retry</button>
           </div>
         </div>
       {:else}
         {#if degraded}
-          <div class="cl-state-card cl-state-warn cl-reveal">
+          <div class="cl-state-card cl-state-warn glass-panel cl-reveal">
             <div class="cl-state-inner">
               <span class="cl-state-icon">⚠️</span>
               <strong>Showing cached changelog data.</strong>
@@ -278,7 +278,7 @@
         <div class="cl-layout">
           <!-- Sidebar -->
           <aside class="cl-sidebar">
-            <div class="cl-sidebar-card cl-reveal">
+            <div class="cl-sidebar-card glass-panel cl-reveal">
               <h2 class="cl-sidebar-label">Versions</h2>
               <nav class="cl-sidebar-links">
                 {#each changelogEntries as entry}
@@ -305,7 +305,7 @@
                     <div class="cl-line"></div>
                   {/if}
                 </div>
-                <div class="cl-entry-card" style="--card-i: {i}" use:glassSheen>
+                <div class="cl-entry-card glass-panel glass-hover" style="--card-i: {i}" use:glassSheen>
                   <div class="cl-entry-header">
                     <h2>v{entry.version}{#if i === 0}<span class="cl-latest-tag">Latest</span>{/if}</h2>
                   </div>
@@ -436,50 +436,16 @@
 
   .cl-action-pill {
     display: inline-flex; align-items: center; gap: 6px;
-    position: relative;
-    overflow: hidden;
-    border: 1px solid var(--glass-border);
     border-radius: 999px; padding: 9px 18px;
     text-decoration: none;
-    background: var(--glass-bg);
     color: var(--text-secondary);
     font-weight: 600; font-size: 13px;
     cursor: pointer;
-    transition:
-      transform 0.45s var(--glass-ease),
-      box-shadow 0.45s var(--glass-ease),
-      border-color 0.3s ease;
-    box-shadow:
-      0 1px 2px rgba(15, 20, 25, 0.05),
-      0 12px 30px rgba(15, 20, 25, 0.1),
-      0 8px 24px rgba(26, 139, 85, 0.08),
-      inset 0 1px 0 var(--glass-highlight);
   }
   .cl-action-pill:hover {
-    border-color: rgba(26,139,85,0.25);
     color: var(--green);
-    box-shadow:
-      0 8px 20px rgba(26, 139, 85, 0.12),
-      0 0 0 1px rgba(26, 139, 85, 0.06),
-      0 20px 44px rgba(15, 20, 25, 0.12),
-      inset 0 1px 0 var(--glass-highlight);
   }
   .cl-action-pill:disabled { opacity: 0.6; cursor: wait; }
-
-  /* Static top gloss shared by the glass surfaces. */
-  .cl-action-pill::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 36%),
-      linear-gradient(120deg, rgba(255, 255, 255, 0.3), rgba(239, 247, 250, 0.16) 48%, rgba(255, 255, 255, 0.28));
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.9),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.35);
-  }
 
   /* ── Body ──────────────────────── */
   .cl-body-section {
@@ -488,18 +454,9 @@
   }
 
   .cl-state-card {
-    position: relative;
-    overflow: hidden;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
     border-radius: 20px;
     padding: 48px;
     text-align: center;
-    box-shadow:
-      0 1px 2px rgba(15, 20, 25, 0.05),
-      0 12px 30px rgba(15, 20, 25, 0.1),
-      0 8px 24px rgba(26, 139, 85, 0.08),
-      inset 0 1px 0 var(--glass-highlight);
   }
 
   .cl-state-error {
@@ -533,17 +490,8 @@
   }
 
   .cl-sidebar-card {
-    position: relative;
-    overflow: hidden;
-    border: 1px solid var(--glass-border);
     border-radius: var(--radius);
-    background: var(--glass-bg);
     padding: 18px;
-    box-shadow:
-      0 1px 2px rgba(15, 20, 25, 0.05),
-      0 12px 30px rgba(15, 20, 25, 0.1),
-      0 8px 24px rgba(26, 139, 85, 0.08),
-      inset 0 1px 0 var(--glass-highlight);
   }
 
   .cl-sidebar-label {
@@ -623,97 +571,12 @@
   }
 
   .cl-entry-card {
-    position: relative;
-    overflow: hidden;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
     border-radius: var(--radius);
     padding: 24px;
-    box-shadow:
-      0 1px 2px rgba(15, 20, 25, 0.05),
-      0 12px 30px rgba(15, 20, 25, 0.1),
-      0 8px 24px rgba(26, 139, 85, 0.08),
-      inset 0 1px 0 var(--glass-highlight);
-    transition:
-      transform 0.45s var(--glass-ease),
-      box-shadow 0.45s var(--glass-ease),
-      border-color 0.3s ease;
   }
 
   .cl-entry-card:hover {
     transform: translateY(-2px);
-    border-color: rgba(26, 139, 85, 0.22);
-    box-shadow:
-      0 8px 20px rgba(26, 139, 85, 0.12),
-      0 0 0 1px rgba(26, 139, 85, 0.06),
-      0 16px 36px rgba(15, 20, 25, 0.1),
-      inset 0 1px 0 var(--glass-highlight);
-  }
-
-  /* Shared navbar glass sheen on the changelog surfaces. */
-  .cl-state-card::before,
-  .cl-sidebar-card::before,
-  .cl-entry-card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 36%),
-      linear-gradient(120deg, rgba(255, 255, 255, 0.3), rgba(239, 247, 250, 0.16) 48%, rgba(255, 255, 255, 0.28));
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.9),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.35);
-  }
-
-  /* Pointer-tracked specular sweep on entry cards (glassSheen action). */
-  .cl-entry-card::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    opacity: 0;
-    background: radial-gradient(
-      240px circle at var(--card-mx, 50%) var(--card-my, 0%),
-      rgba(255, 255, 255, 0.55),
-      rgba(255, 255, 255, 0) 72%
-    );
-    transition: opacity 0.35s ease;
-  }
-
-  .cl-entry-card:hover::after {
-    opacity: 1;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .cl-entry-card,
-    .cl-action-pill {
-      transition: none;
-    }
-
-    .cl-entry-card::after {
-      display: none;
-    }
-  }
-
-  @media (prefers-reduced-transparency: reduce) {
-    .cl-state-card,
-    .cl-sidebar-card,
-    .cl-entry-card,
-    .cl-action-pill {
-      background: #fcfefd;
-      border-color: rgba(226, 232, 240, 0.9);
-    }
-
-    .cl-state-card::before,
-    .cl-sidebar-card::before,
-    .cl-entry-card::before,
-    .cl-action-pill::before,
-    .cl-entry-card::after {
-      display: none;
-    }
   }
 
   .cl-entry-header { margin-bottom: 10px; }
@@ -833,5 +696,11 @@
       padding: 9px 10px;
     }
     .cl-sv { font-size: 13px; }
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .cl-state-warn {
+      background: #fcfefd;
+    }
   }
 </style>

@@ -149,14 +149,14 @@
       <!-- Step 1: Reason -->
       <div class="un-step un-appear" style="animation-delay: 0.1s">
         <div class="un-step-badge" aria-hidden="true">1</div>
-        <div class="un-card">
+        <div class="un-card glass-panel">
           <h2 class="un-card-title">What made you uninstall?</h2>
           <p class="un-card-hint">Pick the closest reason — it helps us prioritize fixes.</p>
           <div class="un-pills">
             {#each reasons as { label, icon }}
               <button
                 type="button"
-                class="un-pill"
+                class="un-pill glass-panel glass-hover"
                 class:active={selectedReason === label}
                 aria-pressed={selectedReason === label}
                 on:click={() => { selectedReason = label; }}
@@ -175,7 +175,7 @@
       <!-- Step 2: Details -->
       <div class="un-step un-appear" style="animation-delay: 0.2s">
         <div class="un-step-badge" aria-hidden="true">2</div>
-        <div class="un-card">
+        <div class="un-card glass-panel">
           <div class="un-card-title-row">
             <h2 class="un-card-title">Tell us more</h2>
             <span class="un-optional-tag">Optional</span>
@@ -188,7 +188,7 @@
               {#each confidenceOptions as { label, icon }}
                 <button
                   type="button"
-                  class="un-mini-pill"
+                  class="un-mini-pill glass-panel glass-hover"
                   class:active={confidenceToReinstall === label}
                   on:click={() => { confidenceToReinstall = label; }}
                 >
@@ -206,7 +206,7 @@
               {#each featureOptions as { label, icon }}
                 <button
                   type="button"
-                  class="un-mini-pill"
+                  class="un-mini-pill glass-panel glass-hover"
                   class:active={selectedFeatures.includes(label)}
                   on:click={() => toggleFeature(label)}
                 >
@@ -280,7 +280,7 @@
               href={STORE_LINKS[browser]}
               target="_blank"
               rel="noopener noreferrer"
-              class="un-reinstall-btn"
+              class="un-reinstall-btn glass-panel glass-hover"
               class:detected={isDetected}
               on:click={() => trackReinstallClick(browser)}
             >
@@ -396,38 +396,8 @@
 
   /* ── Card ──────────────────────── */
   .un-card {
-    position: relative;
-    overflow: hidden;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
     border-radius: var(--radius);
     padding: 36px 32px;
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    backdrop-filter: blur(20px) saturate(180%);
-    box-shadow:
-      0 1px 2px rgba(15, 20, 25, 0.05),
-      0 12px 30px rgba(15, 20, 25, 0.1),
-      0 8px 24px rgba(26, 139, 85, 0.08),
-      inset 0 1px 0 var(--glass-highlight);
-    transition:
-      transform 0.45s var(--glass-ease),
-      box-shadow 0.45s var(--glass-ease),
-      border-color 0.3s ease;
-  }
-
-  /* Static top gloss shared by the glass surfaces. */
-  .un-card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 36%),
-      linear-gradient(120deg, rgba(255, 255, 255, 0.3), rgba(239, 247, 250, 0.16) 48%, rgba(255, 255, 255, 0.28));
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.9),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.35);
   }
 
   .un-card-title-row {
@@ -477,20 +447,13 @@
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    border: 1px solid var(--glass-border);
     border-radius: 999px;
-    background: var(--glass-bg);
     padding: 11px 20px;
     color: var(--text-secondary);
     cursor: pointer;
-    transition:
-      transform 0.45s var(--glass-ease),
-      box-shadow 0.45s var(--glass-ease),
-      border-color 0.3s ease;
     font-size: 14px;
     font-weight: 600;
     font-family: var(--font-ui), sans-serif;
-    box-shadow: 0 1px 2px rgba(15, 20, 25, 0.05), inset 0 1px 0 var(--glass-highlight);
   }
 
   .un-pill-icon {
@@ -499,10 +462,8 @@
   }
 
   .un-pill:hover {
-    border-color: var(--green-border);
     color: var(--green);
     transform: translateY(-1px);
-    box-shadow: 0 4px 14px rgba(26, 139, 85, 0.08);
   }
 
   .un-pill.active {
@@ -547,20 +508,13 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    border: 1px solid var(--glass-border);
     border-radius: 999px;
-    background: var(--glass-bg);
     padding: 8px 16px;
     color: var(--text-secondary);
     cursor: pointer;
-    transition:
-      transform 0.45s var(--glass-ease),
-      box-shadow 0.45s var(--glass-ease),
-      border-color 0.3s ease;
     font-size: 13px;
     font-weight: 600;
     font-family: var(--font-ui), sans-serif;
-    box-shadow: 0 1px 2px rgba(15, 20, 25, 0.05), inset 0 1px 0 var(--glass-highlight);
   }
 
   .un-mini-icon {
@@ -569,7 +523,6 @@
   }
 
   .un-mini-pill:hover {
-    border-color: var(--green-border);
     color: var(--green);
     transform: translateY(-1px);
   }
@@ -728,15 +681,8 @@
     font-size: 14px;
     font-weight: 600;
     color: var(--text-secondary);
-    border: 1px solid var(--glass-border);
     border-radius: var(--radius-sm);
     padding: 12px 22px;
-    transition:
-      transform 0.45s var(--glass-ease),
-      box-shadow 0.45s var(--glass-ease),
-      border-color 0.3s ease;
-    background: var(--glass-bg);
-    box-shadow: 0 1px 2px rgba(15, 20, 25, 0.05), inset 0 1px 0 var(--glass-highlight);
   }
 
   .un-browser-icon {
@@ -746,10 +692,8 @@
   }
 
   .un-reinstall-btn:hover {
-    border-color: var(--green-border);
     color: var(--green);
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
   }
 
   .un-reinstall-btn.detected {
@@ -829,30 +773,16 @@
     }
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .un-card,
-    .un-pill,
-    .un-mini-pill,
-    .un-field-group textarea,
-    .un-reinstall-btn {
-      transition: none;
+  @media (prefers-reduced-transparency: reduce) {
+    .un-field-group textarea {
+      background: #fcfefd;
+      border-color: rgba(226, 232, 240, 0.9);
     }
   }
 
-  @media (prefers-reduced-transparency: reduce) {
-    .un-card,
-    .un-pill,
-    .un-mini-pill,
-    .un-field-group textarea,
-    .un-reinstall-btn {
-      background: #fcfefd;
-      border-color: rgba(226, 232, 240, 0.9);
-      -webkit-backdrop-filter: none;
-      backdrop-filter: none;
-    }
-
-    .un-card::before {
-      display: none;
+  @media (prefers-reduced-motion: reduce) {
+    .un-field-group textarea {
+      transition: none;
     }
   }
 </style>

@@ -88,8 +88,8 @@
 
       <div class="prv-card-grid">
         {#each privacy.sections as section, i}
-          <article class="prv-card prv-reveal" style="animation-delay: {i * 0.06}s" use:glassSheen>
-            <div class="prv-card-icon">{sectionIcons[i % sectionIcons.length]}</div>
+          <article class="prv-card prv-reveal glass-panel glass-hover" style="animation-delay: {i * 0.06}s" use:glassSheen>
+            <div class="prv-card-icon glass-icon">{sectionIcons[i % sectionIcons.length]}</div>
             <h3>{section.title}</h3>
             <p class="prv-card-summary">{section.summary}</p>
             {#if section.bullets.length > 0}
@@ -108,7 +108,7 @@
   <!-- Full Policy CTA -->
   <section class="prv-cta-section">
     <div class="prv-wrap">
-      <div class="prv-cta-card prv-reveal">
+      <div class="prv-cta-card prv-reveal glass-panel">
         <h2>Want the complete details?</h2>
         <p>Read the full, unabridged privacy policy document on GitHub for complete legal language and technical specifics.</p>
         <a class="prv-cta-btn" href={privacy.fullPrivacyUrl} target="_blank" rel="noopener noreferrer">
@@ -282,76 +282,16 @@
   }
 
   .prv-card {
-    position: relative;
-    overflow: hidden;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
     border-radius: var(--radius);
     padding: 28px 24px;
-    box-shadow:
-      0 1px 2px rgba(15, 20, 25, 0.05),
-      0 12px 30px rgba(15, 20, 25, 0.1),
-      0 8px 24px rgba(26, 139, 85, 0.08),
-      inset 0 1px 0 var(--glass-highlight);
-    transition:
-      transform 0.45s var(--glass-ease),
-      box-shadow 0.45s var(--glass-ease),
-      border-color 0.3s ease;
   }
 
   .prv-card:hover {
     transform: translateY(-4px);
-    border-color: rgba(26, 139, 85, 0.22);
-    box-shadow:
-      0 8px 20px rgba(26, 139, 85, 0.12),
-      0 0 0 1px rgba(26, 139, 85, 0.06),
-      0 20px 44px rgba(15, 20, 25, 0.12),
-      inset 0 1px 0 var(--glass-highlight);
-  }
-
-  /* Static top gloss shared by the glass surfaces. */
-  .prv-card::before,
-  .prv-cta-card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 36%),
-      linear-gradient(120deg, rgba(255, 255, 255, 0.3), rgba(239, 247, 250, 0.16) 48%, rgba(255, 255, 255, 0.28));
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.9),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.35);
-  }
-
-  /* Pointer-tracked specular sweep (glassSheen action). */
-  .prv-card::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    opacity: 0;
-    background: radial-gradient(
-      240px circle at var(--card-mx, 50%) var(--card-my, 0%),
-      rgba(255, 255, 255, 0.55),
-      rgba(255, 255, 255, 0) 72%
-    );
-    transition: opacity 0.35s ease;
-  }
-
-  .prv-card:hover::after {
-    opacity: 1;
   }
 
   .prv-card-icon {
     font-size: 32px; margin-bottom: 14px;
-    transition: transform 0.3s var(--glass-ease);
-  }
-
-  .prv-card:hover .prv-card-icon {
-    transform: scale(1.06) rotate(-3deg);
   }
 
   .prv-card h3 {
@@ -392,18 +332,9 @@
   }
 
   .prv-cta-card {
-    position: relative;
-    overflow: hidden;
     text-align: center;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
     border-radius: 24px;
     padding: 56px 48px;
-    box-shadow:
-      0 1px 2px rgba(15, 20, 25, 0.05),
-      0 12px 30px rgba(15, 20, 25, 0.1),
-      0 8px 24px rgba(26, 139, 85, 0.08),
-      inset 0 1px 0 var(--glass-highlight);
   }
 
   .prv-cta-card h2 {
@@ -490,33 +421,6 @@
     .prv-bullets li {
       font-size: 14px;
       line-height: 1.7;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .prv-card,
-    .prv-card-icon {
-      transition: none;
-    }
-
-    .prv-card::after {
-      display: none;
-    }
-  }
-
-  @media (prefers-reduced-transparency: reduce) {
-    .prv-card,
-    .prv-cta-card {
-      background: #fcfefd;
-      border-color: rgba(226, 232, 240, 0.9);
-      -webkit-backdrop-filter: none;
-      backdrop-filter: none;
-    }
-
-    .prv-card::before,
-    .prv-card::after,
-    .prv-cta-card::before {
-      display: none;
     }
   }
 </style>

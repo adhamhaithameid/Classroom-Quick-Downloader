@@ -503,7 +503,7 @@
   <section class="fq-body-section">
     <div class="fq-wrap">
       {#if filteredSections.length === 0}
-        <div class="fq-empty fq-reveal">
+        <div class="fq-empty fq-reveal glass-panel">
           <span class="fq-empty-icon">🔍</span>
           <h3>No results for "{searchQuery}"</h3>
           <p>Try different keywords or <button type="button" class="fq-clear-link" on:click={clearSearch}>clear your search</button>.</p>
@@ -512,7 +512,7 @@
 
       <div class="fq-sections">
         {#each filteredSections as section, sIdx}
-          <div class="fq-section fq-reveal" style="animation-delay: {sIdx * 0.05}s">
+          <div class="fq-section fq-reveal glass-panel" style="animation-delay: {sIdx * 0.05}s">
             <header class="fq-section-head">
               <span class="fq-section-icon">{section.icon}</span>
               <div>
@@ -525,7 +525,7 @@
             <div class="fq-list">
               {#each section.items as item}
                 <button
-                  class="fq-item"
+                  class="fq-item glass-panel glass-hover"
                   class:open={openIds.has(item.id)}
                   type="button"
                   on:click={() => toggle(item.id)}
@@ -561,7 +561,7 @@
   <!-- CTA -->
   <section class="fq-cta-section">
     <div class="fq-wrap">
-      <div class="fq-cta-card fq-reveal">
+      <div class="fq-cta-card fq-reveal glass-panel">
         <h2>Still have questions?</h2>
         <p>Reach out by email and we'll get back to you.</p>
         <div class="fq-cta-actions">
@@ -714,17 +714,8 @@
   .fq-sections { display: grid; gap: 24px; }
 
   .fq-section {
-    position: relative;
-    overflow: hidden;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
     border-radius: 20px;
     padding: 28px;
-    box-shadow:
-      0 1px 2px rgba(15, 20, 25, 0.05),
-      0 12px 30px rgba(15, 20, 25, 0.1),
-      0 8px 24px rgba(26, 139, 85, 0.08),
-      inset 0 1px 0 var(--glass-highlight);
   }
 
   .fq-section-head {
@@ -748,32 +739,13 @@
   .fq-list { display: flex; flex-direction: column; gap: 8px; }
 
   .fq-item {
-    position: relative;
-    overflow: hidden;
     text-align: left;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
     border-radius: var(--radius-sm);
     padding: 0; cursor: pointer; width: 100%;
-    box-shadow:
-      0 1px 2px rgba(15, 20, 25, 0.05),
-      0 8px 24px rgba(15, 20, 25, 0.08),
-      inset 0 1px 0 var(--glass-highlight);
-    transition:
-      transform 0.45s var(--glass-ease),
-      box-shadow 0.45s var(--glass-ease),
-      border-color 0.3s ease,
-      background-color 0.3s ease;
   }
 
   .fq-item:hover {
     transform: translateY(-2px);
-    border-color: rgba(26, 139, 85, 0.22);
-    box-shadow:
-      0 8px 20px rgba(26, 139, 85, 0.12),
-      0 0 0 1px rgba(26, 139, 85, 0.06),
-      0 12px 30px rgba(15, 20, 25, 0.1),
-      inset 0 1px 0 var(--glass-highlight);
   }
 
   .fq-item.open {
@@ -784,44 +756,6 @@
       inset 0 1px 0 var(--glass-highlight);
     background:
       linear-gradient(120deg, rgba(255, 255, 255, 0.78), rgba(248, 252, 249, 0.62));
-  }
-
-  /* Shared navbar glass sheen. */
-  .fq-item::before,
-  .fq-section::before,
-  .fq-empty::before,
-  .fq-cta-card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 36%),
-      linear-gradient(120deg, rgba(255, 255, 255, 0.3), rgba(239, 247, 250, 0.16) 48%, rgba(255, 255, 255, 0.28));
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.9),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.35);
-  }
-
-  .fq-item::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    opacity: 0;
-    background: radial-gradient(
-      240px circle at var(--card-mx, 50%) var(--card-my, 0%),
-      rgba(255, 255, 255, 0.55),
-      rgba(255, 255, 255, 0) 72%
-    );
-    transition: opacity 0.35s ease;
-  }
-
-  .fq-item:hover::after,
-  .fq-item:focus-visible::after {
-    opacity: 1;
   }
 
   .fq-question {
@@ -850,14 +784,10 @@
 
   /* ── Empty State ───────────────── */
   .fq-empty {
-    position: relative;
-    overflow: hidden;
     text-align: center;
     padding: 48px 24px;
-    background: var(--glass-bg);
     border: 1px dashed var(--border-subtle);
     border-radius: 20px;
-    box-shadow: inset 0 1px 0 var(--glass-highlight);
   }
 
   .fq-empty-icon { font-size: 48px; display: block; margin-bottom: 12px; }
@@ -877,18 +807,9 @@
   }
 
   .fq-cta-card {
-    position: relative;
-    overflow: hidden;
     text-align: center;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
     border-radius: 24px;
     padding: 56px 48px;
-    box-shadow:
-      0 1px 2px rgba(15, 20, 25, 0.05),
-      0 12px 30px rgba(15, 20, 25, 0.1),
-      0 8px 24px rgba(26, 139, 85, 0.08),
-      inset 0 1px 0 var(--glass-highlight);
   }
 
   .fq-cta-card h2 {
@@ -936,35 +857,6 @@
     -webkit-backdrop-filter: none;
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .fq-item,
-    .fq-search-input {
-      transition: none;
-    }
-
-    .fq-item::after {
-      display: none;
-    }
-  }
-
-  @media (prefers-reduced-transparency: reduce) {
-    .fq-item,
-    .fq-search-input,
-    .fq-section,
-    .fq-empty,
-    .fq-cta-card {
-      background: #fcfefd;
-      border-color: rgba(226, 232, 240, 0.9);
-    }
-
-    .fq-item::before,
-    .fq-item::after,
-    .fq-section::before,
-    .fq-empty::before,
-    .fq-cta-card::before {
-      display: none;
-    }
-  }
   @keyframes slideDown {
     from { opacity: 0; transform: translateY(-5px); }
     to { opacity: 1; transform: translateY(0); }
@@ -1015,6 +907,13 @@
     .fq-chevron {
       width: 24px;
       height: 24px;
+    }
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .fq-search-input {
+      background: #fcfefd;
+      border-color: rgba(226, 232, 240, 0.9);
     }
   }
 </style>

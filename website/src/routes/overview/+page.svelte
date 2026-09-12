@@ -1545,7 +1545,7 @@
 
 <SeoMeta
   title="Classroom Quick Downloader — Google Classroom Bulk Download"
-  description="Bulk download all Google Classroom attachments in one click. Free, open-source extension for Chrome, Firefox, and Edge, built for students and teachers."
+  description="Bulk download all Google Classroom attachments in one click. Free browser extension for Chrome, Firefox, and Edge, built for students and teachers."
   path={seoPath}
   keywords="download all google classroom files, bulk download google classroom attachments, google classroom extension"
   structuredData={homeStructuredData}
@@ -1688,8 +1688,8 @@
       </div>
 
       <div class="l2-student-grid" role="list">
-        <article class="l2-student-card" role="listitem" style="--card-i: 0" use:glassSheen>
-          <span class="l2-student-icon" aria-hidden="true">
+        <article class="l2-student-card glass-panel glass-hover" role="listitem" style="--card-i: 0" use:glassSheen>
+          <span class="l2-student-icon glass-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 8v5l3 3" />
               <circle cx="12" cy="12" r="9" />
@@ -1698,8 +1698,8 @@
           <h3>Less repetitive clicking</h3>
           <p>Download all materials from an assignment in one action instead of repeating the same file flow.</p>
         </article>
-        <article class="l2-student-card" role="listitem" style="--card-i: 1" use:glassSheen>
-          <span class="l2-student-icon" aria-hidden="true">
+        <article class="l2-student-card glass-panel glass-hover" role="listitem" style="--card-i: 1" use:glassSheen>
+          <span class="l2-student-icon glass-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
             </svg>
@@ -1707,8 +1707,8 @@
           <h3>Faster study prep</h3>
           <p>Get course files quickly so your time goes into understanding material, not managing downloads.</p>
         </article>
-        <article class="l2-student-card" role="listitem" style="--card-i: 2" use:glassSheen>
-          <span class="l2-student-icon" aria-hidden="true">
+        <article class="l2-student-card glass-panel glass-hover" role="listitem" style="--card-i: 2" use:glassSheen>
+          <span class="l2-student-icon glass-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M9 6h11M9 12h11M9 18h11" />
               <path d="m3 6 1.5 1.5L6.5 5.5" />
@@ -1909,12 +1909,12 @@
         <p>Everything you'd expect from a modern extension — and nothing you wouldn't.</p>
       </div>
       <div class="l2-feature-grid">
-        <div class="l2-fcard" style="--card-i: 0" use:glassSheen><div class="l2-fcard-icon">⚡</div><h3>Instant</h3><p>Install → open Classroom → download. Zero configuration, zero learning curve.</p></div>
-        <div class="l2-fcard" style="--card-i: 1" use:glassSheen><div class="l2-fcard-icon">🔒</div><h3>Private</h3><p>No third-party tracking, no cookies, and no user profiles. Only aggregate operational metrics.</p></div>
-        <div class="l2-fcard" style="--card-i: 2" use:glassSheen><div class="l2-fcard-icon">🔓</div><h3>Transparent</h3><p>Clear docs, public roadmap, and predictable release notes for every update.</p></div>
-        <div class="l2-fcard" style="--card-i: 3" use:glassSheen><div class="l2-fcard-icon">🌐</div><h3>Universal</h3><p>Chrome, Firefox, Edge, Brave, Opera, Vivaldi, Arc — it just works.</p></div>
-        <div class="l2-fcard" style="--card-i: 4" use:glassSheen><div class="l2-fcard-icon">🎓</div><h3>For Students</h3><p>Built by a student who was tired of clicking. Designed for real classroom workflows.</p></div>
-        <div class="l2-fcard" style="--card-i: 5" use:glassSheen><div class="l2-fcard-icon">🌍</div><h3><AnimatedNumber value={100} format={{ useGrouping: false }} suffix="+" animated /> Languages</h3><p>Available in English, Arabic, Spanish, French, German, and over <AnimatedNumber value={100} format={{ useGrouping: false }} animated /> more languages.</p></div>
+        <div class="l2-fcard glass-panel glass-hover" style="--card-i: 0" use:glassSheen><div class="l2-fcard-icon glass-icon">⚡</div><h3>Instant</h3><p>Install → open Classroom → download. Zero configuration, zero learning curve.</p></div>
+        <div class="l2-fcard glass-panel glass-hover" style="--card-i: 1" use:glassSheen><div class="l2-fcard-icon glass-icon">🔒</div><h3>Private</h3><p>No third-party tracking, no cookies, and no user profiles. Only aggregate operational metrics.</p></div>
+        <div class="l2-fcard glass-panel glass-hover" style="--card-i: 2" use:glassSheen><div class="l2-fcard-icon glass-icon">🔓</div><h3>Transparent</h3><p>Clear docs, public roadmap, and predictable release notes for every update.</p></div>
+        <div class="l2-fcard glass-panel glass-hover" style="--card-i: 3" use:glassSheen><div class="l2-fcard-icon glass-icon">🌐</div><h3>Universal</h3><p>Chrome, Firefox, Edge, Brave, Opera, Vivaldi, Arc — it just works.</p></div>
+        <div class="l2-fcard glass-panel glass-hover" style="--card-i: 4" use:glassSheen><div class="l2-fcard-icon glass-icon">🎓</div><h3>For Students</h3><p>Built by a student who was tired of clicking. Designed for real classroom workflows.</p></div>
+        <div class="l2-fcard glass-panel glass-hover" style="--card-i: 5" use:glassSheen><div class="l2-fcard-icon glass-icon">🌍</div><h3><AnimatedNumber value={100} format={{ useGrouping: false }} suffix="+" animated /> Languages</h3><p>Available in English, Arabic, Spanish, French, German, and over <AnimatedNumber value={100} format={{ useGrouping: false }} animated /> more languages.</p></div>
       </div>
     </div>
   </section>
@@ -1951,7 +1951,7 @@
         <p>Students, teachers, and universities around the world trust Classroom Quick Downloader.</p>
       </div>
       <div class="l2-proof-grid">
-        <div class="l2-proof-card" style="--card-i: 0" use:glassSheen>
+        <div class="l2-proof-card glass-panel glass-hover" style="--card-i: 0" use:glassSheen>
           <div class="l2-proof-num">
             {#if metricsReady}
               <AnimatedNumber value={downloadCount ?? 0} animated />
@@ -1961,7 +1961,7 @@
           </div>
           <div class="l2-proof-label">Total Downloads</div>
         </div>
-        <div class="l2-proof-card" style="--card-i: 1" use:glassSheen>
+        <div class="l2-proof-card glass-panel glass-hover" style="--card-i: 1" use:glassSheen>
           <div class="l2-proof-num">
             {#if metricsReady}
               <AnimatedNumber value={userCount ?? 0} animated />
@@ -1971,8 +1971,8 @@
           </div>
           <div class="l2-proof-label">Active Users</div>
         </div>
-        <div class="l2-proof-card" style="--card-i: 2" use:glassSheen><div class="l2-proof-num"><AnimatedNumber value={100} suffix="+" animated /></div><div class="l2-proof-label">Languages</div></div>
-        <div class="l2-proof-card" style="--card-i: 3" use:glassSheen><div class="l2-proof-num"><AnimatedNumericText text={latestReleaseVersion} animated stableInitial /></div><div class="l2-proof-label">Latest Release</div></div>
+        <div class="l2-proof-card glass-panel glass-hover" style="--card-i: 2" use:glassSheen><div class="l2-proof-num"><AnimatedNumber value={100} suffix="+" animated /></div><div class="l2-proof-label">Languages</div></div>
+        <div class="l2-proof-card glass-panel glass-hover" style="--card-i: 3" use:glassSheen><div class="l2-proof-num"><AnimatedNumericText text={latestReleaseVersion} animated stableInitial /></div><div class="l2-proof-label">Latest Release</div></div>
       </div>
     </div>
   </section>
@@ -1982,18 +1982,18 @@
     <div class="l2-wrap l2-reveal l2-map-wrap" data-placement-section="map">
       <div class="l2-map-layout">
         {#if mapState === 'loading'}
-          <div class="l2-map-state-card" use:glassSheen>
+          <div class="l2-map-state-card glass-panel">
             <div class="state-loading">Loading live global map…</div>
           </div>
         {:else if mapState === 'error'}
-          <div class="l2-map-state-card" use:glassSheen>
+          <div class="l2-map-state-card glass-panel">
             <div class="state-error">
               <strong>Could not load global map.</strong>
               <p>{mapError}</p>
             </div>
           </div>
         {:else if !RotatingGlobeComponent}
-          <div class="l2-map-state-card" use:glassSheen>
+          <div class="l2-map-state-card glass-panel">
             <div class="state-loading">Preparing globe renderer…</div>
           </div>
         {:else}
@@ -2029,7 +2029,7 @@
           <p>Country-level usage rendered as a rotating globe based on live service metrics.</p>
           <div class="l2-map-top-countries">
             {#each topCountries as country, i}
-              <div class="l2-top-country-card l2-rank-{i}" style="--card-i:{i};--rank-color:{i === 0 ? '#ca8a04' : i === 1 ? '#64748b' : '#92400e'};--rank-bg:{i === 0 ? 'rgba(234,179,8,0.08)' : i === 1 ? 'rgba(148,163,184,0.06)' : 'rgba(180,83,9,0.06)'};--rank-border:{i === 0 ? 'rgba(234,179,8,0.3)' : i === 1 ? 'rgba(148,163,184,0.25)' : 'rgba(180,83,9,0.25)'}" use:glassSheen>
+              <div class="l2-top-country-card l2-rank-{i} glass-panel" style="--card-i:{i};--rank-color:{i === 0 ? '#ca8a04' : i === 1 ? '#64748b' : '#92400e'};--rank-bg:{i === 0 ? 'rgba(234,179,8,0.08)' : i === 1 ? 'rgba(148,163,184,0.06)' : 'rgba(180,83,9,0.06)'};--rank-border:{i === 0 ? 'rgba(234,179,8,0.3)' : i === 1 ? 'rgba(148,163,184,0.25)' : 'rgba(180,83,9,0.25)'}">
                 <div class="l2-top-rank">
                   <span class="l2-rank-medal">{i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}</span>
                 </div>
@@ -2123,7 +2123,7 @@
             showLegend={false}
           />
         {:else}
-          <div class="l2-map-state-card" use:glassSheen>
+          <div class="l2-map-state-card glass-panel">
             <div class="state-loading">Preparing map renderer…</div>
           </div>
         {/if}
@@ -2561,33 +2561,12 @@
   }
 
   .l2-student-card {
-    position: relative;
-    overflow: hidden;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
     border-radius: 18px;
     padding: 28px 24px;
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    backdrop-filter: blur(20px) saturate(180%);
-    box-shadow:
-      0 1px 2px rgba(15, 20, 25, 0.05),
-      0 12px 30px rgba(15, 20, 25, 0.1),
-      0 8px 24px rgba(26, 139, 85, 0.08),
-      inset 0 1px 0 var(--glass-highlight);
-    transition:
-      transform 0.45s var(--glass-ease),
-      box-shadow 0.45s var(--glass-ease),
-      border-color 0.3s ease;
   }
 
   .l2-student-card:hover {
     transform: translateY(-4px);
-    border-color: rgba(26, 139, 85, 0.22);
-    box-shadow:
-      0 8px 20px rgba(26, 139, 85, 0.12),
-      0 0 0 1px rgba(26, 139, 85, 0.06),
-      0 20px 44px rgba(15, 20, 25, 0.12),
-      inset 0 1px 0 var(--glass-highlight);
   }
 
   .l2-student-icon {
@@ -2601,13 +2580,6 @@
     align-items: center;
     justify-content: center;
     margin-bottom: 14px;
-    transition: transform 0.3s var(--glass-ease), box-shadow 0.3s ease;
-  }
-
-  /* The nav glyph flourish: tile scales and tilts as the card wakes up. */
-  .l2-student-card:hover .l2-student-icon {
-    transform: scale(1.06) rotate(-3deg);
-    box-shadow: 0 4px 10px rgba(26, 139, 85, 0.18);
   }
 
   .l2-student-icon svg {
@@ -3348,16 +3320,8 @@
     background-image: linear-gradient(120deg, rgba(255, 255, 255, 0.6), rgba(248, 252, 249, 0.42));
     border: 1.5px solid var(--rank-border);
     border-radius: 16px;
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    backdrop-filter: blur(20px) saturate(180%);
     flex: 1;
     min-width: 160px;
-    transition:
-      transform 0.45s var(--glass-ease),
-      box-shadow 0.45s var(--glass-ease),
-      border-color 0.3s ease;
-    position: relative;
-    overflow: hidden;
   }
 
   .l2-top-country-card::after {
@@ -3625,34 +3589,12 @@
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
   }
   .l2-fcard {
-    position: relative;
-    overflow: hidden;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
     border-radius: var(--radius); padding: 28px 24px;
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    backdrop-filter: blur(20px) saturate(180%);
-    box-shadow:
-      0 1px 2px rgba(15, 20, 25, 0.05),
-      0 12px 30px rgba(15, 20, 25, 0.1),
-      0 8px 24px rgba(26, 139, 85, 0.08),
-      inset 0 1px 0 var(--glass-highlight);
-    transition:
-      transform 0.45s var(--glass-ease),
-      box-shadow 0.45s var(--glass-ease),
-      border-color 0.3s ease;
   }
   .l2-fcard:hover {
     transform: translateY(-4px);
-    border-color: rgba(26, 139, 85, 0.22);
-    box-shadow:
-      0 8px 20px rgba(26, 139, 85, 0.12),
-      0 0 0 1px rgba(26, 139, 85, 0.06),
-      0 20px 44px rgba(15, 20, 25, 0.12),
-      inset 0 1px 0 var(--glass-highlight);
   }
-  .l2-fcard-icon { font-size: 36px; margin-bottom: 14px; transition: transform 0.3s var(--glass-ease); }
-  .l2-fcard:hover .l2-fcard-icon { transform: scale(1.12) rotate(-3deg); }
+  .l2-fcard-icon { font-size: 36px; margin-bottom: 14px; }
   .l2-fcard h3 { font-size: 17px; font-weight: 700; margin: 0 0 8px; }
   .l2-fcard p { font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin: 0; }
 
@@ -3681,31 +3623,7 @@
   /* ── Social Proof ──────────────────── */
   .l2-proof-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
   .l2-proof-card {
-    position: relative;
-    overflow: hidden;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
     border-radius: var(--radius); padding: 28px; text-align: center;
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    backdrop-filter: blur(20px) saturate(180%);
-    box-shadow:
-      0 1px 2px rgba(15, 20, 25, 0.05),
-      0 12px 30px rgba(15, 20, 25, 0.1),
-      0 8px 24px rgba(26, 139, 85, 0.08),
-      inset 0 1px 0 var(--glass-highlight);
-    transition:
-      transform 0.45s var(--glass-ease),
-      box-shadow 0.45s var(--glass-ease),
-      border-color 0.3s ease;
-  }
-  .l2-proof-card:hover {
-    transform: translateY(-3px);
-    border-color: rgba(26, 139, 85, 0.22);
-    box-shadow:
-      0 8px 20px rgba(26, 139, 85, 0.12),
-      0 0 0 1px rgba(26, 139, 85, 0.06),
-      0 20px 44px rgba(15, 20, 25, 0.12),
-      inset 0 1px 0 var(--glass-highlight);
   }
   .l2-proof-num { font-size: 28px; font-weight: 800; color: var(--green); margin-bottom: 6px; }
   .l2-metric-pending { color: #64748b; font-size: 1em; font-weight: 700; letter-spacing: 0.02em; }
@@ -3775,18 +3693,7 @@
 
   .l2-map-state-card {
     width: min(100%, 760px);
-    position: relative;
-    overflow: hidden;
     border-radius: 18px;
-    border: 1px solid var(--glass-border);
-    background: var(--glass-bg);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    backdrop-filter: blur(20px) saturate(180%);
-    box-shadow:
-      0 1px 2px rgba(15, 20, 25, 0.05),
-      0 12px 30px rgba(15, 20, 25, 0.1),
-      0 8px 24px rgba(26, 139, 85, 0.08),
-      inset 0 1px 0 var(--glass-highlight);
     padding: 30px;
   }
 
@@ -3948,57 +3855,6 @@
     color: var(--text-muted);
   }
 
-  /* ── Navbar glass language on cards ──
-     The homepage cards share the navbar's material: a top sheen plus
-     diagonal gloss (::before) and a pointer-tracked specular sweep
-     (::after, fed by the glassSheen action) — the same cursor reaction
-     the navbar bar gives. Hover lifts ride the navbar's springy
-     --glass-ease with the green halo the nav menu links use. */
-  .l2-student-card::before,
-  .l2-fcard::before,
-  .l2-proof-card::before,
-  .l2-map-state-card::before,
-  .l2-top-country-card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 36%),
-      linear-gradient(120deg, rgba(255, 255, 255, 0.3), rgba(239, 247, 250, 0.16) 48%, rgba(255, 255, 255, 0.28));
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.9),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.35);
-  }
-
-  /* The top-country glint owns ::after over there, so the pointer sweep
-     skips that family. */
-  .l2-student-card::after,
-  .l2-fcard::after,
-  .l2-proof-card::after,
-  .l2-map-state-card::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    opacity: 0;
-    background: radial-gradient(
-      240px circle at var(--card-mx, 50%) var(--card-my, 0%),
-      rgba(255, 255, 255, 0.55),
-      rgba(255, 255, 255, 0) 72%
-    );
-    transition: opacity 0.35s ease;
-  }
-
-  .l2-student-card:hover::after,
-  .l2-fcard:hover::after,
-  .l2-proof-card:hover::after,
-  .l2-map-state-card:hover::after {
-    opacity: 1;
-  }
-
   /* Staggered entrance on section reveal — the nav dropdown's "retyped"
      cascade, paced per card with --card-i. `backwards` fill hides each
      card during its delay and releases the transform once done, so hover
@@ -4019,56 +3875,14 @@
     opacity: 0;
   }
 
-  @keyframes card-glass-in {
-    from { opacity: 0; transform: translateY(12px) scale(0.985); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
-  }
-
+  /* The shared glass guards don't know about this page's reveal-gated
+     cascade — switch the scoped entrance off for reduced motion here. */
   @media (prefers-reduced-motion: reduce) {
-    .l2-student-card,
-    .l2-fcard,
-    .l2-proof-card,
-    .l2-map-state-card,
-    .l2-top-country-card {
+    :global(.l2-reveal) .l2-student-card,
+    :global(.l2-reveal) .l2-fcard,
+    :global(.l2-reveal) .l2-proof-card,
+    :global(.l2-reveal) .l2-top-country-card {
       animation: none !important;
-      transition: none !important;
-    }
-
-    .l2-student-card::before,
-    .l2-fcard::before,
-    .l2-proof-card::before,
-    .l2-map-state-card::before,
-    .l2-top-country-card::before,
-    .l2-student-card::after,
-    .l2-fcard::after,
-    .l2-proof-card::after,
-    .l2-map-state-card::after {
-      display: none;
-    }
-  }
-
-  @media (prefers-reduced-transparency: reduce) {
-    .l2-student-card,
-    .l2-fcard,
-    .l2-proof-card,
-    .l2-map-state-card,
-    .l2-top-country-card {
-      background: #fcfefd;
-      border-color: rgba(226, 232, 240, 0.9);
-      -webkit-backdrop-filter: none;
-      backdrop-filter: none;
-    }
-
-    .l2-student-card::before,
-    .l2-fcard::before,
-    .l2-proof-card::before,
-    .l2-map-state-card::before,
-    .l2-top-country-card::before,
-    .l2-student-card::after,
-    .l2-fcard::after,
-    .l2-proof-card::after,
-    .l2-map-state-card::after {
-      display: none;
     }
   }
 

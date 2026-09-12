@@ -138,7 +138,7 @@
 
   <section class="site-map-sections">
     {#each groupedLinks as section}
-      <article class="site-map-card" use:glassSheen>
+      <article class="site-map-card glass-panel glass-hover" use:glassSheen>
         <h2>{section.group}</h2>
         <ul>
           {#each section.links as link}
@@ -191,68 +191,12 @@
   }
 
   .site-map-card {
-    position: relative;
-    overflow: hidden;
-    border: 1px solid var(--glass-border);
     border-radius: 0.9rem;
-    background: var(--glass-bg);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    backdrop-filter: blur(20px) saturate(180%);
     padding: 1rem 1.1rem 1.1rem;
-    box-shadow:
-      0 1px 2px rgba(15, 20, 25, 0.05),
-      0 12px 30px rgba(15, 20, 25, 0.1),
-      0 8px 24px rgba(26, 139, 85, 0.08),
-      inset 0 1px 0 var(--glass-highlight);
-    transition:
-      transform 0.45s var(--glass-ease),
-      box-shadow 0.45s var(--glass-ease),
-      border-color 0.3s ease;
   }
 
   .site-map-card:hover {
     transform: translateY(-2px);
-    border-color: rgba(26, 139, 85, 0.22);
-    box-shadow:
-      0 8px 20px rgba(26, 139, 85, 0.12),
-      0 0 0 1px rgba(26, 139, 85, 0.06),
-      0 20px 44px rgba(15, 20, 25, 0.12),
-      inset 0 1px 0 var(--glass-highlight);
-  }
-
-  /* Static top gloss shared by the glass surfaces. */
-  .site-map-card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 36%),
-      linear-gradient(120deg, rgba(255, 255, 255, 0.3), rgba(239, 247, 250, 0.16) 48%, rgba(255, 255, 255, 0.28));
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.9),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.35);
-  }
-
-  /* Pointer-tracked specular sweep (glassSheen action). */
-  .site-map-card::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    opacity: 0;
-    background: radial-gradient(
-      240px circle at var(--card-mx, 50%) var(--card-my, 0%),
-      rgba(255, 255, 255, 0.55),
-      rgba(255, 255, 255, 0) 72%
-    );
-    transition: opacity 0.35s ease;
-  }
-
-  .site-map-card:hover::after {
-    opacity: 1;
   }
 
   .site-map-card h2 {
@@ -296,32 +240,10 @@
     word-break: break-word;
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .site-map-card {
-      transition: none;
-    }
-
-    .site-map-card::after {
-      display: none;
-    }
-  }
-
   @media (prefers-reduced-transparency: reduce) {
-    .site-map-card {
-      background: #fcfefd;
-      border-color: rgba(226, 232, 240, 0.9);
-      -webkit-backdrop-filter: none;
-      backdrop-filter: none;
-    }
-
     .site-map-card li {
       background: #fcfefd;
       border-color: rgba(226, 232, 240, 0.9);
-    }
-
-    .site-map-card::before,
-    .site-map-card::after {
-      display: none;
     }
   }
 </style>

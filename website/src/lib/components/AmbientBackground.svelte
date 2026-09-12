@@ -45,7 +45,7 @@
 
   /* The vertical + horizontal grid lines shared by every page. */
   .l2-page-grid {
-    opacity: 0.03;
+    opacity: 0.07;
     background-image: linear-gradient(var(--text) 1px, transparent 1px),
       linear-gradient(90deg, var(--text) 1px, transparent 1px);
     background-size: 60px 60px;

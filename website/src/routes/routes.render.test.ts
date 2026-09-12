@@ -90,9 +90,11 @@ describe('route render smoke coverage', () => {
     expect(html).toContain('See where Classroom Quick Downloader is used around the world.');
     expect(html).toContain('Latest Release');
     expect(text).toContain(expectedLatestRelease);
-    expect(html).toContain('l2-page-orbs');
-    expect(html).toContain('l2-page-grid');
     expect(html).toContain('l2-page-floats');
+    // The orbs + grid come from the layout-mounted AmbientBackground — the
+    // page itself must not re-implement them.
+    expect(html).not.toContain('class="l2-page-orbs"');
+    expect(html).not.toContain('class="l2-page-grid"');
     // Reveal must fail open: server markup never ships the hidden state.
     expect(html).not.toContain('l2-reveal-pending');
     expect(html).not.toContain('Element Editor');
