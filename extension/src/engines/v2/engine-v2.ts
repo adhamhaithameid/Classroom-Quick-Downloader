@@ -378,12 +378,16 @@ export class EngineV2 implements CQDEngine {
       }
     }
 
-    // 4. PLAN PLACEMENTS (compute-only, no rendering)
+    // 4. PLAN PLACEMENTS
     this.placementDecisions = this.planPlacements();
 
-    // V2 is detection-only: NO rendering. Legacy handles all visuals.
-    // this.renderDetectedFlags();    ← removed: legacy badges are perfect
-    // this.renderPlacedButtons();    ← removed: legacy buttons are perfect
+    // 4b. RENDER — through the render strategy. The strategy self-gates on
+    // mode: as the PRIMARY engine ('v2'/'v3') V2 renders its own flags and
+    // buttons; as the shadow secondary ('legacy'/'shadow') it is a no-op and
+    // V1 keeps handling all visuals (D8: a primary that renders nothing is
+    // the Liskov failure that made 'v2' mode a black hole).
+    this.renderDetectedFlags();
+    this.renderPlacedButtons();
 
     const elapsed = performance.now() - startTime;
     this.totalScanMs += elapsed;
