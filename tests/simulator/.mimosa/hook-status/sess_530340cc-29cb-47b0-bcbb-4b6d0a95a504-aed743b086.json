@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "mimosa-hook-status/v1",
+  "recordedAt": "2026-09-12T20:01:55.181Z",
+  "sessionId": "sess_530340cc-29cb-47b0-bcbb-4b6d0a95a504",
+  "event": "PostToolUse",
+  "toolName": "Edit",
+  "file": "/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/tests/e2e/qa/harness.ts",
+  "outcome": "inconclusive",
+  "coverage": "partial",
+  "findingCount": 0,
+  "durationMs": 19,
+  "hostState": "hook_complete",
+  "reportHint": ".mimosa/reports/"
+}

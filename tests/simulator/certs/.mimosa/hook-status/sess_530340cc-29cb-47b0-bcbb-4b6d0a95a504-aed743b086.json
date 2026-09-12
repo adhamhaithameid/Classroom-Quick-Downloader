@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "mimosa-hook-status/v1",
+  "recordedAt": "2026-09-12T20:00:42.395Z",
+  "sessionId": "sess_530340cc-29cb-47b0-bcbb-4b6d0a95a504",
+  "event": "PostToolUse",
+  "toolName": "Write",
+  "file": "/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/tests/simulator/proxy.ts",
+  "outcome": "inconclusive",
+  "coverage": "partial",
+  "findingCount": 0,
+  "durationMs": 54,
+  "hostState": "hook_complete",
+  "reportHint": ".mimosa/reports/"
+}

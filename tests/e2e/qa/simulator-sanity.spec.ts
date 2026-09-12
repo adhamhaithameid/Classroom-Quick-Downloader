@@ -14,9 +14,8 @@
  * (HARNESS/ENVIRONMENT), never the assertions.
  */
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
-import { launchQaContext, captureConsole, newRunId } from "./harness";
+import { launchQaContext, captureConsole } from "./harness";
 import { createScenario, streamPath, classworkPath, drive, sheets, forms, youtube, external } from "../../simulator/scenario";
-import { installSimulator } from "../../simulator/server";
 
 const STREAM = streamPath();
 const CLASSWORK = classworkPath();
@@ -68,17 +67,19 @@ test.describe("simulator sanity", () => {
   let context: BrowserContext;
   let page: Page;
   let browser: "chromium" | "firefox";
+  let closeQa: () => Promise<void>;
 
   test.beforeAll(async ({}, testInfo) => {
     browser = testInfo.project.name === "qa-firefox" ? "firefox" : "chromium";
     testInfo.annotations.push({ type: "runbook", description: "harness sanity — not a manual check" });
-    context = await launchQaContext(browser);
-    await installSimulator(context, buildScenario());
+    const session = await launchQaContext(browser, buildScenario());
+    context = session.context;
+    closeQa = session.close;
     page = await context.newPage();
   });
 
   test.afterAll(async () => {
-    await context.close();
+    await closeQa();
   });
 
   test("serves the scenario under the real Classroom origin with primitives and the built extension", async () => {

@@ -29,7 +29,6 @@ import {
   youtube,
   external,
 } from "../../simulator/scenario";
-import { installSimulator } from "../../simulator/server";
 
 const STREAM = streamPath();
 const CLASSWORK = classworkPath();
@@ -87,11 +86,13 @@ test.describe("qa-01 buttons", () => {
   let page: Page;
   let capture: ReturnType<typeof captureConsole>;
   let browser: "chromium" | "firefox";
+  let closeQa: () => Promise<void>;
 
   test.beforeAll(async ({}, testInfo) => {
     browser = testInfo.project.name === "qa-firefox" ? "firefox" : "chromium";
-    context = await launchQaContext(browser);
-    await installSimulator(context, scenario());
+    const session = await launchQaContext(browser, scenario());
+    context = session.context;
+    closeQa = session.close;
     page = await context.newPage();
     capture = captureConsole(page);
     await page.goto(`https://classroom.google.com${STREAM}`, { waitUntil: "domcontentloaded" });
@@ -99,7 +100,7 @@ test.describe("qa-01 buttons", () => {
   });
 
   test.afterAll(async () => {
-    await context.close();
+    await closeQa();
   });
 
   test("manual checks 1-2 / golden rules 1-4: buttons, exclusions, metadata, dedup", async () => {

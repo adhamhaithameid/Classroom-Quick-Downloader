@@ -20,9 +20,12 @@ import {
   chromium,
   firefox,
   expect,
+  test,
   type BrowserContext,
   type Page,
 } from "@playwright/test";
+import type { Scenario } from "../../simulator/scenario";
+import { startSimulatorProxy } from "../../simulator/proxy";
 import type { AssertionResult, QaBrowser, QaCheckResult, QaStatus } from "./qa-types";
 
 const REPO_ROOT = path.resolve(__dirname, "../../..");
@@ -101,53 +104,82 @@ export async function runCheck(
     expect(result.status, `[${result.checkId}] ${result.failureClass}: ${result.error ?? "see result.json"}`).toBe("passed");
   }
   if (result.status === "skipped") {
-    test.skip(true, result.error ?? "skipped");
+    test.skip();
   }
 }
 
 // ---------------------------------------------------------------------------
 // Context launching — one persistent context per spec file, like core-flow.
+//
+// The context is pointed at the simulator's local MITM proxy (started here
+// per context), which is the ONLY network surface in a QA run: classroom /
+// drive / docs are served deterministically and everything else dies. The
+// proxy exists because Playwright route interception cannot feed Chromium's
+// download manager — real downloads must flow through a real socket.
 // ---------------------------------------------------------------------------
 
-export async function launchQaChromium(): Promise<BrowserContext> {
-  return chromium.launchPersistentContext("", {
-    headless: false,
-    acceptDownloads: true,
-    args: [
-      `--disable-extensions-except=${CHROMIUM_EXTENSION_PATH}`,
-      `--load-extension=${CHROMIUM_EXTENSION_PATH}`,
-      "--disable-blink-features=AutomationControlled",
-      "--no-first-run",
-      "--disable-default-apps",
-    ],
-  });
+export interface QaSession {
+  context: BrowserContext;
+  close: () => Promise<void>;
 }
 
-/**
- * Firefox loads the MV2 build from a pre-prepared profile (global-setup zips
- * the build into <profile>/extensions/<gecko-id>.xpi and writes the prefs
- * that allow unsigned installation). Chromium's --load-extension flag does
- * not exist in Firefox — this profile route is the supported loading path.
- */
-export async function launchQaFirefox(): Promise<BrowserContext> {
-  if (!fs.existsSync(path.join(FIREFOX_PROFILE_DIR, "extensions"))) {
-    throw new Error(
-      "ENVIRONMENT: Firefox extension profile not prepared. Run the global setup (pnpm test:qa:firefox triggers it).",
-    );
-  }
-  return firefox.launchPersistentContext(FIREFOX_PROFILE_DIR, {
-    headless: false,
-    acceptDownloads: true,
-    firefoxUserPrefs: {
-      "xpinstall.signatures.required": false,
-      "extensions.autoDisableScopes": 0,
-      "extensions.enabledScopes": 15,
+export async function launchQaContext(
+  browser: QaBrowser,
+  scenario: Scenario,
+): Promise<QaSession> {
+  const sim = await startSimulatorProxy(scenario);
+
+  const context =
+    browser === "chromium"
+      ? await chromium.launchPersistentContext("", {
+          headless: false,
+          acceptDownloads: true,
+          ignoreHTTPSErrors: true,
+          proxy: { server: sim.url },
+          args: [
+            `--disable-extensions-except=${CHROMIUM_EXTENSION_PATH}`,
+            `--load-extension=${CHROMIUM_EXTENSION_PATH}`,
+            "--disable-blink-features=AutomationControlled",
+            "--no-first-run",
+            "--disable-default-apps",
+            // The download manager verifies certificates outside Playwright's
+            // ignoreHTTPSErrors reach; the simulator's test-only CA must be
+            // accepted there or chrome.downloads fails with a cert error.
+            "--ignore-certificate-errors",
+          ],
+        })
+      : await firefox.launchPersistentContext(FIREFOX_PROFILE_DIR, {
+          headless: false,
+          acceptDownloads: true,
+          ignoreHTTPSErrors: true,
+          proxy: { server: sim.url },
+          firefoxUserPrefs: {
+            "xpinstall.signatures.required": false,
+            "extensions.autoDisableScopes": 0,
+            "extensions.enabledScopes": 15,
+          },
+        });
+
+  return {
+    context,
+    close: async () => {
+      // A group left mid-run keeps Chromium's download manager retrying, which
+      // can stall a graceful close — force-kill the browser and bound every
+      // step so a wedged socket can never hang the test run.
+      const graceful = context.close().then(() => "closed").catch(() => "closed");
+      const timeout = new Promise<"timeout">((r) => setTimeout(() => r("timeout"), 10_000));
+      const outcome = await Promise.race([graceful, timeout]);
+      if (outcome === "timeout") {
+        try {
+          context.browser()?.process()?.kill("SIGKILL");
+        } catch {
+          /* firefox has no process handle; the OS reaps it at runner exit */
+        }
+        await new Promise((r) => setTimeout(r, 500));
+      }
+      await sim.close();
     },
-  });
-}
-
-export async function launchQaContext(browser: QaBrowser): Promise<BrowserContext> {
-  return browser === "chromium" ? launchQaChromium() : launchQaFirefox();
+  };
 }
 
 // ---------------------------------------------------------------------------
