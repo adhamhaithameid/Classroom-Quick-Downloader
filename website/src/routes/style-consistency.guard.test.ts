@@ -98,6 +98,30 @@ describe('style consistency: shared glass design system', () => {
   });
 });
 
+describe('style consistency: shared floating entities', () => {
+  it('renders the drifting entities from the layout-mounted ambient layer', () => {
+    const ambient = read('../lib/components/AmbientBackground.svelte');
+    expect(ambient).toContain('class="l2-page-floats"');
+    expect(ambient).toContain('defaultPlacements');
+    expect(ambient).toContain('float-a');
+    // Mobile opt-out matches the overview's own placement breakpoint.
+    expect(ambient).toContain('max-width: 900px');
+
+    // The overview (+editor) render their own editor-connected entity layer,
+    // so the shared one must be suppressible per route.
+    const layout = read('./+layout.svelte');
+    expect(layout).toContain('withFloats');
+    expect(layout).toContain('/overview-editor');
+  });
+
+  it('resolves placement svg through one shared catalog helper', () => {
+    const placements = read('../lib/svgCatalog/placements.ts');
+    expect(placements).toContain('export function resolvePlacementSvg');
+    const overview = read('./overview/+page.svelte');
+    expect(overview).toContain('resolvePlacementSvg');
+  });
+});
+
 describe('style consistency: one shared ambient background', () => {
   it('renders the orbs + grid from the layout-mounted AmbientBackground component', () => {
     const ambient = read('../lib/components/AmbientBackground.svelte');

@@ -598,6 +598,9 @@
   }
 
   $: route = $page.url.pathname.replace(/\/$/, '') || '/';
+  // The overview (+editor) render their own editor-connected entity layer;
+  // every other route gets the shared ambient entities.
+  $: ambientFloats = route !== '/' && route !== '/overview' && route !== '/overview-editor';
   $: isOverviewStyleRoute =
     $page.status === 404 ||
     route === '/' ||
@@ -676,7 +679,8 @@
 <BrowserIconSprite />
 
 <div class="site-shell" class:o2-fullscreen={hideChrome}>
-  <AmbientBackground />
+  <AmbientBackground withFloats={ambientFloats} />
+  <a class="skip-link" href="#main-content">Skip to content</a>
   {#if !hideChrome}
   <header class="l2-nav-shell" class:is-scrolled={scrolled} class:menu-open={openMenu !== null} class:nav-dark={navDark}>
     <div class="l2-nav-float">
@@ -939,7 +943,7 @@
                 </svg>
               </a>
               <p class="l2-gh-desc">
-                Free, open-source browser extension that batch-downloads every Google Classroom attachment in one click. MIT-licensed and auditable by anyone.
+                Free, source-available browser extension that batch-downloads every Google Classroom attachment in one click. The full code is public on GitHub and auditable by anyone.
               </p>
               <div class="l2-gh-stats">
                 <span class="l2-gh-stat" title="Stars">
@@ -1044,6 +1048,7 @@
   {/if}
 
   <main
+    id="main-content"
     class:site-main={!isOverviewStyleRoute && !hideChrome}
     class:site-main-overview-style={isOverviewStyleRoute && !hideChrome}
     class:l2-wrap={!isOverviewStyleRoute && !hideChrome}

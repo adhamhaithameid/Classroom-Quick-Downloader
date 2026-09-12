@@ -76,10 +76,21 @@ body {
   padding: 0;
   font-family: var(--font-ui), sans-serif;
   color: var(--text);
-  background: var(--bg);
   min-height: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* The opaque canvas color lives on html ONLY. body must stay transparent:
+   an opaque body background paints as an in-flow box above the root's
+   negative-z children, which would bury the fixed ambient layers
+   (AmbientBackground) on some routes. */
+html {
+  background: var(--bg);
+}
+
+body {
+  background: transparent;
 }
 
 html {
@@ -265,6 +276,27 @@ select {
 ::selection {
   background: rgba(26, 139, 85, 0.2);
   color: var(--text);
+}
+
+/* Skip link: hidden until keyboard-focused, then pinned under the navbar. */
+.skip-link {
+  position: fixed;
+  top: 12px;
+  left: 16px;
+  z-index: 2000;
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius-sm);
+  background: var(--gc-green-dark);
+  color: #ffffff;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: var(--shadow-green);
+  transform: translateY(-250%);
+  transition: transform 0.15s ease;
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
 }
 
 @media (max-width: 860px) {

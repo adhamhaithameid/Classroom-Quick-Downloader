@@ -1,3 +1,16 @@
+<script lang="ts">
+  import { defaultPlacements, resolvePlacementSvg } from '$lib/svgCatalog/placements';
+
+  /** The overview (+ its editor) render their own editor-connected entity
+   *  layer; every other route gets this shared one. */
+  export let withFloats = true;
+
+  const floatEntities = defaultPlacements
+    .filter((p) => !p.hidden)
+    .slice()
+    .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
+</script>
+
 <div class="l2-page-orbs" aria-hidden="true">
   <span class="aurora-orb ao-1"></span>
   <span class="aurora-orb ao-2"></span>
@@ -7,15 +20,50 @@
   <span class="aurora-orb ao-6"></span>
 </div>
 <div class="l2-page-grid" aria-hidden="true"></div>
+{#if withFloats}
+  <div class="l2-page-floats" aria-hidden="true">
+    {#each floatEntities as p (p.id)}
+      {@const resolved = resolvePlacementSvg(p)}
+      <div
+        class="l2-float-el"
+        style="
+          left: {p.x}%;
+          top: {p.y}%;
+          width: {p.size}px;
+          height: {p.size}px;
+          opacity: {p.opacity};
+          color: {p.color || 'var(--gc-green)'};
+          --placement-rotate: {p.rotate}deg;
+          animation-duration: {p.animDuration}s;
+          z-index: {p.zIndex ?? 0};
+        "
+      >
+        <svg
+          viewBox={resolved.viewBox}
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          style="width:100%;height:100%;"
+        >
+          {@html resolved.svg}
+        </svg>
+      </div>
+    {/each}
+  </div>
+{/if}
 
 <style>
   /* ── Shared ambient background ───────────────────────────────────────
      ONE background for every route: blurred aurora orbs drifting over a
-     slow hue cycle, plus the 60px engineering grid. Mounted once by
-     +layout.svelte; pages must never re-implement these layers. Fixed
-     positioning keeps the field constant while content scrolls; the body
-     carries the opaque --bg canvas and this layer paints behind
-     .site-shell (transparent) at z-index -1. */
+     slow hue cycle, the 60px engineering grid, and the catalog's floating
+     entities. Mounted once by +layout.svelte; pages must never
+     re-implement these layers. Fixed positioning keeps the field constant
+     while content scrolls; the body carries the opaque --bg canvas and
+     these layers paint behind .site-shell (transparent) at z-index -1,
+     except the entity layer, which floats above content (z-index 3) but
+     below the navbar, mirroring the overview's incumbent look. */
   .l2-page-orbs,
   .l2-page-grid {
     position: fixed;
@@ -51,6 +99,32 @@
     background-size: 60px 60px;
   }
 
+  /* Floating entities — the same catalog the overview's editor-connected
+     layer renders. Hidden below 900px to match the overview's placement
+     breakpoint; suppressed per route via the withFloats prop. */
+  .l2-page-floats {
+    position: fixed;
+    inset: 0;
+    z-index: 3;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .l2-float-el {
+    position: absolute;
+    color: var(--gc-green);
+    animation: float-a ease-in-out infinite;
+    pointer-events: none;
+    will-change: transform;
+  }
+
+  @keyframes float-a {
+    0%, 100% { transform: translateY(0) rotate(var(--placement-rotate, 0deg)); }
+    25% { transform: translateY(-20px) rotate(calc(var(--placement-rotate, 0deg) + 5deg)); }
+    50% { transform: translateY(10px) rotate(calc(var(--placement-rotate, 0deg) - 3deg)); }
+    75% { transform: translateY(-15px) rotate(calc(var(--placement-rotate, 0deg) + 4deg)); }
+  }
+
   @keyframes aurora-drift {
     0% { transform: translate(0, 0) scale(1); }
     100% { transform: translate(64px, -52px) scale(1.08); }
@@ -61,9 +135,16 @@
     100% { filter: hue-rotate(360deg); }
   }
 
+  @media (max-width: 900px) {
+    .l2-page-floats {
+      display: none;
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .l2-page-orbs,
-    .aurora-orb {
+    .aurora-orb,
+    .l2-float-el {
       animation: none;
     }
   }

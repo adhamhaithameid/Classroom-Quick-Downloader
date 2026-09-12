@@ -5,6 +5,7 @@
 
 import { categories as svgCategories, doodleItems, threeDElements } from './index';
 import defaultPlacementsSeed from './defaultPlacements.v2.json';
+import type { SvgItem } from './types';
 
 export type PlacementType = 'float' | 'doodle' | '3d';
 
@@ -790,4 +791,42 @@ export function importPlacementsJSON(json: string): PlacementImportResult {
       warnings: []
     };
   }
+}
+
+/** Single SVG resolver for decorative placements — catalog builtins first,
+ *  then custom svgs, then the float/doodle/3D catalogs. Shared by the
+ *  overview page (editor-connected layer) and the site-wide ambient floats. */
+export function resolvePlacementSvg(p: {
+  sampleId: string;
+  customSvg?: string | null;
+  viewBox?: string | null;
+}): { svg: string; viewBox: string } {
+  const builtin = getBuiltinSvg(p.sampleId);
+  if (builtin) return builtin;
+
+  if (p.customSvg) {
+    return { svg: p.customSvg, viewBox: p.viewBox || '0 0 64 64' };
+  }
+
+  for (const cat of svgCategories) {
+    const item = cat.items.find((i: SvgItem) => i.id === p.sampleId);
+    if (item) {
+      return { svg: item.svg, viewBox: '0 0 64 64' };
+    }
+  }
+  for (const d of doodleItems) {
+    if (d.id === p.sampleId) {
+      return { svg: d.svg, viewBox: '0 0 60 60' };
+    }
+  }
+  for (const t of threeDElements) {
+    if (t.id === p.sampleId) {
+      return { svg: t.svg, viewBox: '0 0 120 110' };
+    }
+  }
+
+  return {
+    svg: '<text x="32" y="40" text-anchor="middle" font-size="24" fill="currentColor">?</text>',
+    viewBox: '0 0 64 64'
+  };
 }
