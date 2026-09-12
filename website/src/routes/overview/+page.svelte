@@ -31,7 +31,7 @@
     genPlacementId, getBuiltinSvg,
     maxPlacementZIndex
   } from '$lib/svgCatalog/placements';
-  import { categories as svgCategories, doodleItems, threeDElements } from '$lib/svgCatalog/index';
+  import { categories as svgCategories, doodleItems, threeDElements, resolvePlacementSvg } from '$lib/svgCatalog/index';
   import type { SvgItem } from '$lib/svgCatalog/index';
 
   /* ━━━ Feature toggle: set to false to hide the silly question ━━━ */
@@ -142,6 +142,7 @@
     softwareVersion: latestReleaseVersion.replace(/^v/, ''),
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
     publisher: { '@id': `${SITE_URL}/#organization` },
+    author: { '@type': 'Person', name: 'Adham Haitham', url: STORE_LINKS.github },
     url: buildCanonicalUrl(seoPath),
     downloadUrl: [STORE_LINKS.chrome, STORE_LINKS.firefox, STORE_LINKS.edge]
   };
@@ -1032,31 +1033,7 @@
   /* ━━━ Edit-mode helpers ━━━ */
   /** Resolve SVG content for a placement — from catalog or builtins */
   function resolveSvg(p: ElementPlacement): { svg: string; viewBox: string } {
-    const builtin = getBuiltinSvg(p.sampleId);
-    if (builtin) return builtin;
-
-    if (p.customSvg) {
-      return { svg: p.customSvg, viewBox: p.viewBox || '0 0 64 64' };
-    }
-
-    for (const cat of svgCategories) {
-      const item = cat.items.find((i: SvgItem) => i.id === p.sampleId);
-      if (item) {
-        return { svg: item.svg, viewBox: '0 0 64 64' };
-      }
-    }
-    for (const d of doodleItems) {
-      if (d.id === p.sampleId) {
-        return { svg: d.svg, viewBox: '0 0 60 60' };
-      }
-    }
-    for (const t of threeDElements) {
-      if (t.id === p.sampleId) {
-        return { svg: t.svg, viewBox: '0 0 120 110' };
-      }
-    }
-
-    return { svg: '<text x="32" y="40" text-anchor="middle" font-size="24" fill="currentColor">?</text>', viewBox: '0 0 64 64' };
+    return resolvePlacementSvg(p);
   }
 
   function setEditorStatus(message: string, tone: 'ok' | 'warn' | 'error' = 'ok') {
