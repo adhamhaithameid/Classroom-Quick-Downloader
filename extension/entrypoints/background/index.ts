@@ -10,11 +10,16 @@
 
 import {
   pendingByRequestId,
-  pendingByDownloadId,
   pendingByUrl,
-  pendingByUrlAdd,
-  pendingByUrlGet,
   pendingByBypassTabId,
+  registerPendingUrl,
+  bindDownloadId,
+  unbindDownloadId,
+  unbindBypassTabId,
+  getPendingByRequestId,
+  getPendingByDownloadId,
+  getPendingByBypassTabId,
+  getUnclaimedPendingByUrl,
   cancelledByUs,
   recentDownloads,
   CLEANUP_INTERVAL_MS,
@@ -183,14 +188,14 @@ export default defineBackground(() => {
     if (!message || !sender.tab || sender.tab.id == null) return false;
 
     const tabId = sender.tab.id;
-    const pending = pendingByBypassTabId.get(tabId);
+    const pending = getPendingByBypassTabId(tabId);
 
     // Consent gate for drive_bypass: only tabs the extension itself opened
     // (openDriveBypassTab) may auto-click through Drive interstitials.
     // Answered BEFORE the CQD_* drop-guard below, because unregistered tabs
     // are exactly the ones this check exists for.
     if (message.type === 'CQD_QUERY_BYPASS_CONSENT') {
-      sendResponse({ allowed: pendingByBypassTabId.has(tabId) });
+      sendResponse({ allowed: getPendingByBypassTabId(tabId) !== undefined });
       return;
     }
 
@@ -204,7 +209,7 @@ export default defineBackground(() => {
         sendStatusToTab(pending, 'success');
         pending.finalized = true;
       }
-      pendingByBypassTabId.delete(tabId);
+      unbindBypassTabId(tabId);
       setTimeout(() => {
         try {
           chrome.tabs.remove(tabId);
@@ -216,7 +221,7 @@ export default defineBackground(() => {
     if (message.type === 'CQD_403_SEEN' && pending) {
       pending.confirmed403 = true;
       pending.fallbackStarted = true;
-      pendingByBypassTabId.delete(tabId);
+      unbindBypassTabId(tabId);
       try {
         chrome.tabs.remove(tabId);
       } catch {}
@@ -242,7 +247,7 @@ export default defineBackground(() => {
     }
 
     if (message.type === 'CQD_REGISTER_BYPASS_URL' && pending && typeof message.url === 'string') {
-      pendingByUrlAdd(message.url, pending);
+      registerPendingUrl(pending, message.url);
       return;
     }
   });
@@ -250,12 +255,11 @@ export default defineBackground(() => {
   // 2) onDeterminingFilename (Chrome only)
   if (!IS_FIREFOX && chrome.downloads && chrome.downloads.onDeterminingFilename) {
     chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
-      let pending = pendingByDownloadId.get(item.id);
+      let pending = getPendingByDownloadId(item.id);
       if (!pending) {
-        pending = pendingByUrlGet(item.url) ?? pendingByUrlGet(item.finalUrl || item.url);
+        pending = getUnclaimedPendingByUrl(item.url) ?? getUnclaimedPendingByUrl(item.finalUrl || item.url);
         if (pending) {
-          if (pending.currentDownloadId == null) pending.currentDownloadId = item.id;
-          pendingByDownloadId.set(item.id, pending);
+          bindDownloadId(pending, item.id);
         }
       }
       if (!pending) {
@@ -278,7 +282,7 @@ export default defineBackground(() => {
         cancelledByUs.add(item.id);
         chrome.downloads.cancel(item.id, () => {
           const _ = chrome.runtime.lastError;
-          pendingByDownloadId.delete(item.id);
+          unbindDownloadId(item.id);
           if (!pending.htmlSeen) {
             pending.htmlSeen = true;
             sendStatusToTab(
@@ -312,7 +316,7 @@ export default defineBackground(() => {
   // 2b) onCreated (Firefox)
   if (IS_FIREFOX && chrome.downloads && chrome.downloads.onCreated) {
     chrome.downloads.onCreated.addListener((item) => {
-      let pending = pendingByDownloadId.get(item.id);
+      let pending = getPendingByDownloadId(item.id);
 
       if (!pending && item.url) {
         const downloadFileId = extractDriveFileId(item.url);
@@ -356,13 +360,12 @@ export default defineBackground(() => {
         }
         // Fallback: URL map exact match (prefer entry without a download ID yet)
         if (!pending) {
-          pending = pendingByUrlGet(item.url);
+          pending = getUnclaimedPendingByUrl(item.url);
         }
       }
 
       if (pending) {
-        pending.currentDownloadId = item.id;
-        pendingByDownloadId.set(item.id, pending);
+        bindDownloadId(pending, item.id);
         const ext = getFilenameExt(item.filename);
         if (ext) pending.finalExtension = ext;
         if (!pending.finalized) {
@@ -375,7 +378,7 @@ export default defineBackground(() => {
 
   // 3) onChanged: Analytics trigger
   chrome.downloads.onChanged.addListener((delta) => {
-    const pending = pendingByDownloadId.get(delta.id);
+    const pending = getPendingByDownloadId(delta.id);
     if (!pending) return;
 
     if (delta.state && delta.state.current === 'complete') {
@@ -396,7 +399,7 @@ export default defineBackground(() => {
     if (delta.state && delta.state.current === 'interrupted') {
       if (cancelledByUs.has(delta.id)) {
         cancelledByUs.delete(delta.id);
-        pendingByDownloadId.delete(delta.id);
+        unbindDownloadId(delta.id);
         return;
       }
       const duration = Date.now() - pending.startTime;
@@ -429,7 +432,7 @@ export default defineBackground(() => {
     const requestId = message.requestId as string | undefined;
     if (!requestId) return false;
 
-    const pending = pendingByRequestId.get(requestId);
+    const pending = getPendingByRequestId(requestId);
     if (!pending) return false;
 
     pending.isCancelled = true;
@@ -452,7 +455,7 @@ export default defineBackground(() => {
         try {
           chrome.tabs.remove(tabId);
         } catch {}
-        pendingByBypassTabId.delete(tabId);
+        unbindBypassTabId(tabId);
         break;
       }
     }

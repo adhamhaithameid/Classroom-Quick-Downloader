@@ -1,5 +1,67 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// D11 — registry-faithful state mock shared by every loadBackground variant:
+// the authoritative map plus indexes maintained only through registry fns.
+// (The authority pre-check is exercised in background-state.test.ts; these
+// suites preset unregistered pendings to drive listener logic.)
+function makeStateModule(options: {
+  isFirefox?: boolean;
+  cleanupInterval?: number;
+  urlBuckets?: Array<[string, any[]]>;
+  pendingByRequestId?: Map<string, any>;
+  pendingByDownloadId?: Map<number, any>;
+  pendingByBypassTabId?: Map<number, any>;
+  cancelledByUs?: Set<number>;
+} = {}) {
+  const pendingByRequestId = options.pendingByRequestId ?? new Map<string, any>();
+  const pendingByDownloadId = options.pendingByDownloadId ?? new Map<number, any>();
+  const pendingByUrl = new Map<string, Set<any>>();
+  for (const [url, pendings] of options.urlBuckets ?? []) {
+    pendingByUrl.set(url, new Set(pendings));
+  }
+  const pendingByBypassTabId = options.pendingByBypassTabId ?? new Map<number, any>();
+  const indexUrl = (url: string, p: any) => {
+    let bucket = pendingByUrl.get(url);
+    if (!bucket) { bucket = new Set(); pendingByUrl.set(url, bucket); }
+    bucket.add(p);
+  };
+  return {
+    pendingByRequestId,
+    pendingByDownloadId,
+    pendingByUrl,
+    pendingByBypassTabId,
+    registerPending: (p: any) => {
+      pendingByRequestId.set(p.requestId, p);
+      indexUrl(p.baseUrl, p);
+    },
+    registerPendingUrl: (p: any, url: string) => indexUrl(url, p),
+    bindDownloadId: (p: any, downloadId: number) => {
+      p.currentDownloadId = downloadId;
+      pendingByDownloadId.set(downloadId, p);
+      return true;
+    },
+    unbindDownloadId: (downloadId: number) => { pendingByDownloadId.delete(downloadId); },
+    bindBypassTabId: (p: any, tabId: number) => {
+      pendingByBypassTabId.set(tabId, p);
+      return true;
+    },
+    unbindBypassTabId: (tabId: number) => { pendingByBypassTabId.delete(tabId); },
+    getPendingByRequestId: (id: string) => pendingByRequestId.get(id),
+    getPendingByDownloadId: (id: number) => pendingByDownloadId.get(id),
+    getPendingByBypassTabId: (id: number) => pendingByBypassTabId.get(id),
+    getUnclaimedPendingByUrl: (url: string) => {
+      const bucket = pendingByUrl.get(url);
+      if (!bucket || bucket.size === 0) return undefined;
+      for (const p of bucket) { if (p.currentDownloadId == null) return p; }
+      return undefined;
+    },
+    cancelledByUs: options.cancelledByUs ?? new Set<number>(),
+    recentDownloads: new Map(),
+    CLEANUP_INTERVAL_MS: options.cleanupInterval ?? 1000,
+    IS_FIREFOX: options.isFirefox ?? false,
+  };
+}
+
 describe('background/index', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -18,19 +80,7 @@ describe('background/index', () => {
     });
     const onInstalledAddListener = vi.fn();
 
-    vi.doMock('../entrypoints/background/state', () => ({
-      pendingByRequestId: new Map(),
-      pendingByDownloadId: new Map(),
-      pendingByUrl: new Map(),
-      pendingByUrlAdd: vi.fn(),
-      pendingByUrlRemove: vi.fn(),
-      pendingByUrlGet: vi.fn(),
-      pendingByBypassTabId: new Map(),
-      cancelledByUs: new Set(),
-      recentDownloads: new Map(),
-      CLEANUP_INTERVAL_MS: 1000,
-      IS_FIREFOX: false,
-    }));
+    vi.doMock('../entrypoints/background/state', () => makeStateModule({ isFirefox: false }));
     vi.doMock('../entrypoints/background/icon-manager', () => ({
       createIconUpdaters: () => ({ updateTabIcon, updateGlobalIcon }),
       isClassroomUrl: () => true,
@@ -115,19 +165,7 @@ describe('background/index', () => {
     const sendStatusToTab = vi.fn();
     const recordDownloadEvent = vi.fn();
 
-    vi.doMock('../entrypoints/background/state', () => ({
-      pendingByRequestId: new Map(),
-      pendingByDownloadId,
-      pendingByUrl: new Map(),
-      pendingByUrlAdd: vi.fn(),
-      pendingByUrlRemove: vi.fn(),
-      pendingByUrlGet: vi.fn(),
-      pendingByBypassTabId: new Map(),
-      cancelledByUs: new Set(),
-      recentDownloads: new Map(),
-      CLEANUP_INTERVAL_MS: 1000,
-      IS_FIREFOX: false,
-    }));
+    vi.doMock('../entrypoints/background/state', () => makeStateModule({ pendingByDownloadId }));
     vi.doMock('../entrypoints/background/icon-manager', () => ({
       createIconUpdaters: () => ({ updateTabIcon: vi.fn(), updateGlobalIcon: vi.fn() }),
       isClassroomUrl: () => true,
@@ -194,19 +232,7 @@ describe('background/index', () => {
 
   it('returns false for unknown message types and unexpected senders', async () => {
     vi.resetModules();
-    vi.doMock('../entrypoints/background/state', () => ({
-      pendingByRequestId: new Map(),
-      pendingByDownloadId: new Map(),
-      pendingByUrl: new Map(),
-      pendingByUrlAdd: vi.fn(),
-      pendingByUrlRemove: vi.fn(),
-      pendingByUrlGet: vi.fn(),
-      pendingByBypassTabId: new Map(),
-      cancelledByUs: new Set(),
-      recentDownloads: new Map(),
-      CLEANUP_INTERVAL_MS: 1000,
-      IS_FIREFOX: false,
-    }));
+    vi.doMock('../entrypoints/background/state', () => makeStateModule({ isFirefox: false }));
     vi.doMock('../entrypoints/background/icon-manager', () => ({
       createIconUpdaters: () => ({ updateTabIcon: vi.fn(), updateGlobalIcon: vi.fn() }),
       isClassroomUrl: () => true,
@@ -265,19 +291,7 @@ describe('background/index', () => {
   it('relays student-work resolver publish messages back to the originating tab', async () => {
     vi.resetModules();
 
-    vi.doMock('../entrypoints/background/state', () => ({
-      pendingByRequestId: new Map(),
-      pendingByDownloadId: new Map(),
-      pendingByUrl: new Map(),
-      pendingByUrlAdd: vi.fn(),
-      pendingByUrlRemove: vi.fn(),
-      pendingByUrlGet: vi.fn(),
-      pendingByBypassTabId: new Map(),
-      cancelledByUs: new Set(),
-      recentDownloads: new Map(),
-      CLEANUP_INTERVAL_MS: 1000,
-      IS_FIREFOX: false,
-    }));
+    vi.doMock('../entrypoints/background/state', () => makeStateModule({ isFirefox: false }));
     vi.doMock('../entrypoints/background/icon-manager', () => ({
       createIconUpdaters: () => ({ updateTabIcon: vi.fn(), updateGlobalIcon: vi.fn() }),
       isClassroomUrl: () => true,
@@ -414,33 +428,15 @@ describe('background/index', () => {
   } = {}) {
     vi.resetModules();
 
-    const pendingByUrl = new Map<string, Set<AnyPending>>();
-    for (const [url, pendings] of options.urlBuckets ?? []) {
-      pendingByUrl.set(url, new Set(pendings));
-    }
-
-    const stateModule = {
-      pendingByRequestId: options.pendingByRequestId ?? new Map(),
-      pendingByDownloadId: options.pendingByDownloadId ?? new Map(),
-      pendingByUrl,
-      pendingByUrlAdd: (url: string, p: AnyPending) => {
-        let bucket = pendingByUrl.get(url);
-        if (!bucket) { bucket = new Set(); pendingByUrl.set(url, bucket); }
-        bucket.add(p);
-      },
-      pendingByUrlRemove: vi.fn(),
-      pendingByUrlGet: (url: string) => {
-        const bucket = pendingByUrl.get(url);
-        if (!bucket || bucket.size === 0) return undefined;
-        for (const p of bucket) { if (p.currentDownloadId == null) return p; }
-        return undefined;
-      },
-      pendingByBypassTabId: options.pendingByBypassTabId ?? new Map(),
-      cancelledByUs: options.cancelledByUs ?? new Set<number>(),
-      recentDownloads: new Map(),
-      CLEANUP_INTERVAL_MS: 60_000,
-      IS_FIREFOX: options.isFirefox ?? false,
-    };
+    const stateModule = makeStateModule({
+      isFirefox: options.isFirefox,
+      cleanupInterval: 60_000,
+      urlBuckets: options.urlBuckets,
+      pendingByRequestId: options.pendingByRequestId,
+      pendingByDownloadId: options.pendingByDownloadId,
+      pendingByBypassTabId: options.pendingByBypassTabId,
+      cancelledByUs: options.cancelledByUs,
+    });
 
     const cleanup = vi.fn();
     const sendStatusToTab = vi.fn();

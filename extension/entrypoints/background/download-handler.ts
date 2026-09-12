@@ -6,10 +6,9 @@
 
 import type { PendingDownload } from './types';
 import {
-  pendingByRequestId,
-  pendingByDownloadId,
-  pendingByUrlAdd,
-  pendingByBypassTabId,
+  registerPending,
+  bindDownloadId,
+  bindBypassTabId,
   AUTHUSER_CANDIDATES,
   IS_FIREFOX,
 } from './state';
@@ -51,8 +50,7 @@ export function startSingleAttempt(
         respondOnce?.({ started: false, userMessage: 'Browser blocked download.' });
         return;
       }
-      pending.currentDownloadId = downloadId;
-      pendingByDownloadId.set(downloadId, pending);
+      bindDownloadId(pending, downloadId);
       respondOnce?.({ started: true, requestId: pending.requestId, downloadId });
     }
   );
@@ -64,7 +62,7 @@ export function startSingleAttempt(
 export function openDriveBypassTab(pending: PendingDownload, url: string): void {
   chrome.tabs.create({ url, active: false }, (tab) => {
     if (tab?.id != null) {
-      pendingByBypassTabId.set(tab.id, pending);
+      bindBypassTabId(pending, tab.id);
     }
   });
 }
@@ -121,8 +119,7 @@ export function startNextDriveAttempt(pending: PendingDownload): void {
           startNextDriveAttempt(pending);
           return;
         }
-        pending.currentDownloadId = downloadId;
-        pendingByDownloadId.set(downloadId, pending);
+        bindDownloadId(pending, downloadId);
       }
     );
   }
@@ -168,8 +165,7 @@ export function handleDownloadRequest(
     pending.currentAuthUser = initialAuthUser;
   }
 
-  pendingByRequestId.set(requestId, pending);
-  pendingByUrlAdd(baseUrl, pending);
+  registerPending(pending);
 
   let responseSent = false;
   const respondOnce = (payload: any) => {
@@ -247,8 +243,7 @@ export function handleDownloadRequest(
           }
           return;
         }
-        pending.currentDownloadId = id;
-        pendingByDownloadId.set(id, pending);
+        bindDownloadId(pending, id);
         respondOnce({ started: true, requestId, downloadId: id });
       }
     );

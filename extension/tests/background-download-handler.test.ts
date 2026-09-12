@@ -23,6 +23,9 @@ type TestContext = {
     pendingByUrlAdd: (url: string, pending: PendingDownload) => void;
     pendingByUrlRemove: ReturnType<typeof vi.fn>;
     pendingByUrlGet: (url: string) => PendingDownload | undefined;
+    registerPending: (pending: PendingDownload) => void;
+    bindDownloadId: (pending: PendingDownload, downloadId: number) => boolean;
+    bindBypassTabId: (pending: PendingDownload, tabId: number) => boolean;
   };
   cleanupSpy: ReturnType<typeof vi.fn>;
   sendStatusSpy: ReturnType<typeof vi.fn>;
@@ -65,14 +68,41 @@ function installChromeMocks() {
 async function loadDownloadHandler(options: LoadOptions = {}): Promise<TestContext> {
   vi.resetModules();
 
+  const pendingByRequestId = new Map<string, PendingDownload>();
+  const pendingByDownloadId = new Map<number, PendingDownload>();
   const pendingByUrl = new Map<string, Set<PendingDownload>>();
+  const pendingByBypassTabId = new Map<number, PendingDownload>();
+  const indexUrl = (url: string, p: PendingDownload) => {
+    let bucket = pendingByUrl.get(url);
+    if (!bucket) { bucket = new Set(); pendingByUrl.set(url, bucket); }
+    bucket.add(p);
+  };
   const stateModule = {
-    pendingByRequestId: new Map<string, PendingDownload>(),
-    pendingByDownloadId: new Map<number, PendingDownload>(),
+    pendingByRequestId,
+    pendingByDownloadId,
     pendingByUrl,
-    pendingByBypassTabId: new Map<number, PendingDownload>(),
+    pendingByBypassTabId,
     AUTHUSER_CANDIDATES: options.authCandidates ?? [0, 1, 2],
     IS_FIREFOX: options.isFirefox ?? false,
+    // D11 registry semantics (mirrors the real state module): binds require
+    // the pending to still be authoritative, ids cannot be cross-claimed.
+    registerPending: (p: PendingDownload) => {
+      pendingByRequestId.set(p.requestId, p);
+      indexUrl(p.baseUrl, p);
+    },
+    bindDownloadId: (p: PendingDownload, downloadId: number) => {
+      if (pendingByRequestId.get(p.requestId) !== p) return false;
+      const existing = pendingByDownloadId.get(downloadId);
+      if (existing !== undefined && existing !== p) return false;
+      p.currentDownloadId = downloadId;
+      pendingByDownloadId.set(downloadId, p);
+      return true;
+    },
+    bindBypassTabId: (p: PendingDownload, tabId: number) => {
+      if (pendingByRequestId.get(p.requestId) !== p) return false;
+      pendingByBypassTabId.set(tabId, p);
+      return true;
+    },
     pendingByUrlAdd: (url: string, pending: PendingDownload) => {
       let bucket = pendingByUrl.get(url);
       if (!bucket) { bucket = new Set(); pendingByUrl.set(url, bucket); }
@@ -189,6 +219,7 @@ describe('background download handler', () => {
   it('startSingleAttempt stores pending download on success', async () => {
     const ctx = await loadDownloadHandler();
     const pending = makePending();
+    ctx.stateModule.registerPending(pending); // D11: binds require authority
     (chrome.runtime as { lastError?: { message: string } }).lastError = undefined;
     (chrome.downloads.download as any).mockImplementation((_: unknown, cb: (id?: number) => void) => cb(42));
     const respondOnce = vi.fn();
@@ -203,6 +234,7 @@ describe('background download handler', () => {
   it('openDriveBypassTab tracks bypass tab IDs when a tab is returned', async () => {
     const ctx = await loadDownloadHandler({ isFirefox: true });
     const pending = makePending({ isDrive: true });
+    ctx.stateModule.registerPending(pending); // D11: binds require authority
     (chrome.tabs.create as any).mockImplementation((_: unknown, cb: (tab: { id?: number }) => void) => cb({ id: 77 }));
     ctx.mod.openDriveBypassTab(pending, 'https://drive.google.com/uc?id=abc');
     expect(ctx.stateModule.pendingByBypassTabId.get(77)).toBe(pending);
@@ -250,6 +282,7 @@ describe('background download handler', () => {
   it('startNextDriveAttempt uses bypass tab path in Firefox mode', async () => {
     const ctx = await loadDownloadHandler({ isFirefox: true, authCandidates: [3] });
     const pending = makePending({ isDrive: true, attemptedAuthUsers: [] });
+    ctx.stateModule.registerPending(pending); // D11: binds require authority
     (chrome.tabs.create as any).mockImplementation((_: unknown, cb: (tab: { id?: number }) => void) => cb({ id: 5 }));
     ctx.mod.startNextDriveAttempt(pending);
     expect(pending.currentAuthUser).toBe(3);
@@ -259,6 +292,7 @@ describe('background download handler', () => {
   it('startNextDriveAttempt retries auth user after browser start failure in Chromium mode', async () => {
     const ctx = await loadDownloadHandler({ isFirefox: false, authCandidates: [0, 1] });
     const pending = makePending({ isDrive: true });
+    ctx.stateModule.registerPending(pending); // D11: binds require authority
     let calls = 0;
     (chrome.downloads.download as any).mockImplementation((_: unknown, cb: (id?: number) => void) => {
       calls += 1;
@@ -288,6 +322,7 @@ describe('background download handler', () => {
           : { valid: true, reason: 'OK', url, host: 'drive.google.com' },
     });
     const pending = makePending({ isDrive: true });
+    ctx.stateModule.registerPending(pending); // D11: binds require authority
     (chrome.downloads.download as any).mockImplementation((_: unknown, cb: (id?: number) => void) => {
       (chrome.runtime as { lastError?: { message: string } }).lastError = undefined;
       cb(55);

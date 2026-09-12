@@ -6,39 +6,42 @@
 
 import type { PendingDownload } from './types';
 import {
-  pendingByRequestId,
-  pendingByDownloadId,
-  pendingByUrlRemove,
+  unregisterPending,
+  unbindDownloadId,
   pendingByBypassTabId,
+  pendingByRequestId,
   cancelledByUs,
   recentDownloads,
   PENDING_DOWNLOAD_TTL_MS,
 } from './state';
 
 /**
- * Clean up all tracking maps for a completed/cancelled download.
+ * Clean up all tracking for a completed/cancelled download.
+ *
+ * D11: `unregisterPending` is the one mutator — it removes the authoritative
+ * entry and every index it occupies (URL buckets, download ids, bypass tabs),
+ * so indexes can no longer outlive the truth. The TTL sweep's fallback to the
+ * pending's own recorded download id is preserved.
  */
 export function cleanup(pending: PendingDownload, downloadId?: number): void {
-  pendingByRequestId.delete(pending.requestId);
+  const bypassTabIds: number[] = [];
+  for (const [tabId, p] of pendingByBypassTabId.entries()) {
+    if (p.requestId === pending.requestId) bypassTabIds.push(tabId);
+  }
 
-  // Fall back to the id recorded on the pending itself. The TTL sweep only has
-  // the pending object to work with, so without this a stale download that had
-  // already been assigned a browser download id would leave its entries in
-  // pendingByDownloadId and cancelledByUs behind permanently.
+  unregisterPending(pending);
+
   const effectiveDownloadId = downloadId ?? pending.currentDownloadId;
   if (effectiveDownloadId != null) {
-    pendingByDownloadId.delete(effectiveDownloadId);
     cancelledByUs.delete(effectiveDownloadId);
+    unbindDownloadId(effectiveDownloadId);
   }
-  pendingByUrlRemove(pending);
-  for (const [tabId, p] of pendingByBypassTabId.entries()) {
-    if (p.requestId === pending.requestId) {
-      pendingByBypassTabId.delete(tabId);
-      try {
-        chrome.tabs.remove(tabId);
-      } catch {
-        // Tab may already be closed
-      }
+
+  for (const tabId of bypassTabIds) {
+    try {
+      chrome.tabs.remove(tabId);
+    } catch {
+      // Tab may already be closed
     }
   }
 }
