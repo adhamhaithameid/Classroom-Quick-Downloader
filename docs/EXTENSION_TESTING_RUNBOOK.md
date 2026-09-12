@@ -98,3 +98,44 @@ The extension CI job now checks:
 4. extension coverage gates.
 
 If one of the golden suites fails, assume the change threatens current good behavior until proven otherwise.
+
+## Automated Manual-QA Replay (2026-09-12)
+
+The manual checks below are automated by the Manual-QA Replay pipeline
+(`docs/superpowers/specs/2026-09-12-manual-qa-replay-design.md`). Run:
+
+```bash
+pnpm test:qa          # Chromium (MV3), headed, local simulator
+pnpm test:qa:firefox  # Firefox (MV2)
+pnpm test:qa:report   # rebuild qa-artifacts/report.md from artifacts
+pnpm test:qa:live     # gated live-Classroom canary (read-only)
+```
+
+| Manual check | Automated check | Coverage |
+|---|---|---|
+| 1. attachment cards get one button | qa-01 | Full |
+| 2. Forms/Sheets body links get no buttons | qa-01 | Full |
+| Download All grouping/placement/progress/success/reset | qa-02 | Full |
+| Download All hold-to-cancel | qa-02 | Full |
+| Download All error state (all files fail) | qa-02-error | Skipped (HARNESS: retry timing) |
+| Real download bytes + filename | qa-06 | Full (magic bytes + Content-Disposition) |
+| Drive bypass flow lifecycle | qa-06-bypass | Full |
+| Flagged post: one outer card, badges | qa-03 | Full |
+| Comment count + tooltip | qa-03 | Full |
+| Dark theme badges | qa-03-dark | Full |
+| RTL ownership/geometry | qa-03-rtl | Full |
+| 4. Live flag toggles (popup message path) | qa-03 | Full |
+| 5. Popup render/settings/storage write | qa-04 | Partial (analytics card needs the real popup-window tab context) |
+| Student-work submissions buttons | qa-05 | Skipped (HARNESS: needs fixture-derived rows) |
+| SPA navigation, delayed posts, load-more, churn dedup | qa-05 | Full |
+| Production DOM drift | qa-07 (gated, read-only canary) | Canary |
+
+## Three testing layers
+
+1. **Unit / golden tests** — engine logic, fast and deterministic (existing).
+2. **Manual-QA Replay** — the built extension in real browsers against the
+   minimal Classroom simulator (`tests/simulator/`).
+3. **Live Classroom Canary** — read-only production drift detection against
+   real Classroom; gated by `QA_LIVE_CLASSROOM=1` + `QA_LIVE_STORAGE_STATE`.
+
+Never merge the three layers: they answer different questions.

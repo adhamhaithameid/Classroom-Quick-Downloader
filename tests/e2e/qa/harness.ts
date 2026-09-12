@@ -126,6 +126,7 @@ export async function runCheck(
 
 export interface QaSession {
   context: BrowserContext;
+  servedDownloads: () => { url: string; filename: string }[];
   close: () => Promise<void>;
 }
 
@@ -168,6 +169,7 @@ export async function launchQaContext(
 
   return {
     context,
+    servedDownloads: () => sim.servedDownloads,
     close: async () => {
       // A group left mid-run keeps Chromium's download manager retrying, which
       // can stall a graceful close — force-kill the browser and bound every
