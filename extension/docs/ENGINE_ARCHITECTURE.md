@@ -41,14 +41,17 @@ getPlacementDecisions() / getFlagDecisions() / getDecisionTrace()`.
 **Mode → engine mapping** (`src/engines/engine-registry.ts`):
 
 ```
-legacy → [V1]            business as usual
-shadow → [V1, V2]        V1 renders, V2 runs silently for comparison  ← DEFAULT shipped
-v2     → [V2]            V2 would render (render code is OFF, so nothing shows)
+legacy → [V1]            business as usual  ← DEFAULT shipped
+shadow → [V1, V2]        V1 renders, V2 runs silently for comparison (opt-in)
+v2     → [V2]            V2 renders through its own render strategy
 v3     → [V3]            V2 + API
 ```
 
-> ⚠️ **Default shipped mode is `shadow`** (`src/v2/orchestrator/mode-controller.ts`
-> `DEFAULT_MODE = 'shadow'`). So in production **both V1 and V2 run at once.**
+> **Default shipped mode is `legacy`** (`src/v2/orchestrator/mode-controller.ts`,
+> `DEFAULT_MODE = 'legacy'`; asserted by `tests/v2-mode-controller.test.ts`).
+> Shadow used to ship as the default and was rolled back (2026-08): double
+> scanning plus the ShadowComparator interval taxed every user's CPU with no
+> promotion path. Shadow is now an explicit opt-in (`cqdV2Mode='shadow'`).
 
 ### 1.2 The critical gap: V1 and V2 never talk
 

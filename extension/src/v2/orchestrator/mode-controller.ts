@@ -69,7 +69,11 @@ const STORAGE_KEY = 'cqdV2Mode';
  * To opt into validation manually: set cqdV2Mode='shadow' in
  * chrome.storage.local
  */
-const DEFAULT_MODE: EngineMode = 'legacy';
+/**
+ * The shipped default mode, exported so tests (and docs) can assert it:
+ * docs and code must never disagree about this again (D9).
+ */
+export const DEFAULT_MODE: EngineMode = 'legacy';
 
 // ============================================================================
 // READ / WRITE

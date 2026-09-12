@@ -46,6 +46,15 @@ describe('Mode Controller', () => {
       expect(mode).toBe('legacy');
     });
 
+    // D9 — the documented shipped default is 'legacy' (shadow is opt-in);
+    // docs and code must assert the same constant.
+    it('ships DEFAULT_MODE = "legacy", matching the docs (D9)', async () => {
+      const { modeController } = await loadModeControllerModule();
+      expect(
+        (modeController as { DEFAULT_MODE?: string }).DEFAULT_MODE,
+      ).toBe('legacy');
+    });
+
     it('reads mode from chrome.storage.local', async () => {
       // Set up chrome.storage mock to return shadow
       chrome.storage.local.get = vi.fn().mockResolvedValue({
