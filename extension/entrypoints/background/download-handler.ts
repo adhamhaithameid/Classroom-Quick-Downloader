@@ -8,9 +8,7 @@ import type { PendingDownload } from './types';
 import {
   registerPending,
   bindDownloadId,
-  bindBypassTabId,
   AUTHUSER_CANDIDATES,
-  IS_FIREFOX,
 } from './state';
 import { extractAuthUserFromUrl } from './auth-utils';
 import { normalizeUrl, buildUrlWithAuthUser, getFilenameExt } from './url-helpers';
@@ -57,17 +55,6 @@ export function startSingleAttempt(
 }
 
 /**
- * Open a bypass tab for Drive download (virus scan bypass).
- */
-export function openDriveBypassTab(pending: PendingDownload, url: string): void {
-  chrome.tabs.create({ url, active: false }, (tab) => {
-    if (tab?.id != null) {
-      bindBypassTabId(pending, tab.id);
-    }
-  });
-}
-
-/**
  * Try the next auth user for a Drive download.
  * Cycles through authuser=0..9 to find one with access.
  */
@@ -103,33 +90,30 @@ export function startNextDriveAttempt(pending: PendingDownload): void {
   pending.attemptedAuthUsers.push(nextAuth);
   pending.currentAuthUser = nextAuth;
 
-  if (IS_FIREFOX) {
-    // Firefox: Open bypass tab with next auth
-    const attemptUrl = buildUrlWithAuthUser(pending.baseUrl, nextAuth);
-    openDriveBypassTab(pending, attemptUrl);
-  } else {
-    // Chrome: Try native download
-    const attemptUrl = buildUrlWithAuthUser(pending.baseUrl, nextAuth);
+  // Both browsers download natively: the usercontent byte-serving endpoint
+  // needs no interstitial click-through, so the old Firefox bypass-tab-only
+  // flow (and its visible windows) is gone. Account selection rides on the
+  // authuser param of the attempt URL.
+  const attemptUrl = buildUrlWithAuthUser(pending.baseUrl, nextAuth);
 
-    // Security gate: validate URL before downloading
-    const validation = validateDownloadUrl(attemptUrl);
-    if (!validation.valid) {
-      console.error(`[CQD Security] Blocked Drive download: ${validation.reason} — ${attemptUrl}`);
-      startNextDriveAttempt(pending);
-      return;
-    }
-
-    chrome.downloads.download(
-      { url: attemptUrl, saveAs: false, conflictAction: 'uniquify' },
-      (downloadId) => {
-        if (chrome.runtime.lastError || !downloadId) {
-          startNextDriveAttempt(pending);
-          return;
-        }
-        bindDownloadId(pending, downloadId);
-      }
-    );
+  // Security gate: validate URL before downloading
+  const validation = validateDownloadUrl(attemptUrl);
+  if (!validation.valid) {
+    console.error(`[CQD Security] Blocked Drive download: ${validation.reason} — ${attemptUrl}`);
+    startNextDriveAttempt(pending);
+    return;
   }
+
+  chrome.downloads.download(
+    { url: attemptUrl, saveAs: false, conflictAction: 'uniquify' },
+    (downloadId) => {
+      if (chrome.runtime.lastError || !downloadId) {
+        startNextDriveAttempt(pending);
+        return;
+      }
+      bindDownloadId(pending, downloadId);
+    }
+  );
 }
 
 /**
@@ -181,24 +165,11 @@ export function handleDownloadRequest(
     sendResponse?.(payload);
   };
 
-  // Firefox: Always use bypass tab for Drive
-  if (IS_FIREFOX && isDrive) {
-    if (pending.isCancelled) {
-      cleanup(pending);
-      return true;
-    }
-
-    const bypassUrl =
-      typeof pending.currentAuthUser === 'number'
-        ? buildUrlWithAuthUser(pending.baseUrl, pending.currentAuthUser)
-        : pending.baseUrl;
-    pending.fallbackStarted = true;
-    openDriveBypassTab(pending, bypassUrl);
-    respondOnce({ started: true, requestId, userMessage: 'Opening Drive tab…' });
-    return true;
-  }
-
-  // Chrome/Edge: Try native download first
+  // Both browsers: try the native download first. The usercontent
+  // byte-serving endpoint serves file bytes directly (no interstitial), so
+  // the old Firefox bypass-tab-only flow — the visible-window regression —
+  // is gone. HTML/403 responses are caught downstream by the filename
+  // interceptor (Chromium) or the onCreated mime guard (Firefox).
   if (isDrive) {
     if (pending.isCancelled) {
       cleanup(pending);
@@ -234,20 +205,13 @@ export function handleDownloadRequest(
             type: pending.fileMeta?.ext || 'unknown',
             status: 'fail',
             duration_ms: Date.now() - pending.startTime,
-            bypass_used: true,
+            bypass_used: false,
             error_type: 'BROWSER_START_FAIL',
           });
-          if (!pending.fallbackStarted) {
-            pending.fallbackStarted = true;
-            openDriveBypassTab(pending, pending.baseUrl);
-            respondOnce({
-              started: true,
-              requestId,
-              userMessage: 'Browser blocked. Trying Drive tab…',
-            });
-          } else {
-            respondOnce({ started: false, userMessage: 'Browser blocked download.' });
-          }
+          // Zero-tab contract: no bypass-tab fallback. The browser refused to
+          // start the download — surface the honest failure immediately.
+          respondOnce({ started: false, userMessage: 'Browser blocked download.' });
+          cleanup(pending);
           return;
         }
         bindDownloadId(pending, id);

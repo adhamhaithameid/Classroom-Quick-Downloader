@@ -2,28 +2,21 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PendingDownload } from '../entrypoints/background/types';
 
 /**
- * S9/#537+#547 — full-lifecycle Drive download flow tests at the
- * message-flow/state-machine seam (the S9 BrowserPort-level harness).
+ * S9 zero-tab Drive flow — the #manual-403 regression contract.
  *
- * Unlike background-index.test.ts (which mocks download-handler behind its
- * function seam) and background-download-handler.test.ts (which tests single
- * attempts), these tests drive the REAL index.ts listeners together with the
- * REAL download-handler auth-cycling state machine, with only the browser
- * host (chrome.downloads/tabs) and the registry mocked. IS_FIREFOX toggles
- * the Firefox bypass-tab adapter vs the Chromium download-manager adapter —
- * exactly the split the zen (#537) and Brave (#547) reports exercise.
+ * The legacy flow opened bypass tabs (a visible "403 Access Forbidden"
+ * window that Google error pages never let report back, so it hung until the
+ * TTL). The contract is now: downloads target the usercontent byte-serving
+ * endpoint, chrome.tabs.create is NEVER called — not on success, not on
+ * failure, not while cycling accounts — and every failure settles the pending
+ * through event-driven terminal states, never through timers.
  *
- * Product contract under test (from the bug reports "files start but fail"):
- *   - A 403 / forbidden-family failure must cycle through the signed-in
- *     accounts (authuser candidates) on BOTH browsers before surfacing a
- *     terminal error.
- *   - Terminal failure is AUTH_ALL_FAILED after every candidate was tried.
- *   - Success (CQD_BYPASS_SUCCESS) mid-cycle stops the loop.
- *   - Non-auth interrupts (network etc.) and self-cancelled downloads must
- *     NOT trigger pointless account cycling.
+ * IS_FIREFOX toggles only the host differences that remain: Firefox has no
+ * onDeterminingFilename (HTML responses are caught via the onCreated mime
+ * guard instead) and correlates downloads through onCreated.
  */
 
-const DRIVE_BASE = 'https://drive.google.com/uc?export=download&id=FILE123';
+const DRIVE_BASE = 'https://drive.usercontent.google.com/download?id=FILE123&export=download&confirm=t';
 const ORIGINAL_URL = 'https://drive.google.com/file/d/FILE123/view';
 
 type FlowOptions = {
@@ -140,8 +133,8 @@ async function loadFlow(options: FlowOptions = {}) {
     ),
   }));
   vi.doMock('../entrypoints/background/cleanup', () => ({
-    // Faithful mock: real cleanup unregisters the pending; keep that so
-    // registry assertions observe the same post-state as production.
+    // Faithful mock: real cleanup unregisters the pending and closes any bound
+    // bypass tabs; keep the registry part so assertions observe production state.
     cleanup: (...args: any[]) => {
       stateModule.unregisterPending(args[0]);
       cleanupSpy(...args);
@@ -162,7 +155,8 @@ async function loadFlow(options: FlowOptions = {}) {
     validateDownloadUrl: vi.fn(() => ({ valid: true })),
   }));
 
-  // --- Browser host mocks (the BrowserPort seam) ---
+  // --- Browser host mocks (the BrowserPort seam). tabs.create is mocked so
+  // the zero-tab contract can assert it is NEVER called. ---
   let nextTabId = 100;
   let nextDownloadId = 1000;
   const tabCreations: Array<{ url: string; active?: boolean }> = [];
@@ -183,8 +177,8 @@ async function loadFlow(options: FlowOptions = {}) {
     cb?.(id);
     return id as never;
   }) as never;
-  // Own cancel stub: the setup.ts global was created before the per-test
-  // restoreAllMocks, so its callback implementation cannot be relied on.
+  // Own cancel/erase stubs: the setup.ts globals were created before the
+  // per-test restoreAllMocks, so their callback implementation can't be relied on.
   chrome.downloads.cancel = vi.fn((_id: number, cb?: () => void) => {
     cb?.();
   }) as never;
@@ -194,21 +188,19 @@ async function loadFlow(options: FlowOptions = {}) {
 
   const onMessageListeners: Array<(msg: any, sender: any, resp?: any) => any> = [];
   const downloadChangedListeners: Array<(delta: any) => void> = [];
+  const onCreatedListeners: Array<(item: any) => void> = [];
   const onDeterminingFilenameListeners: Array<(item: any, suggest: any) => void> = [];
-  const dispatchDeterminingFilename = (item: any, suggest?: any) => {
-    for (const listener of onDeterminingFilenameListeners) listener(item, suggest ?? vi.fn());
-  };
   chrome.runtime.onMessage.addListener = vi.fn((l: any) => {
     onMessageListeners.push(l);
   }) as never;
   chrome.downloads.onChanged.addListener = vi.fn((l: any) => {
     downloadChangedListeners.push(l);
   }) as never;
+  (chrome.downloads as any).onCreated = {
+    addListener: vi.fn((l: any) => onCreatedListeners.push(l)),
+  };
   (chrome.downloads as any).onDeterminingFilename = {
     addListener: vi.fn((l: any) => onDeterminingFilenameListeners.push(l)),
-  };
-  (chrome.downloads as any).onCreated = {
-    addListener: vi.fn(),
   };
   vi.spyOn(chrome.storage.local, 'get').mockImplementation((_k: any, cb: any) =>
     cb({ extensionEnabled: true }),
@@ -219,23 +211,22 @@ async function loadFlow(options: FlowOptions = {}) {
   (mod.default as unknown as () => void)();
 
   const dispatchMessage = (message: any, sender: any = { tab: { id: 5 } }) => {
-    let lastReturn: any;
     for (const listener of onMessageListeners) {
-      lastReturn = listener(message, sender, vi.fn());
+      listener(message, sender, vi.fn());
     }
-    return lastReturn;
   };
 
   const dispatchDownloadChange = (delta: any) => {
     for (const listener of downloadChangedListeners) listener(delta);
   };
 
-  /** Fire CQD_403_SEEN from a bypass tab id. */
-  const report403 = (tabId: number) =>
-    dispatchMessage({ type: 'CQD_403_SEEN' }, { tab: { id: tabId } });
+  const dispatchDownloadCreated = (item: any) => {
+    for (const listener of onCreatedListeners) listener(item);
+  };
 
-  const reportBypassSuccess = (tabId: number) =>
-    dispatchMessage({ type: 'CQD_BYPASS_SUCCESS' }, { tab: { id: tabId } });
+  const dispatchDeterminingFilename = (item: any, suggest?: any) => {
+    for (const listener of onDeterminingFilenameListeners) listener(item, suggest ?? vi.fn());
+  };
 
   const requestDownload = () =>
     dispatchMessage({
@@ -245,8 +236,6 @@ async function loadFlow(options: FlowOptions = {}) {
       fileMeta: { name: 'lecture.pdf', ext: 'pdf' },
     });
 
-  const bypassTabIds = () => [...stateModule.pendingByBypassTabId.keys()].sort((a, b) => a - b);
-
   return {
     stateModule,
     cleanupSpy,
@@ -255,11 +244,9 @@ async function loadFlow(options: FlowOptions = {}) {
     tabCreations,
     downloadCalls,
     requestDownload,
-    report403,
-    reportBypassSuccess,
     dispatchDownloadChange,
+    dispatchDownloadCreated,
     dispatchDeterminingFilename,
-    bypassTabIds,
   };
 }
 
@@ -267,118 +254,29 @@ const tryingStatusCall = (spy: ReturnType<typeof vi.fn>) =>
   spy.mock.calls.find((c) => c[1] === 'trying' && c[3] === 'AUTH_LOOP');
 const errorStatusCall = (spy: ReturnType<typeof vi.fn>, errorType: string) =>
   spy.mock.calls.find((c) => c[1] === 'error' && c[3] === errorType);
+const expectZeroTabs = (flow: Awaited<ReturnType<typeof loadFlow>>) =>
+  expect(flow.tabCreations).toHaveLength(0);
 
-describe('S9 bypass flow — Firefox/zen (#537): 403 must cycle accounts, not terminal-fail', () => {
+describe('S9 zero-tab Drive flow — Chromium (#manual-403 regression)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.useFakeTimers();
   });
 
-  it('CQD_403_SEEN opens the next-account bypass tab and keeps the pending alive', async () => {
-    const flow = await loadFlow({ isFirefox: true });
-
-    flow.requestDownload();
-    expect(flow.tabCreations).toHaveLength(1);
-
-    flow.report403(100);
-
-    expect(flow.tabCreations).toHaveLength(2);
-    expect(flow.tabCreations[1].url).toContain('authuser=0');
-    expect(tryingStatusCall(flow.sendStatusSpy)).toBeTruthy();
-    expect(flow.cleanupSpy).not.toHaveBeenCalled();
-    expect(flow.stateModule.isRegistered('req-flow')).toBe(true);
-  });
-
-  it('terminals with AUTH_ALL_FAILED only after every signed-in account was tried', async () => {
-    const flow = await loadFlow({ isFirefox: true });
-
-    flow.requestDownload();
-
-    // Exactly one bypass tab is bound at a time: each 403 unbinds the old tab
-    // and the retry binds the next one (ids 100, 101, ...).
-    const totalTabs = 1 + flow.stateModule.AUTHUSER_CANDIDATES.length;
-    let currentTab = 100;
-    for (let i = 0; i < totalTabs; i++) {
-      expect(flow.tabCreations).toHaveLength(i + 1);
-      flow.report403(currentTab);
-      currentTab += 1;
-    }
-
-    expect(flow.tabCreations).toHaveLength(totalTabs);
-    expect(flow.tabCreations[totalTabs - 1].url).toContain('authuser=9');
-    expect(errorStatusCall(flow.sendStatusSpy, 'AUTH_ALL_FAILED')).toBeTruthy();
-    expect(flow.cleanupSpy).toHaveBeenCalledTimes(1);
-    expect(flow.stateModule.isRegistered('req-flow')).toBe(false);
-  });
-
-  it('CQD_BYPASS_SUCCESS mid-cycle reports success and stops the loop', async () => {
-    const flow = await loadFlow({ isFirefox: true });
-
-    flow.requestDownload();
-    flow.report403(100); // → attempt authuser=0 (tab 101)
-    flow.reportBypassSuccess(101);
-
-    expect(flow.sendStatusSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ requestId: 'req-flow' }),
-      'success',
-    );
-    const tabsAfterSuccess = flow.tabCreations.length;
-
-    // A late 403 from an already-unbound tab must not resurrect the loop.
-    flow.report403(101);
-    expect(flow.tabCreations).toHaveLength(tabsAfterSuccess);
-  });
-
-  it('a late 403 after success was already reported does not resurrect the cycle', async () => {
-    const flow = await loadFlow({ isFirefox: true });
-
-    flow.requestDownload();
-    // Firefox success path: onCreated marks the pending finalized while its
-    // bypass tab is still open and bound (tab auto-closes later).
-    const pending = flow.stateModule.getPendingByRequestId('req-flow');
-    pending!.finalized = true;
-
-    flow.report403(100);
-
-    expect(flow.tabCreations).toHaveLength(1);
-    expect(tryingStatusCall(flow.sendStatusSpy)).toBeFalsy();
-    expect(flow.cleanupSpy).not.toHaveBeenCalled();
-  });
-
-  it('a forbidden interrupt on the bypass-tab download retries via the next-account tab', async () => {
-    const flow = await loadFlow({ isFirefox: true });
-
-    flow.requestDownload();
-    // The bypass tab's native download got a browser id (onCreated path).
-    const pending = flow.stateModule.getPendingByRequestId('req-flow');
-    flow.stateModule.bindDownloadId(pending!, 777);
-
-    flow.dispatchDownloadChange({
-      id: 777,
-      state: { current: 'interrupted' },
-      error: { current: 'SERVER_FORBIDDEN' },
-    });
-
-    expect(flow.downloadCalls).toHaveLength(0); // Firefox never native-downloads Drive
-    expect(flow.tabCreations).toHaveLength(2);
-    expect(flow.tabCreations[1].url).toContain('authuser=0');
-    expect(tryingStatusCall(flow.sendStatusSpy)).toBeTruthy();
-  });
-});
-
-describe('S9 bypass flow — Chromium/Brave (#547): forbidden interrupts must cycle accounts', () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
-    vi.useFakeTimers();
-  });
-
-  it('a SERVER_FORBIDDEN interrupt retries the download under the next account', async () => {
+  it('downloads natively and never creates a tab', async () => {
     const flow = await loadFlow({ isFirefox: false });
 
     flow.requestDownload();
+
     expect(flow.downloadCalls).toHaveLength(1);
     expect(flow.downloadCalls[0].url).toBe(DRIVE_BASE);
+    expectZeroTabs(flow);
+  });
 
+  it('a SERVER_FORBIDDEN interrupt cycles accounts with no tabs', async () => {
+    const flow = await loadFlow({ isFirefox: false });
+
+    flow.requestDownload();
     flow.dispatchDownloadChange({
       id: 1000,
       state: { current: 'interrupted' },
@@ -389,10 +287,35 @@ describe('S9 bypass flow — Chromium/Brave (#547): forbidden interrupts must cy
     expect(flow.downloadCalls[1].url).toContain('authuser=0');
     expect(tryingStatusCall(flow.sendStatusSpy)).toBeTruthy();
     expect(flow.cleanupSpy).not.toHaveBeenCalled();
-    expect(flow.stateModule.isRegistered('req-flow')).toBe(true);
+    expectZeroTabs(flow);
   });
 
-  it('terminals with AUTH_ALL_FAILED after every account was tried via interrupts', async () => {
+  it('identical forbidden failures terminate immediately (Google-gap early-exit)', async () => {
+    const flow = await loadFlow({ isFirefox: false });
+
+    flow.requestDownload();
+    // Attempt 1 (default account) fails forbidden → attempt 2 (authuser=0)
+    // fails with the SAME reason: cycling further is futile — Google no
+    // longer honors per-account selection here — so go terminal.
+    flow.dispatchDownloadChange({
+      id: 1000,
+      state: { current: 'interrupted' },
+      error: { current: 'SERVER_FORBIDDEN' },
+    });
+    flow.dispatchDownloadChange({
+      id: 1001,
+      state: { current: 'interrupted' },
+      error: { current: 'SERVER_FORBIDDEN' },
+    });
+
+    expect(flow.downloadCalls).toHaveLength(2);
+    expect(errorStatusCall(flow.sendStatusSpy, 'AUTH_ALL_FAILED')).toBeTruthy();
+    expect(flow.cleanupSpy).toHaveBeenCalledTimes(1);
+    expect(flow.stateModule.isRegistered('req-flow')).toBe(false);
+    expectZeroTabs(flow);
+  });
+
+  it('distinct forbidden failures still sweep all accounts before terminal', async () => {
     const flow = await loadFlow({ isFirefox: false });
 
     flow.requestDownload();
@@ -402,7 +325,7 @@ describe('S9 bypass flow — Chromium/Brave (#547): forbidden interrupts must cy
       flow.dispatchDownloadChange({
         id: 1000 + i,
         state: { current: 'interrupted' },
-        error: { current: 'SERVER_FORBIDDEN' },
+        error: { current: i % 2 === 0 ? 'SERVER_FORBIDDEN' : 'ACCESS_DENIED' },
       });
     }
 
@@ -411,14 +334,13 @@ describe('S9 bypass flow — Chromium/Brave (#547): forbidden interrupts must cy
     expect(errorStatusCall(flow.sendStatusSpy, 'AUTH_ALL_FAILED')).toBeTruthy();
     expect(flow.cleanupSpy).toHaveBeenCalledTimes(1);
     expect(flow.stateModule.isRegistered('req-flow')).toBe(false);
+    expectZeroTabs(flow);
   });
 
-  it('HTML-intercepted Drive downloads cancel and fall back to the bypass tab (HTML_SEEN)', async () => {
+  it('HTML-intercepted downloads cancel and retry the next account without any tab', async () => {
     const flow = await loadFlow({ isFirefox: false });
 
     flow.requestDownload();
-    expect(flow.downloadCalls).toHaveLength(1);
-
     flow.dispatchDeterminingFilename({
       id: 1000,
       url: DRIVE_BASE,
@@ -428,15 +350,8 @@ describe('S9 bypass flow — Chromium/Brave (#547): forbidden interrupts must cy
     });
 
     expect(chrome.downloads.cancel).toHaveBeenCalledWith(1000, expect.any(Function));
-    // Chromium opened no tab up front — the bypass fallback IS the first tab.
-    expect(flow.tabCreations).toHaveLength(1);
-    expect(flow.tabCreations[0].url).toBe(DRIVE_BASE);
-    expect(
-      flow.sendStatusSpy.mock.calls.find((c) => c[3] === 'HTML_INTERCEPT'),
-    ).toBeTruthy();
-    // The HTML response must not be suggested as a filename.
-    const pending = flow.stateModule.getPendingByRequestId('req-flow');
-    expect(pending!.htmlSeen).toBe(true);
+    expect(flow.downloadCalls).toHaveLength(2); // next-account retry, no tab
+    expectZeroTabs(flow);
   });
 
   it('does not cycle accounts for non-auth interrupts (NETWORK_FAILED)', async () => {
@@ -452,6 +367,7 @@ describe('S9 bypass flow — Chromium/Brave (#547): forbidden interrupts must cy
     expect(flow.downloadCalls).toHaveLength(1);
     expect(tryingStatusCall(flow.sendStatusSpy)).toBeFalsy();
     expect(flow.cleanupSpy).toHaveBeenCalledTimes(1);
+    expectZeroTabs(flow);
   });
 
   it('does not cycle for interrupts it caused itself (cancelledByUs)', async () => {
@@ -467,6 +383,7 @@ describe('S9 bypass flow — Chromium/Brave (#547): forbidden interrupts must cy
     expect(flow.downloadCalls).toHaveLength(1);
     expect(tryingStatusCall(flow.sendStatusSpy)).toBeFalsy();
     expect(flow.cleanupSpy).not.toHaveBeenCalled();
+    expectZeroTabs(flow);
   });
 
   it('does not cycle after success was already reported (finalized)', async () => {
@@ -484,5 +401,96 @@ describe('S9 bypass flow — Chromium/Brave (#547): forbidden interrupts must cy
 
     expect(flow.downloadCalls).toHaveLength(1);
     expect(tryingStatusCall(flow.sendStatusSpy)).toBeFalsy();
+    expectZeroTabs(flow);
+  });
+});
+
+describe('S9 zero-tab Drive flow — Firefox/zen (#537): native downloads, no bypass tabs', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.useFakeTimers();
+  });
+
+  it('downloads natively and never creates a tab (bypass-tab-only flow removed)', async () => {
+    const flow = await loadFlow({ isFirefox: true });
+
+    flow.requestDownload();
+
+    expect(flow.downloadCalls).toHaveLength(1);
+    expect(flow.downloadCalls[0].url).toBe(DRIVE_BASE);
+    expectZeroTabs(flow);
+  });
+
+  it('a forbidden interrupt retries via re-download with no tabs', async () => {
+    const flow = await loadFlow({ isFirefox: true });
+
+    flow.requestDownload();
+    flow.dispatchDownloadChange({
+      id: 1000,
+      state: { current: 'interrupted' },
+      error: { current: 'SERVER_FORBIDDEN' },
+    });
+
+    expect(flow.downloadCalls).toHaveLength(2);
+    expect(flow.downloadCalls[1].url).toContain('authuser=0');
+    expect(tryingStatusCall(flow.sendStatusSpy)).toBeTruthy();
+    expectZeroTabs(flow);
+  });
+
+  it('identical forbidden failures terminate immediately', async () => {
+    const flow = await loadFlow({ isFirefox: true });
+
+    flow.requestDownload();
+    flow.dispatchDownloadChange({
+      id: 1000,
+      state: { current: 'interrupted' },
+      error: { current: 'SERVER_FORBIDDEN' },
+    });
+    flow.dispatchDownloadChange({
+      id: 1001,
+      state: { current: 'interrupted' },
+      error: { current: 'SERVER_FORBIDDEN' },
+    });
+
+    expect(flow.downloadCalls).toHaveLength(2);
+    expect(errorStatusCall(flow.sendStatusSpy, 'AUTH_ALL_FAILED')).toBeTruthy();
+    expect(flow.cleanupSpy).toHaveBeenCalledTimes(1);
+    expectZeroTabs(flow);
+  });
+
+  it('onCreated with an HTML mime cancels and retries the next account (no onDeterminingFilename on Firefox)', async () => {
+    const flow = await loadFlow({ isFirefox: true });
+
+    flow.requestDownload();
+    flow.dispatchDownloadCreated({
+      id: 1000,
+      url: DRIVE_BASE,
+      filename: 'error.html',
+      mime: 'text/html',
+    });
+
+    expect(chrome.downloads.cancel).toHaveBeenCalledWith(1000, expect.any(Function));
+    expect(flow.downloadCalls).toHaveLength(2);
+    expect(tryingStatusCall(flow.sendStatusSpy)).toBeTruthy();
+    expectZeroTabs(flow);
+  });
+
+  it('onCreated with a real file mime reports success once', async () => {
+    const flow = await loadFlow({ isFirefox: true });
+
+    flow.requestDownload();
+    flow.dispatchDownloadCreated({
+      id: 1000,
+      url: DRIVE_BASE,
+      filename: 'lecture.pdf',
+      mime: 'application/pdf',
+    });
+
+    expect(flow.sendStatusSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: 'req-flow' }),
+      'success',
+    );
+    expect(flow.stateModule.getPendingByRequestId('req-flow')!.finalized).toBe(true);
+    expectZeroTabs(flow);
   });
 });

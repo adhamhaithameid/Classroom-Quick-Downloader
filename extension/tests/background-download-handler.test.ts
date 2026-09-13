@@ -231,23 +231,6 @@ describe('background download handler', () => {
     expect(respondOnce).toHaveBeenCalledWith({ started: true, requestId: pending.requestId, downloadId: 42 });
   });
 
-  it('openDriveBypassTab tracks bypass tab IDs when a tab is returned', async () => {
-    const ctx = await loadDownloadHandler({ isFirefox: true });
-    const pending = makePending({ isDrive: true });
-    ctx.stateModule.registerPending(pending); // D11: binds require authority
-    (chrome.tabs.create as any).mockImplementation((_: unknown, cb: (tab: { id?: number }) => void) => cb({ id: 77 }));
-    ctx.mod.openDriveBypassTab(pending, 'https://drive.google.com/uc?id=abc');
-    expect(ctx.stateModule.pendingByBypassTabId.get(77)).toBe(pending);
-  });
-
-  it('openDriveBypassTab ignores tabs without numeric IDs', async () => {
-    const ctx = await loadDownloadHandler({ isFirefox: true });
-    const pending = makePending({ isDrive: true });
-    (chrome.tabs.create as any).mockImplementation((_: unknown, cb: (tab: { id?: number }) => void) => cb({}));
-    ctx.mod.openDriveBypassTab(pending, 'https://drive.google.com/uc?id=abc');
-    expect(ctx.stateModule.pendingByBypassTabId.size).toBe(0);
-  });
-
   it('startNextDriveAttempt fails when all auth users are exhausted', async () => {
     const ctx = await loadDownloadHandler({ authCandidates: [0, 1] });
     const pending = makePending({
@@ -279,14 +262,17 @@ describe('background download handler', () => {
     }));
   });
 
-  it('startNextDriveAttempt uses bypass tab path in Firefox mode', async () => {
+  it('startNextDriveAttempt downloads natively in Firefox mode (zero-tab contract)', async () => {
     const ctx = await loadDownloadHandler({ isFirefox: true, authCandidates: [3] });
     const pending = makePending({ isDrive: true, attemptedAuthUsers: [] });
     ctx.stateModule.registerPending(pending); // D11: binds require authority
-    (chrome.tabs.create as any).mockImplementation((_: unknown, cb: (tab: { id?: number }) => void) => cb({ id: 5 }));
     ctx.mod.startNextDriveAttempt(pending);
     expect(pending.currentAuthUser).toBe(3);
-    expect(ctx.stateModule.pendingByBypassTabId.get(5)).toBe(pending);
+    expect(chrome.downloads.download).toHaveBeenCalledWith(
+      expect.objectContaining({ url: expect.stringContaining('authuser=3') }),
+      expect.any(Function),
+    );
+    expect(chrome.tabs.create).not.toHaveBeenCalled();
   });
 
   it('startNextDriveAttempt retries auth user after browser start failure in Chromium mode', async () => {
@@ -362,15 +348,18 @@ describe('background download handler', () => {
     expect(ctx.stateModule.pendingByDownloadId.has(123)).toBe(true);
   });
 
-  it('handleDownloadRequest uses firefox Drive bypass flow and responds once', async () => {
+  it('handleDownloadRequest downloads natively on Firefox and responds once (zero-tab contract)', async () => {
     const ctx = await loadDownloadHandler({
       isFirefox: true,
       initialAuthUser: 4,
-      normalizeResult: { baseUrl: 'https://drive.google.com/uc?id=abc', isDrive: true },
+      normalizeResult: { baseUrl: 'https://drive.usercontent.google.com/download?id=abc&export=download&confirm=t', isDrive: true },
     });
-    (chrome.tabs.create as any).mockImplementation((_: unknown, cb: (tab: { id?: number }) => void) => cb({ id: 300 }));
     const sendResponse = vi.fn();
 
+    (chrome.downloads.download as any).mockImplementation((_: unknown, cb: (id?: number) => void) => {
+      (chrome.runtime as { lastError?: { message: string } }).lastError = undefined;
+      cb(300);
+    });
     ctx.mod.handleDownloadRequest(
       { url: 'https://drive.google.com/open?id=abc&authuser=4', requestId: 'req-firefox' },
       { tab: { id: 12 } } as chrome.runtime.MessageSender,
@@ -380,33 +369,41 @@ describe('background download handler', () => {
     expect(ctx.extractAuthSpy).toHaveBeenCalled();
     const pending = ctx.stateModule.pendingByRequestId.get('req-firefox');
     expect(pending?.attemptedAuthUsers).toContain(4);
-    expect(sendResponse).toHaveBeenCalledWith({ started: true, requestId: 'req-firefox', userMessage: 'Opening Drive tab…' });
+    expect(chrome.downloads.download).toHaveBeenCalledWith(
+      expect.objectContaining({ url: expect.stringContaining('authuser=4') }),
+      expect.any(Function),
+    );
+    expect(chrome.tabs.create).not.toHaveBeenCalled();
+    expect(sendResponse).toHaveBeenCalledWith({ started: true, requestId: 'req-firefox', downloadId: expect.any(Number) });
   });
 
   it('handleDownloadRequest firefox flow uses base URL when no initial auth is found', async () => {
     const ctx = await loadDownloadHandler({
       isFirefox: true,
       initialAuthUser: undefined,
-      normalizeResult: { baseUrl: 'https://drive.google.com/uc?id=xyz', isDrive: true },
+      normalizeResult: { baseUrl: 'https://drive.usercontent.google.com/download?id=xyz&export=download&confirm=t', isDrive: true },
     });
-    const createSpy = chrome.tabs.create as any;
-    createSpy.mockImplementation((opts: { url: string }, cb: (tab: { id?: number }) => void) => cb({ id: 987 }));
     const sendResponse = vi.fn();
 
+    (chrome.downloads.download as any).mockImplementation((_: unknown, cb: (id?: number) => void) => {
+      (chrome.runtime as { lastError?: { message: string } }).lastError = undefined;
+      cb(987);
+    });
     ctx.mod.handleDownloadRequest(
       { url: 'https://drive.google.com/open?id=xyz', requestId: 'req-firefox-no-auth' },
       { tab: { id: 31 } } as chrome.runtime.MessageSender,
       sendResponse,
     );
 
-    expect(createSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ url: 'https://drive.google.com/uc?id=xyz' }),
+    expect(chrome.downloads.download).toHaveBeenCalledWith(
+      expect.objectContaining({ url: 'https://drive.usercontent.google.com/download?id=xyz&export=download&confirm=t' }),
       expect.any(Function),
     );
+    expect(chrome.tabs.create).not.toHaveBeenCalled();
     expect(sendResponse).toHaveBeenCalledWith({
       started: true,
       requestId: 'req-firefox-no-auth',
-      userMessage: 'Opening Drive tab…',
+      downloadId: expect.any(Number),
     });
   });
 
@@ -456,16 +453,15 @@ describe('background download handler', () => {
     );
   });
 
-  it('handleDownloadRequest falls back to bypass tab when native Drive start fails', async () => {
+  it('handleDownloadRequest fails honestly when native Drive start fails (zero-tab contract)', async () => {
     const ctx = await loadDownloadHandler({
       isFirefox: false,
-      normalizeResult: { baseUrl: 'https://drive.google.com/uc?id=abc', isDrive: true },
+      normalizeResult: { baseUrl: 'https://drive.usercontent.google.com/download?id=abc&export=download&confirm=t', isDrive: true },
     });
     (chrome.downloads.download as any).mockImplementation((_: unknown, cb: (id?: number) => void) => {
       (chrome.runtime as { lastError?: { message: string } }).lastError = { message: 'blocked' };
       cb(undefined);
     });
-    (chrome.tabs.create as any).mockImplementation((_: unknown, cb: (tab: { id?: number }) => void) => cb({ id: 301 }));
 
     const sendResponse = vi.fn();
     ctx.mod.handleDownloadRequest(
@@ -479,11 +475,11 @@ describe('background download handler', () => {
       error_type: 'BROWSER_START_FAIL',
     }));
     expect(sendResponse).toHaveBeenCalledWith({
-      started: true,
-      requestId: 'req-fallback',
-      userMessage: 'Browser blocked. Trying Drive tab…',
+      started: false,
+      userMessage: 'Browser blocked download.',
     });
-    expect(ctx.stateModule.pendingByBypassTabId.get(301)?.requestId).toBe('req-fallback');
+    expect(ctx.cleanupSpy).toHaveBeenCalled();
+    expect(chrome.tabs.create).not.toHaveBeenCalled();
   });
 
   it('handleDownloadRequest processes repeated callback without duplicate responses', async () => {
@@ -504,9 +500,8 @@ describe('background download handler', () => {
     );
     expect(sendResponse).toHaveBeenCalledTimes(1);
     expect(sendResponse).toHaveBeenCalledWith({
-      started: true,
-      requestId: 'req-repeat',
-      userMessage: 'Browser blocked. Trying Drive tab…',
+      started: false,
+      userMessage: 'Browser blocked download.',
     });
   });
 
