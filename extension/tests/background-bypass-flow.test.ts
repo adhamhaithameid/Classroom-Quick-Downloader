@@ -183,9 +183,21 @@ async function loadFlow(options: FlowOptions = {}) {
     cb?.(id);
     return id as never;
   }) as never;
+  // Own cancel stub: the setup.ts global was created before the per-test
+  // restoreAllMocks, so its callback implementation cannot be relied on.
+  chrome.downloads.cancel = vi.fn((_id: number, cb?: () => void) => {
+    cb?.();
+  }) as never;
+  chrome.downloads.erase = vi.fn((_filter: object, cb?: () => void) => {
+    cb?.();
+  }) as never;
 
   const onMessageListeners: Array<(msg: any, sender: any, resp?: any) => any> = [];
   const downloadChangedListeners: Array<(delta: any) => void> = [];
+  const onDeterminingFilenameListeners: Array<(item: any, suggest: any) => void> = [];
+  const dispatchDeterminingFilename = (item: any, suggest?: any) => {
+    for (const listener of onDeterminingFilenameListeners) listener(item, suggest ?? vi.fn());
+  };
   chrome.runtime.onMessage.addListener = vi.fn((l: any) => {
     onMessageListeners.push(l);
   }) as never;
@@ -193,7 +205,7 @@ async function loadFlow(options: FlowOptions = {}) {
     downloadChangedListeners.push(l);
   }) as never;
   (chrome.downloads as any).onDeterminingFilename = {
-    addListener: vi.fn(),
+    addListener: vi.fn((l: any) => onDeterminingFilenameListeners.push(l)),
   };
   (chrome.downloads as any).onCreated = {
     addListener: vi.fn(),
@@ -246,6 +258,7 @@ async function loadFlow(options: FlowOptions = {}) {
     report403,
     reportBypassSuccess,
     dispatchDownloadChange,
+    dispatchDeterminingFilename,
     bypassTabIds,
   };
 }
@@ -316,6 +329,22 @@ describe('S9 bypass flow — Firefox/zen (#537): 403 must cycle accounts, not te
     expect(flow.tabCreations).toHaveLength(tabsAfterSuccess);
   });
 
+  it('a late 403 after success was already reported does not resurrect the cycle', async () => {
+    const flow = await loadFlow({ isFirefox: true });
+
+    flow.requestDownload();
+    // Firefox success path: onCreated marks the pending finalized while its
+    // bypass tab is still open and bound (tab auto-closes later).
+    const pending = flow.stateModule.getPendingByRequestId('req-flow');
+    pending!.finalized = true;
+
+    flow.report403(100);
+
+    expect(flow.tabCreations).toHaveLength(1);
+    expect(tryingStatusCall(flow.sendStatusSpy)).toBeFalsy();
+    expect(flow.cleanupSpy).not.toHaveBeenCalled();
+  });
+
   it('a forbidden interrupt on the bypass-tab download retries via the next-account tab', async () => {
     const flow = await loadFlow({ isFirefox: true });
 
@@ -382,6 +411,32 @@ describe('S9 bypass flow — Chromium/Brave (#547): forbidden interrupts must cy
     expect(errorStatusCall(flow.sendStatusSpy, 'AUTH_ALL_FAILED')).toBeTruthy();
     expect(flow.cleanupSpy).toHaveBeenCalledTimes(1);
     expect(flow.stateModule.isRegistered('req-flow')).toBe(false);
+  });
+
+  it('HTML-intercepted Drive downloads cancel and fall back to the bypass tab (HTML_SEEN)', async () => {
+    const flow = await loadFlow({ isFirefox: false });
+
+    flow.requestDownload();
+    expect(flow.downloadCalls).toHaveLength(1);
+
+    flow.dispatchDeterminingFilename({
+      id: 1000,
+      url: DRIVE_BASE,
+      finalUrl: DRIVE_BASE,
+      filename: 'sign-in.html',
+      mime: 'text/html',
+    });
+
+    expect(chrome.downloads.cancel).toHaveBeenCalledWith(1000, expect.any(Function));
+    // Chromium opened no tab up front — the bypass fallback IS the first tab.
+    expect(flow.tabCreations).toHaveLength(1);
+    expect(flow.tabCreations[0].url).toBe(DRIVE_BASE);
+    expect(
+      flow.sendStatusSpy.mock.calls.find((c) => c[3] === 'HTML_INTERCEPT'),
+    ).toBeTruthy();
+    // The HTML response must not be suggested as a filename.
+    const pending = flow.stateModule.getPendingByRequestId('req-flow');
+    expect(pending!.htmlSeen).toBe(true);
   });
 
   it('does not cycle accounts for non-auth interrupts (NETWORK_FAILED)', async () => {

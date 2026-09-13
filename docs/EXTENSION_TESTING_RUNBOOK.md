@@ -139,3 +139,27 @@ pnpm test:qa:live     # gated live-Classroom canary (read-only)
    real Classroom; gated by `QA_LIVE_CLASSROOM=1` + `QA_LIVE_STORAGE_STATE`.
 
 Never merge the three layers: they answer different questions.
+
+## Firefox QA limitation (ENVIRONMENT, 2026-09-13)
+
+`pnpm test:qa:firefox` runs the shared suite on the qa-firefox project. Verified
+by probe: the MV2 xpi is present in the prepared profile
+(`tests/e2e/.firefox-profile`) before launch, but Playwright's bundled Firefox
+build deletes it within seconds of startup — it ignores
+`xpinstall.signatures.required = false`, rejects the unsigned add-on and removes
+the file, so no extension background page ever exists.
+
+Consequences, by design of the failure-classification contract:
+
+- Every extension journey (qa-01 … qa-06) **skips** on qa-firefox with the
+  recorded `ENVIRONMENT:` reason — it does not fail and it does not fake a pass.
+- `simulator-sanity` still runs on Firefox (it exercises the simulator, not the
+  extension).
+- Chromium journeys keep failing hard on qa-chromium, preserving the acceptance
+  criterion that breaking the extension (e.g. renaming `.cqd-download-btn`)
+  fails qa-01.
+
+The journeys DO exercise the real Firefox MV2 build logic wherever possible at
+the unit seam: `extension/tests/background-bypass-flow.test.ts` toggles the
+Firefox adapter (bypass-tab flow) against the shared state machine. Revisit this
+section if Playwright ships a Firefox build that honors unsigned sideloading.

@@ -182,6 +182,22 @@ export default defineBackground(() => {
     return false;
   });
 
+  /**
+   * Try the next signed-in Google account for a Drive pending: one 'trying'
+   * status per attempt, then hand off to startNextDriveAttempt, which picks
+   * the per-browser adapter and terminals with AUTH_ALL_FAILED when
+   * exhausted. Guarded: a finalized pending (success already reported) is
+   * never resurrected by a late failure message from a still-bound bypass tab.
+   */
+  function cycleNextDriveAccount(pending: NonNullable<ReturnType<typeof getPendingByBypassTabId>>): void {
+    if (pending.finalized) return;
+    if (!pending.htmlSeen) {
+      pending.htmlSeen = true;
+      sendStatusToTab(pending, 'trying', 'Trying your other Google accounts…', 'AUTH_LOOP');
+    }
+    startNextDriveAttempt(pending);
+  }
+
   // 1) Messages from drive_bypass.content.ts
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (sender.id !== chrome.runtime.id) return false;
@@ -230,11 +246,7 @@ export default defineBackground(() => {
       // picks the adapter per browser (Firefox opens the next bypass tab,
       // Chromium re-downloads), so both get the full authuser sweep before the
       // terminal AUTH_ALL_FAILED — Firefox never terminal-fails on the first 403.
-      if (!pending.htmlSeen) {
-        pending.htmlSeen = true;
-        sendStatusToTab(pending, 'trying', 'Trying your other Google accounts…', 'AUTH_LOOP');
-      }
-      startNextDriveAttempt(pending);
+      cycleNextDriveAccount(pending);
       return;
     }
 
@@ -403,13 +415,9 @@ export default defineBackground(() => {
       // self-cancelled downloads never reach this branch.
       const forbiddenFamily =
         errorType === 'SERVER_FORBIDDEN' || errorType === 'ACCESS_DENIED';
-      if (pending.isDrive && !pending.finalized && forbiddenFamily) {
+      if (pending.isDrive && forbiddenFamily) {
         unbindDownloadId(delta.id);
-        if (!pending.htmlSeen) {
-          pending.htmlSeen = true;
-          sendStatusToTab(pending, 'trying', 'Trying your other Google accounts…', 'AUTH_LOOP');
-        }
-        startNextDriveAttempt(pending);
+        cycleNextDriveAccount(pending);
         return;
       }
 

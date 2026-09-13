@@ -93,7 +93,7 @@ export function startNextDriveAttempt(pending: PendingDownload): void {
       type: pending.fileMeta?.ext || 'unknown',
       status: 'fail',
       duration_ms: Date.now() - pending.startTime,
-      bypass_used: true,
+      bypass_used: !!pending.fallbackStarted,
       error_type: 'AUTH_ALL_FAILED',
     });
     cleanup(pending);

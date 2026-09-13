@@ -73,11 +73,11 @@ export function currentRunId(): string {
  * signing limitation). runCheck skips every check with this reason; beforeAll
  * hooks consult session.extensionAvailable to bail before touching UI.
  */
-let FIREFOX_EXTENSION_UNAVAILABLE: string | null = null;
+let EXTENSION_UNAVAILABLE_REASON: string | null = null;
 
 /** Skip the current test when the extension host is unavailable (Firefox). */
 export function skipWhenExtensionUnavailable(): void {
-  if (FIREFOX_EXTENSION_UNAVAILABLE) test.skip(true, FIREFOX_EXTENSION_UNAVAILABLE);
+  if (EXTENSION_UNAVAILABLE_REASON) test.skip(true, EXTENSION_UNAVAILABLE_REASON);
 }
 
 /**
@@ -202,7 +202,7 @@ export async function launchQaContext(
     }
     if (pages.length === 0) {
       extensionAvailable = false;
-      FIREFOX_EXTENSION_UNAVAILABLE =
+      EXTENSION_UNAVAILABLE_REASON =
         "ENVIRONMENT: Playwright's bundled Firefox deletes the unsigned sideloaded xpi at startup (signing pref ignored) — no extension background page; see RUNBOOK firefox section";
     }
   }
