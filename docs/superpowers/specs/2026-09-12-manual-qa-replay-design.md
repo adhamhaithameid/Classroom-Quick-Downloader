@@ -261,10 +261,13 @@ Purpose: **read-only production compatibility monitoring / DOM drift detection.*
 
 ## Scripts
 
-- `pnpm test:qa` — qa-chromium, headed, local simulator, built extension.
-- `pnpm test:qa:firefox` — qa-firefox.
-- `pnpm test:qa:live` — gated live canary (inert without the flag).
-- `pnpm test:qa:report` — regenerate `qa-artifacts/report.md` from artifacts.
+Implemented in the extension workspace (`extension/package.json`), pointing at
+the root `playwright.config.ts`:
+
+- `pnpm -C extension test:qa` — qa-chromium, headed, local simulator, built extension.
+- `pnpm -C extension test:qa:firefox` — qa-firefox.
+- `pnpm -C extension test:qa:live` — gated live canary (inert without the flag).
+- `pnpm -C extension test:qa:report` — regenerate `qa-artifacts/report.md` from artifacts.
 
 ## Regression-detection acceptance
 
@@ -275,3 +278,17 @@ relaxed to tolerate it.
 
 Headed browsers, local simulator, built extension, real interactions, local
 evidence. CI/xvfb is future work.
+
+## Status (2026-09-13)
+
+Implemented and verified. qa-chromium: 11 passed / 3 skipped / 0 failed; the
+skips are documented HARNESS limitations (qa-02 error-state retry timing, qa-04
+analytics popup-window context, qa-05 fixture-derived submission rows), tracked
+in a follow-up bead. qa-firefox: `simulator-sanity` passes; extension journeys
+skip with a classified ENVIRONMENT reason — probe-verified that Playwright's
+bundled Firefox deletes the unsigned sideloaded xpi at startup (signing pref
+ignored), so no extension background page can exist; see the runbook's
+"Firefox QA limitation". Firefox adapter logic is covered at the unit seam by
+`extension/tests/background-bypass-flow.test.ts`. The report generator rebuilds
+`qa-artifacts/report.md` from artifacts only; the canary remains gated and
+inert without `QA_LIVE_CLASSROOM=1`.

@@ -1,6 +1,6 @@
 # Extension Testing Runbook
 
-Last updated: 2026-03-10
+Last updated: 2026-09-13
 
 ## Goal
 
@@ -104,11 +104,14 @@ If one of the golden suites fails, assume the change threatens current good beha
 The manual checks below are automated by the Manual-QA Replay pipeline
 (`docs/superpowers/specs/2026-09-12-manual-qa-replay-design.md`). Run:
 
+The qa scripts live in the extension workspace (`extension/package.json`),
+alongside the root-level `playwright.config.ts` they point at:
+
 ```bash
-pnpm test:qa          # Chromium (MV3), headed, local simulator
-pnpm test:qa:firefox  # Firefox (MV2)
-pnpm test:qa:report   # rebuild qa-artifacts/report.md from artifacts
-pnpm test:qa:live     # gated live-Classroom canary (read-only)
+pnpm -C extension test:qa          # Chromium (MV3), headed, local simulator
+pnpm -C extension test:qa:firefox  # Firefox (MV2)
+pnpm -C extension test:qa:report   # rebuild qa-artifacts/report.md from artifacts
+pnpm -C extension test:qa:live     # gated live-Classroom canary (read-only)
 ```
 
 | Manual check | Automated check | Coverage |
@@ -142,7 +145,7 @@ Never merge the three layers: they answer different questions.
 
 ## Firefox QA limitation (ENVIRONMENT, 2026-09-13)
 
-`pnpm test:qa:firefox` runs the shared suite on the qa-firefox project. Verified
+`pnpm -C extension test:qa:firefox` runs the shared suite on the qa-firefox project. Verified
 by probe: the MV2 xpi is present in the prepared profile
 (`tests/e2e/.firefox-profile`) before launch, but Playwright's bundled Firefox
 build deletes it within seconds of startup — it ignores
