@@ -13,6 +13,7 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import {
   launchQaContext,
+  skipWhenExtensionUnavailable,
   captureConsole,
   runCheck,
   SELECTORS,
@@ -69,6 +70,9 @@ test.describe("qa-02 download all", () => {
     const session = await launchQaContext(browser, scenario());
     context = session.context;
     closeQa = session.close;
+    // Bail out of UI setup when the extension host never came up (Firefox);
+    // runCheck skips the journeys with the recorded ENVIRONMENT reason.
+    if (!session.extensionAvailable) return;
     page = await context.newPage();
     capture = captureConsole(page);
     await page.goto(`https://classroom.google.com${STREAM}`, { waitUntil: "domcontentloaded" });
@@ -151,6 +155,7 @@ test.describe("qa-02 download all", () => {
   });
 
   test("hold-to-cancel during a long run", async ({}, testInfo) => {
+    skipWhenExtensionUnavailable();
     const page2 = await context.newPage();
     const capture2 = captureConsole(page2);
     await page2.goto(`https://classroom.google.com${STREAM}`, { waitUntil: "domcontentloaded" });
@@ -194,6 +199,7 @@ test.describe("qa-02 download all", () => {
 
   test("error state on an all-failed group", async ({}, testInfo) => {
     test.setTimeout(180_000);
+    skipWhenExtensionUnavailable();
     const page2 = await context.newPage();
     const capture2 = captureConsole(page2);
     await page2.goto(`https://classroom.google.com${STREAM}`, { waitUntil: "domcontentloaded" });

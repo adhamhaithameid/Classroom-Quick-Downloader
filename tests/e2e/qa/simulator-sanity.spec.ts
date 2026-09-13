@@ -72,7 +72,9 @@ test.describe("simulator sanity", () => {
   test.beforeAll(async ({}, testInfo) => {
     browser = testInfo.project.name === "qa-firefox" ? "firefox" : "chromium";
     testInfo.annotations.push({ type: "runbook", description: "harness sanity — not a manual check" });
-    const session = await launchQaContext(browser, buildScenario());
+    // Sanity must run even where the extension cannot (Firefox): it tests the
+    // simulator itself, so opt out of the harness extension-availability skip.
+    const session = await launchQaContext(browser, buildScenario(), { skipIfExtensionUnavailable: false });
     context = session.context;
     closeQa = session.close;
     page = await context.newPage();

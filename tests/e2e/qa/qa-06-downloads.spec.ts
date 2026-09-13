@@ -97,6 +97,9 @@ test.describe("qa-06 downloads", () => {
     const session = await launchQaContext(browser, scenario());
     context = session.context;
     closeQa = session.close;
+    // Bail out of UI setup when the extension host never came up (Firefox);
+    // runCheck skips the journeys with the recorded ENVIRONMENT reason.
+    if (!session.extensionAvailable) return;
     servedDownloads = session.servedDownloads;
     page = await context.newPage();
     capture = captureConsole(page);

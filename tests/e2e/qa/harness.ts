@@ -69,6 +69,18 @@ export function currentRunId(): string {
 }
 
 /**
+ * Set when the extension host is unavailable in this browser project (Firefox
+ * signing limitation). runCheck skips every check with this reason; beforeAll
+ * hooks consult session.extensionAvailable to bail before touching UI.
+ */
+let FIREFOX_EXTENSION_UNAVAILABLE: string | null = null;
+
+/** Skip the current test when the extension host is unavailable (Firefox). */
+export function skipWhenExtensionUnavailable(): void {
+  if (FIREFOX_EXTENSION_UNAVAILABLE) test.skip(true, FIREFOX_EXTENSION_UNAVAILABLE);
+}
+
+/**
  * Run one QA check: body executes against a live page; every assertion goes
  * through the check collector; the result artifact is always written; the
  * re-thrown error makes the Playwright test itself reflect the outcome.
@@ -82,6 +94,7 @@ export async function runCheck(
   body: (check: QaCheck) => Promise<void>,
 ): Promise<void> {
   const browser: QaBrowser = testInfo.project.name === "qa-firefox" ? "firefox" : "chromium";
+  skipWhenExtensionUnavailable();
   const check = new QaCheck(
     { browser, checkId, runbookReference, runId: currentRunId() },
     page,
@@ -127,12 +140,15 @@ export async function runCheck(
 export interface QaSession {
   context: BrowserContext;
   servedDownloads: () => { url: string; filename: string }[];
+  /** False when the extension host never came up (Firefox ENVIRONMENT limit). */
+  extensionAvailable: boolean;
   close: () => Promise<void>;
 }
 
 export async function launchQaContext(
   browser: QaBrowser,
   scenario: Scenario,
+  opts: { skipIfExtensionUnavailable?: boolean } = {},
 ): Promise<QaSession> {
   const sim = await startSimulatorProxy(scenario);
 
@@ -167,8 +183,33 @@ export async function launchQaContext(
           },
         });
 
+  // Firefox ENVIRONMENT limitation (verified by probe, 2026-09-13): the xpi is
+  // present in the profile before launch, and Playwright's bundled Firefox
+  // build DELETES it within seconds of startup — it ignores
+  // xpinstall.signatures.required=false, rejects the unsigned add-on and
+  // removes the file, so no background page ever exists. Extension journeys
+  // therefore cannot run there; runCheck skips them with this evidence instead
+  // of failing. Chromium journeys must still fail hard (e.g. the
+  // .cqd-download-btn rename detection criterion), so the probe never skips.
+  let extensionAvailable = true;
+  if (browser === "firefox" && opts.skipIfExtensionUnavailable !== false) {
+    let pages = context.backgroundPages();
+    if (pages.length === 0) {
+      await context
+        .waitForEvent("backgroundpage", { timeout: 5_000 })
+        .catch(() => undefined);
+      pages = context.backgroundPages();
+    }
+    if (pages.length === 0) {
+      extensionAvailable = false;
+      FIREFOX_EXTENSION_UNAVAILABLE =
+        "ENVIRONMENT: Playwright's bundled Firefox deletes the unsigned sideloaded xpi at startup (signing pref ignored) — no extension background page; see RUNBOOK firefox section";
+    }
+  }
+
   return {
     context,
+    extensionAvailable,
     servedDownloads: () => sim.servedDownloads,
     close: async () => {
       // A group left mid-run keeps Chromium's download manager retrying, which

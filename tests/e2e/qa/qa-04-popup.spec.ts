@@ -73,6 +73,9 @@ test.describe("qa-04 popup", () => {
     );
     context = session.context;
     closeQa = session.close;
+    // Bail out of UI setup when the extension host never came up (Firefox);
+    // runCheck skips the journeys with the recorded ENVIRONMENT reason.
+    if (!session.extensionAvailable) return;
     page = await context.newPage();
     capture = captureConsole(page);
     await seedStorage(context, browser);
