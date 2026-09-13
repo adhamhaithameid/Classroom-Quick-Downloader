@@ -6,8 +6,9 @@ import { describe, it, expect, vi } from 'vitest';
 
 import { createEventBus } from '../src/bus/event-bus';
 import type { PageTopicMap } from '../src/contracts/topics';
-import { ViewKind, type PostNode, type FileNode } from '../src/engines/types';
+import { ViewKind, type PostNode, type FileNode, type FlagDecision, type PlacementDecision } from '../src/engines/types';
 import { DetectEngine, type DetectSource } from '../src/roles/detect-engine';
+import { ComputeEngine, type ComputeSource } from '../src/roles/compute-engine';
 
 // ---------------------------------------------------------------------------
 // Fixtures — shapes pinned to src/engines/types.ts (PostNode / FileNode)
@@ -171,5 +172,135 @@ describe('DetectEngine role (S5)', () => {
     engine.onScanComplete();
 
     expect(scanned).toEqual([{ posts }]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ComputeEngine fixtures — FlagDecision / PlacementDecision (engines/types.ts)
+// ---------------------------------------------------------------------------
+
+function makeFlagDecision(postId: string, overrides: Partial<FlagDecision> = {}): FlagDecision {
+  return {
+    postId,
+    commentScore: 42,
+    editedScore: 10,
+    commentCount: 3,
+    editedDiff: null,
+    exclusionPenalties: [],
+    finalVerdict: 'comment',
+    confidence: 'high',
+    trace: {
+      postId,
+      timestamp: 0,
+      viewKind: ViewKind.STREAM,
+      layers: [],
+      exclusions: [],
+      finalScore: 42,
+      duration_ms: 1,
+    },
+    ...overrides,
+  };
+}
+
+function makePlacementDecision(fileId: string, overrides: Partial<PlacementDecision> = {}): PlacementDecision {
+  return {
+    fileId,
+    targetElement: document.createElement('div'),
+    insertionPoint: 'append',
+    anchorSelector: '[data-stream-item-id]',
+    confidence: 90,
+    reasonCodes: ['closest-action-bar'],
+    fallbackUsed: false,
+    ...overrides,
+  };
+}
+
+function makeComputeSource(flags: FlagDecision[], placements: PlacementDecision[]): ComputeSource {
+  return {
+    getFlagDecisions: vi.fn(() => flags),
+    getPlacementDecisions: vi.fn(() => placements),
+  };
+}
+
+describe('ComputeEngine role (S5)', () => {
+  it("publishes 'decision:flags' and 'decision:placement' with the source's arrays verbatim (same references)", () => {
+    const flags = [makeFlagDecision('p1'), makeFlagDecision('p2', { finalVerdict: 'none' })];
+    const placements = [
+      makePlacementDecision('drive-file-1'),
+      makePlacementDecision('drive-file-2', { insertionPoint: 'prepend' }),
+    ];
+    const bus = createEventBus<PageTopicMap>();
+    const seenFlags: PageTopicMap['decision:flags'][] = [];
+    const seenPlacements: PageTopicMap['decision:placement'][] = [];
+    bus.subscribe('decision:flags', (p) => seenFlags.push(p));
+    bus.subscribe('decision:placement', (p) => seenPlacements.push(p));
+
+    new ComputeEngine(bus, makeComputeSource(flags, placements)).onDecisionsComputed();
+
+    expect(seenFlags).toHaveLength(1);
+    expect(seenFlags[0].decisions).toBe(flags); // read VERBATIM — not cloned, not filtered
+    expect(seenPlacements).toHaveLength(1);
+    expect(seenPlacements[0].decisions).toBe(placements); // read VERBATIM — not cloned, not filtered
+  });
+
+  it("publishes both topics with [] when the source has no decisions (topics still carried)", () => {
+    const flags: FlagDecision[] = [];
+    const placements: PlacementDecision[] = [];
+    const bus = createEventBus<PageTopicMap>();
+    const seenFlags: PageTopicMap['decision:flags'][] = [];
+    const seenPlacements: PageTopicMap['decision:placement'][] = [];
+    bus.subscribe('decision:flags', (p) => seenFlags.push(p));
+    bus.subscribe('decision:placement', (p) => seenPlacements.push(p));
+
+    new ComputeEngine(bus, makeComputeSource(flags, placements)).onDecisionsComputed();
+
+    expect(seenFlags).toHaveLength(1);
+    expect(seenFlags[0].decisions).toBe(flags);
+    expect(seenPlacements).toHaveLength(1);
+    expect(seenPlacements[0].decisions).toBe(placements);
+  });
+
+  it("isolates a throwing source: publishes nothing that cycle and no exception escapes onDecisionsComputed()", () => {
+    const bus = createEventBus<PageTopicMap>();
+    const seenFlags: unknown[] = [];
+    const seenPlacements: unknown[] = [];
+    bus.subscribe('decision:flags', (p) => seenFlags.push(p));
+    bus.subscribe('decision:placement', (p) => seenPlacements.push(p));
+    const source: ComputeSource = {
+      getFlagDecisions: vi.fn(() => {
+        throw new Error('decision pipeline blew up');
+      }),
+      getPlacementDecisions: vi.fn(() => [makePlacementDecision('drive-file-1')]),
+    };
+
+    expect(() => new ComputeEngine(bus, source).onDecisionsComputed()).not.toThrow();
+    expect(seenFlags).toEqual([]);
+    expect(seenPlacements).toEqual([]);
+  });
+
+  it('recovers on the next cycle after a source throw', () => {
+    const flags = [makeFlagDecision('p1')];
+    const placements = [makePlacementDecision('drive-file-1')];
+    const bus = createEventBus<PageTopicMap>();
+    const seenFlags: PageTopicMap['decision:flags'][] = [];
+    const seenPlacements: PageTopicMap['decision:placement'][] = [];
+    bus.subscribe('decision:flags', (p) => seenFlags.push(p));
+    bus.subscribe('decision:placement', (p) => seenPlacements.push(p));
+    let throwNext = true;
+    const source: ComputeSource = {
+      getFlagDecisions: vi.fn(() => flags),
+      getPlacementDecisions: vi.fn(() => {
+        if (throwNext) throw new Error('transient');
+        return placements;
+      }),
+    };
+    const engine = new ComputeEngine(bus, source);
+
+    engine.onDecisionsComputed(); // source throws — isolated, nothing published (no half-cycle)
+    throwNext = false;
+    engine.onDecisionsComputed();
+
+    expect(seenFlags).toEqual([{ decisions: flags }]);
+    expect(seenPlacements).toEqual([{ decisions: placements }]);
   });
 });
