@@ -131,6 +131,12 @@ export class EngineV2 implements CQDEngine {
   private performanceMonitor = new PerformanceMonitor();
   private deepValidationScheduled = false;
 
+  /** S5 additive: optional publish hook — fires once per correction this
+   *  engine actually handles, for the HardenEngine role to publish
+   *  'correction:needed'. Undefined by default: with no listener wired this
+   *  field is never invoked and behavior is unchanged. */
+  onCorrectionSeen?: (item: import('../../v2/repair/deep-validator').CorrectionItem) => void;
+
   // ========================================================================
   // LIFECYCLE
   // ========================================================================
@@ -735,6 +741,10 @@ export class EngineV2 implements CQDEngine {
    */
   private handleCorrection(item: import('../../v2/repair/deep-validator').CorrectionItem): boolean {
     if (!this.isActive) return false;
+
+    // S5 additive: publish hook for the HardenEngine role — one call per
+    // correction actually handled, before any op-specific repair runs.
+    this.onCorrectionSeen?.(item);
 
     try {
       switch (item.op) {

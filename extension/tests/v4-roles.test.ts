@@ -523,3 +523,265 @@ describe('EngineV2 render-applied record (S5)', () => {
     engineRegistry.setMode('shadow');
   });
 });
+
+// ===========================================================================
+// HardenEngine role (S5, task 5) — appended block; everything above is
+// byte-untouched. Imports live here because ES import declarations hoist to
+// module scope, so the file's original header did not need editing.
+//
+// Correction route pinned by reading the code: QueueStats
+// (v2/repair/correction-queue.ts) exposes NO monotonic count that grows when
+// corrections are queued — `pending` shrinks on process/flush and dedup makes
+// re-enqueues invisible, `processed`/`failed` grow on outcomes not queueing,
+// `unstableSkipped` grows on skips, `historySize` is a 50-cap ring buffer.
+// So 'correction:needed' is event-triggered via HardenEngine.reportCorrection,
+// fed by EngineV2's additive optional onCorrectionSeen hook (undefined by
+// default), never polled from stats.
+// ===========================================================================
+
+import {
+  HardenEngine,
+  type HardenSource,
+  type BudgetSnapshot,
+  type QueueStats,
+} from '../src/roles/harden-engine';
+import type { ThrottleLevel } from '../src/contracts/topics';
+
+// -- Fixtures: full structural mirrors of the engine's real snapshot/stats
+//    shapes (v2/telemetry/budget-controller.ts, v2/repair/correction-queue.ts).
+
+function makeBudgetSnapshot(throttleLevel: ThrottleLevel): BudgetSnapshot {
+  return {
+    fastPassAvg_ms: 5.2,
+    fastPassP95_ms: 11.4,
+    cpuPerSecond_ms: 31.7,
+    postCount: 120,
+    injectedElementCount: 340,
+    currentDebounce_ms: 80,
+    throttleLevel,
+    violations: [],
+    hardCapHit: false,
+  };
+}
+
+function makeCorrectionStats(pending = 0): QueueStats {
+  return {
+    pending,
+    processed: 0,
+    failed: 0,
+    unstableSkipped: 0,
+    historySize: 0,
+    byPriority: { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 },
+  };
+}
+
+/** Source serving snapshots in order (the last one repeats on extra calls). */
+function makeHardenSource(
+  snapshots: BudgetSnapshot[],
+  stats: QueueStats = makeCorrectionStats(),
+): HardenSource {
+  let i = 0;
+  return {
+    getBudgetSnapshot: vi.fn(() => snapshots[Math.min(i++, snapshots.length - 1)]),
+    getCorrectionStats: vi.fn(() => stats),
+  };
+}
+
+describe('HardenEngine role (S5)', () => {
+  it("the baseline call is silent — even when it already reads a throttled level", () => {
+    const bus = createEventBus<PageTopicMap>();
+    const throttles: PageTopicMap['budget:throttle'][] = [];
+    bus.subscribe('budget:throttle', (p) => throttles.push(p));
+
+    const engine = new HardenEngine(bus, makeHardenSource([makeBudgetSnapshot('critical')]));
+    engine.onCycleChecks(); // first read: establishes the baseline, publishes nothing
+    engine.onCycleChecks(); // still 'critical' — stable after baseline, still silent
+
+    expect(throttles).toEqual([]);
+  });
+
+  it("publishes 'budget:throttle' { level } only when the level differs from the previous call, silent while stable", () => {
+    const bus = createEventBus<PageTopicMap>();
+    const throttles: PageTopicMap['budget:throttle'][] = [];
+    bus.subscribe('budget:throttle', (p) => throttles.push(p));
+
+    const engine = new HardenEngine(
+      bus,
+      makeHardenSource([
+        makeBudgetSnapshot('normal'),   // baseline — silent
+        makeBudgetSnapshot('normal'),   // stable — silent
+        makeBudgetSnapshot('elevated'), // changed — publish
+        makeBudgetSnapshot('elevated'), // stable — silent
+        makeBudgetSnapshot('critical'), // changed — publish
+        makeBudgetSnapshot('normal'),   // changed back — publish
+      ]),
+    );
+    for (let n = 0; n < 6; n++) engine.onCycleChecks();
+
+    expect(throttles).toEqual([
+      { level: 'elevated' },
+      { level: 'critical' },
+      { level: 'normal' },
+    ]);
+  });
+
+  it("reportCorrection publishes 'correction:needed' with the CorrectionItem verbatim (same reference)", () => {
+    const bus = createEventBus<PageTopicMap>();
+    const seen: PageTopicMap['correction:needed'][] = [];
+    bus.subscribe('correction:needed', (p) => seen.push(p));
+
+    // Shape mirrors the rich v2 CorrectionItem that flows through the
+    // engine's handleCorrection → onCorrectionSeen wiring.
+    const item = {
+      id: 'corr-1',
+      op: 'inject-button',
+      priority: 'HIGH',
+      postId: 'p1',
+      fileId: 'drive-file-1',
+      element: document.createElement('button'),
+      reason: 'button missing after navigation',
+      detectedAt: 1726000000000,
+      retryCount: 0,
+    };
+
+    new HardenEngine(bus, makeHardenSource([makeBudgetSnapshot('normal')])).reportCorrection(item);
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0].item).toBe(item); // published VERBATIM — not copied, not reshaped
+  });
+
+  it("the no-correction case publishes nothing — cycles with pending queue stats never synthesize 'correction:needed'", () => {
+    const bus = createEventBus<PageTopicMap>();
+    const seen: PageTopicMap['correction:needed'][] = [];
+    bus.subscribe('correction:needed', (p) => seen.push(p));
+
+    // Realistic stats with corrections sitting in the queue: the cycle path
+    // must NOT poll them into events (the pinned callback-route contract —
+    // QueueStats has no monotonic queued-count to delta over).
+    const engine = new HardenEngine(
+      bus,
+      makeHardenSource(
+        [makeBudgetSnapshot('normal'), makeBudgetSnapshot('normal')],
+        makeCorrectionStats(3),
+      ),
+    );
+    engine.onCycleChecks();
+    engine.onCycleChecks();
+
+    expect(seen).toEqual([]);
+  });
+
+  it("isolates a throwing source getter: no publish, no escape, baseline survives, next call recovers", () => {
+    const bus = createEventBus<PageTopicMap>();
+    const throttles: PageTopicMap['budget:throttle'][] = [];
+    bus.subscribe('budget:throttle', (p) => throttles.push(p));
+
+    let level: ThrottleLevel = 'normal';
+    let throwNext = false;
+    const source: HardenSource = {
+      getBudgetSnapshot: vi.fn(() => {
+        if (throwNext) throw new Error('budget controller blew up');
+        return makeBudgetSnapshot(level);
+      }),
+      getCorrectionStats: vi.fn(() => makeCorrectionStats()),
+    };
+    const engine = new HardenEngine(bus, source);
+
+    engine.onCycleChecks(); // baseline: 'normal', silent
+    level = 'elevated';
+    throwNext = true;
+    expect(() => engine.onCycleChecks()).not.toThrow(); // source throw isolated
+    expect(throttles).toEqual([]); // nothing published that cycle
+    throwNext = false;
+    engine.onCycleChecks(); // recovery: 'elevated' vs the surviving baseline → publish
+
+    expect(throttles).toEqual([{ level: 'elevated' }]);
+  });
+
+  it("a throw on the very first call leaves no baseline: the next successful read becomes the silent baseline", () => {
+    const bus = createEventBus<PageTopicMap>();
+    const throttles: PageTopicMap['budget:throttle'][] = [];
+    bus.subscribe('budget:throttle', (p) => throttles.push(p));
+
+    let throwNext = true;
+    const source: HardenSource = {
+      getBudgetSnapshot: vi.fn(() => {
+        if (throwNext) throw new Error('transient');
+        return makeBudgetSnapshot('critical');
+      }),
+      getCorrectionStats: vi.fn(() => makeCorrectionStats()),
+    };
+    const engine = new HardenEngine(bus, source);
+
+    expect(() => engine.onCycleChecks()).not.toThrow(); // first read throws — isolated
+    throwNext = false;
+    engine.onCycleChecks(); // 'critical' — becomes the baseline, silent
+    engine.onCycleChecks(); // still 'critical' — silent
+    expect(throttles).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// EngineV2.onCorrectionSeen — the additive publish hook the HardenEngine role
+// is fed by. Private-method access idiom copied from the render-applied
+// describe above (v2-engines.test.ts remains the untouched behavior proof).
+// ---------------------------------------------------------------------------
+
+describe('EngineV2 correction-seen hook (S5)', () => {
+  let engine: EngineV2;
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    engine = new EngineV2();
+  });
+
+  function makeV2CorrectionItem(): {
+    id: string; op: 'update-flag'; priority: 'HIGH'; postId: string;
+    element: HTMLElement; reason: string; detectedAt: number; retryCount: number;
+  } {
+    return {
+      id: 'corr-hook-1',
+      op: 'update-flag', // handled without needing tracked post state
+      priority: 'HIGH',
+      postId: 'hook-post-1',
+      element: document.createElement('div'),
+      reason: 'verdict drifted',
+      detectedAt: 1726000000000,
+      retryCount: 0,
+    };
+  }
+
+  async function initAborted(): Promise<void> {
+    const controller = new AbortController();
+    controller.abort();
+    await engine.init('stream' as ViewKind, controller.signal);
+  }
+
+  it('is undefined by default and leaves correction handling unchanged when unset', async () => {
+    await initAborted();
+    expect(engine.onCorrectionSeen).toBeUndefined();
+
+    const handled = (
+      engine as unknown as {
+        handleCorrection: (item: ReturnType<typeof makeV2CorrectionItem>) => boolean;
+      }
+    ).handleCorrection(makeV2CorrectionItem());
+
+    expect(handled).toBe(true); // handled normally — no hook, no throw
+  });
+
+  it('calls an assigned onCorrectionSeen once per handled correction with the exact item', async () => {
+    await initAborted();
+    const seen: unknown[] = [];
+    engine.onCorrectionSeen = (item) => { seen.push(item); };
+
+    const item = makeV2CorrectionItem();
+    const handled = (
+      engine as unknown as { handleCorrection: (i: typeof item) => boolean }
+    ).handleCorrection(item);
+
+    expect(handled).toBe(true);
+    expect(seen).toEqual([item]);
+    expect(seen[0]).toBe(item); // verbatim
+  });
+});
