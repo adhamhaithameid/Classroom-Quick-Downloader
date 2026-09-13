@@ -179,19 +179,14 @@ export default defineBackground(() => {
 
   /**
    * A forbidden-family failure (403/HTML response) for a Drive pending:
-   * cycle to the next signed-in account — but terminate immediately when the
-   * previous attempt failed with the SAME reason. Google ignores per-account
-   * selection on download requests for many setups, so identical failures
-   * mean cycling is futile; two identical attempts are enough to know.
-   * Finalized pendings (success already reported) are never resurrected.
+   * cycle to the next signed-in account. Failure reasons are indistinguishable
+   * across accounts — a later account may hold access even when earlier ones
+   * got 403s — so the sweep always runs to its 10-account bound (invisible to
+   * the user, a few seconds) before the honest terminal. Finalized pendings
+   * (success already reported) are never resurrected.
    */
-  function handleForbiddenFailure(pending: PendingDownloadLike, reason: string): void {
+  function handleForbiddenFailure(pending: PendingDownloadLike): void {
     if (pending.finalized) return;
-    if (pending.lastForbiddenReason === reason) {
-      terminateAuthFailure(pending);
-      return;
-    }
-    pending.lastForbiddenReason = reason;
     if (!pending.htmlSeen) {
       pending.htmlSeen = true;
       sendStatusToTab(pending, 'trying', 'Trying your other Google accounts…', 'AUTH_LOOP');
@@ -256,7 +251,7 @@ export default defineBackground(() => {
           // An HTML response instead of the file is a forbidden/interstitial
           // page — a forbidden-family failure. Zero-tab contract: no bypass
           // tab; retry the next account (or terminal, via the early-exit).
-          handleForbiddenFailure(pending, 'HTML_RESPONSE');
+          handleForbiddenFailure(pending);
         });
         return;
       }
@@ -330,7 +325,7 @@ export default defineBackground(() => {
             const _2 = chrome.runtime.lastError;
           });
           unbindDownloadId(item.id);
-          handleForbiddenFailure(pending!, 'HTML_RESPONSE');
+          handleForbiddenFailure(pending!);
         });
         return;
       }
@@ -382,7 +377,7 @@ export default defineBackground(() => {
         errorType === 'SERVER_FORBIDDEN' || errorType === 'ACCESS_DENIED';
       if (pending.isDrive && forbiddenFamily) {
         unbindDownloadId(delta.id);
-        handleForbiddenFailure(pending, errorType);
+        handleForbiddenFailure(pending);
         return;
       }
 

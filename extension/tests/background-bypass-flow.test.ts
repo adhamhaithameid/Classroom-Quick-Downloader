@@ -290,25 +290,24 @@ describe('S9 zero-tab Drive flow — Chromium (#manual-403 regression)', () => {
     expectZeroTabs(flow);
   });
 
-  it('identical forbidden failures terminate immediately (Google-gap early-exit)', async () => {
+  it('identical forbidden reasons still sweep every account (a later account may hold access)', async () => {
     const flow = await loadFlow({ isFirefox: false });
 
     flow.requestDownload();
-    // Attempt 1 (default account) fails forbidden → attempt 2 (authuser=0)
-    // fails with the SAME reason: cycling further is futile — Google no
-    // longer honors per-account selection here — so go terminal.
-    flow.dispatchDownloadChange({
-      id: 1000,
-      state: { current: 'interrupted' },
-      error: { current: 'SERVER_FORBIDDEN' },
-    });
-    flow.dispatchDownloadChange({
-      id: 1001,
-      state: { current: 'interrupted' },
-      error: { current: 'SERVER_FORBIDDEN' },
-    });
+    // Forbidden interrupt reasons are indistinguishable across accounts —
+    // account 3 may have access even when 0–2 got 403s — so the sweep runs
+    // to its 10-account bound before the honest terminal.
+    const totalAttempts = 1 + flow.stateModule.AUTHUSER_CANDIDATES.length;
+    for (let i = 0; i < totalAttempts; i++) {
+      expect(flow.downloadCalls).toHaveLength(i + 1);
+      flow.dispatchDownloadChange({
+        id: 1000 + i,
+        state: { current: 'interrupted' },
+        error: { current: 'SERVER_FORBIDDEN' },
+      });
+    }
 
-    expect(flow.downloadCalls).toHaveLength(2);
+    expect(flow.downloadCalls).toHaveLength(totalAttempts);
     expect(errorStatusCall(flow.sendStatusSpy, 'AUTH_ALL_FAILED')).toBeTruthy();
     expect(flow.cleanupSpy).toHaveBeenCalledTimes(1);
     expect(flow.stateModule.isRegistered('req-flow')).toBe(false);
@@ -437,22 +436,20 @@ describe('S9 zero-tab Drive flow — Firefox/zen (#537): native downloads, no by
     expectZeroTabs(flow);
   });
 
-  it('identical forbidden failures terminate immediately', async () => {
+  it('identical forbidden reasons sweep every account before terminal', async () => {
     const flow = await loadFlow({ isFirefox: true });
 
     flow.requestDownload();
-    flow.dispatchDownloadChange({
-      id: 1000,
-      state: { current: 'interrupted' },
-      error: { current: 'SERVER_FORBIDDEN' },
-    });
-    flow.dispatchDownloadChange({
-      id: 1001,
-      state: { current: 'interrupted' },
-      error: { current: 'SERVER_FORBIDDEN' },
-    });
+    const totalAttempts = 1 + flow.stateModule.AUTHUSER_CANDIDATES.length;
+    for (let i = 0; i < totalAttempts; i++) {
+      flow.dispatchDownloadChange({
+        id: 1000 + i,
+        state: { current: 'interrupted' },
+        error: { current: 'SERVER_FORBIDDEN' },
+      });
+    }
 
-    expect(flow.downloadCalls).toHaveLength(2);
+    expect(flow.downloadCalls).toHaveLength(totalAttempts);
     expect(errorStatusCall(flow.sendStatusSpy, 'AUTH_ALL_FAILED')).toBeTruthy();
     expect(flow.cleanupSpy).toHaveBeenCalledTimes(1);
     expectZeroTabs(flow);

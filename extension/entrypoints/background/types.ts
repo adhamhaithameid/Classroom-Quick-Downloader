@@ -66,7 +66,4 @@ export type PendingDownload = {
   finalized?: boolean;
   /** Whether user cancelled this download */
   isCancelled?: boolean;
-
-  /** Failure signature of the previous forbidden-family attempt (early-exit) */
-  lastForbiddenReason?: string;
 };
