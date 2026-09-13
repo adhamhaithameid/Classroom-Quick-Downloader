@@ -135,7 +135,7 @@ async function loadDownloadHandler(options: LoadOptions = {}): Promise<TestConte
     getFilenameExt: vi.fn((filename?: string) => filename?.split('.').pop()?.toLowerCase()),
   }));
   vi.doMock('../entrypoints/background/cleanup', () => ({ cleanup: cleanupSpy }));
-  vi.doMock('../entrypoints/background/message-sender', () => ({ sendStatusToTab: sendStatusSpy }));
+  vi.doMock('../entrypoints/background/message-sender', () => ({ sendStatusToTab: sendStatusSpy, setDownloadStatusListener: vi.fn() }));
   vi.doMock('../entrypoints/utils/analytics', () => ({ recordDownloadEvent: recordSpy }));
   vi.doMock('../src/v2/decision/download-validator', () => ({
     validateDownloadUrl: validateSpy,

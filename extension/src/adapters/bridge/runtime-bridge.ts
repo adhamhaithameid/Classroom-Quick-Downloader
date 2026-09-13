@@ -34,7 +34,15 @@ interface ResponseMessage {
 type MessageListener = (message: unknown) => void;
 
 function subscribe(listener: MessageListener): Unsubscribe {
-  const wrapped = (message: unknown) => listener(message);
+  const wrapped = (message: unknown, sender: unknown): boolean => {
+    // Same-extension traffic only, per the repo's listener convention; the
+    // bridge answers via separate messages, never the sendResponse callback,
+    // so every invocation returns false synchronously.
+    const senderId = (sender as { id?: string } | undefined)?.id;
+    if (senderId !== chrome.runtime.id) return false;
+    listener(message);
+    return false;
+  };
   chrome.runtime.onMessage.addListener(wrapped);
   return () => {
     try {

@@ -137,7 +137,7 @@ async function loadFlow(options: FlowOptions = {}) {
     ensureAnalyticsAlarm: vi.fn(),
     checkAndCloseFileTab: vi.fn(),
   }));
-  vi.doMock('../entrypoints/background/message-sender', () => ({ sendStatusToTab: sendStatusSpy }));
+  vi.doMock('../entrypoints/background/message-sender', () => ({ sendStatusToTab: sendStatusSpy, setDownloadStatusListener: vi.fn() }));
   vi.doMock('../entrypoints/utils/analytics', () => ({
     refreshRemoteAnalyticsConfig: vi.fn(async () => {}),
     recordDownloadEvent: recordSpy,

@@ -33,6 +33,8 @@ import {
   startNextDriveAttempt,
 } from './download-handler';
 import { refreshRemoteAnalyticsConfig, recordDownloadEvent } from '../utils/analytics';
+import { createWorkerRuntimeBridge } from '../../src/adapters/bridge/runtime-bridge';
+import { startBridgeDownloadService } from './bridge-download-service';
 import { UNINSTALL_SITE_URL } from '../utils/analytics/constants';
 import { t } from '../content/i18n';
 import {
@@ -196,6 +198,11 @@ export default defineBackground(() => {
   }
 
   type PendingDownloadLike = NonNullable<ReturnType<typeof getPendingByDownloadId>>;
+
+  // 0) Bridge download service (S6/G2): serves CQD_BRIDGE_REQUEST messages
+  //    from the page bus over the worker runtime bridge. Inert until the page
+  //    side sends one; the legacy message flow is untouched.
+  startBridgeDownloadService(createWorkerRuntimeBridge());
 
   // 1) onDeterminingFilename (Chrome only)
   if (!IS_FIREFOX && chrome.downloads && chrome.downloads.onDeterminingFilename) {

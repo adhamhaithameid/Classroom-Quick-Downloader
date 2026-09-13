@@ -99,6 +99,7 @@ describe('background/index', () => {
     }));
     vi.doMock('../entrypoints/background/message-sender', () => ({
       sendStatusToTab: vi.fn(),
+      setDownloadStatusListener: vi.fn(),
     }));
     vi.doMock('../entrypoints/background/download-handler', () => ({
       handleDownloadRequest: vi.fn(() => true),
@@ -183,6 +184,7 @@ describe('background/index', () => {
     }));
     vi.doMock('../entrypoints/background/message-sender', () => ({
       sendStatusToTab,
+      setDownloadStatusListener: vi.fn(),
     }));
     vi.doMock('../entrypoints/background/download-handler', () => ({
       handleDownloadRequest: vi.fn(() => true),
@@ -249,6 +251,7 @@ describe('background/index', () => {
     }));
     vi.doMock('../entrypoints/background/message-sender', () => ({
       sendStatusToTab: vi.fn(),
+      setDownloadStatusListener: vi.fn(),
     }));
     vi.doMock('../entrypoints/background/download-handler', () => ({
       handleDownloadRequest: vi.fn(() => true),
@@ -307,6 +310,7 @@ describe('background/index', () => {
     }));
     vi.doMock('../entrypoints/background/message-sender', () => ({
       sendStatusToTab: vi.fn(),
+      setDownloadStatusListener: vi.fn(),
     }));
     vi.doMock('../entrypoints/background/download-handler', () => ({
       handleDownloadRequest: vi.fn(() => true),
@@ -457,7 +461,7 @@ describe('background/index', () => {
       ensureAnalyticsAlarm: vi.fn(),
       checkAndCloseFileTab: vi.fn(),
     }));
-    vi.doMock('../entrypoints/background/message-sender', () => ({ sendStatusToTab }));
+    vi.doMock('../entrypoints/background/message-sender', () => ({ sendStatusToTab, setDownloadStatusListener: vi.fn() }));
     vi.doMock('../entrypoints/background/download-handler', () => ({
       handleDownloadRequest: vi.fn(() => true),
       startNextDriveAttempt,
