@@ -118,6 +118,9 @@ export class EngineV2 implements CQDEngine {
   private placementDecisions: PlacementDecision[] = [];
   private decisionTraces: Map<string, DecisionTrace> = new Map();
 
+  /** S5 additive: what the last render cycle applied, for the RenderEngine role. */
+  private lastRenderApplied: Array<{ postId: string; kind: 'button' | 'flag' | 'all' }> = [];
+
   // -- Performance tracking --
   private scanCount = 0;
   private totalScanMs = 0;
@@ -638,6 +641,11 @@ export class EngineV2 implements CQDEngine {
    * detection-only and this method is a no-op.
    */
   private renderDetectedFlags(): void {
+    // S5 additive: the render cycle starts here — renderDetectedFlags runs
+    // first in every fullScan, so resetting at its start gives both render
+    // strategies one shared per-cycle record (buttons append after flags).
+    this.lastRenderApplied = [];
+
     // Only render when V2 is the primary engine
     const mode = engineRegistry.getMode();
     if (mode !== 'v2' && mode !== 'v3') {
@@ -654,6 +662,9 @@ export class EngineV2 implements CQDEngine {
 
       try {
         renderFlagBadge(decision, postNode.element);
+        // S5 additive: the flag is on the DOM — record it (inside the try,
+        // so a failed render is not recorded as applied).
+        this.lastRenderApplied.push({ postId, kind: 'flag' });
       } catch (err) {
         console.warn(`[Engine V2] Flag render failed for post ${postId}:`, err);
       }
@@ -867,6 +878,26 @@ export class EngineV2 implements CQDEngine {
     // Render all buttons in one batch
     renderBatch(this.placementDecisions, fileMap);
 
+    // S5 additive: the batch is on the DOM — record what was applied. This
+    // runs only after renderBatch returns, so a batch that throws leaves the
+    // cycle with no button entries. postId is resolved without DOM: a
+    // download-all decision carries it in its fileId, a single-file decision
+    // maps through the post's own file list (the same canonicalId keys the
+    // fileMap above resolved files by). Decisions whose post cannot be
+    // resolved were not rendered by the batch either, so they are not
+    // recorded as applied.
+    const fileToPost = new Map<string, string>();
+    for (const [pid, post] of this.postMap) {
+      for (const f of post.files) fileToPost.set(f.canonicalId, pid);
+      fileToPost.set(`download-all:${pid}`, pid);
+    }
+    for (const decision of this.placementDecisions) {
+      const pid = fileToPost.get(decision.fileId);
+      if (pid !== undefined) {
+        this.lastRenderApplied.push({ postId: pid, kind: 'button' });
+      }
+    }
+
     // Clean up stale buttons (files that were removed since last scan)
     for (const post of this.postMap.values()) {
       const validIds = new Set(post.files.map(f => f.canonicalId));
@@ -894,6 +925,11 @@ export class EngineV2 implements CQDEngine {
 
   getDecisionTrace(postId: string): DecisionTrace | null {
     return this.decisionTraces.get(postId) ?? null;
+  }
+
+  /** S5 additive: what the last render cycle applied, for the RenderEngine role. */
+  getLastRenderApplied(): Array<{ postId: string; kind: 'button' | 'flag' | 'all' }> {
+    return this.lastRenderApplied;
   }
 
   // ========================================================================

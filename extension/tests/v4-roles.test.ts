@@ -3,12 +3,16 @@
 // Role-module tests for S5 "roles behind the bus" (design §4).
 // One describe block per role; new roles append below.
 import { describe, it, expect, vi } from 'vitest';
+import { beforeEach } from 'vitest';
 
 import { createEventBus } from '../src/bus/event-bus';
 import type { PageTopicMap } from '../src/contracts/topics';
 import { ViewKind, type PostNode, type FileNode, type FlagDecision, type PlacementDecision } from '../src/engines/types';
 import { DetectEngine, type DetectSource } from '../src/roles/detect-engine';
 import { ComputeEngine, type ComputeSource } from '../src/roles/compute-engine';
+import { RenderEngine, type RenderSource } from '../src/roles/render-engine';
+import { EngineV2 } from '../src/engines/v2/engine-v2';
+import { engineRegistry } from '../src/engines/engine-registry';
 
 // ---------------------------------------------------------------------------
 // Fixtures — shapes pinned to src/engines/types.ts (PostNode / FileNode)
@@ -302,5 +306,220 @@ describe('ComputeEngine role (S5)', () => {
 
     expect(seenFlags).toEqual([{ decisions: flags }]);
     expect(seenPlacements).toEqual([{ decisions: placements }]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// RenderEngine fixtures — stub source exposing getLastRenderApplied()
+// ---------------------------------------------------------------------------
+
+type RenderAppliedItem = { postId: string; kind: 'button' | 'flag' | 'all' };
+
+function makeRenderSource(applied: RenderAppliedItem[]): RenderSource {
+  return { getLastRenderApplied: vi.fn(() => applied) };
+}
+
+describe('RenderEngine role (S5)', () => {
+  it("publishes one 'render:applied' per applied item with the exact payload { postId, kind }", () => {
+    const applied: RenderAppliedItem[] = [
+      { postId: 'p1', kind: 'flag' },
+      { postId: 'p2', kind: 'button' },
+      { postId: 'p3', kind: 'all' },
+    ];
+    const bus = createEventBus<PageTopicMap>();
+    const seen: PageTopicMap['render:applied'][] = [];
+    bus.subscribe('render:applied', (p) => seen.push(p));
+
+    new RenderEngine(bus, makeRenderSource(applied)).onRenderApplied();
+
+    expect(seen).toHaveLength(3);
+    expect(seen).toEqual([
+      { postId: 'p1', kind: 'flag' },
+      { postId: 'p2', kind: 'button' },
+      { postId: 'p3', kind: 'all' },
+    ]);
+    // Carried VERBATIM — each published payload is the source's own item
+    expect(seen[0]).toBe(applied[0]);
+    expect(seen[1]).toBe(applied[1]);
+    expect(seen[2]).toBe(applied[2]);
+  });
+
+  it("publishes nothing for an empty applied list (no 'render:applied' at all)", () => {
+    const bus = createEventBus<PageTopicMap>();
+    const seen: PageTopicMap['render:applied'][] = [];
+    bus.subscribe('render:applied', (p) => seen.push(p));
+
+    new RenderEngine(bus, makeRenderSource([])).onRenderApplied();
+
+    expect(seen).toEqual([]);
+  });
+
+  it("isolates a throwing source: publishes nothing that cycle and no exception escapes onRenderApplied()", () => {
+    const bus = createEventBus<PageTopicMap>();
+    const seen: unknown[] = [];
+    bus.subscribe('render:applied', (p) => seen.push(p));
+    const source: RenderSource = {
+      getLastRenderApplied: vi.fn(() => {
+        throw new Error('render state blew up');
+      }),
+    };
+
+    expect(() => new RenderEngine(bus, source).onRenderApplied()).not.toThrow();
+    expect(seen).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// EngineV2.getLastRenderApplied — the RenderSource the RenderEngine role reads.
+// Setup idiom copied from tests/v2-engines.test.ts D8 tests (that file is the
+// behavior-unchanged proof and is intentionally NOT edited by this sprint).
+// ---------------------------------------------------------------------------
+
+describe('EngineV2 render-applied record (S5)', () => {
+  let engine: EngineV2;
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    engine = new EngineV2();
+  });
+
+  // D8 helper, copied verbatim from tests/v2-engines.test.ts: seed the
+  // engine's private state with one detected comment flag so the render
+  // strategy has something to render.
+  function injectDetectedFlag(target: EngineV2, postId: string, element: HTMLElement): void {
+    const decision = {
+      postId,
+      commentScore: 100,
+      editedScore: 0,
+      commentCount: 3,
+      editedDiff: null,
+      exclusionPenalties: [],
+      finalVerdict: 'comment' as const,
+      confidence: 'high' as const,
+      trace: {
+        postId,
+        timestamp: Date.now(),
+        viewKind: 'stream' as ViewKind,
+        layers: [],
+        exclusions: [],
+        finalScore: 100,
+        duration_ms: 0,
+      },
+    };
+    (target as unknown as { flagDecisions: Map<string, unknown> }).flagDecisions.set(postId, decision);
+    (target as unknown as { postMap: Map<string, unknown> }).postMap.set(postId, {
+      id: postId,
+      element,
+      viewKind: 'stream',
+      files: [],
+      flags: decision,
+      lastScannedAt: Date.now(),
+    });
+  }
+
+  // Seed one placement decision (one file button on an anchor inside the
+  // post) plus the post/file state renderPlacedButtons resolves files from.
+  function injectPlacement(
+    target: EngineV2,
+    postId: string,
+    postEl: HTMLElement,
+    anchorEl: HTMLElement,
+    fileId: string,
+  ): void {
+    (target as unknown as { postMap: Map<string, unknown> }).postMap.set(postId, {
+      id: postId,
+      element: postEl,
+      viewKind: 'stream',
+      files: [
+        {
+          canonicalId: fileId,
+          element: anchorEl,
+          idSource: 'data-drive-id',
+          name: 'handout.pdf',
+          ext: 'pdf',
+          downloadUrl: 'https://example.com/handout.pdf',
+        },
+      ],
+      flags: null,
+      lastScannedAt: Date.now(),
+    });
+    (target as unknown as { placementDecisions: unknown[] }).placementDecisions.push({
+      fileId,
+      targetElement: anchorEl,
+      insertionPoint: 'append',
+      anchorSelector: '[data-stream-item-id]',
+      confidence: 90,
+      reasonCodes: ['closest-action-bar'],
+      fallbackUsed: false,
+    });
+  }
+
+  it('records flag renders: after a render cycle that applies a flag, the record is non-empty and matches what rendered', async () => {
+    const post = document.createElement('article');
+    post.setAttribute('data-stream-item-id', 'render-post-1');
+    document.body.appendChild(post);
+    const controller = new AbortController();
+    controller.abort();
+    await engine.init('stream' as ViewKind, controller.signal);
+
+    injectDetectedFlag(engine, 'render-post-1', post);
+
+    engineRegistry.setMode('v2');
+    (engine as unknown as { renderDetectedFlags: () => void }).renderDetectedFlags();
+
+    // The badge rendered AND the record matches it — one entry per applied item
+    expect(post.querySelector('.cqd-v2-flag')).not.toBeNull();
+    expect(engine.getLastRenderApplied()).toEqual([{ postId: 'render-post-1', kind: 'flag' }]);
+    engineRegistry.setMode('shadow');
+  });
+
+  it('resets per cycle: a cycle with nothing to render leaves the record empty', async () => {
+    const post = document.createElement('article');
+    post.setAttribute('data-stream-item-id', 'render-post-2');
+    document.body.appendChild(post);
+    const controller = new AbortController();
+    controller.abort();
+    await engine.init('stream' as ViewKind, controller.signal);
+
+    injectDetectedFlag(engine, 'render-post-2', post);
+
+    engineRegistry.setMode('v2');
+    (engine as unknown as { renderDetectedFlags: () => void }).renderDetectedFlags();
+    expect(engine.getLastRenderApplied()).toHaveLength(1);
+
+    // Next cycle has nothing to render (shadow mode — V1 owns rendering):
+    // the record is reset even though the previous cycle recorded an entry.
+    engineRegistry.setMode('shadow');
+    (engine as unknown as { renderDetectedFlags: () => void }).renderDetectedFlags();
+    expect(engine.getLastRenderApplied()).toEqual([]);
+  });
+
+  it('shares one record per render cycle: button entries append after flag entries, kind distinguishes them', async () => {
+    const post = document.createElement('article');
+    post.setAttribute('data-stream-item-id', 'render-post-3');
+    const anchor = document.createElement('a');
+    post.appendChild(anchor);
+    document.body.appendChild(post);
+    const controller = new AbortController();
+    controller.abort();
+    await engine.init('stream' as ViewKind, controller.signal);
+
+    injectDetectedFlag(engine, 'render-post-3', post);
+    injectPlacement(engine, 'render-post-3', post, anchor, 'render-file-3');
+
+    // Same order as the fullScan pipeline (engine-v2.ts:389-390):
+    // flags render first, buttons second — one shared per-cycle record.
+    engineRegistry.setMode('v2');
+    (engine as unknown as { renderDetectedFlags: () => void }).renderDetectedFlags();
+    (engine as unknown as { renderPlacedButtons: () => void }).renderPlacedButtons();
+
+    expect(engine.getLastRenderApplied()).toEqual([
+      { postId: 'render-post-3', kind: 'flag' },
+      { postId: 'render-post-3', kind: 'button' },
+    ]);
+    // Both applications truly happened in the DOM
+    expect(post.querySelector('.cqd-v2-flag')).not.toBeNull();
+    expect(anchor.querySelector('button')).not.toBeNull();
+    engineRegistry.setMode('shadow');
   });
 });
