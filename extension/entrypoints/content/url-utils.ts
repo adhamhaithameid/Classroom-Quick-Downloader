@@ -4,6 +4,7 @@
  */
 
 import { DRIVE_URL_PATTERNS, DRIVE_ANCHOR_SELECTOR } from './state';
+import { buildDriveDownloadUrl } from '../../src/shared/drive-endpoint';
 
 const DOWNLOADABLE_DOCS_PATH = /^\/(document|presentation|drawings|spreadsheets)\/d\/[^/]+/;
 
@@ -77,12 +78,6 @@ export function toDownloadUrl(originalUrl: string, depth = 0): string {
   if (depth > 3) return originalUrl;
   const authUser = getAuthUser();
 
-  // The byte-serving endpoint: where Drive's interstitial "Download anyway"
-  // link lands. Emitting it directly downloads the file with no tab and no
-  // interstitial hop (the visible "403 Access Forbidden" window regression).
-  const driveDownloadUrl = (id: string): string =>
-    `https://drive.usercontent.google.com/download?id=${encodeURIComponent(id)}&export=download&confirm=t`;
-
   try {
     const parsed = new URL(originalUrl, location.href);
     const normalizedPath = parsed.pathname.replace(/^\/u\/\d+(?=\/)/, '');
@@ -101,18 +96,18 @@ export function toDownloadUrl(originalUrl: string, depth = 0): string {
         const cont = parsed.searchParams.get('continue');
         if (cont) return toDownloadUrl(cont, depth + 1);
         const id = parsed.searchParams.get('id');
-        if (id) return appendAuth(driveDownloadUrl(id));
+        if (id) return appendAuth(buildDriveDownloadUrl(id));
         return appendAuth(originalUrl);
       }
 
       const fileMatch = normalizedPath.match(/^\/file\/d\/([^/]+)/);
       if (fileMatch) {
-        return appendAuth(driveDownloadUrl(fileMatch[1]));
+        return appendAuth(buildDriveDownloadUrl(fileMatch[1]));
       }
 
       if (normalizedPath === '/open' || normalizedPath === '/uc') {
         const id = parsed.searchParams.get('id');
-        if (id) return appendAuth(driveDownloadUrl(id));
+        if (id) return appendAuth(buildDriveDownloadUrl(id));
         return appendAuth(originalUrl);
       }
     }
@@ -121,7 +116,7 @@ export function toDownloadUrl(originalUrl: string, depth = 0): string {
       const id = parsed.searchParams.get('id') ||
         parsed.searchParams.get('resourceId') ||
         parsed.searchParams.get('fileId');
-      if (id) return appendAuth(driveDownloadUrl(id));
+      if (id) return appendAuth(buildDriveDownloadUrl(id));
     }
 
     // Google Docs/Sheets/Slides/Drawings viewer URLs
@@ -129,7 +124,7 @@ export function toDownloadUrl(originalUrl: string, depth = 0): string {
     if (parsed.hostname === 'docs.google.com') {
       const docsMatch = normalizedPath.match(/^\/(document|presentation|drawings|spreadsheets)\/d\/([^/]+)/);
       if (docsMatch) {
-        return appendAuth(driveDownloadUrl(docsMatch[2]));
+        return appendAuth(buildDriveDownloadUrl(docsMatch[2]));
       }
     }
 

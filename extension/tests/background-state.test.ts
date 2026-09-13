@@ -9,7 +9,6 @@ function makePending(overrides: Partial<PendingDownload> = {}): PendingDownload 
     baseUrl: 'https://example.com/file.pdf',
     isDrive: false,
     attemptedAuthUsers: [],
-    fallbackStarted: false,
     isCancelled: false,
     ...overrides,
   };

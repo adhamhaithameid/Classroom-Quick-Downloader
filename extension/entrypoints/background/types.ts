@@ -57,9 +57,6 @@ export type PendingDownload = {
   /** Browser download ID once started */
   currentDownloadId?: number;
 
-  /** Whether bypass tab approach was started */
-  fallbackStarted?: boolean;
-
   /** Whether an HTML (interstitial/error) response was intercepted */
   htmlSeen?: boolean;
   /** Whether success status was already sent */

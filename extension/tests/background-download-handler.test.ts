@@ -25,7 +25,6 @@ type TestContext = {
     pendingByUrlGet: (url: string) => PendingDownload | undefined;
     registerPending: (pending: PendingDownload) => void;
     bindDownloadId: (pending: PendingDownload, downloadId: number) => boolean;
-    bindBypassTabId: (pending: PendingDownload, tabId: number) => boolean;
   };
   cleanupSpy: ReturnType<typeof vi.fn>;
   sendStatusSpy: ReturnType<typeof vi.fn>;
@@ -46,7 +45,6 @@ function makePending(overrides: Partial<PendingDownload> = {}): PendingDownload 
     fileMeta: { ext: 'pdf', name: 'file.pdf' },
     tabId: 17,
     attemptedAuthUsers: [],
-    fallbackStarted: false,
     isCancelled: false,
     ...overrides,
   };
@@ -96,11 +94,6 @@ async function loadDownloadHandler(options: LoadOptions = {}): Promise<TestConte
       if (existing !== undefined && existing !== p) return false;
       p.currentDownloadId = downloadId;
       pendingByDownloadId.set(downloadId, p);
-      return true;
-    },
-    bindBypassTabId: (p: PendingDownload, tabId: number) => {
-      if (pendingByRequestId.get(p.requestId) !== p) return false;
-      pendingByBypassTabId.set(tabId, p);
       return true;
     },
     pendingByUrlAdd: (url: string, pending: PendingDownload) => {

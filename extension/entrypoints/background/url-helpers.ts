@@ -3,6 +3,8 @@
  * URL manipulation utilities for download handling.
  */
 
+import { buildDriveDownloadUrl } from '../../src/shared/drive-endpoint';
+
 /**
  * Normalize a download URL and detect if it's a Drive URL.
  *
@@ -30,10 +32,7 @@ export function normalizeUrl(rawUrl: string): { baseUrl: string; isDrive: boolea
       url.pathname.match(/\/file\/d\/([^/]+)/)?.[1] ??
       url.pathname.match(/\/d\/([^/]+)/)?.[1];
     if (id) {
-      return {
-        baseUrl: `https://drive.usercontent.google.com/download?id=${encodeURIComponent(id)}&export=download&confirm=t`,
-        isDrive: true,
-      };
+      return { baseUrl: buildDriveDownloadUrl(id), isDrive: true };
     }
     return { baseUrl: rawUrl, isDrive: true };
   } catch {

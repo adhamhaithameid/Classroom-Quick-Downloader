@@ -1,7 +1,8 @@
 // filepath: extension/entrypoints/background/download-handler.ts
 /**
  * Core download handling logic for Drive and direct downloads.
- * Handles auth rotation, bypass tabs, and retry logic.
+ * Handles auth rotation (authuser cycling on the usercontent byte-serving
+ * endpoint) and retry logic. Tab-free: no bypass windows, ever.
  */
 
 import type { PendingDownload } from './types';
@@ -60,7 +61,6 @@ export function startSingleAttempt(
  */
 export function startNextDriveAttempt(pending: PendingDownload): void {
   pending.htmlSeen = false;
-  pending.fallbackStarted = false;
 
   const nextAuth = AUTHUSER_CANDIDATES.find(
     (n) => !pending.attemptedAuthUsers.includes(n)
@@ -79,7 +79,7 @@ export function startNextDriveAttempt(pending: PendingDownload): void {
       type: pending.fileMeta?.ext || 'unknown',
       status: 'fail',
       duration_ms: Date.now() - pending.startTime,
-      bypass_used: !!pending.fallbackStarted,
+      bypass_used: false,
       error_type: 'AUTH_ALL_FAILED',
     });
     cleanup(pending);
@@ -145,7 +145,6 @@ export function handleDownloadRequest(
     fileMeta,
     tabId: sender.tab?.id,
     attemptedAuthUsers: [],
-    fallbackStarted: false,
     isCancelled: false,
   };
 

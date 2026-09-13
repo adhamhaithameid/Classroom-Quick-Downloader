@@ -69,14 +69,6 @@ function makeFlowState(options: FlowOptions = {}) {
     unbindDownloadId: (downloadId: number) => {
       pendingByDownloadId.delete(downloadId);
     },
-    bindBypassTabId: (p: PendingDownload, tabId: number) => {
-      if (pendingByRequestId.get(p.requestId) !== p) return false;
-      pendingByBypassTabId.set(tabId, p);
-      return true;
-    },
-    unbindBypassTabId: (tabId: number) => {
-      pendingByBypassTabId.delete(tabId);
-    },
     unregisterPending: (p: PendingDownload) => {
       if (pendingByRequestId.get(p.requestId) === p) pendingByRequestId.delete(p.requestId);
       for (const [id, v] of pendingByDownloadId) {
@@ -385,7 +377,7 @@ describe('S9 zero-tab Drive flow — Chromium (#manual-403 regression)', () => {
     expectZeroTabs(flow);
   });
 
-  it('does not cycle after success was already reported (finalized)', async () => {
+  it('does not cycle after success was already reported (finalized) and settles immediately', async () => {
     const flow = await loadFlow({ isFirefox: false });
 
     flow.requestDownload();
@@ -400,6 +392,9 @@ describe('S9 zero-tab Drive flow — Chromium (#manual-403 regression)', () => {
 
     expect(flow.downloadCalls).toHaveLength(1);
     expect(tryingStatusCall(flow.sendStatusSpy)).toBeFalsy();
+    // Event-driven settle: the pending must not linger until the TTL sweep.
+    expect(flow.cleanupSpy).toHaveBeenCalledTimes(1);
+    expect(flow.stateModule.isRegistered('req-flow')).toBe(false);
     expectZeroTabs(flow);
   });
 });

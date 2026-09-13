@@ -4,8 +4,9 @@
  * Wires together all modules and sets up Chrome API listeners.
  *
  * This is the unified background script that works across browsers.
- * Firefox and Chrome/Edge have slightly different download handling
- * (Firefox uses bypass tabs exclusively for Drive).
+ * The download flow is tab-free: Drive downloads target the usercontent
+ * byte-serving endpoint natively on every browser; browser differences are
+ * limited to the filename hooks (onDeterminingFilename vs onCreated).
  */
 
 import {
@@ -194,30 +195,9 @@ export default defineBackground(() => {
     startNextDriveAttempt(pending);
   }
 
-  function terminateAuthFailure(pending: PendingDownloadLike): void {
-    sendStatusToTab(
-      pending,
-      'error',
-      'Access denied for all your accounts. Open the file directly in Drive to confirm access.',
-      'AUTH_ALL_FAILED',
-    );
-    recordDownloadEvent({
-      type: pending.fileMeta?.ext || 'unknown',
-      status: 'fail',
-      duration_ms: Date.now() - pending.startTime,
-      bypass_used: false,
-      error_type: 'AUTH_ALL_FAILED',
-    });
-    cleanup(pending);
-  }
-
   type PendingDownloadLike = NonNullable<ReturnType<typeof getPendingByDownloadId>>;
 
-  // 1) Messages from drive_bypass.content.ts — removed: the zero-tab flow
-  // never opens bypass tabs, so BYPASS_SUCCESS / 403_SEEN / consent queries
-  // no longer exist.
-
-  // 2) onDeterminingFilename (Chrome only)
+  // 1) onDeterminingFilename (Chrome only)
   if (!IS_FIREFOX && chrome.downloads && chrome.downloads.onDeterminingFilename) {
     chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
       let pending = getPendingByDownloadId(item.id);
@@ -250,7 +230,8 @@ export default defineBackground(() => {
           unbindDownloadId(item.id);
           // An HTML response instead of the file is a forbidden/interstitial
           // page — a forbidden-family failure. Zero-tab contract: no bypass
-          // tab; retry the next account (or terminal, via the early-exit).
+          // tab; retry under the next signed-in account until the sweep
+          // exhausts, then the honest terminal.
           handleForbiddenFailure(pending);
         });
         return;
@@ -265,7 +246,7 @@ export default defineBackground(() => {
     });
   }
 
-  // 2b) onCreated (Firefox)
+  // 2) onCreated (Firefox)
   if (IS_FIREFOX && chrome.downloads && chrome.downloads.onCreated) {
     chrome.downloads.onCreated.addListener((item) => {
       let pending = getPendingByDownloadId(item.id);
@@ -308,6 +289,7 @@ export default defineBackground(() => {
       }
 
       if (!pending) return;
+      const p = pending;
 
       // Firefox has no onDeterminingFilename: an HTML "download" is Drive's
       // interstitial or an error page, not the file. Cancel + erase it and
@@ -317,7 +299,7 @@ export default defineBackground(() => {
         mime.includes('html') ||
         getFilenameExt(item.filename) === 'html' ||
         getFilenameExt(item.filename) === 'htm';
-      if (looksLikeHtml && pending.isDrive) {
+      if (looksLikeHtml && p.isDrive) {
         cancelledByUs.add(item.id);
         chrome.downloads.cancel(item.id, () => {
           const _ = chrome.runtime.lastError;
@@ -325,7 +307,7 @@ export default defineBackground(() => {
             const _2 = chrome.runtime.lastError;
           });
           unbindDownloadId(item.id);
-          handleForbiddenFailure(pending!);
+          handleForbiddenFailure(p);
         });
         return;
       }
@@ -340,7 +322,7 @@ export default defineBackground(() => {
     });
   }
 
-  // 3) onChanged: Analytics trigger
+  // 3) onChanged: settle + analytics
   chrome.downloads.onChanged.addListener((delta) => {
     const pending = getPendingByDownloadId(delta.id);
     if (!pending) return;
@@ -353,7 +335,7 @@ export default defineBackground(() => {
         type: ext,
         status: 'success',
         duration_ms: duration,
-        bypass_used: !!pending.fallbackStarted,
+        bypass_used: false,
       });
       if (pending.fileMeta?.name) recentDownloads.set(pending.fileMeta.name, Date.now());
       cleanup(pending, delta.id);
@@ -373,6 +355,12 @@ export default defineBackground(() => {
       // account before giving up. Bounded by the authuser candidate sweep in
       // startNextDriveAttempt; success was already reported (finalized) and
       // self-cancelled downloads never reach this branch.
+      if (pending.finalized) {
+        // Success was already reported (Firefox onCreated path); the pending
+        // must still settle NOW, event-driven — not linger to the TTL sweep.
+        cleanup(pending, delta.id);
+        return;
+      }
       const forbiddenFamily =
         errorType === 'SERVER_FORBIDDEN' || errorType === 'ACCESS_DENIED';
       if (pending.isDrive && forbiddenFamily) {
@@ -387,7 +375,7 @@ export default defineBackground(() => {
         type: ext,
         status: 'fail',
         duration_ms: duration,
-        bypass_used: !!pending.fallbackStarted,
+        bypass_used: false,
         error_type: errorType,
       });
       sendStatusToTab(pending, 'error', t('downloadInterrupted'));
@@ -432,7 +420,7 @@ export default defineBackground(() => {
       type: pending.fileMeta?.ext || 'unknown',
       status: 'cancelled',
       duration_ms: Date.now() - pending.startTime,
-      bypass_used: pending.fallbackStarted || false,
+      bypass_used: false,
     });
 
     cleanup(pending);

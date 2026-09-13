@@ -41,11 +41,6 @@ function makeStateModule(options: {
       return true;
     },
     unbindDownloadId: (downloadId: number) => { pendingByDownloadId.delete(downloadId); },
-    bindBypassTabId: (p: any, tabId: number) => {
-      pendingByBypassTabId.set(tabId, p);
-      return true;
-    },
-    unbindBypassTabId: (tabId: number) => { pendingByBypassTabId.delete(tabId); },
     getPendingByRequestId: (id: string) => pendingByRequestId.get(id),
     getPendingByDownloadId: (id: number) => pendingByDownloadId.get(id),
     getPendingByBypassTabId: (id: number) => pendingByBypassTabId.get(id),

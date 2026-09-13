@@ -20,7 +20,6 @@ function makePending(overrides: Partial<PendingDownload> = {}): PendingDownload 
     isDrive: false,
     fileMeta: { ext: 'pdf', name: 'file.pdf' },
     attemptedAuthUsers: [],
-    fallbackStarted: false,
     isCancelled: false,
     ...overrides,
   };
