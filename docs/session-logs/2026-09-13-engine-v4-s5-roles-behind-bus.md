@@ -47,6 +47,13 @@ by the S6 bridge (bead `1yf.6`) — recorded here as the 1yf.5 acceptance readin
    (`pending` shrinks, `historySize` caps), so `correction:needed` uses the
    callback route; retries re-publish per retry — consumers dedup by
    `CorrectionItem.id` (deep-validator's declared dedup contract).
+   *Amended, final-review fix wave:* the callback route is now actually
+   wired in production — `Orchestrator.publishCycleTopics()` assigns
+   `primary.onCorrectionSeen` per cycle (idempotent, `in`-guarded so
+   EngineV1 is skipped), pointing it at `HardenEngine.reportCorrection()`,
+   which publishes the item verbatim as `correction:needed`. At sprint
+   close the hook had zero production callers; pinned by two new tests in
+   `tests/v4-orchestrator.test.ts`.
 3. **Render cycle boundary:** only `renderDetectedFlags` resets
    `lastRenderApplied`; the sole caller pair (`fullScan`: flags→buttons) makes
    a buttons-side reset self-defeating. Purpose-preserving deviation, reviewed.
@@ -61,7 +68,8 @@ by the S6 bridge (bead `1yf.6`) — recorded here as the 1yf.5 acceptance readin
   null-returns still recorded) — fix when the additivity rule lifts (S10).
 - Source-throw inside DetectEngine is silent (no error topic yet) — Harden
   error-topic candidate.
-- Redundant `S5CapableEngine` casts in orchestrator.ts (cosmetic).
+- ~~Redundant `S5CapableEngine` casts in orchestrator.ts (cosmetic).~~
+  Resolved in the final-review fix wave: replaced with typed declarations.
 - Fitness scanner: raw-text scanning false-positives on comment text;
   dynamic `import()` evasion (consistent with the suite's existing threat model).
 

@@ -340,3 +340,116 @@ describe('Orchestrator cycle publishing (S5 Task 6)', () => {
     o.stop();
   });
 });
+
+// ===========================================================================
+// S5 final-review fix wave — the correction hook is actually wired, and the
+// throttle baseline survives engine swaps
+// ===========================================================================
+
+/**
+ * The REAL CorrectionItem the engine's hook receives — deep-validator's
+ * richer shape (v2/repair/deep-validator.ts), not the page-topic mirror.
+ * Type-only import: erased at runtime, so the module mocks above are
+ * untouched and the real module is never loaded.
+ */
+import type { CorrectionItem as DeepCorrectionItem } from '../src/v2/repair/deep-validator';
+
+describe('Orchestrator correction wiring + throttle baseline (S5 final-review fix)', () => {
+  let log: LogEntry[];
+
+  beforeEach(() => {
+    CapturingMutationObserver.callbacks.length = 0;
+    registryState.primary = null;
+    log = [];
+    vi.stubGlobal('MutationObserver', CapturingMutationObserver);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    registryState.primary = null;
+  });
+
+  it('wires the primary engine\'s onCorrectionSeen hook to the harden role — invoking it publishes correction:needed exactly once, verbatim', async () => {
+    const f = makeV2ShapeFixtures();
+    // Mirror a real EngineV2 instance: the hook is a DECLARED class field,
+    // present on the object but undefined until the orchestrator assigns it.
+    const stub: typeof f.stub & {
+      onCorrectionSeen?: (item: DeepCorrectionItem) => void;
+    } = { ...f.stub, onCorrectionSeen: undefined };
+    registryState.primary = stub as unknown as Record<string, unknown>;
+
+    const o = new Orchestrator();
+    o.start();
+    const drive = await startWithStub(o);
+    recordAllTopics(o.getBus(), log);
+
+    // Cycle 1 — publishCycleTopics runs and wires the hook on the stub (it
+    // also establishes the harden throttle baseline). No corrections yet.
+    drive(makeMutationRecords(), {} as MutationObserver);
+    expect(log.filter((e) => e.topic === 'correction:needed')).toEqual([]);
+
+    // Engine-shaped CorrectionItem, per deep-validator's real shape. The
+    // engine hands this to the wired hook during handleCorrection; here we
+    // play the engine's side.
+    const item: DeepCorrectionItem = {
+      id: 'corr-1',
+      op: 'inject-button',
+      priority: 'HIGH',
+      postId: 'p1',
+      element: document.createElement('button'),
+      reason: 'button missing after render',
+      detectedAt: 1234,
+      retryCount: 0,
+    };
+    stub.onCorrectionSeen?.(item);
+
+    // Exactly one 'correction:needed', wrapping the item VERBATIM (same
+    // object reference — no copy, no reshape; harden's payload contract).
+    const corrections = log.filter((e) => e.topic === 'correction:needed');
+    expect(corrections).toHaveLength(1);
+    const payload = corrections[0].payload as { item: DeepCorrectionItem };
+    expect(Object.keys(payload)).toEqual(['item']);
+    expect(payload.item).toBe(item);
+
+    o.stop();
+  });
+
+  it('keeps the throttle baseline across an engine swap — elevated → swap → elevated stays silent, then normal publishes once', async () => {
+    const first = makeV2ShapeFixtures();
+    const second = makeV2ShapeFixtures();
+    // Both engines report 'elevated' — the point is that the BASELINE (not
+    // the engine instance) decides silence across the swap.
+    first.setThrottle('elevated');
+    second.setThrottle('elevated');
+    registryState.primary = first.stub as unknown as Record<string, unknown>;
+
+    const o = new Orchestrator();
+    o.start();
+    const drive = await startWithStub(o);
+    recordAllTopics(o.getBus(), log);
+    const throttleEvents = () =>
+      log.filter((e) => e.topic === 'budget:throttle').map((e) => e.payload);
+
+    // Cycle 1 — first primary establishes the baseline at 'elevated' (silent
+    // by contract).
+    drive(makeMutationRecords(), {} as MutationObserver);
+    expect(throttleEvents()).toEqual([]);
+
+    // Engine swap. The roles were built once in start() and resolve the
+    // primary lazily per cycle, so the HardenEngine instance — and its
+    // baseline — survive the swap ("effective level" semantics, intended).
+    registryState.primary = second.stub as unknown as Record<string, unknown>;
+
+    // Cycle 2 — swapped-in engine ALSO reports elevated: baseline persists,
+    // nothing publishes.
+    drive(makeMutationRecords(), {} as MutationObserver);
+    expect(throttleEvents()).toEqual([]);
+
+    // Cycle 3 — swapped-in engine drops to normal: exactly one edge event.
+    second.setThrottle('normal');
+    drive(makeMutationRecords(), {} as MutationObserver);
+    expect(throttleEvents()).toEqual([{ level: 'normal' }]);
+
+    o.stop();
+  });
+});

@@ -53,21 +53,30 @@ import { engineRegistry } from '../../engines/engine-registry';
 import { RouteWatcher, isClassroomUrl } from '../context/route-classifier';
 import { ShadowComparator, type ShadowCompareResult } from '../compat/shadow-compare';
 import { createEventBus, type EventBus } from '../../bus/event-bus';
-import type { PageTopicMap } from '../../contracts/topics';
+import type { CorrectionItem, PageTopicMap } from '../../contracts/topics';
 import { DetectEngine } from '../../roles/detect-engine';
 import { ComputeEngine } from '../../roles/compute-engine';
 import { RenderEngine } from '../../roles/render-engine';
 import { HardenEngine, type BudgetSnapshot, type QueueStats } from '../../roles/harden-engine';
 
 /**
- * CQDEngine plus the S5 additive getters that only some engines expose.
- * EngineV2 implements all three; EngineV1 implements none — every use is
- * guarded with `typeof` checks so legacy mode can never break.
+ * CQDEngine plus the S5 additive members that only some engines expose.
+ * EngineV2 implements all of them; EngineV1 implements none — every use is
+ * guarded (`typeof` for the getters, `in` for the hook — see
+ * publishCycleTopics) so legacy mode can never break.
  */
 type S5CapableEngine = CQDEngine & {
   getLastRenderApplied?: () => Array<{ postId: string; kind: 'button' | 'flag' | 'all' }>;
   getBudgetSnapshot?: () => BudgetSnapshot;
   getCorrectionStats?: () => QueueStats;
+  /**
+   * S5 final-review fix: optional per-correction publish hook. EngineV2
+   * DECLARES this field (an own property, undefined until wired — define
+   * semantics under the ESNext target); EngineV1 has no such field. The
+   * orchestrator assigns it once per scan cycle in publishCycleTopics,
+   * pointing it at HardenEngine.reportCorrection.
+   */
+  onCorrectionSeen?: (item: CorrectionItem) => void;
 };
 
 // ============================================================================
@@ -442,7 +451,7 @@ export class Orchestrator {
       }),
       harden: new HardenEngine(this.pageBus, {
         getBudgetSnapshot: () => {
-          const primary = engineRegistry.getPrimaryEngine() as S5CapableEngine | null;
+          const primary: S5CapableEngine | null = engineRegistry.getPrimaryEngine();
           if (!primary || typeof primary.getBudgetSnapshot !== 'function') {
             // EngineV1 has no budget snapshot. Throwing here is safe: the
             // role isolates source throws and keeps its baseline.
@@ -451,7 +460,7 @@ export class Orchestrator {
           return primary.getBudgetSnapshot();
         },
         getCorrectionStats: () => {
-          const primary = engineRegistry.getPrimaryEngine() as S5CapableEngine | null;
+          const primary: S5CapableEngine | null = engineRegistry.getPrimaryEngine();
           if (!primary || typeof primary.getCorrectionStats !== 'function') {
             throw new Error('[CQD Orchestrator] primary engine exposes no correction stats');
           }
@@ -473,8 +482,20 @@ export class Orchestrator {
    * real-but-empty detect/compute topics — correct verbatim behavior.
    */
   private publishCycleTopics(): void {
-    const primary = engineRegistry.getPrimaryEngine() as S5CapableEngine | null;
+    const primary: S5CapableEngine | null = engineRegistry.getPrimaryEngine();
     if (!primary || !this.currentView) return;
+
+    // S5 final-review fix: point the primary's optional correction hook at the
+    // harden role, so EngineV2.handleCorrection's `onCorrectionSeen?.(item)`
+    // fires land on the bus as 'correction:needed' via reportCorrection().
+    // Re-assigned every cycle — idempotent, and a mode swap that installs a
+    // fresh primary is re-wired on its next scan cycle. The `in` guard (not a
+    // `typeof === 'function'` check) is deliberate: EngineV2 DECLARES the hook
+    // as an own field that is undefined until wired, while EngineV1 has no
+    // such field at all — `in` skips exactly the engines that lack the slot.
+    if ('onCorrectionSeen' in primary) {
+      primary.onCorrectionSeen = (item) => this.roles?.harden.reportCorrection(item);
+    }
 
     if (typeof primary.getLastRenderApplied === 'function') {
       this.roles?.render.onRenderApplied();

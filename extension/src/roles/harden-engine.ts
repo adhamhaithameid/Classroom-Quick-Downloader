@@ -25,7 +25,8 @@
  *   processed/failed grow on outcomes, historySize is a 50-cap ring buffer),
  *   so onCycleChecks() synthesizes no correction events. The engine reports
  *   each handled correction through its optional onCorrectionSeen hook
- *   (additive, undefined by default), wired to reportCorrection().
+ *   (additive, undefined by default) — assigned per cycle by
+ *   Orchestrator.publishCycleTopics to this role's reportCorrection().
  * - Fault model (§9): the bus boundary is the fault boundary, so publishing
  *   needs no try/catch here — a throwing subscriber is isolated by the bus
  *   and reported via onError. Reading the SOURCE happens inside this role: a
