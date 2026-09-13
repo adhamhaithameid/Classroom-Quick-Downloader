@@ -747,33 +747,15 @@ function App() {
     }
   }, []);
 
-  function handleToggleV2Engine() {
-    const nextMode = engineMode === 'v2' ? 'legacy' : 'v2';
+  function handleEngineModeSelect(nextMode: 'legacy' | 'v2') {
+    if (nextMode === engineMode) return;
     setEngineMode(nextMode);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const browserApi = (globalThis as any).chrome;
     if (browserApi?.storage?.local) {
       browserApi.storage.local.set({ cqdV2Mode: nextMode });
     }
-    // Also notify content script via message
-    if (browserApi?.tabs?.query) {
-      browserApi.tabs.query({ active: true, currentWindow: true }, (tabs: any[]) => {
-        if (tabs?.[0]?.id) {
-          browserApi.tabs.sendMessage(tabs[0].id, { type: 'cqd-set-mode', mode: nextMode });
-        }
-      });
-    }
-  }
-
-  function handleToggleLegacyEngine() {
-    const nextMode = engineMode === 'legacy' ? 'v2' : 'legacy';
-    setEngineMode(nextMode);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const browserApi = (globalThis as any).chrome;
-    if (browserApi?.storage?.local) {
-      browserApi.storage.local.set({ cqdV2Mode: nextMode });
-    }
-    // Also notify content script via message
+    // Live-switch: notify the Classroom tab's mode controller (no reload).
     if (browserApi?.tabs?.query) {
       browserApi.tabs.query({ active: true, currentWindow: true }, (tabs: any[]) => {
         if (tabs?.[0]?.id) {
@@ -1287,6 +1269,21 @@ function App() {
                       </div>
 
                       <div className="cqd-settings-section">
+                        <div className="cqd-settings-section-label">Engine</div>
+                        <div className="cqd-toggle-group">
+                          <EngineModeRow
+                            mode={engineMode}
+                            loading={engineModeLoading}
+                            onSelect={handleEngineModeSelect}
+                          />
+                          <div className="cqd-settings-section-note">
+                            New runs the rewritten engine. Switch back to Legacy any time — one
+                            click rolls everything back.
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="cqd-settings-section">
                         <div className="cqd-settings-section-label">Flags</div>
                         <div className="cqd-toggle-group">
                           <div className="cqd-flag-toggle-row cqd-flag-toggle-comment">
@@ -1556,6 +1553,43 @@ function App() {
 }
 
 // --- Subcomponents ---
+
+/** The engine modes the popup exposes (#684). API (v3) stays hidden until
+ *  S13 lands OAuth — a hidden option is not a shipped option. */
+export type PopupEngineMode = 'legacy' | 'v2';
+
+interface EngineModeRowProps {
+  mode: string;
+  loading?: boolean;
+  onSelect: (mode: PopupEngineMode) => void;
+}
+
+/** Separate Engine Mode control (#684 decision: not folded into flag
+ *  toggles — engine selection changes the whole page pipeline, flags tune
+ *  one feature). Segmented control, aria-pressed marks the active mode. */
+export function EngineModeRow({ mode, loading, onSelect }: EngineModeRowProps) {
+  const options: Array<{ value: PopupEngineMode; label: string }> = [
+    { value: 'legacy', label: 'Legacy' },
+    { value: 'v2', label: 'New' },
+  ];
+  return (
+    <div className="cqd-engine-mode" role="group" aria-label="Engine Mode">
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          className="cqd-engine-mode-option"
+          data-mode={option.value}
+          aria-pressed={mode === option.value}
+          disabled={!!loading}
+          onClick={() => onSelect(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function ToggleRow({
   label,
