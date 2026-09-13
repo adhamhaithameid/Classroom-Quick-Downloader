@@ -7,7 +7,8 @@
  *
  *   1. core/** is pure — no document/window/chrome/browser/fetch/Date.now/
  *      Math.random/timer identifiers anywhere in the source.
- *   2. roles/** import only bus + contracts (zero role-to-role imports).
+ *   2. roles/** import only bus + contracts, and no role file imports
+ *      another role file (canary-enforced); roles/ holds >= 4 modules.
  *   3. contracts/** imports nothing except engines/types and './' siblings
  *      (already enforced by tests/contracts/import-boundary.test.ts; kept
  *      here as a canary for the new files).
@@ -66,6 +67,58 @@ function relToSrc(file: string): string {
   return relative(SRC, file).replace(/\\/g, '/');
 }
 
+/**
+ * Resolves a relative module specifier against the importer's src-relative
+ * directory. Returns the src-relative target with any extension stripped, or
+ * null when the specifier is bare/alias-style or resolves outside src.
+ */
+function resolveToSrc(spec: string, importerRel: string): string | null {
+  if (!spec.startsWith('.')) return null;
+  const parts = importerRel.split('/').slice(0, -1);
+  for (const seg of spec.split('/')) {
+    if (seg === '.' || seg === '') continue;
+    if (seg === '..') {
+      if (parts.length === 0) return null; // climbs out of src — out of scope
+      parts.pop();
+    } else {
+      parts.push(seg);
+    }
+  }
+  if (parts.length === 0) return null;
+  return parts.join('/').replace(/\.(ts|js)$/, '');
+}
+
+/** True when `spec`, imported by the src-relative file `importerRel`,
+ *  targets a file under src/roles/ other than the importer itself. */
+function isRoleToRole(spec: string, importerRel: string): boolean {
+  if (!importerRel.startsWith('roles/')) return false;
+  if (!spec.startsWith('.')) {
+    // Alias-style specifier that textually points into roles (e.g.
+    // '@/roles/detect-engine'); the suite resolves no tsconfig paths, so the
+    // textual match is the signal. Bare npm imports in a role are already
+    // banned by the "roles import only bus and contracts" rule above.
+    return /(^|\/)roles\//.test(spec);
+  }
+  const target = resolveToSrc(spec, importerRel);
+  if (!target) return false;
+  const self = importerRel.replace(/\.(ts|js)$/, '');
+  return (target === 'roles' || target.startsWith('roles/')) && target !== self;
+}
+
+/**
+ * Role-to-role scanner: the import specifiers in raw source `code` that
+ * resolve into a sibling role file. `code` must be raw — no comment or string
+ * stripping, because the specifiers themselves are string literals (the
+ * codeOf idiom would erase them). The match covers `from '...'`, bare
+ * side-effect imports (`import './sibling'`), and `export * from '...'`,
+ * which importsIn's from-only regex would miss.
+ */
+function roleToRoleSpecs(code: string, importerRel: string): string[] {
+  return [...code.matchAll(/\b(?:from|import)\s+['"]([^'"]+)['"]/g)]
+    .map((m) => m[1]!)
+    .filter((spec) => isRoleToRole(spec, importerRel));
+}
+
 describe('fitness: core purity (ADR-0007)', () => {
   it('flags globals in a violating snippet (scanner canary)', () => {
     expect(CORE_GLOBAL_FORBIDDEN.test('const t = Date.now();')).toBe(true);
@@ -97,6 +150,45 @@ describe('fitness: role isolation', () => {
           spec.includes('/contracts/') ||
           spec.endsWith('engines/types');
         if (!allowed) offenders.push(`${relToSrc(file)} imports ${spec}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('flags a role importing a sibling role in a violating snippet (scanner canary)', () => {
+    // Fixture: a role reaching into a sibling role — the exact coupling the
+    // S5 "roles behind the bus" architecture forbids; roles talk through the
+    // orchestrator's page EventBus, never through each other's modules.
+    expect(
+      roleToRoleSpecs("import { detectFiles } from './detect-engine';", 'roles/compute-engine.ts'),
+    ).toEqual(['./detect-engine']);
+    expect(
+      roleToRoleSpecs("import '../roles/render-engine';", 'roles/compute-engine.ts'),
+    ).toEqual(['../roles/render-engine']);
+    expect(
+      roleToRoleSpecs("import { harden } from '../../roles/harden-engine';", 'roles/sub/compute-engine.ts'),
+    ).toEqual(['../../roles/harden-engine']);
+    // Bus, contracts, and engines/types remain the sanctioned imports…
+    expect(
+      roleToRoleSpecs("import type { EventBus } from '../bus/event-bus';", 'roles/compute-engine.ts'),
+    ).toEqual([]);
+    expect(
+      roleToRoleSpecs("import type { PageTopicMap } from '../contracts/topics';", 'roles/compute-engine.ts'),
+    ).toEqual([]);
+    expect(
+      roleToRoleSpecs("import type { FileNode } from '../engines/types';", 'roles/compute-engine.ts'),
+    ).toEqual([]);
+    // …a file is not its own sibling, and the rule only applies under roles/**.
+    expect(roleToRoleSpecs("import './compute-engine';", 'roles/compute-engine.ts')).toEqual([]);
+    expect(roleToRoleSpecs("import { x } from './y';", 'bus/event-bus.ts')).toEqual([]);
+  });
+
+  it('no role file imports another file under roles/', () => {
+    const offenders: string[] = [];
+    for (const file of walk(join(SRC, 'roles'))) {
+      const importerRel = relToSrc(file);
+      for (const spec of roleToRoleSpecs(readFileSync(file, 'utf8'), importerRel)) {
+        offenders.push(`${importerRel} imports ${spec}`);
       }
     }
     expect(offenders).toEqual([]);
@@ -167,5 +259,9 @@ describe('fitness: live surface', () => {
     for (const seeded of ['core', 'bus', 'adapters']) {
       expect(walk(join(SRC, seeded)).length, `src/${seeded} has modules`).toBeGreaterThan(0);
     }
+  });
+
+  it('roles/** holds all four S5 role modules so the role rules cannot pass vacuously', () => {
+    expect(walk(join(SRC, 'roles')).length, 'src/roles has >= 4 modules').toBeGreaterThanOrEqual(4);
   });
 });
