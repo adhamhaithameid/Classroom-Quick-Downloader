@@ -76,6 +76,13 @@ export default defineContentScript({
 
       console.log('[CQD V2 Bootstrap] Orchestrator started');
 
+      // 3b. Bridge relay (S6/G2): page bus download topics cross the
+      //     BridgePort to the background worker. Inert until something
+      //     publishes download:requested — zero behavior change today.
+      const { createPageRuntimeBridge } = await import('../src/adapters/bridge/runtime-bridge');
+      const { wireBridgeRelay } = await import('../src/v2/orchestrator/bridge-relay');
+      wireBridgeRelay(orchestrator.getBus(), createPageRuntimeBridge());
+
       // 4. Initialize debug panel (Ctrl+Shift+D to toggle)
       try {
         const { initDebugPanel } = await import('../src/v2/debug/debug-panel');
