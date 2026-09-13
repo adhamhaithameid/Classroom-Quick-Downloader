@@ -97,8 +97,17 @@ test.describe("qa-04 popup", () => {
         if (api?.tabs && typeof api.tabs.query === "function") {
           const realQuery = api.tabs.query.bind(api.tabs);
           api.tabs.query = (...args: unknown[]) => {
+            const [queryInfo, callback] = args as [{ active?: boolean; currentWindow?: boolean }, (r: unknown) => void];
+            // A real anchored popup resolves {active, currentWindow} to the
+            // Classroom tab it is anchored over. A popup-as-page resolves to
+            // itself (an extension page), so emulate the anchored answer: a
+            // synthetic active Classroom tab. Other query shapes pass through.
+            if (queryInfo?.active === true && queryInfo?.currentWindow === true) {
+              const anchored = [{ id: 999, url: "https://classroom.google.com/u/0/h", active: true, windowId: 1 }];
+              callback?.(anchored);
+              return;
+            }
             const result = (realQuery as (...a: unknown[]) => unknown)(...args);
-            // Prefer a non-extension tab if the real query returned one.
             return result;
           };
         }
