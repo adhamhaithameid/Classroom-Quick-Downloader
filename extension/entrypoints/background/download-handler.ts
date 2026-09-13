@@ -61,7 +61,6 @@ export function startSingleAttempt(
 export function startNextDriveAttempt(pending: PendingDownload): void {
   pending.htmlSeen = false;
   pending.fallbackStarted = false;
-  pending.confirmed403 = false;
 
   const nextAuth = AUTHUSER_CANDIDATES.find(
     (n) => !pending.attemptedAuthUsers.includes(n)

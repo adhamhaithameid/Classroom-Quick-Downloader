@@ -8,7 +8,6 @@ import type { PendingDownload } from './types';
 import {
   unregisterPending,
   unbindDownloadId,
-  pendingByBypassTabId,
   pendingByRequestId,
   cancelledByUs,
   recentDownloads,
@@ -19,30 +18,17 @@ import {
  * Clean up all tracking for a completed/cancelled download.
  *
  * D11: `unregisterPending` is the one mutator — it removes the authoritative
- * entry and every index it occupies (URL buckets, download ids, bypass tabs),
- * so indexes can no longer outlive the truth. The TTL sweep's fallback to the
- * pending's own recorded download id is preserved.
+ * entry and every index it occupies (URL buckets, download ids), so indexes
+ * can no longer outlive the truth. The zero-tab flow has no windows to close:
+ * every failure settles here, event-driven, never on a timer.
  */
 export function cleanup(pending: PendingDownload, downloadId?: number): void {
-  const bypassTabIds: number[] = [];
-  for (const [tabId, p] of pendingByBypassTabId.entries()) {
-    if (p.requestId === pending.requestId) bypassTabIds.push(tabId);
-  }
-
   unregisterPending(pending);
 
   const effectiveDownloadId = downloadId ?? pending.currentDownloadId;
   if (effectiveDownloadId != null) {
     cancelledByUs.delete(effectiveDownloadId);
     unbindDownloadId(effectiveDownloadId);
-  }
-
-  for (const tabId of bypassTabIds) {
-    try {
-      chrome.tabs.remove(tabId);
-    } catch {
-      // Tab may already be closed
-    }
   }
 }
 

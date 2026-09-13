@@ -5,12 +5,12 @@
  *
  * D11 — ONE AUTHORITATIVE MAP. `pendingByRequestId` (keyed by the correlation
  * id) is the single source of truth for which downloads are in flight. The
- * other maps (`pendingByDownloadId`, `pendingByUrl`, `pendingByBypassTabId`)
- * are indexes OVER that truth, maintained exclusively through the registry
- * functions below — no module may mutate them directly. Every bind checks the
- * authoritative map first, so a late callback can never resurrect a zombie
- * index entry for a pending the TTL sweep already reaped, and a download id
- * can never be correlated to two pendings at once (the pendingByUrl race).
+ * other maps (`pendingByDownloadId`, `pendingByUrl`) are indexes OVER that
+ * truth, maintained exclusively through the registry functions below — no
+ * module may mutate them directly. Every bind checks the authoritative map
+ * first, so a late callback can never resurrect a zombie index entry for a
+ * pending the TTL sweep already reaped, and a download id can never be
+ * correlated to two pendings at once (the pendingByUrl race).
  */
 
 import type { PendingDownload } from './types';
@@ -28,9 +28,6 @@ export const pendingByDownloadId = new Map<number, PendingDownload>();
 /** Index: URL to the set of pending downloads registered under it (supports concurrent same-URL downloads) */
 export const pendingByUrl = new Map<string, Set<PendingDownload>>();
 
-/** Index: bypass tab ID to pending download */
-export const pendingByBypassTabId = new Map<number, PendingDownload>();
-
 // --- REGISTRY FUNCTIONS ---
 
 /**
@@ -46,15 +43,6 @@ export function registerPending(pending: PendingDownload): void {
 /** Does the authoritative registry still track this requestId? */
 export function isRegistered(requestId: string): boolean {
   return pendingByRequestId.has(requestId);
-}
-
-/**
- * Index an additional URL for a pending (e.g. the bypass-tab URL the content
- * script reports back). No-op for a pending that is no longer authoritative.
- */
-export function registerPendingUrl(pending: PendingDownload, url: string): void {
-  if (pendingByRequestId.get(pending.requestId) !== pending) return;
-  indexUrl(url, pending);
 }
 
 function indexUrl(url: string, pending: PendingDownload): void {
@@ -93,24 +81,6 @@ export function unbindDownloadId(downloadId: number): void {
 }
 
 /**
- * Drop a single bypass-tab binding without unregistering the pending
- * (used when the bypass tab reports success and closes itself).
- */
-export function unbindBypassTabId(tabId: number): void {
-  pendingByBypassTabId.delete(tabId);
-}
-
-/**
- * Correlate a bypass tab ID to a pending download. No-op for a pending that
- * is no longer authoritative.
- */
-export function bindBypassTabId(pending: PendingDownload, tabId: number): boolean {
-  if (pendingByRequestId.get(pending.requestId) !== pending) return false;
-  pendingByBypassTabId.set(tabId, pending);
-  return true;
-}
-
-/**
  * Remove a pending download from the authoritative registry and from every
  * index it occupies. Indexes are rebuilt from the pending's own correlation
  * keys, so cleanup cannot leave a bucket or an id behind.
@@ -124,11 +94,6 @@ export function unregisterPending(pending: PendingDownload): void {
       pendingByDownloadId.delete(id);
     }
   }
-  for (const [tabId, p] of pendingByBypassTabId) {
-    if (p === pending || p.requestId === pending.requestId) {
-      pendingByBypassTabId.delete(tabId);
-    }
-  }
   pendingByUrlRemove(pending);
 }
 
@@ -140,10 +105,6 @@ export function getPendingByRequestId(requestId: string): PendingDownload | unde
 
 export function getPendingByDownloadId(downloadId: number): PendingDownload | undefined {
   return pendingByDownloadId.get(downloadId);
-}
-
-export function getPendingByBypassTabId(tabId: number): PendingDownload | undefined {
-  return pendingByBypassTabId.get(tabId);
 }
 
 /**

@@ -60,12 +60,8 @@ export type PendingDownload = {
   /** Whether bypass tab approach was started */
   fallbackStarted?: boolean;
 
-  /** Whether HTML response was seen (needs bypass) */
+  /** Whether an HTML (interstitial/error) response was intercepted */
   htmlSeen?: boolean;
-  /** Whether 403 was confirmed */
-  confirmed403?: boolean;
-  /** Whether virus scan warning was seen */
-  confirmedVirus?: boolean;
   /** Whether success status was already sent */
   finalized?: boolean;
   /** Whether user cancelled this download */

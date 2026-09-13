@@ -53,7 +53,6 @@ describe('background state module', () => {
     expect(state.pendingByRequestId).toBeInstanceOf(Map);
     expect(state.pendingByDownloadId).toBeInstanceOf(Map);
     expect(state.pendingByUrl).toBeInstanceOf(Map);
-    expect(state.pendingByBypassTabId).toBeInstanceOf(Map);
     expect(state.cancelledByUs).toBeInstanceOf(Set);
     expect(state.recentDownloads).toBeInstanceOf(Map);
   });
@@ -206,7 +205,7 @@ describe('background state module', () => {
 
 describe('D11 pending registry', () => {
   it('registers a pending in the authoritative map and the URL index', async () => {
-    const { registerPending, pendingByRequestId, pendingByUrl, pendingByDownloadId, pendingByBypassTabId } =
+    const { registerPending, pendingByRequestId, pendingByUrl, pendingByDownloadId } =
       await loadStateModuleWithNavigator('Chrome/120');
     const p = makePending({ requestId: 'reg-1' });
     registerPending(p);
@@ -214,7 +213,6 @@ describe('D11 pending registry', () => {
     expect(pendingByUrl.get(p.baseUrl)?.has(p)).toBe(true);
     // Registering must not invent correlation keys that do not exist yet.
     expect(pendingByDownloadId.size).toBe(0);
-    expect(pendingByBypassTabId.size).toBe(0);
   });
 
   it('binds a download id only for a pending that is still authoritative (the race)', async () => {
@@ -236,24 +234,20 @@ describe('D11 pending registry', () => {
 
   it('keeps indexes consistent when unregistering (every index over one truth)', async () => {
     const {
-      registerPending, registerPendingUrl, bindDownloadId, bindBypassTabId,
+      registerPending, bindDownloadId,
       unregisterPending, getPendingByDownloadId, pendingByRequestId,
-      pendingByDownloadId, pendingByUrl, pendingByBypassTabId,
+      pendingByDownloadId, pendingByUrl,
     } = await loadStateModuleWithNavigator('Chrome/120');
     const p = makePending({ requestId: 'unreg-1', baseUrl: 'https://example.com/base.pdf' });
     registerPending(p);
-    registerPendingUrl(p, 'https://bypass.example.com/alias');
     bindDownloadId(p, 55);
-    bindBypassTabId(p, 7);
 
     unregisterPending(p);
 
     expect(pendingByRequestId.has('unreg-1')).toBe(false);
     expect(getPendingByDownloadId(55)).toBeUndefined();
     expect(pendingByDownloadId.size).toBe(0);
-    expect(pendingByBypassTabId.has(7)).toBe(false);
     expect(pendingByUrl.has('https://example.com/base.pdf')).toBe(false);
-    expect(pendingByUrl.has('https://bypass.example.com/alias')).toBe(false);
   });
 
   it('unbinds a single download id without dropping the pending (HTML intercept)', async () => {
