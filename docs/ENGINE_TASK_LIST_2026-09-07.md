@@ -2,8 +2,8 @@
 
 Consolidated, actionable task list for the extension engines and surrounding
 program. **Status columns refreshed 2026-09-13** against the beads epic
-(`Classroom-Quick-Downloader-1yf`): S1–S4, S7, S8, S9 closed; S5 is the next
-takeable sprint. Sections C/F are historical snapshots. Produced from a full
+(`Classroom-Quick-Downloader-1yf`): S1–S5, S7–S9 closed; S6 is the next
+takeable sprint (gate G2). Sections C/F are historical snapshots. Produced from a full
 scan of: the Engine V4 epic
 (`Classroom-Quick-Downloader-1yf`), `docs/ENGINE_V4_MASTER_PLAN.md`,
 `extension/docs/ENGINE_V4_SYSTEM_DESIGN.md`, `extension/docs/PRD_ENGINE_REFACTOR.md`,
@@ -19,9 +19,9 @@ built for performance, with multiple download/data sources.**
 
 | Engine (owner's term) | V4 home | Sprints | Beads | State |
 |---|---|---|---|---|
-| **Scan engine** (detection) | `roles/detect-engine.ts` + `roles/compute-engine.ts`, core in `core/detect` + `core/decide`; one MutationObserver, zero heartbeats | S4, S5, S10 | `1yf.4`, `1yf.5`, `1yf.10` | **S4 done** (pure `core/detect`, D1–D7/D12 closed); S5 role-wrapping open |
+| **Scan engine** (detection) | `roles/detect-engine.ts` + `roles/compute-engine.ts`, core in `core/detect` + `core/decide`; one MutationObserver, zero heartbeats | S4, S5, S10 | `1yf.4`, `1yf.5`, `1yf.10` | **S4 + S5 done** (pure `core/detect`; four roles wrapped behind the page bus, 2026-09-13); S10 strip open |
 | **Download engine** (acquisition) | `core/acquire/state-machine.ts` (pure reducer) + `roles/acquire-engine.ts` (worker) + `adapters/browser/*` strategies: direct, drive-auth (authuser 0–9), bypass-tab, later API+zip | S8, S9 | `1yf.8` (+`1yf.8.1` D11), `1yf.9` | **S8 + S9 done**: D11 authoritative registry shipped, #537/#547 fixed with the `background-bypass-flow.test.ts` BrowserPort-seam harness (2026-09-13); worker roles still to wrap (S5) |
-| **Display engine** (render) | `roles/render-engine.ts` — the only DOM writer; button/flag renderers become strategies | S5, S6, S10 | `1yf.5`, `1yf.6` (D8, D9) | D8/D9 defects closed; renderers in `src/v2/render/`; role wrapping (S5/S6) open |
+| **Display engine** (render) | `roles/render-engine.ts` — the only DOM writer; button/flag renderers become strategies | S5, S6, S10 | `1yf.5`, `1yf.6` (D8, D9) | D8/D9 defects closed; renderers in `src/v2/render/`; S5 role wrapping done (2026-09-13); bridge activation (S6) open |
 | **API engine** (V3 assist) | `strategies/detect/api-detector.ts` behind `Detector` port + OAuth via `BrowserPort`; **promotion stays post-G4** per master plan R7 | S13+ | *none filed — file it* | Stub only (`src/engines/v3/`); no `identity` permission, no client id |
 
 Shared foundation all four sit on: **S3 — `contracts/ports.ts`,
@@ -36,8 +36,8 @@ fitness suite** (gate G1). Nothing above can start cleanly without it.
 | S2 baseline freeze | 40 cases / 6 locales on disk; budget v2 ratcheted | G0 | `1yf.2` | **Done** |
 | S3 contracts & bus | ports.ts, topics.ts, event-bus.ts, adapters + fakes, fitness suite; zero behavior change | G1 | `1yf.3` | **Done** (G1) |
 | S4 core extraction + D1–D7, D12 | pure `core/detect`; one owned pattern table; defect fixes each with a corpus case | — | `1yf.4.*` | **Done** |
-| S5 roles behind bus | Detect/Compute/Render/Harden wrap existing code **verbatim** | — | `1yf.5` | Open — **next takeable** (S4 done) |
-| S6 bridge + Engine Mode UI | activate bridge, fix D8/D9, shadow parity | G2 | `1yf.6.*` | Blocked on S5 |
+| S5 roles behind bus | Detect/Compute/Render/Harden wrap existing code **verbatim** | — | `1yf.5` | **Done** (2026-09-13, commits 29c1138d..70319ea5; session log) |
+| S6 bridge + Engine Mode UI | activate bridge, Engine Mode UI, shadow parity | G2 | `1yf.6.*` | Open — **next takeable** (S5 done; D8/D9 already closed) |
 | S7 naming core | `core/name/{derive,strip,sanitize,verify}`; locale TypeLabelRegistry; fixes D10 (#541) | — | `1yf.7` | **Done** (gh #541 verified closed 2026-09-13) |
 | S8 acquisition core | pure state machine; one correlation id replaces 4 pending maps; deadline → forced settle | — | `1yf.8` | **Done** |
 | S9 acquisition adapters | Direct/Drive-auth/BypassTab strategies; Chrome/Firefox BrowserPort adapters; #537/#546/#547 repro tests | — | `1yf.9` | **Done** (2026-09-13: authuser cycling fix + flow harness, commit af09ac05/fef5dfc0) |
