@@ -77,10 +77,16 @@ export function toDownloadUrl(originalUrl: string, depth = 0): string {
   if (depth > 3) return originalUrl;
   const authUser = getAuthUser();
 
+  // The byte-serving endpoint: where Drive's interstitial "Download anyway"
+  // link lands. Emitting it directly downloads the file with no tab and no
+  // interstitial hop (the visible "403 Access Forbidden" window regression).
+  const driveDownloadUrl = (id: string): string =>
+    `https://drive.usercontent.google.com/download?id=${encodeURIComponent(id)}&export=download&confirm=t`;
+
   try {
     const parsed = new URL(originalUrl, location.href);
     const normalizedPath = parsed.pathname.replace(/^\/u\/\d+(?=\/)/, '');
-    
+
     const appendAuth = (u: string): string => {
       if (!authUser) return u;
       const newU = new URL(u);
@@ -95,29 +101,27 @@ export function toDownloadUrl(originalUrl: string, depth = 0): string {
         const cont = parsed.searchParams.get('continue');
         if (cont) return toDownloadUrl(cont, depth + 1);
         const id = parsed.searchParams.get('id');
-        if (id) return appendAuth(`https://drive.google.com/uc?export=download&id=${id}`);
+        if (id) return appendAuth(driveDownloadUrl(id));
         return appendAuth(originalUrl);
       }
-      
+
       const fileMatch = normalizedPath.match(/^\/file\/d\/([^/]+)/);
       if (fileMatch) {
-        return appendAuth(`https://drive.google.com/uc?export=download&id=${fileMatch[1]}`);
+        return appendAuth(driveDownloadUrl(fileMatch[1]));
       }
-      
+
       if (normalizedPath === '/open' || normalizedPath === '/uc') {
-        const normalizedUrl = new URL(parsed.toString());
-        normalizedUrl.pathname = normalizedPath;
-        normalizedUrl.searchParams.set('export', 'download');
-        if (authUser) normalizedUrl.searchParams.set('authuser', authUser);
-        return normalizedUrl.toString();
+        const id = parsed.searchParams.get('id');
+        if (id) return appendAuth(driveDownloadUrl(id));
+        return appendAuth(originalUrl);
       }
     }
-    
+
     if (parsed.hostname === 'classroom.google.com' && normalizedPath.startsWith('/drive')) {
       const id = parsed.searchParams.get('id') ||
         parsed.searchParams.get('resourceId') ||
         parsed.searchParams.get('fileId');
-      if (id) return appendAuth(`https://drive.google.com/uc?export=download&id=${id}`);
+      if (id) return appendAuth(driveDownloadUrl(id));
     }
 
     // Google Docs/Sheets/Slides/Drawings viewer URLs
@@ -125,10 +129,10 @@ export function toDownloadUrl(originalUrl: string, depth = 0): string {
     if (parsed.hostname === 'docs.google.com') {
       const docsMatch = normalizedPath.match(/^\/(document|presentation|drawings|spreadsheets)\/d\/([^/]+)/);
       if (docsMatch) {
-        return appendAuth(`https://drive.google.com/uc?export=download&id=${docsMatch[2]}`);
+        return appendAuth(driveDownloadUrl(docsMatch[2]));
       }
     }
-    
+
     return appendAuth(originalUrl);
   } catch {
     return originalUrl;

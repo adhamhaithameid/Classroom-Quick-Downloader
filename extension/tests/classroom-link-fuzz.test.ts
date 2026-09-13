@@ -52,23 +52,23 @@ describe('classroom link fuzz matrix', () => {
   it('normalizes viewer variants to direct download URLs', () => {
     expect(
       toDownloadUrl('https://drive.google.com/file/d/FILE123/view?usp=sharing')
-    ).toBe('https://drive.google.com/uc?export=download&id=FILE123');
+    ).toBe('https://drive.usercontent.google.com/download?id=FILE123&export=download&confirm=t');
 
     expect(
       toDownloadUrl('https://drive.google.com/u/1/file/d/FILE456/view?usp=sharing')
-    ).toBe('https://drive.google.com/uc?export=download&id=FILE456');
+    ).toBe('https://drive.usercontent.google.com/download?id=FILE456&export=download&confirm=t');
 
     expect(
       toDownloadUrl('https://docs.google.com/document/d/DOC123/edit?usp=sharing')
-    ).toBe('https://drive.google.com/uc?export=download&id=DOC123');
+    ).toBe('https://drive.usercontent.google.com/download?id=DOC123&export=download&confirm=t');
 
     expect(
       toDownloadUrl('https://docs.google.com/u/1/presentation/d/SLIDE123/edit?usp=sharing')
-    ).toBe('https://drive.google.com/uc?export=download&id=SLIDE123');
+    ).toBe('https://drive.usercontent.google.com/download?id=SLIDE123&export=download&confirm=t');
 
     expect(
       toDownloadUrl('https://classroom.google.com/u/1/drive?resourceId=FILE999')
-    ).toBe('https://drive.google.com/uc?export=download&id=FILE999');
+    ).toBe('https://drive.usercontent.google.com/download?id=FILE999&export=download&confirm=t');
   });
 
   it.each([

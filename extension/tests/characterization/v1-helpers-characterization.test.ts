@@ -38,9 +38,9 @@ describe('characterization: V1 cleanAttachmentName', () => {
 });
 
 describe('characterization: V1 toDownloadUrl', () => {
-  it('converts a Drive file URL to the uc export form', () => {
+  it('converts a Drive file URL to the usercontent download form', () => {
     expect(toDownloadUrl('https://drive.google.com/file/d/ABC123/view?usp=sharing')).toBe(
-      'https://drive.google.com/uc?export=download&id=ABC123',
+      'https://drive.usercontent.google.com/download?id=ABC123&export=download&confirm=t',
     );
   });
 
