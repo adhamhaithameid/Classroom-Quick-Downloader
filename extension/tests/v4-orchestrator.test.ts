@@ -2,20 +2,29 @@
 import { describe, it, expect, vi } from 'vitest';
 
 // Isolate the orchestrator singleton per test (established repo idiom).
-vi.mock('../../src/engines/engine-registry', () => ({
+// NOTE: paths are '../src/...' — this file lives in extension/tests/, so
+// '../..' would escape the extension root and the mock would never apply.
+// registryState lets the Task 6 cycle tests install a stub primary engine;
+// with nothing installed the registry behaves exactly as before (no active
+// engines, no primary), so the pre-existing tests below are unaffected.
+const registryState = vi.hoisted(() => ({
+  primary: null as Record<string, unknown> | null,
+}));
+vi.mock('../src/engines/engine-registry', () => ({
   engineRegistry: {
-    getActiveEngines: vi.fn(() => []),
+    getActiveEngines: vi.fn(() => (registryState.primary ? [registryState.primary] : [])),
     getEngine: vi.fn(() => null),
     getMode: vi.fn(() => 'legacy'),
     setModeChangeCallback: vi.fn(),
     getSummary: vi.fn(() => ''),
+    getPrimaryEngine: vi.fn(() => registryState.primary),
   },
 }));
-vi.mock('../../src/v2/context/route-classifier', () => ({
+vi.mock('../src/v2/context/route-classifier', () => ({
   RouteWatcher: class { start() {} stop() {} },
   isClassroomUrl: vi.fn((url: string) => url.includes('classroom.google.com')),
 }));
-vi.mock('../../src/v2/compat/shadow-compare', () => ({ ShadowComparator: class {} }));
+vi.mock('../src/v2/compat/shadow-compare', () => ({ ShadowComparator: class {} }));
 
 import { Orchestrator } from '../src/v2/orchestrator/orchestrator';
 import { ViewKind } from '../src/engines/types';
@@ -43,5 +52,291 @@ describe('Orchestrator page bus (S5)', () => {
     await (o as unknown as { handleViewChange: (v: ViewKind, p: ViewKind | null, u: string) => Promise<void> })
       .handleViewChange(ViewKind.UNKNOWN, null, 'https://example.com');
     expect(seen).toEqual([]);
+  });
+});
+
+// ===========================================================================
+// S5 Task 6 — the orchestrator publishes every scan cycle through the roles
+// ===========================================================================
+
+import { beforeEach, afterEach } from 'vitest';
+
+/**
+ * Captures the callback the orchestrator hands to `new MutationObserver` so
+ * tests can drive scan cycles directly. Swapped in per-test with
+ * vi.stubGlobal — the orchestrator resolves the global at setupDomObserver()
+ * time, so no import-order tricks are needed.
+ */
+class CapturingMutationObserver {
+  static callbacks: MutationCallback[] = [];
+  observe(): void {}
+  disconnect(): void {}
+  takeRecords(): MutationRecord[] {
+    return [];
+  }
+  constructor(cb: MutationCallback) {
+    CapturingMutationObserver.callbacks.push(cb);
+  }
+}
+
+/** A minimal-but-shaped MutationRecord; the callback only forwards it. */
+function makeMutationRecords(): MutationRecord[] {
+  return [
+    {
+      type: 'childList',
+      target: document.body,
+      addedNodes: [] as unknown as NodeList,
+      removedNodes: [] as unknown as NodeList,
+      previousSibling: null,
+      nextSibling: null,
+      attributeName: null,
+      attributeNamespace: null,
+      oldValue: null,
+    },
+  ];
+}
+
+/**
+ * Fixtures for a V2-shaped stub engine: full CQDEngine surface plus all
+ * three S5 additive getters. The arrays are hoisted so tests can pin the
+ * verbatim-reference payload contract with toBe().
+ */
+function makeV2ShapeFixtures() {
+  const fileNode = {
+    canonicalId: 'drive-file-1',
+    name: 'slides.pdf',
+    ext: 'pdf',
+    downloadUrl: 'https://drive.google.com/uc?export=download&id=drive-file-1',
+    element: document.createElement('a'),
+    idSource: 'data-drive-id' as const,
+  };
+  const post = {
+    id: 'p1',
+    element: document.createElement('div'),
+    viewKind: ViewKind.STREAM,
+    files: [fileNode],
+    flags: null,
+    lastScannedAt: 0,
+  };
+  const posts = [post];
+  const flagDecisions = [
+    {
+      postId: 'p1',
+      commentScore: 0,
+      editedScore: 0,
+      commentCount: null,
+      editedDiff: null,
+      exclusionPenalties: [],
+      finalVerdict: 'none' as const,
+      confidence: 'high' as const,
+      trace: {
+        postId: 'p1',
+        timestamp: 0,
+        viewKind: ViewKind.STREAM,
+        layers: [],
+        exclusions: [],
+        finalScore: 0,
+        duration_ms: 0,
+      },
+    },
+  ];
+  const placementDecisions = [
+    {
+      fileId: 'drive-file-1',
+      targetElement: document.createElement('div'),
+      insertionPoint: 'append' as const,
+      anchorSelector: 'div',
+      confidence: 90,
+      reasonCodes: [],
+      fallbackUsed: false,
+    },
+  ];
+  const renderApplied = [{ postId: 'p1', kind: 'button' as const }];
+
+  let throttleLevel: 'normal' | 'elevated' = 'normal';
+  return {
+    posts,
+    flagDecisions,
+    placementDecisions,
+    renderApplied,
+    setThrottle(level: 'normal' | 'elevated') {
+      throttleLevel = level;
+    },
+    stub: {
+      name: 'stub-engine-v2',
+      version: '0.0.0-test',
+      init: vi.fn(async () => {}),
+      destroy: vi.fn(),
+      handleMutations: vi.fn(),
+      fullScan: vi.fn(),
+      getTrackedPosts: vi.fn(() => posts),
+      getFlagDecisions: vi.fn(() => flagDecisions),
+      getPlacementDecisions: vi.fn(() => placementDecisions),
+      getDecisionTrace: vi.fn(() => null),
+      getLastRenderApplied: vi.fn(() => renderApplied),
+      getBudgetSnapshot: vi.fn(() => ({
+        fastPassAvg_ms: 1,
+        fastPassP95_ms: 2,
+        cpuPerSecond_ms: 3,
+        postCount: 1,
+        injectedElementCount: 1,
+        currentDebounce_ms: 50,
+        throttleLevel,
+        violations: [],
+        hardCapHit: false,
+      })),
+      getCorrectionStats: vi.fn(() => ({
+        pending: 0,
+        processed: 0,
+        failed: 0,
+        unstableSkipped: 0,
+        historySize: 0,
+        byPriority: { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 },
+      })),
+    },
+  };
+}
+
+type LogEntry = { topic: string; payload: unknown };
+
+/** Subscribe one recorder to every page topic, pushing into a shared log. */
+function recordAllTopics(bus: ReturnType<Orchestrator['getBus']>, log: LogEntry[]): void {
+  const topics = [
+    'route:changed',
+    'post:scanned',
+    'file:discovered',
+    'decision:flags',
+    'decision:placement',
+    'render:applied',
+    'correction:needed',
+    'budget:throttle',
+    'download:requested',
+    'download:progress',
+    'download:settled',
+  ] as const;
+  for (const topic of topics) {
+    bus.subscribe(topic, (payload) => {
+      log.push({ topic, payload });
+    });
+  }
+}
+
+/** Drive one accepted view change and return the captured observer callback. */
+async function startWithStub(o: Orchestrator): Promise<MutationCallback> {
+  await (o as unknown as { handleViewChange: (v: ViewKind, p: ViewKind | null, u: string) => Promise<void> })
+    .handleViewChange(ViewKind.STREAM, null, 'https://classroom.google.com/u/0/c/test-class');
+  const cb =
+    CapturingMutationObserver.callbacks[CapturingMutationObserver.callbacks.length - 1];
+  expect(cb).toBeDefined();
+  return cb;
+}
+
+describe('Orchestrator cycle publishing (S5 Task 6)', () => {
+  let log: LogEntry[];
+
+  beforeEach(() => {
+    CapturingMutationObserver.callbacks.length = 0;
+    registryState.primary = null;
+    log = [];
+    vi.stubGlobal('MutationObserver', CapturingMutationObserver);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    registryState.primary = null;
+  });
+
+  it('publishes every scan cycle through the four roles in order render → detect → compute → harden', async () => {
+    const f = makeV2ShapeFixtures();
+    registryState.primary = f.stub as unknown as Record<string, unknown>;
+
+    const o = new Orchestrator();
+    o.start();
+    const drive = await startWithStub(o);
+    recordAllTopics(o.getBus(), log);
+
+    // Cycle 1 — harden establishes its baseline and is silent by contract.
+    drive(makeMutationRecords(), {} as MutationObserver);
+    expect(log.map((e) => e.topic)).toEqual([
+      'render:applied',
+      'post:scanned',
+      'file:discovered',
+      'decision:flags',
+      'decision:placement',
+    ]);
+
+    // Cycle 2 — throttle level changes: budget:throttle publishes, last.
+    log.length = 0;
+    f.setThrottle('elevated');
+    drive(makeMutationRecords(), {} as MutationObserver);
+    expect(log.map((e) => e.topic)).toEqual([
+      'render:applied',
+      'post:scanned',
+      'file:discovered',
+      'decision:flags',
+      'decision:placement',
+      'budget:throttle',
+    ]);
+
+    // Exact payloads, carried verbatim from the primary engine.
+    const byTopic = (t: string) => log.filter((e) => e.topic === t).map((e) => e.payload);
+    expect(byTopic('render:applied')[0]).toBe(f.renderApplied[0]); // same object
+    const scanned = byTopic('post:scanned')[0] as { posts: unknown[] };
+    expect(scanned.posts[0]).toBe(f.posts[0]); // verbatim reference, not a copy
+    const discovered = byTopic('file:discovered')[0] as { postId: string; files: unknown[] };
+    expect(discovered.postId).toBe('p1');
+    expect(discovered.files).toEqual([
+      {
+        fileId: 'drive-file-1',
+        url: 'https://drive.google.com/uc?export=download&id=drive-file-1',
+        ext: 'pdf',
+        name: 'slides.pdf',
+      },
+    ]);
+    const flags = byTopic('decision:flags')[0] as { decisions: unknown[] };
+    expect(flags.decisions[0]).toBe(f.flagDecisions[0]); // verbatim reference
+    const placements = byTopic('decision:placement')[0] as { decisions: unknown[] };
+    expect(placements.decisions[0]).toBe(f.placementDecisions[0]); // verbatim reference
+    expect(byTopic('budget:throttle')).toEqual([{ level: 'elevated' }]);
+    expect(byTopic('correction:needed')).toEqual([]); // event-triggered, never polled
+
+    o.stop();
+  });
+
+  it('with a V1-shaped primary (no render/harden getters), only post:scanned + decision topics publish and nothing throws', async () => {
+    const v1Post = {
+      id: 'v1-post',
+      element: document.createElement('div'),
+      viewKind: ViewKind.STREAM,
+      files: [], // live DOM query over a bare jsdom body — no files
+      flags: null,
+      lastScannedAt: 0,
+    };
+    const v1Stub = {
+      name: 'stub-engine-v1',
+      version: '0.0.0-test',
+      init: vi.fn(async () => {}),
+      destroy: vi.fn(),
+      handleMutations: vi.fn(),
+      fullScan: vi.fn(),
+      getTrackedPosts: vi.fn(() => [v1Post]),
+      getFlagDecisions: vi.fn(() => []),
+      getPlacementDecisions: vi.fn(() => []),
+      getDecisionTrace: vi.fn(() => null),
+      // EngineV1 has NO getLastRenderApplied / getBudgetSnapshot / getCorrectionStats.
+    };
+    registryState.primary = v1Stub as unknown as Record<string, unknown>;
+
+    const o = new Orchestrator();
+    o.start();
+    const drive = await startWithStub(o);
+    recordAllTopics(o.getBus(), log);
+
+    expect(() => drive(makeMutationRecords(), {} as MutationObserver)).not.toThrow();
+    expect(log.map((e) => e.topic)).toEqual(['post:scanned', 'decision:flags', 'decision:placement']);
+    const scanned = log[0].payload as { posts: unknown[] };
+    expect(scanned.posts[0]).toBe(v1Post);
+
+    o.stop();
   });
 });

@@ -54,6 +54,21 @@ import { RouteWatcher, isClassroomUrl } from '../context/route-classifier';
 import { ShadowComparator, type ShadowCompareResult } from '../compat/shadow-compare';
 import { createEventBus, type EventBus } from '../../bus/event-bus';
 import type { PageTopicMap } from '../../contracts/topics';
+import { DetectEngine } from '../../roles/detect-engine';
+import { ComputeEngine } from '../../roles/compute-engine';
+import { RenderEngine } from '../../roles/render-engine';
+import { HardenEngine, type BudgetSnapshot, type QueueStats } from '../../roles/harden-engine';
+
+/**
+ * CQDEngine plus the S5 additive getters that only some engines expose.
+ * EngineV2 implements all three; EngineV1 implements none — every use is
+ * guarded with `typeof` checks so legacy mode can never break.
+ */
+type S5CapableEngine = CQDEngine & {
+  getLastRenderApplied?: () => Array<{ postId: string; kind: 'button' | 'flag' | 'all' }>;
+  getBudgetSnapshot?: () => BudgetSnapshot;
+  getCorrectionStats?: () => QueueStats;
+};
 
 // ============================================================================
 // ORCHESTRATOR CLASS
@@ -92,6 +107,19 @@ export class Orchestrator {
   /** The page-scoped event bus (S5). Roles subscribe/publish here only. */
   private pageBus: EventBus<PageTopicMap> = createEventBus<PageTopicMap>();
 
+  /**
+   * The four S5 roles (design §4, "roles behind the bus"). Built once in
+   * start() against the page bus; their sources resolve the PRIMARY engine
+   * lazily per read (engineRegistry.getPrimaryEngine()), so mode changes are
+   * honored without rebuilding them. Null before start() / after stop().
+   */
+  private roles: {
+    detect: DetectEngine;
+    compute: ComputeEngine;
+    render: RenderEngine;
+    harden: HardenEngine;
+  } | null = null;
+
   // ========================================================================
   // LIFECYCLE
   // ========================================================================
@@ -110,6 +138,10 @@ export class Orchestrator {
     this.running = true;
 
     console.log('[CQD Orchestrator] Starting...');
+
+    // Construct the S5 roles against the page bus. Their sources read the
+    // primary engine lazily per cycle, so a later mode change needs no rebuild.
+    this.constructRoles();
 
     // Listen for mode changes (from popup, debug panel, storage sync)
     // When the mode changes, we need to tear down current engines
@@ -171,6 +203,10 @@ export class Orchestrator {
       }
     }
     this.activeEngines = [];
+
+    // 5. Drop the S5 roles — rebuilt by the next start(). They are stateless
+    // over the bus, so page navigations (abortCurrentPage) leave them alive.
+    this.roles = null;
 
     this.currentView = null;
     this.running = false;
@@ -351,6 +387,9 @@ export class Orchestrator {
           );
         }
       }
+
+      // Publish this cycle's topics through the S5 roles (page bus).
+      this.publishCycleTopics();
     });
 
     // Start observing
@@ -368,6 +407,85 @@ export class Orchestrator {
           'style',
         ],
       });
+    }
+  }
+
+  // ========================================================================
+  // CYCLE TOPIC PUBLISHING (S5 — roles behind the bus)
+  // ========================================================================
+
+  /**
+   * Build the four S5 roles against the page bus (once per start()).
+   *
+   * Role sources are thin adapters over the registry: they resolve the
+   * PRIMARY engine at read time, so switching modes (legacy → shadow → v2)
+   * is honored without rebuilding. EngineV1 lacks the render/harden getters;
+   * the adapters surface that as an isolated no-op inside the role (design
+   * §9 fault model) rather than letting a TypeError escape.
+   */
+  private constructRoles(): void {
+    this.roles = {
+      detect: new DetectEngine(this.pageBus, {
+        getTrackedPosts: () =>
+          engineRegistry.getPrimaryEngine()?.getTrackedPosts() ?? [],
+      }),
+      compute: new ComputeEngine(this.pageBus, {
+        getFlagDecisions: () =>
+          engineRegistry.getPrimaryEngine()?.getFlagDecisions() ?? [],
+        getPlacementDecisions: () =>
+          engineRegistry.getPrimaryEngine()?.getPlacementDecisions() ?? [],
+      }),
+      render: new RenderEngine(this.pageBus, {
+        getLastRenderApplied: () =>
+          (engineRegistry.getPrimaryEngine() as S5CapableEngine | null)
+            ?.getLastRenderApplied?.() ?? [],
+      }),
+      harden: new HardenEngine(this.pageBus, {
+        getBudgetSnapshot: () => {
+          const primary = engineRegistry.getPrimaryEngine() as S5CapableEngine | null;
+          if (!primary || typeof primary.getBudgetSnapshot !== 'function') {
+            // EngineV1 has no budget snapshot. Throwing here is safe: the
+            // role isolates source throws and keeps its baseline.
+            throw new Error('[CQD Orchestrator] primary engine exposes no budget snapshot');
+          }
+          return primary.getBudgetSnapshot();
+        },
+        getCorrectionStats: () => {
+          const primary = engineRegistry.getPrimaryEngine() as S5CapableEngine | null;
+          if (!primary || typeof primary.getCorrectionStats !== 'function') {
+            throw new Error('[CQD Orchestrator] primary engine exposes no correction stats');
+          }
+          return primary.getCorrectionStats();
+        },
+      }),
+    };
+  }
+
+  /**
+   * Publish one scan cycle's worth of topics through the S5 roles.
+   *
+   * Called at the tail of the shared MutationObserver callback, after all
+   * engines have handled the mutations. Reads the PRIMARY engine only and
+   * bails when nothing is active or no view is current. Publish order is
+   * pinned by test: render → detect → compute → harden. EngineV1 lacks the
+   * render/harden getters, so those two role calls are skipped for it; its
+   * live-DOM getTrackedPosts and empty decision arrays still publish
+   * real-but-empty detect/compute topics — correct verbatim behavior.
+   */
+  private publishCycleTopics(): void {
+    const primary = engineRegistry.getPrimaryEngine() as S5CapableEngine | null;
+    if (!primary || !this.currentView) return;
+
+    if (typeof primary.getLastRenderApplied === 'function') {
+      this.roles?.render.onRenderApplied();
+    }
+    this.roles?.detect.onScanComplete();
+    this.roles?.compute.onDecisionsComputed();
+    if (
+      typeof primary.getBudgetSnapshot === 'function' &&
+      typeof primary.getCorrectionStats === 'function'
+    ) {
+      this.roles?.harden.onCycleChecks();
     }
   }
 
