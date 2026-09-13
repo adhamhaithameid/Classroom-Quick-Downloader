@@ -27,7 +27,12 @@ import { collectDriveFiles, resolveSimulatedResponse, type SimulatedResponse } f
 import { buildAppDocument } from "./app";
 
 const CERTS_DIR = path.resolve(__dirname, "certs");
-const SIMULATED_HOSTS = new Set(["classroom.google.com", "drive.google.com", "docs.google.com"]);
+const SIMULATED_HOSTS = new Set([
+  "classroom.google.com",
+  "drive.google.com",
+  "drive.usercontent.google.com",
+  "docs.google.com",
+]);
 
 export interface ServedDownload {
   url: string;
@@ -103,7 +108,7 @@ export async function startSimulatorProxy(scenario: Scenario): Promise<Simulator
   const servedDownloads: ServedDownload[] = [];
   const resolve = (url: string) => {
     const response = resolveSimulatedResponse(url, { appDocument, files });
-    if (url.includes("uc?export=download")) {
+    if (url.includes("export=download")) {
       const disposition = response.headers?.["content-disposition"] ?? "";
       servedDownloads.push({
         url,

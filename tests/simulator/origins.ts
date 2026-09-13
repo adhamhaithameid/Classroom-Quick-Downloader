@@ -165,6 +165,29 @@ export function resolveSimulatedResponse(
     return viewerPage({ id: "", filename: "unknown", bytesKind: "pdf" }, "Drive");
   }
 
+  if (url.hostname === "drive.usercontent.google.com") {
+    // The byte-serving endpoint the extension now targets directly — the
+    // destination Drive's interstitial "Download anyway" link lands on.
+    if (url.pathname === "/download" && url.searchParams.get("export") === "download") {
+      const id = url.searchParams.get("id") ?? "";
+      if (id.startsWith("missing")) return { ...NOT_FOUND, resetSocket: true };
+      // Auth-locked modeling: ids prefixed "authlocked" 403 unless the attempt
+      // carries authuser=1 (the account that holds access). This exercises the
+      // extension's account-cycling sweep end-to-end: forbidden interrupts on
+      // the default-account attempts, bytes once the sweep reaches authuser=1.
+      if (id.startsWith("authlocked") && url.searchParams.get("authuser") !== "1") {
+        return {
+          status: 403,
+          contentType: "text/html; charset=utf-8",
+          body: '<!doctype html><html><head><title>403 Access Forbidden</title></head><body>403. That\'s an error. You do not have access.</body></html>',
+        };
+      }
+      const file = context.files.get(id);
+      return file ? fileDownloadResponse(file) : NOT_FOUND;
+    }
+    return NOT_FOUND;
+  }
+
   if (url.hostname === "docs.google.com") {
     const match = url.pathname.match(/^\/(?:document|presentation|drawings|spreadsheets)\/d\/([^/]+)/);
     if (!match) return INERT_PAGE;

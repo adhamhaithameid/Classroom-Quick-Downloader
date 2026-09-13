@@ -153,7 +153,7 @@ test.describe("qa-01 buttons", () => {
       const docsUrl = await docsBtn.getAttribute("data-cqd-url");
       check.assert(
         "docs button converts to a Drive download URL (#546 family behavior)",
-        !!docsUrl && docsUrl.includes("drive.google.com/uc?export=download") && docsUrl.includes("btn-docs-1"),
+        !!docsUrl && docsUrl.includes("drive.usercontent.google.com/download") && docsUrl.includes("btn-docs-1"),
         docsUrl ?? "missing",
       );
 

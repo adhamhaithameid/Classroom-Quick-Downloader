@@ -38,8 +38,8 @@ function scenario() {
           },
           {
             id: "dl-bypass",
-            body: "Virus-scan gated file.",
-            attachments: [drive("dl-gated-1", "gated.pdf")],
+            body: "Account-locked file: the default account gets 403s; authuser=1 holds access.",
+            attachments: [drive("authlocked-dl-1", "secret.pdf")],
           },
         ],
       },
@@ -143,29 +143,48 @@ test.describe("qa-06 downloads", () => {
     });
   });
 
-  test("Drive bypass flow: gated file → interstitial → download → button success", async () => {
+  test("Drive downloads are zero-tab: auth-locked file cycles accounts and completes", async () => {
     test.setTimeout(180_000);
-    await runCheck(test.info(), page, capture, "qa-06-bypass", RUNBOOK_REF + " (bypass)", async (check) => {
-      const btn = page.locator(`[data-attachment-id="dl-gated-1"] ${SELECTORS.downloadButton}`);
+    await runCheck(test.info(), page, capture, "qa-06-bypass", RUNBOOK_REF + " (account cycling)", async (check) => {
+      // Zero-tab contract at the browser level: no window/tab may appear
+      // during the whole flow — the extension downloads natively.
+      const pagesBefore = context.pages().length;
+
+      const btn = page.locator(`[data-attachment-id="authlocked-dl-1"] ${SELECTORS.downloadButton}`);
       await btn.click();
 
-      // The bypass content script auto-clicks the interstitial; the download
-      // completes after the gated id is finally fetched.
+      // The default-account attempt 403s (simulator 403 for non-authuser=1);
+      // the sweep retries under authuser=1, which serves the bytes.
+      // Attempt ids: 4 = authuser=0 (403), 5 = authuser=1 (bytes).
       await expect
         .poll(async () => (await readProbe()).downloads.join("\n"), { timeout: 60_000 })
-        .toContain("onChanged id=4 state=complete");
-      check.assert("gated download reached state=complete after the bypass flow", true);
+        .toContain("onChanged id=5 state=complete");
+      check.assert("auth-locked download reached state=complete after account cycling", true);
 
-      const served = servedDownloads().find((d) => d.url.includes("id=dl-gated-1"));
+      const probeLog = (await readProbe()).downloads.join("\n");
+      const startedCount = (probeLog.match(/start \{/g) ?? []).length;
       check.assert(
-        "gated file served with Content-Disposition filename",
-        !!served && served.filename === "gated.pdf",
-        JSON.stringify(served ?? {}),
+        "multiple download attempts were made (account sweep ran)",
+        startedCount >= 2,
+        probeLog,
+      );
+
+      const served = servedDownloads().find(
+        (d) => d.url.includes("id=authlocked-dl-1") && d.filename === "secret.pdf",
+      );
+      check.assert(
+        "served from the usercontent byte-serving endpoint under authuser=1",
+        !!served && served.url.includes("drive.usercontent.google.com") && served.url.includes("authuser=1") && served.filename === "secret.pdf",
+        JSON.stringify(servedDownloads().filter((d) => d.url.includes("id=authlocked-dl-1"))),
       );
 
       await expect(btn).toHaveClass(/cqd-success/, { timeout: 15_000 });
       check.assert("originating button flipped to success", true);
-      await check.screenshot("bypass-success");
+
+      // No tab or window was ever created — the manual-test regression.
+      const pagesAfter = context.pages().length;
+      check.assert("no new window or tab was opened (zero-tab)", pagesAfter === pagesBefore, `pages before=${pagesBefore} after=${pagesAfter}`);
+      await check.screenshot("authlocked-cycled-success");
     });
   });
 });
