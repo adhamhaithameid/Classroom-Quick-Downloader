@@ -426,11 +426,19 @@ function markGroupDirty(group: GroupState): void {
 function scheduleRefresh(): void {
   if (refreshScheduled) return;
   refreshScheduled = true;
-  requestAnimationFrame(() => {
+  const flush = () => {
     refreshScheduled = false;
     dirtyGroups.forEach(updateGroupState);
     dirtyGroups.clear();
-  });
+  };
+  // requestAnimationFrame is SUSPENDED in hidden/occluded tabs — a group
+  // running in a background tab would never re-render (stuck progress, no
+  // error state). Flush on a timer there instead; rAF when visible.
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+    window.setTimeout(flush, 250);
+  } else {
+    requestAnimationFrame(() => flush());
+  }
 }
 
 function updateGroupState(group: GroupState): void {
