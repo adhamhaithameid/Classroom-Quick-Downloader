@@ -50,10 +50,6 @@ function scenario() {
             attachments: [drive("nav-drive-delayed", "late.pdf")],
             insertAfterMs: 2000,
           },
-          {
-            id: "nav-post-more",
-            attachments: [drive("nav-drive-more", "extra.pdf")],
-          },
         ],
         loadMorePosts: [{ id: "nav-post-more", attachments: [drive("nav-drive-more", "extra.pdf")] }],
       },
@@ -207,7 +203,22 @@ test.describe("qa-05 navigation", () => {
       }
 
 
-      // back to stream via popstate (back navigation).
+      // Back via popstate: the SPA history is stream → classwork → details →
+      // submissions, so one back lands on DETAILS. Assert the previously
+      // visited route re-initializes (buttons + Download All again), then SPA
+      // back to the stream and assert the same there.
+      await page.goBack();
+      await expect
+        .poll(async () => page.locator('[data-drive-id="nav-drive-a"] button.cqd-download-btn').count(), {
+          timeout: 15_000,
+        })
+        .toBe(1);
+      await expect
+        .poll(async () => page.locator(SELECTORS.downloadAllButton).count(), { timeout: 10_000 })
+        .toBe(1);
+      check.assert("popstate back to details re-initializes cleanly", true);
+
+      await page.goBack();
       await page.goBack();
       await expect
         .poll(async () => page.locator('[data-stream-item-id="nav-post-1"] button.cqd-download-btn').count(), {
@@ -215,6 +226,14 @@ test.describe("qa-05 navigation", () => {
         })
         .toBe(1);
       check.assert("returning to stream re-initializes cleanly", true);
+
+      // The delayed post re-arms its 2s insert timer on every stream render;
+      // wait for it before counting, or the churn assertion races the timer.
+      await expect
+        .poll(async () => page.locator('[data-stream-item-id="nav-post-delayed"] button.cqd-download-btn').count(), {
+          timeout: 10_000,
+        })
+        .toBe(1);
 
       // Load-more: the simulator reveals the staged post on scroll.
       await page.evaluate(() => (window as unknown as { __cqdSimLoadMore?: () => void }).__cqdSimLoadMore?.());

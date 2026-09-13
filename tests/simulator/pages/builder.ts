@@ -42,14 +42,14 @@ function looseLinkHtml(link: LinkSpec): string {
   return `<a href="${esc(linkHref(link))}">${esc(link.name)}</a>`;
 }
 
-function attachmentCardHtml(att: AttachmentSpec, containerClass: string, containerAttr: string): string {
+function attachmentCardHtml(att: AttachmentSpec, containerClass: string, containerAttr: string, hrefOverride?: string): string {
   const icon = KIND_ICON[att.kind] ?? KIND_ICON.drive;
   return `
       <div class="${containerClass}" ${containerAttr}>
         <a
           class="VkhHKd e7EEH nQaZq"
           aria-label="Attachment: ${esc(att.name)}"
-          href="${esc(linkHref(att))}"
+          href="${esc(hrefOverride ?? linkHref(att))}"
         >
           <div class="rzTfPe xSP5ic">
             <img src="//ssl.gstatic.com/docs/doclist/images/mediatype/${icon}" alt="" />
@@ -123,8 +123,18 @@ function detailsHtml(route: Extract<RouteSpec, { kind: "details" }>): string {
 function submissionsHtml(route: Extract<RouteSpec, { kind: "submissions" }>): string {
   const rows = route.submissions.rows
     .map((row) => {
+      // Real submissions rows anchor attachments to the Classroom student-work
+      // viewer (/g/tg/…) with the Drive id as a query param — that is the
+      // container contract the student-work scripts key on.
       const cards = row.attachments
-        .map((a) => attachmentCardHtml(a, "WkZsyc", () => `data-submission-attachment-id="${esc(a.id ?? a.name)}"`))
+        .map((a) =>
+          attachmentCardHtml(
+            a,
+            "WkZsyc",
+            `data-submission-attachment-id="${esc(a.id ?? a.name)}"`,
+            `https://classroom.google.com/g/tg/submission-attachment/viewer?id=${encodeURIComponent(a.id ?? a.name)}`,
+          ),
+        )
         .join("\n");
       return `  <div class="student-row" data-item-id="${esc(row.id)}" data-stream-item-id="${esc(row.id)}">
     <div class="author-row">${esc(row.student)}</div>
