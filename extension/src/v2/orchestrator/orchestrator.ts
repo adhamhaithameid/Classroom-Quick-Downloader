@@ -52,6 +52,8 @@ import { ViewKind, type CQDEngine } from '../../engines/types';
 import { engineRegistry } from '../../engines/engine-registry';
 import { RouteWatcher, isClassroomUrl } from '../context/route-classifier';
 import { ShadowComparator, type ShadowCompareResult } from '../compat/shadow-compare';
+import { createEventBus, type EventBus } from '../../bus/event-bus';
+import type { PageTopicMap } from '../../contracts/topics';
 
 // ============================================================================
 // ORCHESTRATOR CLASS
@@ -86,6 +88,9 @@ export class Orchestrator {
 
   /** Latest shadow comparison report (for debug panel) */
   private latestShadowReport: ShadowCompareResult | null = null;
+
+  /** The page-scoped event bus (S5). Roles subscribe/publish here only. */
+  private pageBus: EventBus<PageTopicMap> = createEventBus<PageTopicMap>();
 
   // ========================================================================
   // LIFECYCLE
@@ -204,6 +209,11 @@ export class Orchestrator {
       this.abortCurrentPage();
       return;
     }
+
+    // Publish the accepted view change on the page bus (S5). This sits after
+    // the guard and before the engines-empty early return so every accepted
+    // view is announced, even when no engines are active to handle it.
+    this.pageBus.publish('route:changed', { view: newView, url });
 
     console.log(`[CQD Orchestrator] View change: ${this.currentView || 'none'} → ${newView}`);
 
@@ -432,6 +442,13 @@ export class Orchestrator {
    */
   getCurrentView(): ViewKind | null {
     return this.currentView;
+  }
+
+  /**
+   * The page bus. Roles and debug tooling get it here — never a global.
+   */
+  getBus(): EventBus<PageTopicMap> {
+    return this.pageBus;
   }
 
   /**
