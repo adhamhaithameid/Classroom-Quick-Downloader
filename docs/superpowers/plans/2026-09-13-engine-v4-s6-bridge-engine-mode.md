@@ -4,7 +4,10 @@
 `BridgePort`; the Engine Mode toggle ships (rollback = one setting); shadow
 parity meets the agreed threshold.
 
-**Status:** IN PROGRESS (2026-09-13). Spec: `ENGINE_V4_SYSTEM_DESIGN.md` §7
+**STATUS (2026-09-13): COMPLETE.** All tasks executed TDD-first; evidence and
+decisions: docs/session-logs/2026-09-13-engine-v4-s6-bridge-engine-mode.md
+(3,627 unit tests, fitness 11/11, accuracy gate + goldens green). Original
+carrier text below. Spec: `ENGINE_V4_SYSTEM_DESIGN.md` §7
 (bridge), §13 (coexistence); gh #676, #684; S5 log rules `download:*` topics as
 S6's worker half.
 
