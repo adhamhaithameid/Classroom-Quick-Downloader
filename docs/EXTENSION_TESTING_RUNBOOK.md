@@ -122,7 +122,7 @@ pnpm -C extension test:qa:live     # gated live-Classroom canary (read-only)
 | Download All hold-to-cancel | qa-02 | Full |
 | Download All error state (all files fail) | qa-02-error | Skipped (HARNESS: retry timing) |
 | Real download bytes + filename | qa-06 | Full (magic bytes + Content-Disposition) |
-| Drive bypass flow lifecycle | qa-06-bypass | Full |
+| Zero-tab downloads + account cycling on forbidden files | qa-06-bypass | Full (auth-locked fixture; asserts no window opens) |
 | Flagged post: one outer card, badges | qa-03 | Full |
 | Comment count + tooltip | qa-03 | Full |
 | Dark theme badges | qa-03-dark | Full |
@@ -166,3 +166,17 @@ The journeys DO exercise the real Firefox MV2 build logic wherever possible at
 the unit seam: `extension/tests/background-bypass-flow.test.ts` toggles the
 Firefox adapter (bypass-tab flow) against the shared state machine. Revisit this
 section if Playwright ships a Firefox build that honors unsigned sideloading.
+
+## Zero-tab Drive downloads (2026-09-13)
+
+The bypass-tab mechanism is gone. All Drive downloads target
+`drive.usercontent.google.com/download?id=…&export=download&confirm=t` — the
+byte-serving endpoint Drive's own "Download anyway" link lands on — so no
+interstitial page and no window is ever opened, on any browser. Forbidden
+responses cycle signed-in accounts invisibly (bounded by the authuser sweep)
+and settle event-driven: the button reaches success or the honest
+`AUTH_ALL_FAILED` error, never a stuck state. The simulator models an
+auth-locked fixture (`authlocked-…` ids: 403 unless `authuser=1`) so the
+cycling path is exercised end-to-end in qa-06-bypass, which also asserts no
+tab was created. If Playwright's Firefox ever honors unsigned sideloading, the
+whole suite (including these journeys) runs there unchanged.
