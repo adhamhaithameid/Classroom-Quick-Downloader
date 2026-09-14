@@ -51,7 +51,17 @@ function writeResponse(socket: net.Socket, response: SimulatedResponse): void {
   }
   const body = Buffer.isBuffer(response.body) ? response.body : Buffer.from(response.body, "utf8");
   const statusText =
-    response.status === 200 ? "OK" : response.status === 204 ? "No Content" : response.status === 404 ? "Not Found" : "OK";
+    response.status === 200
+      ? "OK"
+      : response.status === 204
+        ? "No Content"
+        : response.status === 302
+          ? "Found"
+          : response.status === 404
+            ? "Not Found"
+            : response.status === 503
+              ? "Service Unavailable"
+              : "OK";
   const headers = [
     `HTTP/1.1 ${response.status} ${statusText}`,
     `content-type: ${response.contentType}`,
@@ -60,6 +70,32 @@ function writeResponse(socket: net.Socket, response: SimulatedResponse): void {
     "connection: close",
   ];
   socket.write(headers.join("\r\n") + "\r\n\r\n");
+  if (response.destroyAfterSend) {
+    // Real-world shape: response headers arrive, the body starts, and the
+    // connection dies mid-stream — the download manager reports an interrupt
+    // for an already-started download.
+    socket.write(body);
+    socket.destroy();
+    return;
+  }
+  if (response.slowChunks && response.slowChunks.parts > 1) {
+    // Real-world shape: a slow trickle — body arrives in chunks with delays,
+    // exercising stall handling and progress patience.
+    const parts = response.slowChunks.parts;
+    const delayMs = response.slowChunks.delayMs;
+    const size = Math.ceil(body.length / parts);
+    let sent = 0;
+    const sendNext = () => {
+      if (socket.destroyed) return;
+      const slice = body.subarray(sent * size, Math.min((sent + 1) * size, body.length));
+      socket.write(slice);
+      sent += 1;
+      if (sent < parts) setTimeout(sendNext, delayMs);
+      else socket.end();
+    };
+    sendNext();
+    return;
+  }
   socket.end(body);
 }
 

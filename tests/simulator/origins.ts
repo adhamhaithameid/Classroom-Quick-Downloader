@@ -28,6 +28,16 @@ export interface SimulatedResponse {
    * real NETWORK_FAILED interruption for the download manager.
    */
   resetSocket?: boolean;
+  /**
+   * Send headers + body, then destroy the socket WITHOUT a clean close —
+   * models a connection dying mid-stream on an already-started download.
+   */
+  destroyAfterSend?: boolean;
+  /**
+   * Trickle the body in `parts` chunks `delayMs` apart — models a slow
+   * stream and exercises stall handling.
+   */
+  slowChunks?: { parts: number; delayMs: number };
 }
 
 const MAGIC: Record<ByteKind, { head: Buffer; contentType: string }> = {
@@ -147,6 +157,63 @@ const INERT_PAGE: SimulatedResponse = {
   body: "<!doctype html><html><body>simulator: docs surface</body></html>",
 };
 
+/** Adversarial failure vocabulary (no-dead-ends program): every shape models a
+ *  real-world Drive/download failure the engine must classify honestly. */
+function failureResponse(id: string): SimulatedResponse | null {
+  if (id.startsWith("srvfail")) {
+    // Transient server error: 503 — the engine should retry, then settle.
+    return { status: 503, contentType: "text/plain", body: "simulator: backend error" };
+  }
+  if (id.startsWith("signin")) {
+    // Drive bounces unauthenticated downloads to the sign-in flow.
+    return {
+      status: 302,
+      contentType: "text/html; charset=utf-8",
+      headers: { location: "https://accounts.google.com/SignIn?continue=https://drive.usercontent.google.com/download" },
+      body: "",
+    };
+  }
+  if (id.startsWith("resetmid")) {
+    // Headers arrive, bytes start, connection dies mid-stream.
+    return {
+      status: 200,
+      contentType: "application/pdf",
+      headers: { "content-disposition": `attachment; filename="${id}.pdf"` },
+      body: Buffer.concat([MAGIC.pdf.head, Buffer.alloc(64 * 1024, 0x41)]),
+      destroyAfterSend: true,
+    };
+  }
+  if (id.startsWith("slow")) {
+    // A slow trickle: 1 MB over 8 chunks, 400 ms apart (~2.8s total).
+    return {
+      status: 200,
+      contentType: "application/pdf",
+      headers: { "content-disposition": `attachment; filename="${id}.pdf"` },
+      body: Buffer.concat([MAGIC.pdf.head, Buffer.alloc(1024 * 1024, 0x42)]),
+      slowChunks: { parts: 8, delayMs: 400 },
+    };
+  }
+  if (id.startsWith("zerobyte")) {
+    // Completes successfully with an EMPTY file — a silent-corruption shape.
+    return {
+      status: 200,
+      contentType: "application/pdf",
+      headers: { "content-disposition": `attachment; filename="${id}.pdf"` },
+      body: Buffer.alloc(0),
+    };
+  }
+  if (id.startsWith("quota")) {
+    // Drive's quota/usage-limit page arrives as HTML — must be intercepted,
+    // never saved as a fake .html "download".
+    return {
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      body: '<!doctype html><html><head><title>Quota exceeded</title></head><body>usageLimits — you have exceeded your download quota. Try again later.</body></html>',
+    };
+  }
+  return null;
+}
+
 /**
  * Resolve ANY request the browser makes during a QA run. Everything that is
  * not a simulated origin dies as 204 — the browser can never reach the real
@@ -175,9 +242,9 @@ export function resolveSimulatedResponse(
       // QA journeys prefix missing file ids with "missing" to exercise the
       // download-failure path (NETWORK_FAILED, not an HTTP error body).
       if (id.startsWith("missing")) return { ...NOT_FOUND, resetSocket: true };
-      // Forbidden modeling: 403 for every account, so the sweep runs to its
-      // AUTH_ALL_FAILED terminal (qa-02's all-failed group). No resetSocket.
       if (id.startsWith("forbidden")) return FORBIDDEN;
+      const ucFailure = failureResponse(id);
+      if (ucFailure) return ucFailure;
       const file = context.files.get(id);
       return file ? fileDownloadResponse(file) : NOT_FOUND;
     }
@@ -208,6 +275,8 @@ export function resolveSimulatedResponse(
           body: '<!doctype html><html><head><title>403 Access Forbidden</title></head><body>403. That\'s an error. You do not have access.</body></html>',
         };
       }
+      const failure = failureResponse(id);
+      if (failure) return failure;
       const file = context.files.get(id);
       return file ? fileDownloadResponse(file) : NOT_FOUND;
     }
