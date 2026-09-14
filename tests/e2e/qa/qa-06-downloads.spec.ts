@@ -15,7 +15,7 @@
  * Nothing is mocked: the download genuinely flows browser → proxy → bytes.
  */
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
-import { launchQaContext, captureConsole, runCheck, SELECTORS } from "./harness";
+import { launchQaContext, captureConsole, runCheck, SELECTORS, instrumentSw, type SwProbe } from "./harness";
 import { createScenario, streamPath, drive, sheets } from "../../simulator/scenario";
 
 const STREAM = streamPath();
@@ -45,42 +45,6 @@ function scenario() {
       },
     ],
   });
-}
-
-interface SwProbe {
-  downloads: string[];
-}
-
-async function instrumentSw(context: BrowserContext, swUrlMatch: string): Promise<() => Promise<SwProbe>> {
-  let sw = context.serviceWorkers().find((w) => w.url().includes(swUrlMatch));
-  if (!sw) sw = await context.waitForEvent("serviceworker", { timeout: 15_000 }).catch(() => undefined);
-  if (!sw) throw new Error("ENVIRONMENT: extension service worker not found");
-  await sw.evaluate(() => {
-    const w = self as unknown as {
-      __cqdProbe: { downloads: string[] };
-      chrome: {
-        downloads: {
-          download: (opts: unknown, cb?: (id?: number) => void) => void;
-          onChanged: { addListener: (fn: (delta: { id: number; state?: { current: string } }) => void) => void };
-        };
-        runtime: { lastError?: { message?: string } };
-      };
-    };
-    w.__cqdProbe = { downloads: [] };
-    const api = w.chrome.downloads;
-    const orig = api.download.bind(api);
-    api.download = (opts: unknown, cb?: (id?: number) => void) => {
-      w.__cqdProbe.downloads.push(`start ${JSON.stringify(opts).slice(0, 140)}`);
-      return orig(opts, (id?: number) => {
-        w.__cqdProbe.downloads.push(`callback id=${id} err=${w.chrome.runtime.lastError?.message ?? "none"}`);
-        cb?.(id);
-      });
-    };
-    api.onChanged.addListener((delta) => {
-      w.__cqdProbe.downloads.push(`onChanged id=${delta.id} state=${delta.state ? delta.state.current : "?"}`);
-    });
-  });
-  return () => sw!.evaluate(() => (self as unknown as { __cqdProbe: SwProbe }).__cqdProbe);
 }
 
 test.describe("qa-06 downloads", () => {

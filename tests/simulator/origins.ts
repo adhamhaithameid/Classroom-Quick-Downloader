@@ -121,6 +121,26 @@ function fileDownloadResponse(file: DriveFile): SimulatedResponse {
 
 const NOT_FOUND: SimulatedResponse = { status: 404, contentType: "text/plain", body: "simulator: unknown resource" };
 const NO_CONTENT: SimulatedResponse = { status: 204, contentType: "text/plain", body: "" };
+/**
+ * Forbidden modeling: ids prefixed "forbidden" 403 for EVERY signed-in
+ * account — the extension's account-cycling sweep runs its full bound and
+ * settles on the honest all-accounts-denied terminal (qa-02's all-failed
+ * group). Plain HTTP error body, deliberately NO resetSocket: the browser
+ * downloads the HTML, the filename interceptor cancels, and the failure
+ * resolves in seconds instead of Chromium's long dead-socket retry window.
+ * The body is padded to several MB so the download is still IN PROGRESS when
+ * the filename interception fires — a tiny body could complete before the
+ * cancel lands and flip the file to a false success.
+ */
+const FORBIDDEN_BODY =
+  '<!doctype html><html><head><title>403 Access Forbidden</title></head><body>403. That\'s an error. You do not have access.' +
+  'x'.repeat(5 * 1024 * 1024) +
+  '</body></html>';
+const FORBIDDEN: SimulatedResponse = {
+  status: 403,
+  contentType: "text/html; charset=utf-8",
+  body: FORBIDDEN_BODY,
+};
 const INERT_PAGE: SimulatedResponse = {
   status: 200,
   contentType: "text/html; charset=utf-8",
@@ -155,6 +175,9 @@ export function resolveSimulatedResponse(
       // QA journeys prefix missing file ids with "missing" to exercise the
       // download-failure path (NETWORK_FAILED, not an HTTP error body).
       if (id.startsWith("missing")) return { ...NOT_FOUND, resetSocket: true };
+      // Forbidden modeling: 403 for every account, so the sweep runs to its
+      // AUTH_ALL_FAILED terminal (qa-02's all-failed group). No resetSocket.
+      if (id.startsWith("forbidden")) return FORBIDDEN;
       const file = context.files.get(id);
       return file ? fileDownloadResponse(file) : NOT_FOUND;
     }
@@ -171,6 +194,9 @@ export function resolveSimulatedResponse(
     if (url.pathname === "/download" && url.searchParams.get("export") === "download") {
       const id = url.searchParams.get("id") ?? "";
       if (id.startsWith("missing")) return { ...NOT_FOUND, resetSocket: true };
+      // Forbidden modeling: 403 for every account, so the sweep runs to its
+      // AUTH_ALL_FAILED terminal (qa-02's all-failed group). No resetSocket.
+      if (id.startsWith("forbidden")) return FORBIDDEN;
       // Auth-locked modeling: ids prefixed "authlocked" 403 unless the attempt
       // carries authuser=1 (the account that holds access). This exercises the
       // extension's account-cycling sweep end-to-end: forbidden interrupts on
