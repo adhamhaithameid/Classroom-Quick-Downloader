@@ -55,6 +55,7 @@
     "@vitest/coverage-v8": "^4.1.10",
     "@wxt-dev/module-react": "^1.2.2",
     "fake-indexeddb": "^6.2.5",
+    "fast-check": "^4.10.0",
     "happy-dom": "20.11.2",
     "jsdom": "^30.0.1",
     "typescript": "^6.0.3",

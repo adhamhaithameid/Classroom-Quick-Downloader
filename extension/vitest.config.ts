@@ -83,6 +83,14 @@ export default defineConfig({
     coverage: getCoverageConfig(),
     setupFiles: ["./tests/setup.ts"],
   },
+  server: {
+    fs: {
+      // The adversarial suites import the repo-root simulator (tests/simulator)
+      // so production and the pure machine can be tested against ONE failure
+      // vocabulary. Allow the repo root, not just the extension workspace.
+      allow: [__dirname, path.resolve(__dirname, "..")],
+    },
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "entrypoints/content"),
