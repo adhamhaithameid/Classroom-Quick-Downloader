@@ -96,7 +96,6 @@ function startDownloadAllFeature() {
         });
       } else if (m.type === 'attributes') {
         const target = m.target as HTMLElement;
-        
         // Handle download button attribute changes
         if (
           target instanceof HTMLButtonElement &&
@@ -500,9 +499,14 @@ function updateGroupState(group: GroupState): void {
   let inProgress = 0;
 
   for (const file of group.files.values()) {
+    // downloaded/failed seed from the previous pass ON PURPOSE (sticky — the
+    // per-file buttons auto-reset to idle a few seconds after settling, and
+    // the group must remember the outcome). inProgress is LIVE state: seeding
+    // it made it sticky too — a group whose buttons left the loading state
+    // could never reach allCompleted, so Download All hung forever.
     let someSuccess = file.downloaded;
     let someError = file.failed;
-    let someLoading = file.inProgress;
+    let someLoading = false;
     let someCancelled = false;
 
     for (const b of file.buttons) {
