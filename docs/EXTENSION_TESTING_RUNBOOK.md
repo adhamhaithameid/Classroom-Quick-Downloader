@@ -120,7 +120,7 @@ pnpm -C extension test:qa:live     # gated live-Classroom canary (read-only)
 | 2. Forms/Sheets body links get no buttons | qa-01 | Full |
 | Download All grouping/placement/progress/success/reset | qa-02 | Full |
 | Download All hold-to-cancel | qa-02 | Full |
-| Download All error state (all files fail) | qa-02-error | Skipped (HARNESS: retry timing) |
+| Download All error state (all files fail) | qa-02-error | Full (was masking a real hang bug — inProgress sticky seed) |
 | Real download bytes + filename | qa-06 | Full (magic bytes + Content-Disposition) |
 | Zero-tab downloads + account cycling on forbidden files | qa-06-bypass | Full (auth-locked fixture; asserts no window opens) |
 | Flagged post: one outer card, badges | qa-03 | Full |
