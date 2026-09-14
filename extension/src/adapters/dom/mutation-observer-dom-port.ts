@@ -2,29 +2,124 @@
 /**
  * Real DomPort over the platform MutationObserver. The DetectEngine role is
  * the only caller allowed to `observe` — one live observer per page is a
- * gate (G3/G5), and this adapter is where that budget physically lives.
+ * gate (G3/G5), and this adapter is where that budget physically lives:
+ * ONE platform MutationObserver per DomPort instance multiplexes every
+ * subscription, narrowing batches per subscriber at dispatch time.
  */
 import type { DomPort } from '../../contracts/ports';
 import type { Unsubscribe } from '../../bus/event-bus';
 
+type MutationCallback = (mutations: MutationRecord[]) => void;
+
+/**
+ * The single real observer always watches the widest surface: attributeFilter
+ * is deliberately omitted so every attribute record flows into dispatch,
+ * where each subscription's own filter decides. Per-subscription record
+ * narrowing is out of scope — subscribers receive the full batch and filter
+ * records themselves (engines already do).
+ */
+const SUPERSET_INIT: MutationObserverInit = {
+  childList: true,
+  subtree: true,
+  attributes: true,
+};
+
+interface Subscription {
+  options: MutationObserverInit;
+  callback: MutationCallback;
+}
+
+/**
+ * Multiplexer match rule: does `mutations` contain at least one record this
+ * subscription asked for? A subscription that names no record kind (no
+ * childList/attributes/characterData) matches every batch.
+ */
+function batchMatches(options: MutationObserverInit, mutations: MutationRecord[]): boolean {
+  const wantsChildList = options.childList === true;
+  const wantsAttributes = options.attributes === true;
+  const wantsCharacterData = options.characterData === true;
+  if (!wantsChildList && !wantsAttributes && !wantsCharacterData) return true;
+
+  const attributeFilter = Array.isArray(options.attributeFilter) ? options.attributeFilter : null;
+  return mutations.some((record) => {
+    if (record.type === 'childList') return wantsChildList;
+    if (record.type === 'attributes') {
+      if (!wantsAttributes) return false;
+      if (!attributeFilter) return true;
+      return record.attributeName !== null && attributeFilter.includes(record.attributeName);
+    }
+    if (record.type === 'characterData') return wantsCharacterData;
+    return false;
+  });
+}
+
+export class MutationObserverDomPort implements DomPort {
+  readonly document: Document;
+
+  private readonly subscriptions = new Map<number, Subscription>();
+  private observer: MutationObserver | null = null;
+  private nextId = 1;
+
+  constructor(document: Document = window.document) {
+    this.document = document;
+  }
+
+  /** Live subscription count — S10 qa probe hook. */
+  get subscriptionCount(): number {
+    return this.subscriptions.size;
+  }
+
+  querySelectorAll<T extends Element = Element>(selector: string, root?: ParentNode): T[] {
+    const scope = root ?? this.document;
+    return Array.from(scope.querySelectorAll<T>(selector));
+  }
+
+  observe(options: MutationObserverInit, callback: MutationCallback): Unsubscribe {
+    const id = this.nextId++;
+    this.subscriptions.set(id, { options, callback });
+    // Idempotent on the platform: re-observing the same target just refreshes.
+    this.ensureObserver().observe(this.document, SUPERSET_INIT);
+    let active = true;
+    return () => {
+      if (!active) return;
+      active = false;
+      if (!this.subscriptions.delete(id)) return; // already gone (e.g. dispose)
+      if (this.subscriptions.size === 0) this.observer?.disconnect();
+    };
+  }
+
+  /** Owner teardown: disconnect the real observer and drop every subscription. */
+  dispose(): void {
+    this.subscriptions.clear();
+    this.observer?.disconnect();
+    this.observer = null;
+  }
+
+  private ensureObserver(): MutationObserver {
+    if (!this.observer) {
+      this.observer = new MutationObserver((mutations) => this.dispatch(mutations));
+    }
+    return this.observer;
+  }
+
+  private dispatch(mutations: MutationRecord[]): void {
+    for (const subscription of this.subscriptions.values()) {
+      if (batchMatches(subscription.options, mutations)) subscription.callback(mutations);
+    }
+  }
+}
+
 export function createMutationObserverDomPort(document: Document): DomPort {
-  return {
-    document,
+  return new MutationObserverDomPort(document);
+}
 
-    querySelectorAll<T extends Element = Element>(selector: string, root?: ParentNode) {
-      const scope = root ?? document;
-      return Array.from(scope.querySelectorAll<T>(selector));
-    },
-
-    observe(options, callback): Unsubscribe {
-      const observer = new MutationObserver(callback);
-      observer.observe(document, options);
-      let active = true;
-      return () => {
-        if (!active) return;
-        active = false;
-        observer.disconnect();
-      };
-    },
-  };
+/**
+ * Per-PAGE singleton: S10's separate content-script entries must share one
+ * DomPort (hence one platform observer) per page. Anchored on window so
+ * independently-evaluated module copies still converge on the same instance.
+ */
+export function getPageDomPort(): MutationObserverDomPort {
+  const host = window as unknown as { __cqdDomPort?: MutationObserverDomPort };
+  host.__cqdDomPort ??= new MutationObserverDomPort();
+  return host.__cqdDomPort;
 }
