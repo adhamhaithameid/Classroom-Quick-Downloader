@@ -28,6 +28,7 @@ vi.mock('../src/v2/compat/shadow-compare', () => ({ ShadowComparator: class {} }
 
 import { Orchestrator } from '../src/v2/orchestrator/orchestrator';
 import { ViewKind } from '../src/engines/types';
+import { getPageDomPort } from '../src/adapters/dom/mutation-observer-dom-port';
 
 describe('Orchestrator page bus (S5)', () => {
   it('exposes a page bus and publishes route:changed for an accepted view', async () => {
@@ -69,13 +70,19 @@ import { beforeEach, afterEach } from 'vitest';
  */
 class CapturingMutationObserver {
   static callbacks: MutationCallback[] = [];
+  /** S10: construction counter — the single-observer gate counts instantiations. */
+  static instances: CapturingMutationObserver[] = [];
+  observing = true;
   observe(): void {}
-  disconnect(): void {}
+  disconnect(): void {
+    this.observing = false;
+  }
   takeRecords(): MutationRecord[] {
     return [];
   }
   constructor(cb: MutationCallback) {
     CapturingMutationObserver.callbacks.push(cb);
+    CapturingMutationObserver.instances.push(this);
   }
 }
 
@@ -449,6 +456,82 @@ describe('Orchestrator correction wiring + throttle baseline (S5 final-review fi
     second.setThrottle('normal');
     drive(makeMutationRecords(), {} as MutationObserver);
     expect(throttleEvents()).toEqual([{ level: 'normal' }]);
+
+    o.stop();
+  });
+});
+
+// ===========================================================================
+// S10 Task 2 — the orchestrator's dom observer rides the SHARED page port
+// ===========================================================================
+
+describe('Orchestrator observes through the shared page port (S10)', () => {
+  beforeEach(() => {
+    CapturingMutationObserver.callbacks.length = 0;
+    CapturingMutationObserver.instances.length = 0;
+    registryState.primary = null;
+    delete (window as { __cqdDomPort?: unknown }).__cqdDomPort;
+    vi.stubGlobal('MutationObserver', CapturingMutationObserver);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    registryState.primary = null;
+    delete (window as { __cqdDomPort?: unknown }).__cqdDomPort;
+  });
+
+  it('subscribes once through the page port; page aborts unsubscribe (never dispose); stop() disposes', async () => {
+    const f = makeV2ShapeFixtures();
+    registryState.primary = f.stub as unknown as Record<string, unknown>;
+
+    const o = new Orchestrator();
+    o.start();
+    const port = getPageDomPort();
+
+    // Accepted view → exactly ONE dom subscription and ONE observer construction.
+    await (o as unknown as { handleViewChange: (v: ViewKind, p: ViewKind | null, u: string) => Promise<void> })
+      .handleViewChange(ViewKind.STREAM, null, 'https://classroom.google.com/u/0/c/test-class');
+    expect(port.subscriptionCount).toBe(1);
+    expect(CapturingMutationObserver.instances).toHaveLength(1);
+
+    // A second page (abortCurrentPage path) unsubscribes + resubscribes —
+    // the shared port is NOT disposed, and the platform observer is revived,
+    // never reconstructed.
+    await (o as unknown as { handleViewChange: (v: ViewKind, p: ViewKind | null, u: string) => Promise<void> })
+      .handleViewChange(ViewKind.STREAM, null, 'https://classroom.google.com/u/0/c/test-class-2');
+    expect(port.subscriptionCount).toBe(1);
+    expect(CapturingMutationObserver.instances).toHaveLength(1);
+
+    // Scan cycles still flow through the port's dispatch to the engines.
+    const drive = CapturingMutationObserver.callbacks[CapturingMutationObserver.callbacks.length - 1]!;
+    expect(() => drive(makeMutationRecords(), {} as MutationObserver)).not.toThrow();
+    expect(f.stub.handleMutations).toHaveBeenCalledWith(makeMutationRecords());
+
+    // stop() is the only place that disposes the shared port.
+    o.stop();
+    expect(port.subscriptionCount).toBe(0);
+    expect(CapturingMutationObserver.instances[0]!.observing).toBe(false);
+  });
+
+  it('mutations delivered through the port publish the same S5 cycle topics (behavior parity)', async () => {
+    const f = makeV2ShapeFixtures();
+    registryState.primary = f.stub as unknown as Record<string, unknown>;
+
+    const o = new Orchestrator();
+    o.start();
+    const drive = await startWithStub(o);
+    const log: LogEntry[] = [];
+    recordAllTopics(o.getBus(), log);
+
+    drive(makeMutationRecords(), {} as MutationObserver);
+
+    expect(log.map((e) => e.topic)).toEqual([
+      'render:applied',
+      'post:scanned',
+      'file:discovered',
+      'decision:flags',
+      'decision:placement',
+    ]);
 
     o.stop();
   });

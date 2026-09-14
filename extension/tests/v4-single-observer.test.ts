@@ -12,6 +12,11 @@ import {
   createMutationObserverDomPort,
   getPageDomPort,
 } from '../src/adapters/dom/mutation-observer-dom-port';
+import { RouteWatcher } from '../src/v2/context/route-classifier';
+import { Orchestrator } from '../src/v2/orchestrator/orchestrator';
+import { EngineV2 } from '../src/engines/v2/engine-v2';
+import { engineRegistry } from '../src/engines/engine-registry';
+import { ViewKind, type CQDEngine } from '../src/engines/types';
 
 type MutationCallback = (mutations: MutationRecord[]) => void;
 
@@ -105,6 +110,7 @@ describe('DomPort multiplexer: one observer, many subscriptions', () => {
       childList: true,
       subtree: true,
       attributes: true,
+      characterData: true,
     });
     // attributeFilter stays out of the observer level so every attribute
     // record flows in; narrowing is per subscription at dispatch.
@@ -311,5 +317,163 @@ describe('multiplexer over the real platform observer', () => {
 
     off();
     port.dispose();
+  });
+});
+
+// ===========================================================================
+// S10 Task 2 — the v2 stack rides the shared page port
+// ===========================================================================
+
+/** jsdom's default document may lack a <title>; RouteWatcher guards on it. */
+function ensureTitleElement(): void {
+  if (!document.querySelector('title')) {
+    document.head.appendChild(document.createElement('title'));
+  }
+}
+
+function appendStreamPost(id: string): void {
+  const post = document.createElement('div');
+  post.setAttribute('data-stream-item-id', id);
+  document.body.appendChild(post);
+}
+
+/** Immediate-resolving engine so handleViewChange reaches setupDomObserver. */
+function makeInstantEngine(name = 'engine-v2'): CQDEngine {
+  return {
+    name,
+    version: '0.0.0-s10-test',
+    init: vi.fn(async () => {}),
+    destroy: vi.fn(),
+    handleMutations: vi.fn(),
+    fullScan: vi.fn(),
+    getTrackedPosts: vi.fn(() => []),
+    getFlagDecisions: vi.fn(() => []),
+    getPlacementDecisions: vi.fn(() => []),
+    getDecisionTrace: vi.fn(() => null),
+  } as unknown as CQDEngine;
+}
+
+describe('S10: EngineV2 waitForContentReady rides the shared page port', () => {
+  beforeEach(() => {
+    FakeMutationObserver.instances = [];
+    document.body.innerHTML = '';
+    ensureTitleElement();
+    delete (window as { __cqdDomPort?: unknown }).__cqdDomPort;
+    vi.stubGlobal('MutationObserver', FakeMutationObserver);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    delete (window as { __cqdDomPort?: unknown }).__cqdDomPort;
+  });
+
+  it('subscribes through the port while waiting and unsubscribes on ready', async () => {
+    const port = getPageDomPort();
+    const engine = new EngineV2();
+
+    // init() is synchronous up to waitForContentReady — the transient
+    // subscription is live by the time init returns its pending promise.
+    const initPromise = engine.init(ViewKind.STREAM, new AbortController().signal);
+    expect(port.subscriptionCount).toBe(1);
+    expect(FakeMutationObserver.instances).toHaveLength(1);
+
+    // Content arrives → one childList batch through the ONE observer
+    // resolves the wait and removes the transient subscription.
+    appendStreamPost('s10-ready-post');
+    FakeMutationObserver.instances[0]!.emit([{ type: 'childList' }]);
+    await initPromise;
+
+    expect(port.subscriptionCount).toBe(0);
+    expect(FakeMutationObserver.instances).toHaveLength(1);
+  });
+
+  it('the abort path owns the unsubscribe: aborting the page signal removes the transient', async () => {
+    const port = getPageDomPort();
+    const controller = new AbortController();
+    const engine = new EngineV2();
+
+    const initPromise = engine.init(ViewKind.STREAM, controller.signal);
+    expect(port.subscriptionCount).toBe(1);
+
+    controller.abort();
+    await initPromise;
+
+    expect(port.subscriptionCount).toBe(0);
+  });
+});
+
+describe('S10: the v2 stack shares ONE page observer end to end', () => {
+  beforeEach(() => {
+    FakeMutationObserver.instances = [];
+    document.body.innerHTML = '';
+    ensureTitleElement();
+    delete (window as { __cqdDomPort?: unknown }).__cqdDomPort;
+    vi.stubGlobal('MutationObserver', FakeMutationObserver);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    delete (window as { __cqdDomPort?: unknown }).__cqdDomPort;
+    engineRegistry.unregister('engine-v2');
+    engineRegistry.setMode('legacy');
+  });
+
+  it('a default-mode page: orchestrator dom + RouteWatcher title + engine transient over exactly ONE observer', async () => {
+    const port = getPageDomPort();
+    engineRegistry.register(new EngineV2());
+    engineRegistry.setMode('v2');
+
+    const o = new Orchestrator();
+    o.start();
+    // RouteWatcher's <title> fallback is the first port subscription.
+    expect(port.subscriptionCount).toBe(1);
+    expect(FakeMutationObserver.instances).toHaveLength(1);
+
+    const hvc = (o as unknown as { handleViewChange: (v: ViewKind, p: ViewKind | null, u: string) => Promise<void> })
+      .handleViewChange(ViewKind.STREAM, null, 'https://classroom.google.com/u/0/c/test-class');
+    // engine-v2's waitForContentReady adds the transient during init…
+    expect(port.subscriptionCount).toBe(2);
+    expect(FakeMutationObserver.instances).toHaveLength(1);
+
+    // …content arrives, the transient returns to baseline…
+    appendStreamPost('s10-e2e-post');
+    FakeMutationObserver.instances[0]!.emit([{ type: 'childList' }]);
+    await hvc;
+
+    // …and the orchestrator's dom subscription takes its place. Still ONE
+    // platform observer for domObserver + title + content-ready combined.
+    expect(port.subscriptionCount).toBe(2);
+    expect(FakeMutationObserver.instances).toHaveLength(1);
+
+    o.stop();
+    expect(port.subscriptionCount).toBe(0);
+    expect(FakeMutationObserver.instances[0]!.observing).toBe(false);
+  });
+
+  it('RouteWatcher stop() removes only its title subscription; the observer stays alive for the orchestrator', async () => {
+    const port = getPageDomPort();
+    engineRegistry.register(makeInstantEngine());
+    engineRegistry.setMode('v2');
+
+    const o = new Orchestrator();
+    o.start();
+    expect(port.subscriptionCount).toBe(1); // title fallback
+
+    await (o as unknown as { handleViewChange: (v: ViewKind, p: ViewKind | null, u: string) => Promise<void> })
+      .handleViewChange(ViewKind.STREAM, null, 'https://classroom.google.com/u/0/c/test-class');
+    expect(port.subscriptionCount).toBe(2); // + orchestrator dom
+
+    // A second RouteWatcher (e.g. the next orchestrator generation) adds
+    // its own title subscription, and stopping it must not touch anything else.
+    const watcher = new RouteWatcher(vi.fn());
+    watcher.start();
+    expect(port.subscriptionCount).toBe(3);
+
+    watcher.stop();
+    expect(port.subscriptionCount).toBe(2);
+    expect(FakeMutationObserver.instances[0]!.observing).toBe(true);
+    expect(FakeMutationObserver.instances).toHaveLength(1);
+
+    o.stop();
   });
 });

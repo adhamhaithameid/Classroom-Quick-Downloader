@@ -14,7 +14,10 @@ type MutationCallback = (mutations: MutationRecord[]) => void;
 /**
  * The single real observer always watches the widest surface: attributeFilter
  * is deliberately omitted so every attribute record flows into dispatch,
- * where each subscription's own filter decides. Per-subscription record
+ * where each subscription's own filter decides. characterData is included so
+ * title-style subscriptions (RouteWatcher's <title> fallback) still see
+ * Text-node data changes; subscriptions that don't ask for characterData
+ * never receive characterData-only batches. Per-subscription record
  * narrowing is out of scope — subscribers receive the full batch and filter
  * records themselves (engines already do).
  */
@@ -22,6 +25,7 @@ const SUPERSET_INIT: MutationObserverInit = {
   childList: true,
   subtree: true,
   attributes: true,
+  characterData: true,
 };
 
 interface Subscription {

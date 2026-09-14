@@ -54,6 +54,7 @@ import { RouteWatcher, isClassroomUrl } from '../context/route-classifier';
 import { ShadowComparator, type ShadowCompareResult } from '../compat/shadow-compare';
 import { createEventBus, type EventBus } from '../../bus/event-bus';
 import type { CorrectionItem, PageTopicMap } from '../../contracts/topics';
+import { getPageDomPort } from '../../adapters/dom/mutation-observer-dom-port';
 import { DetectEngine } from '../../roles/detect-engine';
 import { ComputeEngine } from '../../roles/compute-engine';
 import { RenderEngine } from '../../roles/render-engine';
@@ -90,8 +91,13 @@ export class Orchestrator {
   /** Watches for URL changes in the Classroom SPA */
   private routeWatcher: RouteWatcher | null = null;
 
-  /** The single MutationObserver that feeds all active engines */
-  private domObserver: MutationObserver | null = null;
+  /**
+   * The orchestrator's subscription on the shared page DomPort (S10).
+   * The ONE platform MutationObserver lives on the port (window singleton);
+   * the orchestrator only holds the Unsubscribe handle. Page aborts
+   * unsubscribe; only stop() disposes the port itself.
+   */
+  private domUnsubscribe: (() => void) | null = null;
 
   /**
    * AbortController for the current page's lifecycle.
@@ -194,14 +200,14 @@ export class Orchestrator {
       this.routeWatcher = null;
     }
 
-    // 2. Abort current page lifecycle
+    // 2. Abort current page lifecycle (unsubscribes the dom subscription)
     this.abortCurrentPage();
 
-    // 3. Disconnect DOM observer
-    if (this.domObserver) {
-      this.domObserver.disconnect();
-      this.domObserver = null;
-    }
+    // 3. Tear down the shared page port itself. Every v2 subscription
+    // (orchestrator dom, title fallback, engine transients) has been
+    // removed above; dispose() drops the platform observer. The window
+    // singleton revives cleanly if the orchestrator starts again.
+    getPageDomPort().dispose();
 
     // 4. Destroy all active engines
     for (const engine of this.activeEngines) {
@@ -358,13 +364,14 @@ export class Orchestrator {
   // ========================================================================
 
   /**
-   * Set up the single shared MutationObserver.
+   * Subscribe to the shared page DomPort (S10).
    *
-   * ONE observer for ALL engines. This is the key performance improvement
-   * over V1's three independent observers.
+   * ONE platform MutationObserver for the whole page — the orchestrator's
+   * subscription is multiplexed on it alongside the RouteWatcher title
+   * fallback and any engine transient (waitForContentReady).
    *
-   * We observe childList and attributes on document.body with subtree.
-   * The attribute filter is tuned to only catch changes we care about:
+   * The subscription asks for childList and attributes on the document with
+   * subtree, with the same attribute filter the dedicated observer used:
    * - data-stream-item-id: post added/changed
    * - data-drive-id: file reference changed
    * - aria-expanded: accordion state changed
@@ -372,38 +379,20 @@ export class Orchestrator {
    * - class: class names changed (state changes)
    * - style: visibility changes
    *
-   * We DON'T observe characterData because text changes within existing
-   * elements rarely affect our decisions. If we need to catch text changes
-   * in the future, we can add it, but for now it saves a lot of noise.
+   * The port delivers every batch that contains at least one matching
+   * record; the callback body already handles arbitrary batches, so the
+   * multiplexed behavior is identical to the old dedicated observer.
+   * characterData is NOT requested — text-only batches never reach engines.
    */
   private setupDomObserver(): void {
-    // Disconnect any existing observer
-    if (this.domObserver) {
-      this.domObserver.disconnect();
+    // Drop any previous page's subscription first (idempotent).
+    if (this.domUnsubscribe) {
+      this.domUnsubscribe();
+      this.domUnsubscribe = null;
     }
 
-    // Create the shared observer
-    this.domObserver = new MutationObserver((mutations) => {
-      if (!this.running) return;
-
-      // Feed mutations to ALL active engines
-      for (const engine of this.activeEngines) {
-        try {
-          engine.handleMutations(mutations);
-        } catch (e) {
-          console.error(
-            `[CQD Orchestrator] Error in ${engine.name}.handleMutations:`, e,
-          );
-        }
-      }
-
-      // Publish this cycle's topics through the S5 roles (page bus).
-      this.publishCycleTopics();
-    });
-
-    // Start observing
-    if (document.body) {
-      this.domObserver.observe(document.body, {
+    this.domUnsubscribe = getPageDomPort().observe(
+      {
         childList: true,
         subtree: true,
         attributes: true,
@@ -415,8 +404,25 @@ export class Orchestrator {
           'class',
           'style',
         ],
-      });
-    }
+      },
+      (mutations) => {
+        if (!this.running) return;
+
+        // Feed mutations to ALL active engines
+        for (const engine of this.activeEngines) {
+          try {
+            engine.handleMutations(mutations);
+          } catch (e) {
+            console.error(
+              `[CQD Orchestrator] Error in ${engine.name}.handleMutations:`, e,
+            );
+          }
+        }
+
+        // Publish this cycle's topics through the S5 roles (page bus).
+        this.publishCycleTopics();
+      },
+    );
   }
 
   // ========================================================================
@@ -537,9 +543,12 @@ export class Orchestrator {
       this.pageAbortController = null;
     }
 
-    // 2. Disconnect DOM observer
-    if (this.domObserver) {
-      this.domObserver.disconnect();
+    // 2. Unsubscribe the orchestrator's dom subscription. The shared port
+    //    itself stays alive — the title fallback and engine transients are
+    //    multiplexed on it too. Only stop() disposes the port.
+    if (this.domUnsubscribe) {
+      this.domUnsubscribe();
+      this.domUnsubscribe = null;
     }
 
     // 3. Destroy active engines
@@ -567,7 +576,7 @@ export class Orchestrator {
       `  Running: ${this.running}`,
       `  Current View: ${this.currentView || 'none'}`,
       `  Active Engines: ${this.activeEngines.map(e => `${e.name} v${e.version}`).join(', ') || 'none'}`,
-      `  DOM Observer: ${this.domObserver ? 'connected' : 'disconnected'}`,
+      `  DOM Observer: ${this.domUnsubscribe ? 'connected' : 'disconnected'}`,
       `  Page Signal: ${this.pageAbortController ? (this.pageAbortController.signal.aborted ? 'aborted' : 'active') : 'none'}`,
       '',
       engineRegistry.getSummary(),

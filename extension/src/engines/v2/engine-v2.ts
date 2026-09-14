@@ -79,6 +79,7 @@ import { injectV2Styles, removeV2Styles } from '../../v2/render/button-styles';
 import { renderFlagBadge, removeAllV2Badges } from '../../v2/render/flag-renderer';
 import { removeFlagStyles } from '../../v2/render/flag-styles';
 import { validateBatch, clearInstabilityState } from '../../v2/repair/deep-validator';
+import { getPageDomPort } from '../../adapters/dom/mutation-observer-dom-port';
 import { CorrectionQueue } from '../../v2/repair/correction-queue';
 import { BudgetController } from '../../v2/telemetry/budget-controller';
 import { PerformanceMonitor } from '../../v2/telemetry/performance-monitor';
@@ -1100,6 +1101,11 @@ export class EngineV2 implements CQDEngine {
    *
    * Timeout: 5 seconds max. If no posts appear, we scan anyway
    * (the page might genuinely have no posts).
+   *
+   * S10: the wait rides the shared page DomPort as a transient
+   * subscription instead of constructing a dedicated MutationObserver.
+   * The port delivers batches containing childList records; each of the
+   * three exit paths (ready, timeout, abort) owns its unsubscribe.
    */
   private waitForContentReady(signal: AbortSignal): Promise<void> {
     return new Promise<void>((resolve) => {
@@ -1109,32 +1115,30 @@ export class EngineV2 implements CQDEngine {
         return;
       }
 
-      // Set up a MutationObserver to wait for posts
-      const observer = new MutationObserver(() => {
-        if (document.querySelector('[data-stream-item-id]')) {
-          observer.disconnect();
-          clearTimeout(timeout);
-          resolve();
-        }
-      });
+      // Transient subscription on the shared page observer
+      const unsubscribe = getPageDomPort().observe(
+        { childList: true, subtree: true },
+        () => {
+          if (document.querySelector('[data-stream-item-id]')) {
+            unsubscribe();
+            clearTimeout(timeout);
+            resolve();
+          }
+        },
+      );
 
       // Timeout after 5 seconds
       const timeout = setTimeout(() => {
-        observer.disconnect();
+        unsubscribe();
         resolve();
       }, 5000);
 
       // If the signal is aborted, clean up
       signal.addEventListener('abort', () => {
-        observer.disconnect();
+        unsubscribe();
         clearTimeout(timeout);
         resolve();
       }, { once: true });
-
-      observer.observe(document.body, {
-        childList: true,
-        subtree: true,
-      });
     });
   }
 }
