@@ -284,7 +284,14 @@ evidence. CI/xvfb is future work.
 Implemented and verified. qa-chromium: 11 passed / 3 skipped / 0 failed; the
 skips are documented HARNESS limitations (qa-02 error-state retry timing, qa-04
 analytics popup-window context, qa-05 fixture-derived submission rows), tracked
-in a follow-up bead. qa-firefox: `simulator-sanity` passes; extension journeys
+in a follow-up bead. **All three HARNESS skips resolved 2026-09-14 (bead 0wq):
+qa-chromium 13 passed / 1 skipped / 0 failed — the only skip is the env-gated
+live canary.** qa-02 uses deterministic always-403 drive ids (`forbidden`
+prefix, no socket reset) so the real auth-cycling → all-failed path runs;
+qa-04 anchors the popup with a synthetic active-Classroom-tab `tabs.query`
+stub (fallback skip kept as a diagnostic, not a standing skip); qa-05's
+simulator submission rows now satisfy the student-work container contracts.
+qa-firefox: `simulator-sanity` passes; extension journeys
 skip with a classified ENVIRONMENT reason — probe-verified that Playwright's
 bundled Firefox deletes the unsigned sideloaded xpi at startup (signing pref
 ignored), so no extension background page can exist; see the runbook's
