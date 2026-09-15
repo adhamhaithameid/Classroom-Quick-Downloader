@@ -4,6 +4,8 @@
   import { submitUninstallFeedback } from '$lib/api/publicSite';
   import { STORE_LINKS } from '$lib/config';
   import { trackWebsiteEvent } from '$lib/analytics/websiteEvents';
+  import { parseUninstallStatsParams } from '$lib/analytics/uninstallParams';
+  import { buildUninstallViewEvent } from '$lib/analytics/uninstallViewEvent';
   import { buildUninstallNotesPayload } from '$lib/uninstall/feedback';
   import { browserDisplayName, detectBrowserFromUserAgent, type BrowserKey } from '$lib/browser/detect';
   import SeoMeta from '$lib/components/SeoMeta.svelte';
@@ -41,6 +43,9 @@
   let queryBrowser: BrowserKey = 'chrome';
   let queryVersion = 'unknown';
   let querySource = 'website';
+  // W3: compact download totals the extension appended to the uninstall URL.
+  let queryDownloads = 0;
+  let queryAttempts = 0;
   let detectedBrowser: BrowserKey = 'chrome';
 
   let submitState: 'idle' | 'sending' | 'done' | 'error' = 'idle';
@@ -76,7 +81,10 @@
       eventType: 'cta',
       action: 'install_click',
       placement: `uninstall_reinstall_${browser}`,
-      pagePath: '/uninstall'
+      pagePath: '/uninstall',
+      // W3: usage totals carried through the uninstall URL (d/a params), so
+      // they survive uninstall.
+      meta: { downloads: queryDownloads, attempts: queryAttempts }
     });
   }
 
@@ -120,6 +128,22 @@
     queryBrowser = detectedBrowser;
     queryVersion = params.get('version') || 'unknown';
     querySource = params.get('source') || 'website';
+    // W3: extension-appended download totals (d/a), NaN/negative-safe.
+    const stats = parseUninstallStatsParams(params);
+    queryDownloads = stats.downloads;
+    queryAttempts = stats.attempts;
+
+    // W3: emit the uninstall lifecycle signal on page visit so the stats
+    // carried through the uninstall URL reach the warehouse even when the
+    // user never clicks reinstall. onMount runs once per page load.
+    trackWebsiteEvent(buildUninstallViewEvent({
+      stats,
+      context: {
+        source: querySource,
+        browser: queryBrowser,
+        version: queryVersion
+      }
+    }));
   });
 </script>
 
