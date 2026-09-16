@@ -159,18 +159,19 @@ describe('download-validator', () => {
       expect(result.reason).toBe('UNEXPECTED_URL_SHAPE');
     });
 
-    it('rejects Google Forms and Sheets editor/export URLs', () => {
+    it('rejects Google Forms editor URLs but accepts Sheets exports (no-dead-ends)', () => {
       const forms = validateDownloadUrl(
         'https://docs.google.com/forms/d/e/1FAIpQLSdZBCCxLrM0oZiJF2QEFBR4RdhBj_byOSGFBD5rs74U8XaAWw/viewform?usp=dialog',
       );
       expect(forms.valid).toBe(false);
       expect(forms.reason).toBe('UNEXPECTED_URL_SHAPE');
 
+      // Sheets exports are legitimate downloads — rejecting them was a dead
+      // end for a real attachment shape.
       const sheets = validateDownloadUrl(
         'https://docs.google.com/spreadsheets/d/1abc123def/export?format=xlsx',
       );
-      expect(sheets.valid).toBe(false);
-      expect(sheets.reason).toBe('UNEXPECTED_URL_SHAPE');
+      expect(sheets.valid).toBe(true);
     });
 
     it('rejects double-encoded URLs', () => {

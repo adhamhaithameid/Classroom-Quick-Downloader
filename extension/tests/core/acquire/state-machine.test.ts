@@ -122,22 +122,23 @@ describe('PLANNED → DIRECT phase', () => {
     expect(effects).toContainEqual({ type: 'set-deadline', ms: 30000 });
   });
 
-  it('a confirmed 403 falls through to the bypass tab', () => {
+  it('a confirmed 403 rotates to the next signed-in account (zero-tab)', () => {
     const direct = { ...driveRequested(), phase: 'direct' as const };
     const { state, effects } = nextAcquireState(direct, { type: 'forbidden-confirmed' });
 
-    expect(state.phase).toBe('bypass-tab');
-    expect(effects).toContainEqual({ type: 'open-bypass-tab' });
+    expect(state.phase).toBe('drive-auth');
+    expect(effects).toContainEqual({ type: 'begin-strategy', strategy: 'drive-auth', authUser: 0 });
   });
 
-  it('a start failure on a drive file falls back to the bypass tab', () => {
+  it('a start failure on a drive file retries in place once (zero-tab)', () => {
     const direct = { ...driveRequested(), phase: 'direct' as const };
-    const { state } = nextAcquireState(direct, { type: 'start-failed' });
+    const { state, effects } = nextAcquireState(direct, { type: 'start-failed' });
 
-    expect(state.phase).toBe('bypass-tab');
+    expect(state.phase).toBe('direct');
+    expect(effects).toContainEqual({ type: 'begin-strategy', strategy: 'direct', authUser: undefined });
   });
 
-  it('a start failure on a non-drive file settles browser-fail', () => {
+  it('a start failure on a non-drive file retries once, then settles browser-fail', () => {
     const state: AcquireMachineState = {
       phase: 'direct',
       requestId: 'req-1',
@@ -146,7 +147,13 @@ describe('PLANNED → DIRECT phase', () => {
       isDrive: false,
       attemptedAuthUsers: [],
     };
-    const { state: next, effects } = nextAcquireState(state, { type: 'start-failed' });
+    // First failure: one in-place retry.
+    const first = nextAcquireState(state, { type: 'start-failed' });
+    expect(first.state.phase).toBe('direct');
+    expect(first.state.startRetried).toBe(true);
+
+    // Second failure: honest browser-fail terminal.
+    const { state: next, effects } = nextAcquireState(first.state, { type: 'start-failed' });
 
     expect(next.phase).toBe('settled');
     if (next.phase === 'settled') expect(next.outcome.status).toBe('browser-fail');
@@ -199,7 +206,7 @@ describe('DRIVE_AUTH phase — authuser rotation is data', () => {
 });
 
 describe('BYPASS_TAB phase', () => {
-  it('a confirmed 403 from drive-auth opens the bypass tab', () => {
+  it('a confirmed 403 from drive-auth rotates to the next account (zero-tab)', () => {
     const state: AcquireMachineState = {
       phase: 'drive-auth',
       requestId: 'req-1',
@@ -210,8 +217,9 @@ describe('BYPASS_TAB phase', () => {
     };
     const { state: next, effects } = nextAcquireState(state, { type: 'forbidden-confirmed' });
 
-    expect(next.phase).toBe('bypass-tab');
-    expect(effects).toContainEqual({ type: 'open-bypass-tab' });
+    expect(next.phase).toBe('drive-auth');
+    expect(next.attemptedAuthUsers).toEqual([0, 1]);
+    expect(effects).toContainEqual({ type: 'begin-strategy', strategy: 'drive-auth', authUser: 1 });
   });
 
   it('a save settling from the bypass tab resolves saved', () => {

@@ -76,6 +76,7 @@ async function loadDownloadHandler(options: LoadOptions = {}): Promise<TestConte
     bucket.add(p);
   };
   const stateModule = {
+    setPendingExpiredHook: vi.fn(),
     pendingByRequestId,
     pendingByDownloadId,
     pendingByUrl,
@@ -446,7 +447,8 @@ describe('background download handler', () => {
     );
   });
 
-  it('handleDownloadRequest fails honestly when native Drive start fails (zero-tab contract)', async () => {
+  it('handleDownloadRequest retries a refused start once, then fails with guidance (zero-tab contract)', async () => {
+    vi.useFakeTimers();
     const ctx = await loadDownloadHandler({
       isFirefox: false,
       normalizeResult: { baseUrl: 'https://drive.usercontent.google.com/download?id=abc&export=download&confirm=t', isDrive: true },
@@ -463,13 +465,17 @@ describe('background download handler', () => {
       sendResponse,
     );
 
+    // One automatic retry after the 1s backoff, then the honest terminal.
+    expect(chrome.downloads.download).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(1_100);
+    expect(chrome.downloads.download).toHaveBeenCalledTimes(2);
     expect(ctx.recordSpy).toHaveBeenCalledWith(expect.objectContaining({
       status: 'fail',
       error_type: 'BROWSER_START_FAIL',
     }));
     expect(sendResponse).toHaveBeenCalledWith({
       started: false,
-      userMessage: 'Browser blocked download.',
+      userMessage: expect.stringContaining('Browser blocked the download'),
     });
     expect(ctx.cleanupSpy).toHaveBeenCalled();
     expect(chrome.tabs.create).not.toHaveBeenCalled();
@@ -491,11 +497,8 @@ describe('background download handler', () => {
       { tab: { id: 21 } } as chrome.runtime.MessageSender,
       sendResponse,
     );
+    // The duplicate callback is swallowed by respondOnce deduplication.
     expect(sendResponse).toHaveBeenCalledTimes(1);
-    expect(sendResponse).toHaveBeenCalledWith({
-      started: false,
-      userMessage: 'Browser blocked download.',
-    });
   });
 
   it('handleDownloadRequest handles cancellation race after download ID assignment', async () => {

@@ -26,6 +26,7 @@ function makeStateModule(options: {
     bucket.add(p);
   };
   return {
+    setPendingExpiredHook: vi.fn(),
     pendingByRequestId,
     pendingByDownloadId,
     pendingByUrl,
@@ -693,8 +694,9 @@ describe('background/index', () => {
 
       onCreatedListeners[0]({ id: 77, url: 'https://example.com/file.pdf', filename: 'file.pdf' });
 
-      expect(sendStatusToTab).toHaveBeenCalledWith(pending, 'success');
-      expect(pending.finalized).toBe(true);
+      // Correlate-only (Firefox honesty): success waits for onChanged complete.
+      expect(sendStatusToTab).not.toHaveBeenCalled();
+      expect(pending.finalized).toBeFalsy();
       expect(pending.currentDownloadId).toBe(77);
     });
 
@@ -725,7 +727,8 @@ describe('background/index', () => {
       onCreatedListeners[0]({ id: 55, url: 'https://drive.usercontent.google.com/download?id=FILE1&export=download&confirm=t', filename: 'file.pdf' });
 
       expect(pending.currentDownloadId).toBe(55);
-      expect(sendStatusToTab).toHaveBeenCalledWith(pending, 'success');
+      // Correlate-only: success waits for onChanged complete (Firefox honesty).
+      expect(sendStatusToTab).not.toHaveBeenCalled();
     });
 
     it('finds pending via Drive file ID match in pendingByUrl bucket (Set iteration)', async () => {
@@ -743,7 +746,8 @@ describe('background/index', () => {
       onCreatedListeners[0]({ id: 66, url: 'https://drive.google.com/uc?id=FILE2', filename: 'file.pdf' });
 
       expect(pending.currentDownloadId).toBe(66);
-      expect(sendStatusToTab).toHaveBeenCalledWith(pending, 'success');
+      // Correlate-only (Firefox honesty): success waits for onChanged complete.
+      expect(sendStatusToTab).not.toHaveBeenCalled();
     });
 
     it('falls back to exact URL match via pendingByUrlGet when Drive file ID is null', async () => {
@@ -757,7 +761,8 @@ describe('background/index', () => {
       onCreatedListeners[0]({ id: 44, url: 'https://example.com/direct.pdf', filename: 'direct.pdf' });
 
       expect(pending.currentDownloadId).toBe(44);
-      expect(sendStatusToTab).toHaveBeenCalledWith(pending, 'success');
+      // Correlate-only (Firefox honesty): success waits for onChanged complete.
+      expect(sendStatusToTab).not.toHaveBeenCalled();
     });
 
     it('finds pending via request ID map when URL and bypass tab maps have no match', async () => {
@@ -775,7 +780,8 @@ describe('background/index', () => {
       onCreatedListeners[0]({ id: 33, url: 'https://drive.google.com/uc?id=FILE3', filename: 'file.pdf' });
 
       expect(pending.currentDownloadId).toBe(33);
-      expect(sendStatusToTab).toHaveBeenCalledWith(pending, 'success');
+      // Correlate-only (Firefox honesty): success waits for onChanged complete.
+      expect(sendStatusToTab).not.toHaveBeenCalled();
     });
 
     it('correctly picks unassigned pending from a shared-URL bucket', async () => {

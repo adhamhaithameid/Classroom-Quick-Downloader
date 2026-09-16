@@ -39,6 +39,7 @@ function makeFlowState(options: FlowOptions = {}) {
     bucket.add(p);
   };
   return {
+    setPendingExpiredHook: vi.fn(),
     pendingByRequestId,
     pendingByDownloadId,
     pendingByUrl,
@@ -355,8 +356,17 @@ describe('S9 zero-tab Drive flow — Chromium (#manual-403 regression)', () => {
       error: { current: 'NETWORK_FAILED' },
     });
 
+    // Transient: one in-place retry (2s backoff), then terminal — no account
+    // cycling.
     expect(flow.downloadCalls).toHaveLength(1);
-    expect(tryingStatusCall(flow.sendStatusSpy)).toBeFalsy();
+    vi.advanceTimersByTime(2_000); // retry fires
+    expect(flow.downloadCalls).toHaveLength(2);
+    flow.dispatchDownloadChange({
+      id: 1001,
+      state: { current: 'interrupted' },
+      error: { current: 'NETWORK_FAILED' },
+    });
+    expect(errorStatusCall(flow.sendStatusSpy, 'NETWORK_FAILED')).toBeTruthy();
     expect(flow.cleanupSpy).toHaveBeenCalledTimes(1);
     expectZeroTabs(flow);
   });
@@ -467,10 +477,11 @@ describe('S9 zero-tab Drive flow — Firefox/zen (#537): native downloads, no by
     expectZeroTabs(flow);
   });
 
-  it('onCreated with a real file mime reports success once', async () => {
+  it('onCreated with a real file mime correlates; success waits for onChanged complete (Firefox honesty)', async () => {
     const flow = await loadFlow({ isFirefox: true });
 
     flow.requestDownload();
+    // Firefox onCreated: CORRELATION only — starting is not finishing.
     flow.dispatchDownloadCreated({
       id: 1000,
       url: DRIVE_BASE,
@@ -478,11 +489,15 @@ describe('S9 zero-tab Drive flow — Firefox/zen (#537): native downloads, no by
       mime: 'application/pdf',
     });
 
+    expect(flow.sendStatusSpy).not.toHaveBeenCalled();
+    expect(flow.stateModule.getPendingByDownloadId(1000)?.requestId).toBe('req-flow');
+
+    // The browser finishing the download is what reports success.
+    flow.dispatchDownloadChange({ id: 1000, state: { current: 'complete' } });
     expect(flow.sendStatusSpy).toHaveBeenCalledWith(
       expect.objectContaining({ requestId: 'req-flow' }),
       'success',
     );
-    expect(flow.stateModule.getPendingByRequestId('req-flow')!.finalized).toBe(true);
     expectZeroTabs(flow);
   });
 });

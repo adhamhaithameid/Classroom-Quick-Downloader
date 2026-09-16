@@ -141,7 +141,7 @@ describe('P2 authuser sweep boundedness', () => {
     fc.assert(
       fc.property(
         fc.set(fc.integer({ min: 0, max: 9 }), { minLength: 0, maxLength: 10 }),
-        fc.array(fc.constantFrom('auth-attempt-failed', 'html-interstitial-seen') as unknown as AcquireEvent, { maxLength: 15 }),
+        fc.array(fc.constantFrom<AcquireEvent>({ type: 'auth-attempt-failed' }, { type: 'html-interstitial-seen' }), { maxLength: 15 }),
         (preAttempted, events) => {
           let state: AcquireMachineState = {
             ...baseState,
@@ -188,6 +188,7 @@ describe('P2 authuser sweep boundedness', () => {
           if (state.phase === 'settled') break;
         }
         expect(state.phase).toBe('settled');
+        if (state.phase !== 'settled') throw new Error('unreachable');
         expect(state.outcome.status).toBe('auth-exhausted');
         expect(settles).toBe(1);
         // Extra events after settling change nothing.
@@ -211,6 +212,7 @@ describe('P3 deadline closure — no state escapes a timeout', () => {
           expect(effects).toEqual([]);
         } else {
           expect(state.phase).toBe('settled');
+          if (state.phase !== 'settled') throw new Error('unreachable');
           expect(state.outcome.status).toBe('timeout');
           expect(effects.filter((e) => e.type === 'settle')).toHaveLength(1);
         }
@@ -307,9 +309,9 @@ describe('P5 resolver determinism and mapper totality', () => {
       'not-a-url',
     );
     fc.assert(
-      fc.property(urlArb, fc.nat(50), (url) => {
-        const a = resolveSimulatedResponse(url, { ...ctx, appDocument: ctx.appDocument, files: ctx.files });
-        const b = resolveSimulatedResponse(url, { ...ctx, appDocument: ctx.appDocument, files: ctx.files });
+      fc.property(urlArb, (url) => {
+        const a = resolveSimulatedResponse(url, ctx);
+        const b = resolveSimulatedResponse(url, ctx);
         expect(a.status).toBe(b.status);
         expect(a.contentType).toBe(b.contentType);
         expect(Buffer.compare(Buffer.from(a.body as never), Buffer.from(b.body as never))).toBe(0);
