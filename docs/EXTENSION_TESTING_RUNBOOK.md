@@ -180,3 +180,28 @@ auth-locked fixture (`authlocked-…` ids: 403 unless `authuser=1`) so the
 cycling path is exercised end-to-end in qa-06-bypass, which also asserts no
 tab was created. If Playwright's Firefox ever honors unsigned sideloading, the
 whole suite (including these journeys) runs there unchanged.
+
+## Download failure taxonomy (no-dead-ends program, 2026-09-14)
+
+Every failure a user can hit now has a classified, actionable terminal — there
+is no path that ends in silence, and none that opens a window.
+
+| Failure | Class | User sees |
+|---|---|---|
+| Invalid URL (validator) | blocked | "Download blocked: invalid URL." |
+| Browser refuses download start | browser | 1 retry, then "Browser blocked the download — check site permissions and try again." |
+| 403 / forbidden HTML (Drive) | account | invisible signed-in-account sweep → error only after all accounts |
+| NETWORK_FAILED / SERVER_FAILED / NETWORK_TIMED_OUT | transient | "Retrying…" once, then the honest error |
+| USER_CANCELED (browser shelf) | user | cancelled state — never an error |
+| FILE_FAILED | permanent | "The file could not be saved. Try downloading it again." |
+| STORAGE_FULL | permanent | "Your disk is full — free up some space and try again." |
+| CRASH | permanent | "The browser crashed during the download. Try again." |
+| SERVER_BAD_CONTENT | permanent | "The file is no longer available at its source." |
+| HTML error page (any host, incl. quota pages) | blocked | cancelled+erased, then forbidden sweep (Drive) or "This link requires signing in…" |
+| Stall (no terminal event) | timeout | 150s deadline → cancel + "This download timed out. Try again." |
+
+Verification layers: `tests/acquire-corpus.test.ts` (every class, differential
+pure-machine vs production), `tests/acquire-properties.test.ts` (fast-check
+invariants — terminals absorb events, sweep bounded, deadline closure),
+`tests/e2e/qa/qa-08-resilience.spec.ts` (real-browser journey: transient 5xx,
+quota HTML, zero-byte — all reach a classified terminal, zero windows).
