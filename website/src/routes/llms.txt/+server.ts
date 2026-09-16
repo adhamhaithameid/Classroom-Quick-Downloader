@@ -1,4 +1,4 @@
-import { STORE_LINKS } from '$lib/config';
+import { APP_VERSION, STORE_LINKS } from '$lib/config';
 import { seoPages } from '$lib/content/seoPages';
 import { SITE_NAME, toAbsoluteSiteUrl } from '$lib/seo/site';
 
@@ -35,13 +35,17 @@ export function GET() {
 
   const body = `# ${SITE_NAME}
 
-> ${SITE_NAME} (CQD) is a free, open-source browser extension for Chrome, Firefox, and Edge that adds one-click bulk download buttons inside Google Classroom, so students and teachers can download every attachment of an assignment or class without opening files one at a time. It is not affiliated with Google or Google Classroom.
+> ${SITE_NAME} (CQD) is a free, source-available browser extension for Chrome, Firefox, and Edge that adds one-click bulk download buttons inside Google Classroom, so students and teachers can download every attachment of an assignment or class without opening files one at a time. It is not affiliated with Google or Google Classroom.
 
 Key facts:
 - Price: free, no account required.
 - Browsers: Chrome, Firefox, Edge, and all Chromium browsers (Brave, Opera, Vivaldi, Arc).
 - Core problem solved: Google Classroom has no native "download all attachments" action.
 - Also handles Google Drive's "Can't scan this file for viruses" interstitial during bulk downloads.
+- Developer: Adham Haitham — independent developer.
+- License: source-available (PolyForm Noncommercial 1.0.0); free for personal and educational use.
+- Latest version: ${APP_VERSION}.
+- Support: adhamhaithameid@gmail.com or GitHub issues.
 - Source code: ${STORE_LINKS.github}
 
 ## Install
