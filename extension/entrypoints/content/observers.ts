@@ -7,16 +7,11 @@ import type { QueryRoot } from './types';
 import {
   scanTimeoutId,
   setScanTimeoutId,
-  observer,
-  setObserver,
-  rescanIntervalId,
-  setRescanIntervalId,
   effectiveEnabled,
   setEffectiveEnabled,
   initialized,
   setInitialized,
   RESCAN_DEBOUNCE_MS,
-  RESCAN_INTERVAL_MS,
   CLASSROOM_URL_PATTERN,
   DRIVE_ANCHOR_SELECTOR,
   ATTACHMENT_CONTAINER_SELECTOR,
@@ -26,8 +21,15 @@ import {
 import { extractDriveUrlFromAnchor, findDriveUrl } from './url-utils';
 import { injectButtonIntoAttachment } from './button-factory';
 import { injectStyles } from './styles';
+import { getPageDomPort } from '../../src/adapters/dom/mutation-observer-dom-port';
 
 const ATTACHMENT_ICON_SELECTOR = 'img[src*="doclist/images/mediatype/icon_"]';
+
+// S10: the button injector rides the page-wide DomPort (one platform observer
+// per page) instead of owning a raw MutationObserver. The 2000ms rescan
+// interval is deleted — mutation, scroll, and ONE bounded settle scan below
+// cover rescan duty.
+let portUnsubscribe: (() => void) | null = null;
 
 function hasAttachmentSignals(container: HTMLElement, anchor: HTMLAnchorElement): boolean {
   if (
@@ -199,9 +201,9 @@ export function setupObservers(): void {
 
   window.addEventListener('scroll', scheduleScan, { passive: true });
 
-  if (observer) return;
+  if (portUnsubscribe) return;
 
-  const obs = new MutationObserver((mutations) => {
+  const handleMutations = (mutations: MutationRecord[]) => {
     const roots = new Set<QueryRoot>();
     let shouldScan = false;
 
@@ -243,21 +245,22 @@ export function setupObservers(): void {
         scheduleScan();
       }
     }
-  });
+  };
 
-  obs.observe(document.body, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['class', 'style', 'data-cqd-processed'],
-  });
+  // Same filtering options the dedicated observer used — the port narrows
+  // batches per subscription at dispatch time.
+  portUnsubscribe = getPageDomPort().observe(
+    {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'style', 'data-cqd-processed'],
+    },
+    handleMutations,
+  );
 
-  setObserver(obs);
-
-  if (rescanIntervalId == null) {
-    setRescanIntervalId(window.setInterval(() => scheduleScan(), RESCAN_INTERVAL_MS));
-  }
-
+  // One bounded settle scan after start: this replaces the deleted rescan
+  // interval's role as a slow safety net for late-settling Classroom DOM.
   scheduleScan();
 }
 
@@ -295,19 +298,14 @@ export function stopCQD(): void {
   if (!initialized) return;
   setInitialized(false);
 
-  if (observer) {
-    observer.disconnect();
-    setObserver(null);
+  if (portUnsubscribe) {
+    portUnsubscribe();
+    portUnsubscribe = null;
   }
 
   if (scanTimeoutId !== null) {
     window.clearTimeout(scanTimeoutId);
     setScanTimeoutId(null);
-  }
-
-  if (rescanIntervalId !== null) {
-    window.clearInterval(rescanIntervalId);
-    setRescanIntervalId(null);
   }
 
   window.removeEventListener('scroll', scheduleScan);

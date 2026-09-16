@@ -56,15 +56,21 @@ async function loadObserversModule() {
   };
 }
 
+const portHost = () => window as unknown as { __cqdDomPort?: unknown };
+
 describe('content/observers', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     document.body.innerHTML = '';
+    // The injector now rides the window-anchored page DomPort — reset it so
+    // each test builds a fresh port against the current MutationObserver.
+    delete portHost().__cqdDomPort;
     vi.stubGlobal('location', new URL('https://classroom.google.com/c/123'));
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    delete portHost().__cqdDomPort;
   });
 
   it('detects classroom URLs', async () => {

@@ -9,6 +9,7 @@ import { triggerPostClick, upgradeCombinedBadge, ATTR_EDIT_DIFF } from './conten
 import { triggerPulseEffect, markTargetElements } from './content/pulse-effect';
 import { queryPostCards } from './content/post-card-utils';
 import { isStudentWorkRoute } from '../src/student_work/url-classifier';
+import { getPageDomPort } from '../src/adapters/dom/mutation-observer-dom-port';
 
 // Selector for the main stream card (works for both Stream and Classwork tabs)
 // Stream: div[data-stream-item-id], Classwork: li[data-stream-item-id]
@@ -22,9 +23,12 @@ let editedScanScheduled = false;
 // Per-tab + runtime state
 // let tabEnabled = true; // Removed
 let running = false;
-let domObserver: MutationObserver | null = null;
-let heartbeatId: number | null = null;
-let urlObserver: MutationObserver | null = null;
+// S10: both watchers ride the shared page DomPort (one platform observer per
+// page). The 2500ms heartbeat is deleted — mutation, scroll, and ONE bounded
+// settle scan after start cover rescan duty.
+let domUnsubscribe: (() => void) | null = null;
+let urlUnsubscribe: (() => void) | null = null;
+let settleScanId: number | null = null;
 
 // Flag toggle state (controlled from popup)
 let editedFlagEnabled = true;
@@ -135,39 +139,45 @@ function startEditedFeature(): void {
   // Scroll listener (Fixes missing frames after hard scroll)
   window.addEventListener('scroll', scanForEditedPosts, { passive: true });
 
-  domObserver = new MutationObserver(() => {
-    if (editedScanScheduled) return;
-    editedScanScheduled = true;
-    requestAnimationFrame(() => {
-      editedScanScheduled = false;
-      if (!running) return;
-      scanForEditedPosts();
-    });
-  });
+  domUnsubscribe = getPageDomPort().observe(
+    {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['aria-label', 'title', 'style'],
+    },
+    () => {
+      if (editedScanScheduled) return;
+      editedScanScheduled = true;
+      requestAnimationFrame(() => {
+        editedScanScheduled = false;
+        if (!running) return;
+        scanForEditedPosts();
+      });
+    },
+  );
 
-  domObserver.observe(document.body, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['aria-label', 'title', 'style'], 
-  });
-
-  heartbeatId = window.setInterval(() => {
+  // Heartbeat deleted (S10): one bounded settle scan catches late-settling
+  // DOM right after start; mutations + scroll handle everything after.
+  settleScanId = window.setTimeout(() => {
+    settleScanId = null;
     if (!running) return;
     scanForEditedPosts();
-  }, 2500);
+  }, 1500);
 
   let lastUrl = location.href;
-  urlObserver = new MutationObserver(() => {
-    const url = location.href;
-    if (url !== lastUrl) {
-      lastUrl = url;
-      if (!running) return;
-      setTimeout(scanForEditedPosts, 500);
-      setTimeout(scanForEditedPosts, 1500);
-    }
-  });
-  urlObserver.observe(document, { subtree: true, childList: true });
+  urlUnsubscribe = getPageDomPort().observe(
+    { subtree: true, childList: true },
+    () => {
+      const url = location.href;
+      if (url !== lastUrl) {
+        lastUrl = url;
+        if (!running) return;
+        setTimeout(scanForEditedPosts, 500);
+        setTimeout(scanForEditedPosts, 1500);
+      }
+    },
+  );
 }
 
 function stopEditedFeature(): void {
@@ -176,17 +186,17 @@ function stopEditedFeature(): void {
 
   window.removeEventListener('scroll', scanForEditedPosts);
 
-  if (domObserver) {
-    domObserver.disconnect();
-    domObserver = null;
+  if (domUnsubscribe) {
+    domUnsubscribe();
+    domUnsubscribe = null;
   }
-  if (heartbeatId != null) {
-    window.clearInterval(heartbeatId);
-    heartbeatId = null;
+  if (urlUnsubscribe) {
+    urlUnsubscribe();
+    urlUnsubscribe = null;
   }
-  if (urlObserver) {
-    urlObserver.disconnect();
-    urlObserver = null;
+  if (settleScanId != null) {
+    window.clearTimeout(settleScanId);
+    settleScanId = null;
   }
   editedScanScheduled = false;
 
