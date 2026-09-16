@@ -402,17 +402,52 @@ export default defineBackground(() => {
     if (!pending) return;
 
     if (delta.state && delta.state.current === 'complete') {
-      const duration = Date.now() - pending.startTime;
-      const ext = pending.finalExtension || pending.fileMeta?.ext || 'unknown';
-      sendStatusToTab(pending, 'success');
-      recordDownloadEvent({
-        type: ext,
-        status: 'success',
-        duration_ms: duration,
-        bypass_used: false,
-      });
-      if (pending.fileMeta?.name) recentDownloads.set(pending.fileMeta.name, Date.now());
-      cleanup(pending, delta.id);
+      // No-dead-ends: verify what actually landed. Chromium does NOT always
+      // fire onDeterminingFilename (a text/html response with no
+      // Content-Disposition completes silently), so read the finished
+      // DownloadItem: an HTML "download" of a Drive file is an error page —
+      // erase it and walk the forbidden path instead of reporting a fake
+      // success.
+      const reportSuccess = (finalFilename?: string): void => {
+        const duration = Date.now() - pending.startTime;
+        const ext =
+          pending.finalExtension ||
+          (finalFilename ? getFilenameExt(finalFilename) : undefined) ||
+          pending.fileMeta?.ext ||
+          'unknown';
+        sendStatusToTab(pending, 'success');
+        recordDownloadEvent({
+          type: ext,
+          status: 'success',
+          duration_ms: duration,
+          bypass_used: false,
+        });
+        if (pending.fileMeta?.name) recentDownloads.set(pending.fileMeta.name, Date.now());
+        cleanup(pending, delta.id);
+      };
+      try {
+        chrome.downloads.search({ id: delta.id }, (items) => {
+          const _ = chrome.runtime.lastError;
+          const item = items?.[0];
+          const itemMime = (item?.mime || '').toLowerCase();
+          if (pending.isDrive && !pending.finalized && itemMime.includes('html')) {
+            cancelledByUs.add(delta.id);
+            chrome.downloads.cancel(delta.id, () => {
+              const _e = chrome.runtime.lastError;
+              chrome.downloads.erase({ id: delta.id }, () => {
+                const _e2 = chrome.runtime.lastError;
+              });
+              unbindDownloadId(delta.id);
+              handleForbiddenFailure(pending);
+            });
+            return;
+          }
+          reportSuccess(item?.filename);
+        });
+      } catch {
+        // Search unavailable — report the completion without verification.
+        reportSuccess(undefined);
+      }
       return;
     }
 
