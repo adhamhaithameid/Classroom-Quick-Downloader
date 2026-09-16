@@ -249,6 +249,102 @@ describe('fitness: file-size budget', () => {
   });
 });
 
+// ===========================================================================
+// S10 Task 5 — observer & interval budgets
+//
+//   6. ONE platform MutationObserver per page: `new MutationObserver` is
+//      banned under src/** and entrypoints/** except the DomPort adapter
+//      (src/adapters/dom/), where the page's single observer physically
+//      lives. Everything else subscribes through the port multiplexer.
+//   7. The Classroom entrypoints run no `setInterval` heartbeats — their
+//      polling era ended in S10; they observe through the shared port.
+// ===========================================================================
+
+const MUTATION_OBSERVER_CONSTRUCTION = /\bnew\s+MutationObserver\b/;
+
+/**
+ * Allowlist of src/entrypoints-relative paths that may construct the
+ * platform observer. Sole sanctioned site: the DomPort adapter. The second
+ * entry is a narrowly-scoped temporary grant for live-but-unmigrated v1
+ * button code — it must shrink in S11.
+ */
+const MUTATION_OBSERVER_ALLOWLIST = new Set([
+  'src/adapters/dom/mutation-observer-dom-port.ts',
+  // TODO(S11): migrate — download-all's per-button syncObserver still has
+  // live runtime callers (refresh.ts ← student_work_by_status /
+  // download_all entrypoints) even though page-wide observation rides the
+  // port. Delete this entry when the button sync rides the port too.
+  'src/download-all/button-controller.ts',
+]);
+
+const CLASSROOM_INTERVAL_BAN = /\bsetInterval\b/;
+
+/** The six Classroom entrypoints whose setInterval heartbeat era ended in S10. */
+const CLASSROOM_ENTRYPOINTS = [
+  'entrypoints/content/observers.ts',
+  'entrypoints/comment_frame.content.ts',
+  'entrypoints/edited_frame.content.ts',
+  'entrypoints/download_all.content.ts',
+  'entrypoints/student_work_by_status.content.ts',
+  'entrypoints/student_work_sidecar.content.ts',
+];
+
+/** extension-relative path of a scanned file (posix separators). */
+function relToExt(file: string): string {
+  return relative(EXT, file).replace(/\\/g, '/');
+}
+
+describe('fitness: one MutationObserver per page (S10)', () => {
+  it('flags construction outside the adapter allowlist (scanner canary)', () => {
+    expect(MUTATION_OBSERVER_CONSTRUCTION.test('const o = new MutationObserver(cb);')).toBe(true);
+    // The DomPort adapter class is not a platform construction.
+    expect(MUTATION_OBSERVER_CONSTRUCTION.test('const o = new MutationObserverDomPort();')).toBe(false);
+    expect(MUTATION_OBSERVER_ALLOWLIST.has('src/adapters/dom/mutation-observer-dom-port.ts')).toBe(true);
+    expect(MUTATION_OBSERVER_ALLOWLIST.has('src/v2/model/element-lifecycle.ts')).toBe(false);
+    expect(MUTATION_OBSERVER_ALLOWLIST.has('entrypoints/content/observers.ts')).toBe(false);
+  });
+
+  it('every allowlist entry names a real file so the rule cannot rot vacuously', () => {
+    expect(MUTATION_OBSERVER_ALLOWLIST.size).toBeGreaterThan(0);
+    for (const allowed of MUTATION_OBSERVER_ALLOWLIST) {
+      expect(existsSync(join(EXT, allowed)), `${allowed} must exist`).toBe(true);
+    }
+  });
+
+  it('src/** and entrypoints/** construct no MutationObserver outside the dom adapter', () => {
+    const offenders: string[] = [];
+    for (const root of [SRC, join(EXT, 'entrypoints')]) {
+      for (const file of walk(root)) {
+        if (!MUTATION_OBSERVER_CONSTRUCTION.test(codeOf(file))) continue;
+        if (MUTATION_OBSERVER_ALLOWLIST.has(relToExt(file))) continue;
+        offenders.push(relToExt(file));
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});
+
+describe('fitness: classroom entrypoints run no setInterval heartbeats (S10)', () => {
+  it('flags setInterval in a violating snippet (scanner canary)', () => {
+    expect(CLASSROOM_INTERVAL_BAN.test('window.setInterval(tick, 4000);')).toBe(true);
+    expect(CLASSROOM_INTERVAL_BAN.test('setTimeout(tick, 4000);')).toBe(false);
+  });
+
+  it('all six Classroom entrypoints exist so the rule cannot pass vacuously', () => {
+    for (const rel of CLASSROOM_ENTRYPOINTS) {
+      expect(existsSync(join(EXT, rel)), `${rel} must exist`).toBe(true);
+    }
+  });
+
+  it('the six Classroom entrypoints schedule no setInterval heartbeats', () => {
+    const offenders: string[] = [];
+    for (const rel of CLASSROOM_ENTRYPOINTS) {
+      if (CLASSROOM_INTERVAL_BAN.test(codeOf(join(EXT, rel)))) offenders.push(rel);
+    }
+    expect(offenders).toEqual([]);
+  });
+});
+
 describe('fitness: live surface', () => {
   it('all new layers exist so the suite cannot pass vacuously', () => {
     for (const layer of NEW_LAYERS) {
