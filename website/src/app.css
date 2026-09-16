@@ -52,10 +52,10 @@
   --shadow-green: 0 4px 24px rgba(26, 139, 85, 0.12);
 
   /* Glass language — shared with the navbar surface so cards speak the
-     same material: gradient glass, saturated blur, white specular edge,
-     and the navbar's springy morph easing. */
+     same material. The gradient is fully opaque: a translucent surface let
+     the ambient orbs bleed through and read as a site-wide opacity drop. */
   --glass-ease: cubic-bezier(0.32, 1.35, 0.42, 1);
-  --glass-bg: linear-gradient(120deg, rgba(255, 255, 255, 0.6), rgba(248, 252, 249, 0.42));
+  --glass-bg: linear-gradient(120deg, #ffffff, #f8fcf9);
   --glass-border: rgba(255, 255, 255, 0.72);
   --glass-highlight: rgba(255, 255, 255, 0.85);
 
@@ -185,8 +185,6 @@ select {
   border-radius: var(--radius);
   border: 1px solid var(--glass-border);
   background: var(--glass-bg);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
   box-shadow:
     0 1px 2px rgba(15, 20, 25, 0.05),
     0 12px 30px rgba(15, 20, 25, 0.1),
@@ -196,47 +194,12 @@ select {
 }
 
 .card:hover {
-  transform: translateY(-3px);
-  border-color: rgba(26, 139, 85, 0.22);
+  transform: translateY(-2px);
+  border-color: rgba(26, 139, 85, 0.16);
   box-shadow:
-    0 8px 20px rgba(26, 139, 85, 0.12),
-    0 20px 44px rgba(15, 20, 25, 0.12),
+    0 2px 4px rgba(15, 20, 25, 0.06),
+    0 16px 36px rgba(15, 20, 25, 0.12),
     inset 0 1px 0 var(--glass-highlight);
-}
-
-/* Navbar specular sheen: top gloss band + diagonal sheen. */
-.card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 36%),
-    linear-gradient(120deg, rgba(255, 255, 255, 0.3), rgba(239, 247, 250, 0.16) 48%, rgba(255, 255, 255, 0.28));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.35);
-}
-
-/* Pointer-tracked specular sweep (fed by the glassSheen action). */
-.card::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  opacity: 0;
-  background: radial-gradient(
-    240px circle at var(--card-mx, 50%) var(--card-my, 0%),
-    rgba(255, 255, 255, 0.55),
-    rgba(255, 255, 255, 0) 72%
-  );
-  transition: opacity 0.35s ease;
-}
-
-.card:hover::after {
-  opacity: 1;
 }
 
 .state-loading,
@@ -261,8 +224,6 @@ select {
   border-radius: var(--radius);
   border: 1px solid var(--glass-border);
   background: var(--glass-bg);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
   padding: 18px;
   animation: riseIn 0.6s ease both;
   box-shadow:
@@ -274,10 +235,10 @@ select {
 
 .metric:hover {
   transform: translateY(-2px);
-  border-color: rgba(26, 139, 85, 0.22);
+  border-color: rgba(26, 139, 85, 0.16);
   box-shadow:
-    0 8px 20px rgba(26, 139, 85, 0.12),
-    0 16px 36px rgba(15, 20, 25, 0.1),
+    0 2px 4px rgba(15, 20, 25, 0.06),
+    0 16px 36px rgba(15, 20, 25, 0.12),
     inset 0 1px 0 var(--glass-highlight);
 }
 
