@@ -107,7 +107,7 @@ describe('fetchWebsiteSnapshot', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('loads canonical snapshot from Oracle and caches for 3 hours', async () => {
+  it('loads canonical snapshot from Oracle and caches for 6 hours', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-02-23T00:00:00.000Z'));
 
@@ -192,7 +192,7 @@ describe('fetchWebsiteSnapshot', () => {
     expect(first.map.totals.downloads).toBe(15);
     expect(first.overview.installs.usersTotal).toBe(20);
     expect(second.fetchedAtUtc).toBe(first.fetchedAtUtc);
-    expect(first.nextRefreshAtUtc - first.fetchedAtUtc).toBe(ORACLE_SNAPSHOT_REFRESH_MS);
+    expect(first.nextRefreshAtUtc - first.fetchedAtUtc).toBe(6 * 60 * 60 * 1000);
   }, 15_000);
 
   it('keeps session-pinned snapshot stable until forced refresh', async () => {
@@ -263,11 +263,12 @@ describe('fetchWebsiteSnapshot', () => {
     const forced = await fetchWebsiteSnapshot({ force: true });
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
-    vi.setSystemTime(new Date('2026-02-23T04:10:00.000Z'));
+    vi.setSystemTime(new Date('2026-02-23T07:10:00.000Z'));
     const refreshed = await fetchWebsiteSnapshot();
-    // Self-heal: >3h since the last network fetch, the pipeline re-fetches and
-    // RE-STAGES the next snapshot, but the running session stays pinned —
-    // the returned snapshot is still the pinned one (asserted below).
+    // Self-heal: past the staged snapshot's own 6h refresh window since the
+    // last network fetch, the pipeline re-fetches and RE-STAGES the next
+    // snapshot, but the running session stays pinned — the returned snapshot
+    // is still the pinned one (asserted below).
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(refreshed.fetchedAtUtc).toBe(forced.fetchedAtUtc);
   });
