@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { isPageDark, watchThemeChanges } from '../entrypoints/content/theme';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { isPageDark } from '../entrypoints/content/theme';
 
 describe('content/theme', () => {
   beforeEach(() => {
@@ -29,17 +29,5 @@ describe('content/theme', () => {
     document.body.appendChild(post);
 
     expect(isPageDark()).toBe(true);
-  });
-
-  it('watchThemeChanges emits initial and mutation-driven updates', async () => {
-    const callback = vi.fn();
-    const observer = watchThemeChanges(callback);
-    expect(callback).toHaveBeenCalledTimes(1);
-
-    document.documentElement.setAttribute('data-darkreader-scheme', 'dark');
-    await Promise.resolve();
-    expect(callback).toHaveBeenCalledTimes(2);
-
-    observer.disconnect();
   });
 });

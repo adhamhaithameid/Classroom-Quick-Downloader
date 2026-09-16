@@ -29,9 +29,6 @@ export type { ScanResult, ScannedPost, ScannedFile } from './dom-scanner';
 export { reconcile, applyOpsToModel } from './reconciler';
 export type { ReconcileOp, ReconcileResult } from './reconciler';
 
-// Element lifecycle
-export { ElementLifecycleObserver } from './element-lifecycle';
-export type { LifecycleCallback, LifecycleObserverOptions } from './element-lifecycle';
 
 // Viewport observer
 export { ViewportObserver } from './viewport-observer';
