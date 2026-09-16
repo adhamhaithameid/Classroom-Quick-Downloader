@@ -37,6 +37,29 @@ describe('SeoContentPage brand guard', () => {
     expect(html).toContain('Frequently Asked Questions');
   });
 
+  it('renders section links as descriptive anchors for cross-linking guides', () => {
+    const configWithLinks: SeoPageConfig = {
+      ...config,
+      sections: [
+        ...config.sections,
+        {
+          heading: 'Browser Guides',
+          paragraphs: ['Pick your browser:'],
+          links: [
+            { label: 'Firefox install guide', href: '/install/firefox' },
+            { label: 'Edge install guide', href: '/install/edge' }
+          ]
+        }
+      ]
+    };
+    const { body } = render(SeoContentPage, { props: { config: configWithLinks } });
+    const html = body.replace(/\s+/g, ' ');
+    expect(html).toContain('Firefox install guide');
+    expect(html).toContain('Edge install guide');
+    expect(html).toContain('href="/install/firefox"');
+    expect(html).toContain('href="/install/edge"');
+  });
+
   it('does not reintroduce the off-brand teal palette', () => {
     const source = componentSource();
     expect(source).not.toContain('#047857');
