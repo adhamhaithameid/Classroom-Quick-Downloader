@@ -172,6 +172,47 @@ describe('DomPort multiplexer: one observer, many subscriptions', () => {
     expect(seen).toHaveLength(2);
   });
 
+  it('a throwing subscription never starves its siblings in the same batch', () => {
+    const port = new MutationObserverDomPort(document);
+    const seen: MutationRecord[][] = [];
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    port.observe({ childList: true }, () => {
+      throw new Error('subscriber A exploded');
+    });
+    port.observe({ childList: true }, (m) => seen.push(m));
+    const observer = FakeMutationObserver.instances[0]!;
+
+    // The dispatch loop survives A's exception; B receives the SAME batch.
+    expect(() => observer.emit([{ type: 'childList' }])).not.toThrow();
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.length).toBe(1);
+
+    // The failure is not silent (codebase idiom: prefixed console.warn)…
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+
+    // …and later batches still reach BOTH subscriptions — A stays subscribed.
+    observer.emit([{ type: 'childList' }]);
+    expect(seen).toHaveLength(2);
+    expect(port.subscriptionCount).toBe(2);
+  });
+
+  it('a throwing subscription does not block unsubscriptions made earlier in the batch', () => {
+    // Ordering case: the throwing subscriber runs FIRST in Map insertion
+    // order, and the healthy one after it must still run (the pre-fix bug
+    // starves every subscription after the thrower for that batch).
+    const port = new MutationObserverDomPort(document);
+    const healthy: MutationRecord[][] = [];
+    port.observe({ childList: true }, () => {
+      throw new Error('first subscriber exploded');
+    });
+    port.observe({ childList: true }, (m) => healthy.push(m));
+    const observer = FakeMutationObserver.instances[0]!;
+
+    observer.emit([{ type: 'childList' }]);
+    expect(healthy).toHaveLength(1);
+  });
+
   it('unsubscribes only that callback and leaves the other live', () => {
     const port = new MutationObserverDomPort(document);
     const first = vi.fn();

@@ -108,7 +108,16 @@ export class MutationObserverDomPort implements DomPort {
 
   private dispatch(mutations: MutationRecord[]): void {
     for (const subscription of this.subscriptions.values()) {
-      if (batchMatches(subscription.options, mutations)) subscription.callback(mutations);
+      if (!batchMatches(subscription.options, mutations)) continue;
+      // Fault isolation: one broken subscriber must never starve the others
+      // in the batch (the pre-S10 per-feature observers were isolated by
+      // construction). Swallow with a prefixed warn, matching the
+      // [CQD …] logging idiom; the subscription stays live for later batches.
+      try {
+        subscription.callback(mutations);
+      } catch (error) {
+        console.warn('[CQD DomPort] subscription callback threw:', error);
+      }
     }
   }
 }
