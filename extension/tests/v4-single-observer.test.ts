@@ -312,6 +312,106 @@ describe('getPageDomPort per-page singleton', () => {
   });
 });
 
+// ===========================================================================
+// S10 Task 5 — the adapter qa probe surface
+// ===========================================================================
+
+describe('S10: adapter observerCreatedCount + disposed probe getters', () => {
+  beforeEach(() => {
+    FakeMutationObserver.instances = [];
+    vi.stubGlobal('MutationObserver', FakeMutationObserver);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('observerCreatedCount is a monotonic count of platform constructions', () => {
+    const port = new MutationObserverDomPort(document);
+    expect(port.observerCreatedCount).toBe(0);
+
+    const off = port.observe({ childList: true }, () => {});
+    expect(port.observerCreatedCount).toBe(1);
+    expect(FakeMutationObserver.instances).toHaveLength(1);
+
+    // Unsubscribe (even the last one) never rebuilds — disconnect is reuse.
+    off();
+    expect(port.observerCreatedCount).toBe(1);
+
+    // Only an owner dispose() + revival constructs a second observer.
+    port.dispose();
+    port.observe({ childList: true }, () => {});
+    expect(port.observerCreatedCount).toBe(2);
+    expect(FakeMutationObserver.instances).toHaveLength(2);
+    port.dispose();
+  });
+
+  it('disposed flips true on dispose() and false again when observe revives', () => {
+    const port = new MutationObserverDomPort(document);
+    expect(port.disposed).toBe(false);
+
+    port.observe({ childList: true }, () => {});
+    expect(port.disposed).toBe(false);
+
+    port.dispose();
+    expect(port.disposed).toBe(true);
+
+    port.observe({ childList: true }, () => {});
+    expect(port.disposed).toBe(false);
+    port.dispose();
+  });
+});
+
+describe('S10: window.__cqdDomPortInfo — the page singleton qa probe', () => {
+  type PortInfo = {
+    subscriptionCount: () => number;
+    observerCreatedCount: () => number;
+    disposed: () => boolean;
+  };
+  const infoOf = () => (window as unknown as { __cqdDomPortInfo?: PortInfo }).__cqdDomPortInfo;
+
+  beforeEach(() => {
+    FakeMutationObserver.instances = [];
+    delete (window as { __cqdDomPort?: unknown }).__cqdDomPort;
+    delete (window as { __cqdDomPortInfo?: unknown }).__cqdDomPortInfo;
+    vi.stubGlobal('MutationObserver', FakeMutationObserver);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    (window as unknown as { __cqdDomPort?: MutationObserverDomPort }).__cqdDomPort?.dispose();
+    delete (window as { __cqdDomPort?: unknown }).__cqdDomPort;
+    delete (window as { __cqdDomPortInfo?: unknown }).__cqdDomPortInfo;
+  });
+
+  it('exposes live subscription/created/disposed state of the page port', () => {
+    const port = getPageDomPort();
+    const info = infoOf();
+    expect(info).toBeDefined();
+
+    expect(info!.subscriptionCount()).toBe(0);
+    expect(info!.observerCreatedCount()).toBe(0);
+    expect(info!.disposed()).toBe(false);
+
+    const off = port.observe({ childList: true }, () => {});
+    expect(info!.subscriptionCount()).toBe(1);
+    expect(info!.observerCreatedCount()).toBe(1);
+
+    off();
+    expect(info!.subscriptionCount()).toBe(0);
+
+    port.dispose();
+    expect(info!.disposed()).toBe(true);
+  });
+
+  it('registers the info once — repeated getPageDomPort calls keep it stable', () => {
+    getPageDomPort();
+    const first = infoOf();
+    getPageDomPort();
+    expect(infoOf()).toBe(first);
+  });
+});
+
 describe('multiplexer over the real platform observer', () => {
   beforeEach(() => {
     // The global setup fakes timers; mutation delivery needs the real event loop.

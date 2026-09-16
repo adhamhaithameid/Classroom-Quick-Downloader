@@ -63,6 +63,8 @@ export class MutationObserverDomPort implements DomPort {
   private readonly subscriptions = new Map<number, Subscription>();
   private observer: MutationObserver | null = null;
   private nextId = 1;
+  private disposedSinceLastObserve = false;
+  private createdObservers = 0;
 
   constructor(document: Document = window.document) {
     this.document = document;
@@ -73,12 +75,28 @@ export class MutationObserverDomPort implements DomPort {
     return this.subscriptions.size;
   }
 
+  /** True between dispose() and the next observe() that revives the port. */
+  get disposed(): boolean {
+    return this.disposedSinceLastObserve;
+  }
+
+  /**
+   * Monotonic count of platform MutationObservers this instance constructed.
+   * A healthy page stays at 1 for its whole life: the multiplexer reuses one
+   * observer across subscribe/unsubscribe cycles; only an owner dispose()
+   * followed by a revival constructs another.
+   */
+  get observerCreatedCount(): number {
+    return this.createdObservers;
+  }
+
   querySelectorAll<T extends Element = Element>(selector: string, root?: ParentNode): T[] {
     const scope = root ?? this.document;
     return Array.from(scope.querySelectorAll<T>(selector));
   }
 
   observe(options: MutationObserverInit, callback: MutationCallback): Unsubscribe {
+    this.disposedSinceLastObserve = false;
     const id = this.nextId++;
     this.subscriptions.set(id, { options, callback });
     // Idempotent on the platform: re-observing the same target just refreshes.
@@ -94,6 +112,7 @@ export class MutationObserverDomPort implements DomPort {
 
   /** Owner teardown: disconnect the real observer and drop every subscription. */
   dispose(): void {
+    this.disposedSinceLastObserve = true;
     this.subscriptions.clear();
     this.observer?.disconnect();
     this.observer = null;
@@ -101,6 +120,7 @@ export class MutationObserverDomPort implements DomPort {
 
   private ensureObserver(): MutationObserver {
     if (!this.observer) {
+      this.createdObservers += 1;
       this.observer = new MutationObserver((mutations) => this.dispatch(mutations));
     }
     return this.observer;
@@ -127,12 +147,33 @@ export function createMutationObserverDomPort(document: Document): DomPort {
 }
 
 /**
+ * Additive debug surface for the qa-08 single-observer journey (extension
+ * world only — content scripts run isolated, so the page's main world never
+ * sees this). Getter-shaped, so every read is current at
+ * subscribe/unsubscribe/dispose time without the port pushing updates.
+ */
+export interface CqdDomPortDebugInfo {
+  subscriptionCount: () => number;
+  observerCreatedCount: () => number;
+  disposed: () => boolean;
+}
+
+/**
  * Per-PAGE singleton: S10's separate content-script entries must share one
  * DomPort (hence one platform observer) per page. Anchored on window so
  * independently-evaluated module copies still converge on the same instance.
+ * Also registers `window.__cqdDomPortInfo` once, over that same instance.
  */
 export function getPageDomPort(): MutationObserverDomPort {
-  const host = window as unknown as { __cqdDomPort?: MutationObserverDomPort };
-  host.__cqdDomPort ??= new MutationObserverDomPort();
-  return host.__cqdDomPort;
+  const host = window as unknown as {
+    __cqdDomPort?: MutationObserverDomPort;
+    __cqdDomPortInfo?: CqdDomPortDebugInfo;
+  };
+  const port = (host.__cqdDomPort ??= new MutationObserverDomPort());
+  host.__cqdDomPortInfo ??= {
+    subscriptionCount: () => port.subscriptionCount,
+    observerCreatedCount: () => port.observerCreatedCount,
+    disposed: () => port.disposed,
+  };
+  return port;
 }
