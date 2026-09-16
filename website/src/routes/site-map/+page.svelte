@@ -3,7 +3,6 @@
   import { SITE_URL } from '$lib/config';
   import SeoMeta from '$lib/components/SeoMeta.svelte';
   import { INDEXABLE_SITE_PATHS } from '$lib/seo/site';
-  import { glassSheen } from '$lib/actions/glassSheen';
 
   type SiteMapGroup =
     | 'Core pages'
@@ -138,7 +137,7 @@
 
   <section class="site-map-sections">
     {#each groupedLinks as section}
-      <article class="site-map-card glass-panel glass-hover" use:glassSheen>
+      <article class="site-map-card glass-panel glass-hover">
         <h2>{section.group}</h2>
         <ul>
           {#each section.links as link}
@@ -193,10 +192,6 @@
   .site-map-card {
     border-radius: 0.9rem;
     padding: 1rem 1.1rem 1.1rem;
-  }
-
-  .site-map-card:hover {
-    transform: translateY(-2px);
   }
 
   .site-map-card h2 {
