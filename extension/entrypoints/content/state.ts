@@ -40,14 +40,15 @@ export const ATTACHMENT_CONTAINER_SELECTOR = [
   '.ndfuHe',  // Student Work attachment wrapper
 ].join(', ');
 
-/** Patterns to identify Drive URLs */
+/** Patterns to identify Drive URLs. The last entry is scoped to Google hosts:
+ *  a bare /file/d/ match made ANY external link look like a Drive file, and
+ *  the download validator then rejected it — a button that can only produce
+ *  a dead end. External links never get download buttons. */
 export const DRIVE_URL_PATTERNS: RegExp[] = [
-  /https:\/\/drive\.google\.com\/file\/d\//,
-  /https:\/\/drive\.google\.com\/open\?/,
-  /https:\/\/drive\.google\.com\/uc\?/,
+  /https:\/\/drive\.google\.com\/(?:u\/\d+\/)?(?:file\/d\/|open\?|uc\?)/,
   /https:\/\/classroom\.google\.com\/drive\//,
-  /https:\/\/docs\.google\.com\/(?:document|presentation|drawings|spreadsheets)\/d\//,
-  /\/file\/d\/[A-Za-z0-9_-]+/,
+  /https:\/\/docs\.google\.com\/(?:u\/\d+\/)?(?:document|presentation|drawings|spreadsheets)\/d\//,
+  /https:\/\/[a-z0-9.-]+\.google(?:usercontent)?\.com\/[^/]*\/file\/d\/[A-Za-z0-9_-]+/,
 ];
 
 // --- DOM ATTRIBUTES ---
