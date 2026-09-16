@@ -61,8 +61,10 @@ export interface NameHint {
 // ACQUISITION TYPES (design §7)
 // ============================================================================
 
-/** The strategies the AcquireEngine may drive, in fallback order. */
-export type AcquireStrategyName = 'direct' | 'drive-auth' | 'bypass-tab';
+/** The strategies the AcquireEngine may drive, in fallback order. `api` is
+ *  the reserved third tier (Drive files.get via OAuth) — flag-gated off until
+ *  the #398 consent model ships; see docs/API_DOWNLOAD_TIER.md. */
+export type AcquireStrategyName = 'direct' | 'drive-auth' | 'bypass-tab' | 'api';
 
 /** Which acquisition state a download is in when progress is reported. */
 export type AcquirePhase =
