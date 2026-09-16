@@ -54,6 +54,10 @@ interface AcquireCommon {
   attemptedAuthUsers: number[];
   /** Authuser carried in from the original URL, if any. */
   initialAuthUser?: number;
+  /** Transient interrupts already retried in place (bounded to one). */
+  transientRetried?: boolean;
+  /** Browser start failures already retried (bounded to one). */
+  startRetried?: boolean;
 }
 
 export type AcquireMachineState =
@@ -72,6 +76,7 @@ export type AcquireMachineState =
 export type AcquireEvent =
   | { type: 'validate'; ok: boolean; reason?: string }
   | { type: 'plan'; isDrive: boolean; strategies: AcquireStrategyName[] }
+  | { type: 'strategy-started'; strategy: AcquireStrategyName }
   | { type: 'download-started'; downloadId: number }
   | { type: 'start-failed' }
   | { type: 'html-interstitial-seen' }
@@ -79,6 +84,7 @@ export type AcquireEvent =
   | { type: 'auth-attempt-failed' }
   | { type: 'bypass-tab-opened'; tabId: number }
   | { type: 'saved'; downloadId?: number }
+  | { type: 'transient-failed'; detail?: string }
   | { type: 'interrupted'; detail?: string }
   | { type: 'timeout' }
   | { type: 'cancel' };
@@ -190,6 +196,22 @@ export function nextAcquireState(
       };
     }
 
+    case 'strategy-started': {
+      // The engine reports the planned strategy actually beginning — the
+      // planned phase is never a dead state.
+      if (state.phase !== 'planned') break;
+      if (event.strategy === 'direct') {
+        return {
+          state: { ...state, phase: 'direct', authUser: state.initialAuthUser },
+          effects: [],
+        };
+      }
+      if (event.strategy === 'drive-auth') {
+        return { state: { ...state, phase: 'drive-auth' }, effects: [] };
+      }
+      break;
+    }
+
     case 'download-started': {
       if (state.phase === 'direct' || state.phase === 'drive-auth') {
         return { state: { ...state, downloadId: event.downloadId }, effects: [] };
@@ -199,7 +221,17 @@ export function nextAcquireState(
 
     case 'start-failed': {
       if (state.phase !== 'direct') break;
-      if (state.isDrive) return toBypassTab(state);
+      // Zero-tab contract: no bypass-tab fallback. Retry once — the browser
+      // can transiently refuse a start — then settle with honest guidance.
+      if (!state.startRetried) {
+        return {
+          state: { ...state, startRetried: true },
+          effects: [
+            { type: 'begin-strategy', strategy: 'direct', authUser: state.authUser },
+            { type: 'set-deadline', ms: ATTEMPT_DEADLINE_MS },
+          ],
+        };
+      }
       const outcome: AcquireOutcome = { status: 'browser-fail', detail: 'browser blocked download' };
       return { state: { ...state, phase: 'settled', outcome }, effects: settled(state, outcome) };
     }
@@ -215,7 +247,34 @@ export function nextAcquireState(
     }
 
     case 'forbidden-confirmed': {
-      if (state.phase === 'direct' || state.phase === 'drive-auth') return toBypassTab(state);
+      // Zero-tab: the account sweep IS the fallback — no bypass tab. Drive
+      // rotates to the next signed-in account; non-Drive has no account axis
+      // and fails honestly.
+      if (state.phase === 'direct' || state.phase === 'drive-auth') {
+        if (state.isDrive) return rotateAuthUser(state);
+        const outcome: AcquireOutcome = { status: 'failed', detail: 'forbidden' };
+        return { state: { ...state, phase: 'settled', outcome }, effects: settled(state, outcome) };
+      }
+      break;
+    }
+
+    case 'transient-failed': {
+      // NETWORK_FAILED / SERVER_FAILED class: one in-place retry with a fresh
+      // deadline, then settle — transient failures are worth one more try,
+      // never an unbounded loop.
+      if (state.phase === 'direct' || state.phase === 'drive-auth') {
+        if (!state.transientRetried) {
+          return {
+            state: { ...state, transientRetried: true },
+            effects: [
+              { type: 'begin-strategy', strategy: state.phase === 'direct' ? 'direct' : 'drive-auth', authUser: state.authUser },
+              { type: 'set-deadline', ms: ATTEMPT_DEADLINE_MS },
+            ],
+          };
+        }
+        const outcome: AcquireOutcome = { status: 'failed', detail: event.detail ?? 'transient' };
+        return { state: { ...state, phase: 'settled', outcome }, effects: settled(state, outcome) };
+      }
       break;
     }
 
