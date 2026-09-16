@@ -21,6 +21,7 @@ import {
 import { extractDriveUrlFromAnchor, findDriveUrl } from './url-utils';
 import { injectButtonIntoAttachment } from './button-factory';
 import { injectStyles } from './styles';
+import { gateV1Stack } from './mode-gate';
 import { getPageDomPort } from '../../src/adapters/dom/mutation-observer-dom-port';
 
 const ATTACHMENT_ICON_SELECTOR = 'img[src*="doclist/images/mediatype/icon_"]';
@@ -282,7 +283,7 @@ export function applyEffectiveState(enabled: boolean): void {
 /**
  * Start CQD for this tab.
  */
-export function startCQD(): void {
+function startCQDInternal(): void {
   if (initialized) return;
   if (!isGoogleClassroom()) return;
   setInitialized(true);
@@ -294,7 +295,7 @@ export function startCQD(): void {
 /**
  * Stop CQD for this tab.
  */
-export function stopCQD(): void {
+function stopCQDInternal(): void {
   if (!initialized) return;
   setInitialized(false);
 
@@ -316,4 +317,18 @@ export function stopCQD(): void {
   } catch { /* ignore */ }
 
   applyEffectiveState(false);
+}
+
+// S10 T4 (engine-v4): the button-injector stack is mode-gated — while the
+// engine mode is 'v2' the V2 engine renders and this stack stays inert.
+// A live cqdV2Mode flip hot-stops (v2) or hot-starts (away from v2) the
+// stack through the internal start/stop paths above.
+const gatedStack = gateV1Stack({ start: startCQDInternal, stop: stopCQDInternal });
+
+export function startCQD(): void {
+  gatedStack.start();
+}
+
+export function stopCQD(): void {
+  gatedStack.stop();
 }

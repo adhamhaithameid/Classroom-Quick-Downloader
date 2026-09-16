@@ -42,6 +42,7 @@ const dirtyGroups = new Set<GroupState>();
 let refreshScheduled = false;
 
 import { subscribeToGlobalState } from './content/flags';
+import { gateV1Stack } from './content/mode-gate';
 import { getCancelHoldDelayMs } from './utils/analytics';
 import { getPageDomPort } from '../src/adapters/dom/mutation-observer-dom-port';
 
@@ -77,10 +78,14 @@ export default defineContentScript({
   matches: ['https://classroom.google.com/*'],
   runAt: 'document_idle',
   main() {
-    subscribeToGlobalState(
-      () => startDownloadAllFeature(),
-      () => stopDownloadAllFeature()
-    );
+    // S10 T4: mode gate — while the engine mode is 'v2' the V2 engine
+    // renders and this V1 stack stays inert; live cqdV2Mode flips hot
+    // stop/start it. The global enabled flag behaves exactly as before.
+    const gated = gateV1Stack({
+      start: startDownloadAllFeature,
+      stop: stopDownloadAllFeature,
+    });
+    subscribeToGlobalState(gated.start, gated.stop);
   },
 });
 

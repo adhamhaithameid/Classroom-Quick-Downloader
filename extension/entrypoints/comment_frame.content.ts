@@ -5,6 +5,7 @@ import { t, getCurrentCachedLanguage } from './content/i18n';
 import { detectComments } from './content/smart-detector';
 import { isPageDark } from './content/theme';
 import { subscribeToGlobalState, createCommentBadge } from './content/flags';
+import { gateV1Stack } from './content/mode-gate';
 import { triggerPostClick, upgradeCombinedBadge, ATTR_COMMENT_COUNT } from './content/both-badge';
 import { triggerPulseEffect, markTargetElements } from './content/pulse-effect';
 import { queryPostCards } from './content/post-card-utils';
@@ -116,12 +117,16 @@ export default defineContentScript({
   matches: ['https://classroom.google.com/*'],
   runAt: 'document_idle',
   main() {
+    // S10 T4: mode gate — while the engine mode is 'v2' the V2 engine
+    // renders and this V1 stack stays inert; live cqdV2Mode flips hot
+    // stop/start it. The global enabled flag behaves exactly as before.
+    const gated = gateV1Stack({
+      start: startCommentsFeature,
+      stop: stopCommentsFeature,
+    });
     // Subscribe to global enabled/disabled events
     // This handles initial check AND live updates
-    subscribeToGlobalState(
-      () => startCommentsFeature(),
-      () => stopCommentsFeature()
-    );
+    subscribeToGlobalState(gated.start, gated.stop);
   },
 });
 

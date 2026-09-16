@@ -55,25 +55,26 @@ const STORAGE_KEY = 'cqdV2Mode';
 /**
  * The default mode when no setting is found in storage.
  *
- * CHANGED back from 'shadow' to 'legacy' (2026-08): shadow shipped V1+V2
- * double scanning plus a 10s ShadowComparator interval and full-DOM
- * snapshots to EVERY user as a permanent CPU/battery tax, with no
- * readiness-gate promotion path actually flipping it off.
+ * S10 Task 4 (2026-09): FLIPPED to 'v2' — rollout step 2 of the plan
+ * below. The readiness gate passed (accuracy corpus runs the V2 detector
+ * on Tier B), the six V1 self-starting stacks are mode-gated inert in
+ * 'v2' (entrypoints/content/mode-gate.ts), and the popup still offers a
+ * one-click rollback to 'legacy'.
  *
- * Rollout plan (unchanged in intent):
- * 1. 'shadow' becomes an explicit opt-in (storage `cqdV2Mode='shadow'`
- *    or remote config) while V2 validation runs on limited cohorts
- * 2. Default flips to 'v2' only after the readiness gate passes
+ * Rollout history:
+ * 1. 'shadow' was reverted to an explicit opt-in (2026-08) after it
+ *    shipped double scanning as a permanent CPU/battery tax (D9)
+ * 2. Default flipped to 'v2' (S10 T4) once V2 owned rendering end to end
  * 3. 'v3' stays behind a flag until the identity permission lands
  *
- * To opt into validation manually: set cqdV2Mode='shadow' in
- * chrome.storage.local
+ * To roll back manually: set cqdV2Mode='legacy' in chrome.storage.local
+ * (or use the popup's engine-mode control).
  */
 /**
  * The shipped default mode, exported so tests (and docs) can assert it:
  * docs and code must never disagree about this again (D9).
  */
-export const DEFAULT_MODE: EngineMode = 'legacy';
+export const DEFAULT_MODE: EngineMode = 'v2';
 
 // ============================================================================
 // READ / WRITE

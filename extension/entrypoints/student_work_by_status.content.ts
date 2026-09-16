@@ -1,4 +1,5 @@
 import { subscribeToGlobalState } from './content/flags';
+import { gateV1Stack } from './content/mode-gate';
 import { injectStyles } from './content/styles';
 import { extractFileMeta } from './content/file-meta';
 import { createStudentWorkButton } from '../src/student_work/button';
@@ -735,9 +736,13 @@ export default defineContentScript({
   matches: ['https://classroom.google.com/*'],
   runAt: 'document_idle',
   main() {
-    subscribeToGlobalState(
-      () => startSidecar(),
-      () => stopSidecar(),
-    );
+    // S10 T4: mode gate — while the engine mode is 'v2' the V2 engine
+    // renders and this V1 stack stays inert; live cqdV2Mode flips hot
+    // stop/start it. The global enabled flag behaves exactly as before.
+    const gated = gateV1Stack({
+      start: startSidecar,
+      stop: stopSidecar,
+    });
+    subscribeToGlobalState(gated.start, gated.stop);
   },
 });
