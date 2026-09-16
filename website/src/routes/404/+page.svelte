@@ -1,7 +1,6 @@
 <script lang="ts">
   import { base } from '$app/paths';
   import SeoMeta from '$lib/components/SeoMeta.svelte';
-  import { glassSheen } from '$lib/actions/glassSheen';
 </script>
 
 <SeoMeta
@@ -34,21 +33,21 @@
   <section class="nf-links-section">
     <div class="nf-wrap">
       <div class="nf-links-grid">
-        <a class="nf-link-card glass-panel glass-hover" href="{base}/" use:glassSheen>
+        <a class="nf-link-card glass-panel glass-hover" href="{base}/">
           <span class="nf-link-icon glass-icon">🏠</span>
           <div>
             <strong>Overview</strong>
             <p>Learn what Classroom Quick Downloader does and how it works.</p>
           </div>
         </a>
-        <a class="nf-link-card glass-panel glass-hover" href="{base}/faq" use:glassSheen>
+        <a class="nf-link-card glass-panel glass-hover" href="{base}/faq">
           <span class="nf-link-icon glass-icon">❓</span>
           <div>
             <strong>FAQ</strong>
             <p>Find answers to commonly asked questions about the extension.</p>
           </div>
         </a>
-        <a class="nf-link-card glass-panel glass-hover" href="{base}/changelog" use:glassSheen>
+        <a class="nf-link-card glass-panel glass-hover" href="{base}/changelog">
           <span class="nf-link-icon glass-icon">📋</span>
           <div>
             <strong>Changelog</strong>
@@ -190,10 +189,6 @@
   .nf-link-card:nth-child(1) { animation-delay: 0.05s; }
   .nf-link-card:nth-child(2) { animation-delay: 0.1s; }
   .nf-link-card:nth-child(3) { animation-delay: 0.15s; }
-
-  .nf-link-card:hover {
-    transform: translateY(-4px);
-  }
 
   .nf-link-icon {
     font-size: 28px;
