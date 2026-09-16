@@ -43,6 +43,7 @@ let refreshScheduled = false;
 
 import { subscribeToGlobalState } from './content/flags';
 import { getCancelHoldDelayMs } from './utils/analytics';
+import { getPageDomPort } from '../src/adapters/dom/mutation-observer-dom-port';
 
 // Cached cancel hold delay
 let cancelHoldDelayMs = 1000;
@@ -53,9 +54,21 @@ getCancelHoldDelayMs().then((ms) => {
 
 
 // Per-tab runtime state
+// S10 3b: both watchers ride the shared page DomPort (one platform observer
+// per page). The 4000ms interval is deleted — mutation, scroll, and ONE
+// bounded settle scan after start cover rescan duty. The per-button
+// syncObserver family and per-post accordion observer family are replaced by
+// the attribute-dispatch subscription below: FIXED subscription counts, not
+// one observer per button/post.
 let running = false;
-let globalObserver: MutationObserver | null = null;
-let globalInterval: number | null = null;
+let domUnsubscribe: (() => void) | null = null;
+let attrUnsubscribe: (() => void) | null = null;
+let settleScanId: number | null = null;
+
+// The deleted syncObservers relied on MutationRecord.oldValue (attributeOldValue),
+// which the shared port does not retain — mirror it with last-seen classes.
+const downloadAllToGroup = new WeakMap<HTMLButtonElement, GroupState>();
+const lastDownloadAllClasses = new WeakMap<HTMLButtonElement, string>();
 
 // Clean up handler reference for removal
 const scrollHandler = () => scheduleRefresh();
@@ -82,86 +95,161 @@ function startDownloadAllFeature() {
 
   window.addEventListener('scroll', scrollHandler, { passive: true });
 
-  globalObserver = new MutationObserver((mutations) => {
-    if (!running) return;
-    for (const m of mutations) {
-      if (m.type === 'childList') {
-        m.addedNodes.forEach((node) => {
-          if (!(node instanceof HTMLElement)) return;
-          registerButtonsInSubtree(node);
-        });
-        m.removedNodes.forEach((node) => {
-          if (!(node instanceof HTMLElement)) return;
-          cleanupRemovedButtons(node);
-        });
-      } else if (m.type === 'attributes') {
-        const target = m.target as HTMLElement;
-        // Handle download button attribute changes
-        if (
-          target instanceof HTMLButtonElement &&
-          target.classList.contains('cqd-download-btn')
-        ) {
-          const group = ensureButtonRegistered(target);
-          if (group) markGroupDirty(group);
-        }
-        
-        // Handle Classwork post fold/unfold (class changes on li elements)
-        // When user opens/closes a post, the class changes from AZd1I to lXuxY (or vice versa)
-        if (
-          m.attributeName === 'class' &&
-          target.matches('li[data-stream-item-id]')
-        ) {
-          // Check if this post has a Download All button
-          const downloadAllBtn = target.querySelector<HTMLButtonElement>('.cqd-download-all-btn');
-          if (downloadAllBtn) {
-            const isCollapsed = isPostCollapsed(target);
-            if (isCollapsed) {
-              // Hide the button when post is folded (with fade-out)
-              downloadAllBtn.classList.add('cqd-hidden');
-            } else {
-              // Show the button when post is unfolded (with fade-in)
-              downloadAllBtn.classList.remove('cqd-hidden');
-            }
+  domUnsubscribe = getPageDomPort().observe(
+    {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'data-cqd-all-done', 'aria-expanded'],
+    },
+    (mutations) => {
+      if (!running) return;
+      for (const m of mutations) {
+        if (m.type === 'childList') {
+          m.addedNodes.forEach((node) => {
+            if (!(node instanceof HTMLElement)) return;
+            registerButtonsInSubtree(node);
+          });
+          m.removedNodes.forEach((node) => {
+            if (!(node instanceof HTMLElement)) return;
+            cleanupRemovedButtons(node);
+          });
+        } else if (m.type === 'attributes') {
+          const target = m.target as HTMLElement;
+          // Handle download button attribute changes
+          if (
+            target instanceof HTMLButtonElement &&
+            target.classList.contains('cqd-download-btn')
+          ) {
+            const group = ensureButtonRegistered(target);
+            if (group) markGroupDirty(group);
           }
-        }
-        
-        // Handle aria-expanded changes (also indicates fold/unfold)
-        if (
-          m.attributeName === 'aria-expanded' &&
-          target.closest('li[data-stream-item-id]')
-        ) {
-          const postRoot = target.closest<HTMLElement>('li[data-stream-item-id]');
-          if (postRoot) {
-            const downloadAllBtn = postRoot.querySelector<HTMLButtonElement>('.cqd-download-all-btn');
+
+          // Handle Classwork post fold/unfold (class changes on li elements)
+          // When user opens/closes a post, the class changes from AZd1I to lXuxY (or vice versa)
+          if (
+            m.attributeName === 'class' &&
+            target.matches('li[data-stream-item-id]')
+          ) {
+            // Check if this post has a Download All button
+            const downloadAllBtn = target.querySelector<HTMLButtonElement>('.cqd-download-all-btn');
             if (downloadAllBtn) {
-              const isCollapsed = isPostCollapsed(postRoot);
+              const isCollapsed = isPostCollapsed(target);
               if (isCollapsed) {
+                // Hide the button when post is folded (with fade-out)
                 downloadAllBtn.classList.add('cqd-hidden');
               } else {
+                // Show the button when post is unfolded (with fade-in)
                 downloadAllBtn.classList.remove('cqd-hidden');
+              }
+            }
+          }
+
+          // Handle aria-expanded changes (also indicates fold/unfold)
+          if (
+            m.attributeName === 'aria-expanded' &&
+            target.closest('li[data-stream-item-id]')
+          ) {
+            const postRoot = target.closest<HTMLElement>('li[data-stream-item-id]');
+            if (postRoot) {
+              const downloadAllBtn = postRoot.querySelector<HTMLButtonElement>('.cqd-download-all-btn');
+              if (downloadAllBtn) {
+                const isCollapsed = isPostCollapsed(postRoot);
+                if (isCollapsed) {
+                  downloadAllBtn.classList.add('cqd-hidden');
+                } else {
+                  downloadAllBtn.classList.remove('cqd-hidden');
+                }
               }
             }
           }
         }
       }
-    }
-    scheduleRefresh();
-  });
+      scheduleRefresh();
+    },
+  );
 
-  if (document.body) {
-    globalObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
+  // Attribute dispatch for the two deleted per-element observer families:
+  // the syncObserver (class transitions on Download-All buttons) and the
+  // accordion observers (aria-expanded on the post toggle) become ONE fixed
+  // subscription whose callback routes records to the same per-element
+  // handlers.
+  attrUnsubscribe = getPageDomPort().observe(
+    {
       attributes: true,
-      attributeFilter: ['class', 'data-cqd-all-done', 'aria-expanded'],
-    });
-  }
+      attributeFilter: ['class', 'aria-expanded'],
+    },
+    (mutations) => {
+      if (!running) return;
+      handleButtonAttributeMutations(mutations);
+    },
+  );
 
-  globalInterval = window.setInterval(() => {
+  // Heartbeat deleted (S10): one bounded settle scan catches late-settling
+  // DOM right after start and performs the first group render pass.
+  settleScanId = window.setTimeout(() => {
+    settleScanId = null;
     if (!running) return;
     registerButtonsInSubtree(document);
     scheduleRefresh();
-  }, 4000);
+  }, 1500);
+}
+
+/**
+ * Attribute-dispatch replacement for the deleted per-element observer
+ * families (2 fixed subscriptions instead of 2 per Download-All button):
+ * - class transitions on a Download-All button (terminal → idle) reset the
+ *   group's visuals — what the per-button syncObserver did with
+ *   attributeOldValue, mirrored here via lastDownloadAllClasses.
+ * - aria-expanded changes on a Classwork accordion toggle update the post's
+ *   button visibility — what the per-post accordion observer's
+ *   updateVisibility did.
+ */
+function handleButtonAttributeMutations(mutations: MutationRecord[]): void {
+  for (const m of mutations) {
+    if (m.type !== 'attributes') continue;
+    const target = m.target as HTMLElement;
+
+    if (
+      m.attributeName === 'class' &&
+      target instanceof HTMLButtonElement &&
+      target.classList.contains('cqd-download-all-btn')
+    ) {
+      const group = downloadAllToGroup.get(target);
+      if (!group) continue;
+      const oldClasses = lastDownloadAllClasses.get(target) ?? '';
+      lastDownloadAllClasses.set(target, target.className);
+      const wasTerminal =
+        oldClasses.includes('cqd-all-cancelled') ||
+        oldClasses.includes('cqd-all-success') ||
+        oldClasses.includes('cqd-all-error');
+      const isTerminal =
+        target.classList.contains('cqd-all-cancelled') ||
+        target.classList.contains('cqd-all-success') ||
+        target.classList.contains('cqd-all-error');
+      // If transitioned from any terminal state to idle
+      if (wasTerminal && !isTerminal) {
+        resetGroupVisuals(group);
+      }
+      continue;
+    }
+
+    if (
+      m.attributeName === 'aria-expanded' &&
+      target instanceof HTMLElement &&
+      target.matches('div[role="button"][aria-expanded]')
+    ) {
+      const postRoot = target.closest<HTMLElement>('li[data-stream-item-id]');
+      if (!postRoot) continue;
+      const downloadAllBtn = postRoot.querySelector<HTMLButtonElement>('.cqd-download-all-btn');
+      if (!downloadAllBtn) continue;
+      if (target.getAttribute('aria-expanded') === 'true') {
+        downloadAllBtn.classList.remove('cqd-hidden');
+      } else {
+        downloadAllBtn.classList.add('cqd-hidden');
+      }
+    }
+  }
 }
 
 function stopDownloadAllFeature() {
@@ -170,16 +258,19 @@ function stopDownloadAllFeature() {
 
   window.removeEventListener('scroll', scrollHandler);
 
-  if (globalObserver) {
-    globalObserver.disconnect();
-    globalObserver = null;
+  if (domUnsubscribe) {
+    domUnsubscribe();
+    domUnsubscribe = null;
+  }
+  if (attrUnsubscribe) {
+    attrUnsubscribe();
+    attrUnsubscribe = null;
+  }
+  if (settleScanId != null) {
+    window.clearTimeout(settleScanId);
+    settleScanId = null;
   }
 
-  if (globalInterval != null) {
-    window.clearInterval(globalInterval);
-    globalInterval = null;
-  }
-  
   refreshScheduled = false;
 
   // Cleanup UI
@@ -829,27 +920,11 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
   button.appendChild(mainSpan);
   button.appendChild(subSpan);
 
-  // Sync Observer: Force individual buttons to reset when Download All button resets
-  const syncObserver = new MutationObserver((mutations) => {
-    for (const m of mutations) {
-      if (m.attributeName === 'class') {
-        const oldClasses = m.oldValue || '';
-        const wasCancelled = oldClasses.includes('cqd-all-cancelled');
-        const wasSuccess = oldClasses.includes('cqd-all-success');
-        const wasError = oldClasses.includes('cqd-all-error');
-        
-        const isCancelled = button.classList.contains('cqd-all-cancelled');
-        const isSuccess = button.classList.contains('cqd-all-success');
-        const isError = button.classList.contains('cqd-all-error');
-        
-        // If transitioned from any terminal state to idle
-        if ((wasCancelled || wasSuccess || wasError) && !isCancelled && !isSuccess && !isError) {
-          resetGroupVisuals(group);
-        }
-      }
-    }
-  });
-  syncObserver.observe(button, { attributes: true, attributeFilter: ['class'], attributeOldValue: true });
+  // Sync behavior (S10 3b): the per-button syncObserver is deleted — class
+  // transitions on this button are dispatched by the shared attribute
+  // subscription via handleButtonAttributeMutations. Seed the dispatch maps.
+  downloadAllToGroup.set(button, group);
+  lastDownloadAllClasses.set(button, button.className);
 
   const computed = window.getComputedStyle(targetContainer);
   if (computed.position === 'static') {
@@ -918,29 +993,35 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
     button.style.marginInlineStart = '8px';
   }
 
-  // Attach per-button visibility observer for accordion state (aria-expanded)
-  // This ensures button hides when post is collapsed
-  attachVisibilityObserver(root, button);
+  // Initial accordion visibility (S10 3b): the per-post MutationObserver is
+  // deleted — aria-expanded changes on the toggle are dispatched by the
+  // shared attribute subscription. Only the initial visibility application
+  // remains here.
+  applyInitialAccordionVisibility(root, button);
 
   group.downloadAllBtn = button;
   return button;
 }
 
 /**
- * Attaches a MutationObserver to manage button visibility based on post accordion state.
- * 
+ * Applies initial button visibility based on post accordion state.
+ *
  * Per spec: The button must ONLY be visible when the post is EXPANDED (aria-expanded="true").
  * When the post is collapsed (aria-expanded="false"), the button is hidden.
- * 
+ *
  * Target: div[role="button"][aria-expanded] (Classes: .SFCE1b, .JUr7jb)
- * 
+ *
  * IMPORTANT: In Classwork List View, the postElement is div.sVNOQ (attachments container)
  * but the toggle is in the parent <li> element. We need to search upward.
+ *
+ * S10 3b: live updates used to come from a per-post MutationObserver here;
+ * they now arrive through the shared attribute-dispatch subscription
+ * (handleButtonAttributeMutations). This function only sets the INITIAL state.
  */
-function attachVisibilityObserver(postElement: HTMLElement, button: HTMLElement): void {
+function applyInitialAccordionVisibility(postElement: HTMLElement, button: HTMLElement): void {
   // Determine the search scope - for sVNOQ, search from parent li element
   let searchScope: HTMLElement = postElement;
-  
+
   // If postElement is sVNOQ (Classwork/Topic view), the toggle is in parent li
   if (postElement.classList.contains('sVNOQ') || postElement.matches('div[data-stream-item-id]')) {
     const parentLi = postElement.closest<HTMLElement>('li[data-stream-item-id]');
@@ -948,46 +1029,27 @@ function attachVisibilityObserver(postElement: HTMLElement, button: HTMLElement)
       searchScope = parentLi;
     }
   }
-  
+
   // Find the expansion trigger (accordion toggle button)
   const toggle = searchScope.querySelector<HTMLElement>('div[role="button"][aria-expanded]');
-  
+
   if (!toggle) {
     // No accordion toggle found - button stays visible by default
     // This is normal for Stream view posts and Topic view which don't have accordions
     button.classList.remove('cqd-hidden');
     return;
   }
-  
-  // Function to update button visibility based on aria-expanded state
+
+  // Update button visibility based on aria-expanded state
   // Uses CSS class toggle for smooth opacity transition
-  const updateVisibility = () => {
-    const isExpanded = toggle.getAttribute('aria-expanded') === 'true';
-    if (isExpanded) {
-      // Post is expanded - show button with fade-in
-      button.classList.remove('cqd-hidden');
-    } else {
-      // Post is collapsed - hide button with fade-out
-      button.classList.add('cqd-hidden');
-    }
-  };
-  
-  // Set initial visibility state
-  updateVisibility();
-  
-  // Watch for aria-expanded attribute changes
-  const observer = new MutationObserver((mutations) => {
-    for (const mutation of mutations) {
-      if (mutation.type === 'attributes' && mutation.attributeName === 'aria-expanded') {
-        updateVisibility();
-      }
-    }
-  });
-  
-  observer.observe(toggle, { 
-    attributes: true,
-    attributeFilter: ['aria-expanded']
-  });
+  const isExpanded = toggle.getAttribute('aria-expanded') === 'true';
+  if (isExpanded) {
+    // Post is expanded - show button with fade-in
+    button.classList.remove('cqd-hidden');
+  } else {
+    // Post is collapsed - hide button with fade-out
+    button.classList.add('cqd-hidden');
+  }
 }
 
 function placeDownloadButtonForPostView(

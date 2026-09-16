@@ -12,10 +12,10 @@ import {
   isStudentWorkByStatusRoute,
   isStudentWorkRoute,
 } from '../src/student_work/url-classifier';
+import { getPageDomPort } from '../src/adapters/dom/mutation-observer-dom-port';
 
 // 120ms seems okay right? my mentor told me to add debounce to everything.
 const SCAN_DEBOUNCE_MS = 120;
-const RESCAN_INTERVAL_MS = 2_000;
 const SIDE_CAR_ATTR = 'data-cqd-sw-processed';
 const FLAG_ARTIFACT_SELECTOR = [
   '.cqd-flag',
@@ -43,8 +43,10 @@ const FLAG_ARTIFACT_ATTRS = [
 
 // super important state flags. plz do not delete!!1!
 let running = false;
-let observer: MutationObserver | null = null;
-let rescanIntervalId: number | null = null;
+// S10 3b: rides the shared page DomPort (one platform observer per page).
+// The 2000ms rescan interval is deleted — mutation, scroll, and the debounced
+// scan cover rescan duty.
+let portUnsubscribe: (() => void) | null = null;
 let pendingScanTimer: number | null = null;
 
 // this counts things. IDK why it needs to but it works so I'm not touching it.
@@ -357,13 +359,9 @@ export function setStudentWorkSidecarRunningForTest(value: boolean): void {
 export function resetStudentWorkSidecarForTest(): void {
   running = false;
   clearPendingScan();
-  if (observer) {
-    observer.disconnect();
-    observer = null;
-  }
-  if (rescanIntervalId != null) {
-    window.clearInterval(rescanIntervalId);
-    rescanIntervalId = null;
+  if (portUnsubscribe) {
+    portUnsubscribe();
+    portUnsubscribe = null;
   }
 
   const sidecarButtons = document.querySelectorAll<HTMLButtonElement>('.cqd-download-btn[data-cqd-sw="true"]');
@@ -396,36 +394,34 @@ function startSidecar(): void {
   injectStyles();
   scanStudentWorkLinks(document);
 
-  observer = new MutationObserver((mutations) => {
-    let shouldScan = false;
+  portUnsubscribe = getPageDomPort().observe(
+    {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['href', 'class', SIDE_CAR_ATTR],
+    },
+    (mutations) => {
+      if (!running) return;
+      let shouldScan = false;
 
-    for (const mutation of mutations) {
-      if (mutation.type === 'childList') {
-        shouldScan = true;
-        for (const node of mutation.addedNodes) {
-          if (!(node instanceof HTMLElement)) continue;
-          scanStudentWorkLinks(node);
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList') {
+          shouldScan = true;
+          for (const node of mutation.addedNodes) {
+            if (!(node instanceof HTMLElement)) continue;
+            scanStudentWorkLinks(node);
+          }
+        } else if (mutation.type === 'attributes') {
+          shouldScan = true;
         }
-      } else if (mutation.type === 'attributes') {
-        shouldScan = true;
       }
-    }
 
-    if (shouldScan) {
-      scheduleScan();
-    }
-  });
-
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['href', 'class', SIDE_CAR_ATTR],
-  });
-
-  rescanIntervalId = window.setInterval(() => {
-    scanStudentWorkLinks(document);
-  }, RESCAN_INTERVAL_MS);
+      if (shouldScan) {
+        scheduleScan();
+      }
+    },
+  );
 
   window.addEventListener('scroll', scheduleScan, { passive: true });
 }
@@ -436,14 +432,9 @@ function stopSidecar(): void {
 
   clearPendingScan();
 
-  if (observer) {
-    observer.disconnect();
-    observer = null;
-  }
-
-  if (rescanIntervalId != null) {
-    window.clearInterval(rescanIntervalId);
-    rescanIntervalId = null;
+  if (portUnsubscribe) {
+    portUnsubscribe();
+    portUnsubscribe = null;
   }
 
   window.removeEventListener('scroll', scheduleScan);

@@ -21,20 +21,18 @@ describe('content state module', () => {
     expect(state.DRIVE_URL_PATTERNS.length).toBeGreaterThan(0);
     expect(state.INJECTED_ATTR).toBe('data-cqd-injected');
     expect(state.PROCESSED_ATTR).toBe('data-cqd-processed');
-    expect(state.RESCAN_INTERVAL_MS).toBe(2000);
+    // S10: RESCAN_INTERVAL_MS deleted — the rescan interval no longer exists.
   });
 
   it('maintains mutable state through setter helpers', async () => {
     const state = await loadStateWithDelay();
     state.setScanTimeoutId(10);
-    state.setRescanIntervalId(12);
     state.setObserver({ disconnect: () => undefined } as unknown as MutationObserver);
     state.setDesiredEnabled(false);
     state.setEffectiveEnabled(true);
     state.setInitialized(true);
     state.setGlobalEnabled(false);
     expect(state.scanTimeoutId).toBe(10);
-    expect(state.rescanIntervalId).toBe(12);
     expect(state.observer).toBeTruthy();
     expect(state.desiredEnabled).toBe(false);
     expect(state.effectiveEnabled).toBe(true);

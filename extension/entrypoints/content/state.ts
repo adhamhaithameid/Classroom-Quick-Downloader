@@ -57,8 +57,7 @@ export const INJECTED_ATTR = 'data-cqd-injected';
 export const PROCESSED_ATTR = 'data-cqd-processed';
 
 // --- TIMING CONSTANTS ---
-// magic numbers 
-export const RESCAN_INTERVAL_MS = 2000;
+// magic numbers
 export const RESCAN_DEBOUNCE_MS = 150;
 export const LOADING_MIN_MS = 600;
 export const FEEDBACK_SUCCESS_MS = 2000;
@@ -76,9 +75,8 @@ export function setScanTimeoutId(id: number | null) { scanTimeoutId = id; }
 export let observer: MutationObserver | null = null;
 export function setObserver(obs: MutationObserver | null) { observer = obs; }
 
-/** Rescan interval ID */
-export let rescanIntervalId: number | null = null;
-export function setRescanIntervalId(id: number | null) { rescanIntervalId = id; }
+// S10: rescanIntervalId/setRescanIntervalId deleted — the rescan interval no
+// longer exists anywhere; entrypoints hold their own port unsubscribe handles.
 
 /** Map of pending buttons by request ID */
 export const pendingButtons = new Map<string, PendingButton>();
