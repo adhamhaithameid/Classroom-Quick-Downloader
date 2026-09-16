@@ -19,7 +19,7 @@ import type {
 import { WEBSITE_MANUAL_CHANGELOG } from '$lib/content/changelog.manual.generated';
 
 const REQUEST_TIMEOUT_MS = 8000;
-export const ORACLE_SNAPSHOT_REFRESH_MS = 3 * 60 * 60 * 1000;
+export const ORACLE_SNAPSHOT_REFRESH_MS = 6 * 60 * 60 * 1000;
 const SNAPSHOT_STORAGE_KEY = 'cqd.website.snapshot.lastgood.v1';
 const SNAPSHOT_SESSION_KEY = 'cqd.website.snapshot.session.v1';
 const SNAPSHOT_NEXT_KEY = 'cqd.website.snapshot.next.v1';
