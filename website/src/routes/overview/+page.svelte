@@ -12,7 +12,6 @@
   import AnimatedNumber from '$lib/components/AnimatedNumber.svelte';
   import MediaLoader from '$lib/components/MediaLoader.svelte';
   import AnimatedNumericText from '$lib/components/AnimatedNumericText.svelte';
-  import { glassSheen } from '$lib/actions/glassSheen';
   import {
     canStartCelebration,
     nextCooldownUntil
@@ -1665,7 +1664,7 @@
       </div>
 
       <div class="l2-student-grid" role="list">
-        <article class="l2-student-card glass-panel glass-hover" role="listitem" style="--card-i: 0" use:glassSheen>
+        <article class="l2-student-card glass-panel glass-hover" role="listitem" style="--card-i: 0">
           <span class="l2-student-icon glass-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 8v5l3 3" />
@@ -1675,7 +1674,7 @@
           <h3>Less repetitive clicking</h3>
           <p>Download all materials from an assignment in one action instead of repeating the same file flow.</p>
         </article>
-        <article class="l2-student-card glass-panel glass-hover" role="listitem" style="--card-i: 1" use:glassSheen>
+        <article class="l2-student-card glass-panel glass-hover" role="listitem" style="--card-i: 1">
           <span class="l2-student-icon glass-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
@@ -1684,7 +1683,7 @@
           <h3>Faster study prep</h3>
           <p>Get course files quickly so your time goes into understanding material, not managing downloads.</p>
         </article>
-        <article class="l2-student-card glass-panel glass-hover" role="listitem" style="--card-i: 2" use:glassSheen>
+        <article class="l2-student-card glass-panel glass-hover" role="listitem" style="--card-i: 2">
           <span class="l2-student-icon glass-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M9 6h11M9 12h11M9 18h11" />
@@ -1886,12 +1885,12 @@
         <p>Everything you'd expect from a modern extension — and nothing you wouldn't.</p>
       </div>
       <div class="l2-feature-grid">
-        <div class="l2-fcard glass-panel glass-hover" style="--card-i: 0" use:glassSheen><div class="l2-fcard-icon glass-icon">⚡</div><h3>Instant</h3><p>Install → open Classroom → download. Zero configuration, zero learning curve.</p></div>
-        <div class="l2-fcard glass-panel glass-hover" style="--card-i: 1" use:glassSheen><div class="l2-fcard-icon glass-icon">🔒</div><h3>Private</h3><p>No third-party tracking, no cookies, and no user profiles. Only aggregate operational metrics.</p></div>
-        <div class="l2-fcard glass-panel glass-hover" style="--card-i: 2" use:glassSheen><div class="l2-fcard-icon glass-icon">🔓</div><h3>Transparent</h3><p>Clear docs, public roadmap, and predictable release notes for every update.</p></div>
-        <div class="l2-fcard glass-panel glass-hover" style="--card-i: 3" use:glassSheen><div class="l2-fcard-icon glass-icon">🌐</div><h3>Universal</h3><p>Chrome, Firefox, Edge, Brave, Opera, Vivaldi, Arc — it just works.</p></div>
-        <div class="l2-fcard glass-panel glass-hover" style="--card-i: 4" use:glassSheen><div class="l2-fcard-icon glass-icon">🎓</div><h3>For Students</h3><p>Built by a student who was tired of clicking. Designed for real classroom workflows.</p></div>
-        <div class="l2-fcard glass-panel glass-hover" style="--card-i: 5" use:glassSheen><div class="l2-fcard-icon glass-icon">🌍</div><h3><AnimatedNumber value={100} format={{ useGrouping: false }} suffix="+" animated /> Languages</h3><p>Available in English, Arabic, Spanish, French, German, and over <AnimatedNumber value={100} format={{ useGrouping: false }} animated /> more languages.</p></div>
+        <div class="l2-fcard glass-panel glass-hover" style="--card-i: 0"><div class="l2-fcard-icon glass-icon">⚡</div><h3>Instant</h3><p>Install → open Classroom → download. Zero configuration, zero learning curve.</p></div>
+        <div class="l2-fcard glass-panel glass-hover" style="--card-i: 1"><div class="l2-fcard-icon glass-icon">🔒</div><h3>Private</h3><p>No third-party tracking, no cookies, and no user profiles. Only aggregate operational metrics.</p></div>
+        <div class="l2-fcard glass-panel glass-hover" style="--card-i: 2"><div class="l2-fcard-icon glass-icon">🔓</div><h3>Transparent</h3><p>Clear docs, public roadmap, and predictable release notes for every update.</p></div>
+        <div class="l2-fcard glass-panel glass-hover" style="--card-i: 3"><div class="l2-fcard-icon glass-icon">🌐</div><h3>Universal</h3><p>Chrome, Firefox, Edge, Brave, Opera, Vivaldi, Arc — it just works.</p></div>
+        <div class="l2-fcard glass-panel glass-hover" style="--card-i: 4"><div class="l2-fcard-icon glass-icon">🎓</div><h3>For Students</h3><p>Built by a student who was tired of clicking. Designed for real classroom workflows.</p></div>
+        <div class="l2-fcard glass-panel glass-hover" style="--card-i: 5"><div class="l2-fcard-icon glass-icon">🌍</div><h3><AnimatedNumber value={100} format={{ useGrouping: false }} suffix="+" animated /> Languages</h3><p>Available in English, Arabic, Spanish, French, German, and over <AnimatedNumber value={100} format={{ useGrouping: false }} animated /> more languages.</p></div>
       </div>
     </div>
   </section>
@@ -1928,7 +1927,7 @@
         <p>Students, teachers, and universities around the world trust Classroom Quick Downloader.</p>
       </div>
       <div class="l2-proof-grid">
-        <div class="l2-proof-card glass-panel glass-hover" style="--card-i: 0" use:glassSheen>
+        <div class="l2-proof-card glass-panel glass-hover" style="--card-i: 0">
           <div class="l2-proof-num">
             {#if metricsReady}
               <AnimatedNumber value={downloadCount ?? 0} animated />
@@ -1938,7 +1937,7 @@
           </div>
           <div class="l2-proof-label">Total Downloads</div>
         </div>
-        <div class="l2-proof-card glass-panel glass-hover" style="--card-i: 1" use:glassSheen>
+        <div class="l2-proof-card glass-panel glass-hover" style="--card-i: 1">
           <div class="l2-proof-num">
             {#if metricsReady}
               <AnimatedNumber value={userCount ?? 0} animated />
@@ -1948,8 +1947,8 @@
           </div>
           <div class="l2-proof-label">Active Users</div>
         </div>
-        <div class="l2-proof-card glass-panel glass-hover" style="--card-i: 2" use:glassSheen><div class="l2-proof-num"><AnimatedNumber value={100} suffix="+" animated /></div><div class="l2-proof-label">Languages</div></div>
-        <div class="l2-proof-card glass-panel glass-hover" style="--card-i: 3" use:glassSheen><div class="l2-proof-num"><AnimatedNumericText text={latestReleaseVersion} animated stableInitial /></div><div class="l2-proof-label">Latest Release</div></div>
+        <div class="l2-proof-card glass-panel glass-hover" style="--card-i: 2"><div class="l2-proof-num"><AnimatedNumber value={100} suffix="+" animated /></div><div class="l2-proof-label">Languages</div></div>
+        <div class="l2-proof-card glass-panel glass-hover" style="--card-i: 3"><div class="l2-proof-num"><AnimatedNumericText text={latestReleaseVersion} animated stableInitial /></div><div class="l2-proof-label">Latest Release</div></div>
       </div>
     </div>
   </section>
@@ -3291,51 +3290,18 @@
     align-items: center;
     gap: 14px;
     padding: 14px 18px;
-    /* Rank tint under the shared glass gradient — the navbar's glass
-       material lets each medal's color breathe through. */
+    /* Rank identity rides on the border + a faint tint layer; the surface
+       itself is the shared opaque glass gradient like every other card. */
     background-color: var(--rank-bg);
-    background-image: linear-gradient(120deg, rgba(255, 255, 255, 0.6), rgba(248, 252, 249, 0.42));
+    background-image: var(--glass-bg);
     border: 1.5px solid var(--rank-border);
     border-radius: 16px;
     flex: 1;
     min-width: 160px;
   }
 
-  .l2-top-country-card::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background: linear-gradient(
-      118deg,
-      transparent 30%,
-      rgba(255, 255, 255, 0.38) 50%,
-      transparent 70%
-    );
-    transform: translateX(-130%);
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  .l2-top-country-card:hover {
-    transform: translateY(-3px);
-    border-color: rgba(26, 139, 85, 0.3);
-    box-shadow:
-      0 8px 20px rgba(26, 139, 85, 0.12),
-      0 16px 36px rgba(15, 20, 25, 0.12),
-      inset 0 1px 0 rgba(255, 255, 255, 0.85);
-  }
-
-  .l2-top-country-card:hover::after,
-  .l2-top-country-card:focus-within::after {
-    opacity: 1;
-    animation: top-country-glint 1.2s ease-out 1;
-  }
-
-  @keyframes top-country-glint {
-    from { transform: translateX(-130%); }
-    to { transform: translateX(130%); }
-  }
+  /* Hover: the shared .glass-hover response only — the old per-card lift
+     and one-shot glint sweep stacked on top of it and read as extreme. */
 
   .l2-top-rank {
     flex-shrink: 0;
@@ -3567,9 +3533,6 @@
   }
   .l2-fcard {
     border-radius: var(--radius); padding: 28px 24px;
-  }
-  .l2-fcard:hover {
-    transform: translateY(-4px);
   }
   .l2-fcard-icon { font-size: 36px; margin-bottom: 14px; }
   .l2-fcard h3 { font-size: 17px; font-weight: 700; margin: 0 0 8px; }
