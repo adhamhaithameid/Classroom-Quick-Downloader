@@ -108,6 +108,11 @@ async function loadObservers() {
   vi.doMock('../entrypoints/content/styles', () => ({
     injectStyles,
   }));
+  // S10 T4: these suites drive the stack lifecycle directly; the engine
+  // mode gate has its own suite (v4-mode-gate.test.ts) — pass through.
+  vi.doMock('../entrypoints/content/mode-gate', () => ({
+    gateV1Stack: ({ start, stop }: { start: () => void; stop: () => void }) => ({ start, stop }),
+  }));
 
   const mod = await import('../entrypoints/content/observers');
   return { mod, injectButtonIntoAttachment, injectStyles };
@@ -271,6 +276,11 @@ async function loadCommentFrame() {
   vi.doMock('../entrypoints/content/post-card-utils', () => ({
     queryPostCards,
   }));
+  // S10 T4: lifecycle suite — engine mode gate passes through (its own
+  // suite is v4-mode-gate.test.ts).
+  vi.doMock('../entrypoints/content/mode-gate', () => ({
+    gateV1Stack: ({ start, stop }: { start: () => void; stop: () => void }) => ({ start, stop }),
+  }));
 
   const mod = await import('../entrypoints/comment_frame.content');
   (mod.default as unknown as { main: (ctx: unknown) => void }).main({});
@@ -409,6 +419,11 @@ async function loadEditedFrame() {
   }));
   vi.doMock('../entrypoints/content/post-card-utils', () => ({
     queryPostCards,
+  }));
+  // S10 T4: lifecycle suite — engine mode gate passes through (its own
+  // suite is v4-mode-gate.test.ts).
+  vi.doMock('../entrypoints/content/mode-gate', () => ({
+    gateV1Stack: ({ start, stop }: { start: () => void; stop: () => void }) => ({ start, stop }),
   }));
 
   const mod = await import('../entrypoints/edited_frame.content');

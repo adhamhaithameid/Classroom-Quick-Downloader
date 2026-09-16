@@ -144,6 +144,11 @@ async function loadDownloadAll() {
   vi.doMock('../entrypoints/utils/analytics', () => ({
     getCancelHoldDelayMs: vi.fn(async () => 1000),
   }));
+  // S10 T4: lifecycle suite — engine mode gate passes through (its own
+  // suite is v4-mode-gate.test.ts).
+  vi.doMock('../entrypoints/content/mode-gate', () => ({
+    gateV1Stack: ({ start, stop }: { start: () => void; stop: () => void }) => ({ start, stop }),
+  }));
 
   const mod = await import('../entrypoints/download_all.content');
   (mod.default as unknown as { main: (ctx: unknown) => void }).main({});
@@ -320,6 +325,11 @@ async function loadByStatus() {
   vi.doMock('../src/student_work/button', () => ({ createStudentWorkButton }));
   vi.doMock('../src/download-all/group-manager', () => ({ registerButtonsInSubtree: vi.fn() }));
   vi.doMock('../src/download-all/refresh', () => ({ scheduleRefresh: vi.fn() }));
+  // S10 T4: lifecycle suite — engine mode gate passes through (its own
+  // suite is v4-mode-gate.test.ts).
+  vi.doMock('../entrypoints/content/mode-gate', () => ({
+    gateV1Stack: ({ start, stop }: { start: () => void; stop: () => void }) => ({ start, stop }),
+  }));
 
   const mod = await import('../entrypoints/student_work_by_status.content');
   (mod.default as unknown as { main: (ctx: unknown) => void }).main({});
@@ -435,6 +445,12 @@ async function loadSidecar() {
     extractFileMeta: vi.fn(() => ({ name: 'F', ext: 'pdf', kind: 'other' })),
   }));
   vi.doMock('../src/student_work/button', () => ({ createStudentWorkButton }));
+
+  // S10 T4: lifecycle suite — engine mode gate passes through (its own
+  // suite is v4-mode-gate.test.ts).
+  vi.doMock('../entrypoints/content/mode-gate', () => ({
+    gateV1Stack: ({ start, stop }: { start: () => void; stop: () => void }) => ({ start, stop }),
+  }));
 
   const mod = await import('../entrypoints/student_work_sidecar.content');
   (mod.default as unknown as { main: (ctx: unknown) => void }).main({});

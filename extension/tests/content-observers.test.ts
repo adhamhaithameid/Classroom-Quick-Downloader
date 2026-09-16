@@ -44,6 +44,11 @@ async function loadObserversModule() {
   vi.doMock('../entrypoints/content/styles', () => ({
     injectStyles,
   }));
+  // S10 T4: unit suite for the scan logic — the engine mode gate has its
+  // own suite (v4-mode-gate.test.ts) and passes through here.
+  vi.doMock('../entrypoints/content/mode-gate', () => ({
+    gateV1Stack: ({ start, stop }: { start: () => void; stop: () => void }) => ({ start, stop }),
+  }));
 
   const mod = await import('../entrypoints/content/observers');
   return {
