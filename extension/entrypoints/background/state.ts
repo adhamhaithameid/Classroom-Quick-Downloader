@@ -15,6 +15,37 @@
 
 import type { PendingDownload } from './types';
 
+// --- STALL DEADLINE (no-dead-ends) -------------------------------------
+// Every registered pending gets a hard deadline: if nothing has settled it
+// by then, the user's button must NOT sit in "trying" until the silent TTL
+// reap. The hook is injected by index.ts (registry stays dependency-free).
+export const PENDING_DEADLINE_MS = 150_000;
+type PendingExpiredHook = (pending: PendingDownload) => void;
+let pendingExpiredHook: PendingExpiredHook | null = null;
+const deadlineTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+export function setPendingExpiredHook(hook: PendingExpiredHook | null): void {
+  pendingExpiredHook = hook;
+}
+
+function scheduleDeadline(pending: PendingDownload): void {
+  if (typeof setTimeout !== 'function') return;
+  const timer = setTimeout(() => {
+    deadlineTimers.delete(pending.requestId);
+    if (pendingByRequestId.get(pending.requestId) !== pending) return;
+    pendingExpiredHook?.(pending);
+  }, PENDING_DEADLINE_MS);
+  deadlineTimers.set(pending.requestId, timer);
+}
+
+function clearDeadline(requestId: string): void {
+  const timer = deadlineTimers.get(requestId);
+  if (timer != null) {
+    clearTimeout(timer);
+    deadlineTimers.delete(requestId);
+  }
+}
+
 // --- AUTHORITATIVE REGISTRY ---
 
 /** Map request ID to pending download. The authoritative registry. */
@@ -38,6 +69,7 @@ export const pendingByUrl = new Map<string, Set<PendingDownload>>();
 export function registerPending(pending: PendingDownload): void {
   pendingByRequestId.set(pending.requestId, pending);
   indexUrl(pending.baseUrl, pending);
+  scheduleDeadline(pending);
 }
 
 /** Does the authoritative registry still track this requestId? */
@@ -86,6 +118,7 @@ export function unbindDownloadId(downloadId: number): void {
  * keys, so cleanup cannot leave a bucket or an id behind.
  */
 export function unregisterPending(pending: PendingDownload): void {
+  clearDeadline(pending.requestId);
   if (pendingByRequestId.get(pending.requestId) === pending) {
     pendingByRequestId.delete(pending.requestId);
   }

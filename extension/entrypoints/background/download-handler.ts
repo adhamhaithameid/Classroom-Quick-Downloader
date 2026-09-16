@@ -30,6 +30,7 @@ export function startSingleAttempt(
   if (!validation.valid) {
     console.error(`[CQD Security] Blocked download: ${validation.reason} — ${pending.baseUrl}`);
     cleanup(pending);
+    sendStatusToTab(pending, 'error', 'Download blocked: invalid URL.', 'INVALID_URL');
     respondOnce?.({ started: false, userMessage: 'Download blocked: invalid URL.' });
     return;
   }
@@ -183,39 +184,56 @@ export function handleDownloadRequest(
     const validation = validateDownloadUrl(firstUrl);
     if (!validation.valid) {
       console.error(`[CQD Security] Blocked initial Drive download: ${validation.reason} — ${firstUrl}`);
+      sendStatusToTab(pending, 'error', 'Download blocked: invalid URL.', 'INVALID_URL');
       respondOnce({ started: false, userMessage: 'Download blocked: invalid URL.' });
       cleanup(pending);
       return true;
     }
 
-    chrome.downloads.download(
-      { url: firstUrl, saveAs: false, conflictAction: 'uniquify' },
-      (id) => {
-        // Race condition check
-        if (pending.isCancelled) {
-          if (id) chrome.downloads.cancel(id, () => { const _ = chrome.runtime.lastError; });
-          cleanup(pending, id);
-          return;
-        }
+    const attemptDriveStart = (): void => {
+      chrome.downloads.download(
+        { url: firstUrl, saveAs: false, conflictAction: 'uniquify' },
+        (id) => {
+          // Race condition check
+          if (pending.isCancelled) {
+            if (id) chrome.downloads.cancel(id, () => { const _ = chrome.runtime.lastError; });
+            cleanup(pending, id);
+            return;
+          }
 
-        if (chrome.runtime.lastError || !id) {
-          recordDownloadEvent({
-            type: pending.fileMeta?.ext || 'unknown',
-            status: 'fail',
-            duration_ms: Date.now() - pending.startTime,
-            bypass_used: false,
-            error_type: 'BROWSER_START_FAIL',
-          });
-          // Zero-tab contract: no bypass-tab fallback. The browser refused to
-          // start the download — surface the honest failure immediately.
-          respondOnce({ started: false, userMessage: 'Browser blocked download.' });
-          cleanup(pending);
-          return;
+          if (chrome.runtime.lastError || !id) {
+            const _ = chrome.runtime.lastError;
+            // No-dead-ends: the browser can transiently refuse a start.
+            // Retry ONCE after a short beat, then settle with guidance.
+            if (!pending.startRetried && !pending.isCancelled) {
+              pending.startRetried = true;
+              sendStatusToTab(pending, 'trying', 'Retrying…', 'START_RETRY');
+              setTimeout(attemptDriveStart, 1_000);
+              return;
+            }
+            recordDownloadEvent({
+              type: pending.fileMeta?.ext || 'unknown',
+              status: 'fail',
+              duration_ms: Date.now() - pending.startTime,
+              bypass_used: false,
+              error_type: 'BROWSER_START_FAIL',
+            });
+            // Zero-tab contract: no bypass-tab fallback. Surface the honest
+            // failure with guidance about the usual cause.
+            respondOnce({
+              started: false,
+              userMessage: 'Browser blocked the download — check site permissions and try again.',
+            });
+            sendStatusToTab(pending, 'error', 'Browser blocked the download — check site permissions and try again.', 'BROWSER_START_FAIL');
+            cleanup(pending);
+            return;
+          }
+          bindDownloadId(pending, id);
+          respondOnce({ started: true, requestId, downloadId: id });
         }
-        bindDownloadId(pending, id);
-        respondOnce({ started: true, requestId, downloadId: id });
-      }
-    );
+      );
+    };
+    attemptDriveStart();
   } else {
     if (pending.isCancelled) {
       cleanup(pending);

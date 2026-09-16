@@ -22,7 +22,8 @@ export type DownloadStatus =
   | 'blocked_html'
   | 'error'
   | 'success'
-  | 'trying';
+  | 'trying'
+  | 'cancelled';
 
 /**
  * Represents a download in progress with all tracking state.
@@ -59,6 +60,10 @@ export type PendingDownload = {
 
   /** Whether an HTML (interstitial/error) response was intercepted */
   htmlSeen?: boolean;
+  /** Transient interrupts already retried in place (bounded to one) */
+  transientRetried?: boolean;
+  /** Browser start failures already retried (bounded to one) */
+  startRetried?: boolean;
   /** Whether success status was already sent */
   finalized?: boolean;
   /** Whether user cancelled this download */

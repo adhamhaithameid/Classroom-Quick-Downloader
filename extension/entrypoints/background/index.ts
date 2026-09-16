@@ -17,6 +17,8 @@ import {
   getPendingByRequestId,
   getPendingByDownloadId,
   getUnclaimedPendingByUrl,
+  setPendingExpiredHook,
+  isRegistered,
   cancelledByUs,
   recentDownloads,
   CLEANUP_INTERVAL_MS,
@@ -31,6 +33,7 @@ import { sendStatusToTab } from './message-sender';
 import {
   handleDownloadRequest,
   startNextDriveAttempt,
+  startSingleAttempt,
 } from './download-handler';
 import { refreshRemoteAnalyticsConfig, recordDownloadEvent } from '../utils/analytics';
 import { createWorkerRuntimeBridge } from '../../src/adapters/bridge/runtime-bridge';
@@ -181,6 +184,49 @@ export default defineBackground(() => {
   });
 
   /**
+   * No-dead-ends: retry the SAME attempt (same URL, same account) once for
+   * transient server/network failures. Used by the onChanged taxonomy.
+   */
+  function retrySameAttempt(pending: PendingDownloadLike): void {
+    if (pending.isDrive) {
+      const url =
+        typeof pending.currentAuthUser === 'number'
+          ? buildUrlWithAuthUser(pending.baseUrl, pending.currentAuthUser)
+          : pending.baseUrl;
+      chrome.downloads.download({ url, saveAs: false, conflictAction: 'uniquify' }, (id) => {
+        if (chrome.runtime.lastError || !id) {
+          const _ = chrome.runtime.lastError;
+          sendStatusToTab(pending, 'error', t('downloadInterrupted'), 'RETRY_START_FAIL');
+          cleanup(pending);
+          return;
+        }
+        bindDownloadId(pending, id);
+      });
+    } else {
+      startSingleAttempt(pending);
+    }
+  }
+
+  /**
+   * Stall deadline: a pending that never settles must not leave the user's
+   * button in "trying" until the silent TTL reap. The registry fires this
+   * hook after PENDING_DEADLINE_MS.
+   */
+  setPendingExpiredHook((pending) => {
+    if (pending.currentDownloadId != null) {
+      try {
+        chrome.downloads.cancel(pending.currentDownloadId, () => {
+          const _ = chrome.runtime.lastError;
+        });
+      } catch {
+        // Already gone.
+      }
+    }
+    sendStatusToTab(pending, 'error', 'This download timed out. Try again.', 'TIMEOUT');
+    cleanup(pending);
+  });
+
+  /**
    * A forbidden-family failure (403/HTML response) for a Drive pending:
    * cycle to the next signed-in account. Failure reasons are indistinguishable
    * across accounts — a later account may hold access even when earlier ones
@@ -230,16 +276,27 @@ export default defineBackground(() => {
       const userWantedHtml =
         expectedKind === 'html' || expectedExt === 'html' || expectedExt === 'htm';
 
-      if (looksLikeHtml && !userWantedHtml && pending.isDrive) {
+      if (looksLikeHtml && !userWantedHtml) {
         cancelledByUs.add(item.id);
         chrome.downloads.cancel(item.id, () => {
           const _ = chrome.runtime.lastError;
           unbindDownloadId(item.id);
-          // An HTML response instead of the file is a forbidden/interstitial
-          // page — a forbidden-family failure. Zero-tab contract: no bypass
-          // tab; retry under the next signed-in account until the sweep
-          // exhausts, then the honest terminal.
-          handleForbiddenFailure(pending);
+          if (pending.isDrive) {
+            // An HTML response instead of the file is a forbidden/interstitial
+            // page — a forbidden-family failure. Zero-tab contract: no bypass
+            // tab; retry under the next signed-in account until the sweep
+            // exhausts, then the honest terminal.
+            handleForbiddenFailure(pending);
+          } else {
+            // Non-Drive HTML (sign-in page, error page): never save garbage.
+            sendStatusToTab(
+              pending,
+              'error',
+              'This link requires signing in — open it in a browser tab and try again.',
+              'HTML_RESPONSE',
+            );
+            cleanup(pending, item.id);
+          }
         });
         return;
       }
@@ -306,7 +363,7 @@ export default defineBackground(() => {
         mime.includes('html') ||
         getFilenameExt(item.filename) === 'html' ||
         getFilenameExt(item.filename) === 'htm';
-      if (looksLikeHtml && p.isDrive) {
+      if (looksLikeHtml) {
         cancelledByUs.add(item.id);
         chrome.downloads.cancel(item.id, () => {
           const _ = chrome.runtime.lastError;
@@ -314,18 +371,28 @@ export default defineBackground(() => {
             const _2 = chrome.runtime.lastError;
           });
           unbindDownloadId(item.id);
-          handleForbiddenFailure(p);
+          if (p.isDrive) {
+            handleForbiddenFailure(p);
+          } else {
+            // Non-Drive HTML: never save garbage (Firefox branch).
+            sendStatusToTab(
+              p,
+              'error',
+              'This link requires signing in — open it in a browser tab and try again.',
+              'HTML_RESPONSE',
+            );
+            cleanup(p, item.id);
+          }
         });
         return;
       }
 
+      // Correlate only: success is reported by the onChanged 'complete'
+      // event, like Chromium — a download that has merely STARTED is not a
+      // download that finished (Firefox-honesty fix).
       bindDownloadId(pending, item.id);
       const ext = getFilenameExt(item.filename);
       if (ext) pending.finalExtension = ext;
-      if (!pending.finalized) {
-        sendStatusToTab(pending, 'success');
-        pending.finalized = true;
-      }
     });
   }
 
@@ -357,22 +424,50 @@ export default defineBackground(() => {
       }
       const errorType = delta.error?.current || 'UNKNOWN_INTERRUPT';
 
-      // #537/#547 ("files start but fail"): a 403-class interrupt mid-stream
-      // means the current account lacks access — retry under the next signed-in
-      // account before giving up. Bounded by the authuser candidate sweep in
-      // startNextDriveAttempt; success was already reported (finalized) and
-      // self-cancelled downloads never reach this branch.
       if (pending.finalized) {
-        // Success was already reported (Firefox onCreated path); the pending
-        // must still settle NOW, event-driven — not linger to the TTL sweep.
+        // Success was already reported (Firefox onCreated correlation path);
+        // the pending must still settle NOW, event-driven — not linger to the
+        // TTL sweep.
         cleanup(pending, delta.id);
         return;
       }
+
+      // USER_CANCELED from the browser's own download shelf is the USER's
+      // cancellation — report it as cancelled, never as an error.
+      if (errorType === 'USER_CANCELED') {
+        sendStatusToTab(pending, 'cancelled');
+        cleanup(pending, delta.id);
+        return;
+      }
+
       const forbiddenFamily =
         errorType === 'SERVER_FORBIDDEN' || errorType === 'ACCESS_DENIED';
       if (pending.isDrive && forbiddenFamily) {
         unbindDownloadId(delta.id);
         handleForbiddenFailure(pending);
+        return;
+      }
+
+      // No-dead-ends taxonomy: transient server/network failures get ONE
+      // in-place retry (same URL, same account) before the honest terminal;
+      // permanent failures fail fast with a message that names the cause.
+      const TRANSIENT = new Set(['NETWORK_FAILED', 'SERVER_FAILED', 'NETWORK_TIMED_OUT']);
+      const PERMANENT_MESSAGE: Record<string, string> = {
+        FILE_FAILED: 'The file could not be saved. Try downloading it again.',
+        STORAGE_FULL: 'Your disk is full — free up some space and try again.',
+        CRASH: 'The browser crashed during the download. Try again.',
+        SERVER_BAD_CONTENT: 'The file is no longer available at its source.',
+        FILE_VIRUS_INFECTED: 'The file is infected and was blocked by your browser.',
+        FILE_BLOCKED: 'Your browser blocked this file type for security reasons.',
+      };
+      if (TRANSIENT.has(errorType) && !pending.transientRetried) {
+        pending.transientRetried = true;
+        unbindDownloadId(delta.id);
+        setTimeout(() => {
+          if (!isRegistered(pending.requestId) || pending.finalized) return;
+          retrySameAttempt(pending);
+        }, 2_000);
+        sendStatusToTab(pending, 'trying', 'Retrying…', 'TRANSIENT_RETRY');
         return;
       }
 
@@ -385,7 +480,8 @@ export default defineBackground(() => {
         bypass_used: false,
         error_type: errorType,
       });
-      sendStatusToTab(pending, 'error', t('downloadInterrupted'));
+      const guidance = PERMANENT_MESSAGE[errorType];
+      sendStatusToTab(pending, 'error', guidance ?? t('downloadInterrupted'), errorType);
       cleanup(pending, delta.id);
     }
   });
