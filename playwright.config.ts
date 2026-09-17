@@ -11,8 +11,8 @@
  * args. We build the extension first (via `pnpm -C extension build`),
  * then point Playwright at the built output directory.
  *
- * IMPORTANT: These tests need a REAL Chromium (not headless!) because
- * Chrome extensions don't work in headless mode. Playwright handles
+ * Extensions run headless via Chromium's new headless mode (channel
+ * 'chromium'). Playwright handles
  * this gracefully — it opens a real browser window for the tests.
  *
  * The test flow:
@@ -68,11 +68,12 @@ export default defineConfig({
       testIgnore: /[/\\]qa[/\\]/,
       use: {
         ...devices['Desktop Chrome'],
+        // channel 'chromium' = new headless, the build that supports extensions.
+        channel: 'chromium',
 
-        // Launch with the extension loaded.
-        // headless: false is REQUIRED because extension APIs are unavailable in headless mode.
+        // Launch with the extension loaded (works headless since new headless).
         launchOptions: {
-          headless: false,
+          headless: true,
           args: [
             `--disable-extensions-except=${EXTENSION_PATH}`,
             `--load-extension=${EXTENSION_PATH}`,
@@ -101,7 +102,7 @@ export default defineConfig({
         channel: 'msedge',
 
         launchOptions: {
-          headless: false,
+          headless: true,
           args: [
             `--disable-extensions-except=${EXTENSION_PATH}`,
             `--load-extension=${EXTENSION_PATH}`,

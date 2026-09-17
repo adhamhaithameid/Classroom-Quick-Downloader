@@ -164,7 +164,10 @@ export async function launchQaContext(
   const context =
     browser === "chromium"
       ? await chromium.launchPersistentContext("", {
-          headless: false,
+          // New headless (channel 'chromium') supports extensions; the bundled
+          // old-headless build does not.
+          channel: "chromium",
+          headless: true,
           acceptDownloads: true,
           ignoreHTTPSErrors: true,
           proxy: { server: sim.url },
@@ -181,7 +184,7 @@ export async function launchQaContext(
           ],
         })
       : await firefox.launchPersistentContext(FIREFOX_PROFILE_DIR, {
-          headless: false,
+          headless: true,
           acceptDownloads: true,
           ignoreHTTPSErrors: true,
           proxy: { server: sim.url },
