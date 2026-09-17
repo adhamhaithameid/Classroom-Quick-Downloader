@@ -2,8 +2,8 @@
 
 Consolidated, actionable task list for the extension engines and surrounding
 program. **Status columns refreshed 2026-09-13** against the beads epic
-(`Classroom-Quick-Downloader-1yf`): S1–S5, S7–S9 closed; S6 is the next
-takeable sprint (gate G2). Sections C/F are historical snapshots. Produced from a full
+(`Classroom-Quick-Downloader-1yf`): S1–S10, S6 closed (G2 2026-09-13, G3
+2026-09-17); S11 is the next takeable sprint (gate G5). Sections C/F are historical snapshots. Produced from a full
 scan of: the Engine V4 epic
 (`Classroom-Quick-Downloader-1yf`), `docs/ENGINE_V4_MASTER_PLAN.md`,
 `extension/docs/ENGINE_V4_SYSTEM_DESIGN.md`, `extension/docs/PRD_ENGINE_REFACTOR.md`,
@@ -19,9 +19,9 @@ built for performance, with multiple download/data sources.**
 
 | Engine (owner's term) | V4 home | Sprints | Beads | State |
 |---|---|---|---|---|
-| **Scan engine** (detection) | `roles/detect-engine.ts` + `roles/compute-engine.ts`, core in `core/detect` + `core/decide`; one MutationObserver, zero heartbeats | S4, S5, S10 | `1yf.4`, `1yf.5`, `1yf.10` | **S4 + S5 done** (pure `core/detect`; four roles wrapped behind the page bus, 2026-09-13); S10 strip open |
+| **Scan engine** (detection) | `roles/detect-engine.ts` + `roles/compute-engine.ts`, core in `core/detect` + `core/decide`; one MutationObserver, zero heartbeats | S4, S5, S10 | `1yf.4`, `1yf.5`, `1yf.10` | **S4 + S5 + S10 done** (roles on the bus; ONE MutationObserver via the DomPort multiplexer, zero heartbeats, mode-gated stacks, v2 default at interactive parity) |
 | **Download engine** (acquisition) | `core/acquire/state-machine.ts` (pure reducer) + `roles/acquire-engine.ts` (worker) + `adapters/browser/*` strategies: direct, drive-auth (authuser 0–9), bypass-tab, later API+zip | S8, S9 | `1yf.8` (+`1yf.8.1` D11), `1yf.9` | **S8 + S9 done**: D11 authoritative registry shipped, #537/#547 fixed with the `background-bypass-flow.test.ts` BrowserPort-seam harness (2026-09-13); worker roles still to wrap (S5) |
-| **Display engine** (render) | `roles/render-engine.ts` — the only DOM writer; button/flag renderers become strategies | S5, S6, S10 | `1yf.5`, `1yf.6` (D8, D9) | D8/D9 defects closed; renderers in `src/v2/render/`; S5 role wrapping done (2026-09-13); bridge activation (S6) open |
+| **Display engine** (render) | `roles/render-engine.ts` — the only DOM writer; button/flag renderers become strategies | S5, S6, S10 | `1yf.5`, `1yf.6` (D8, D9) | S5 roles done; S6 bridge live; S10: v2 default renders buttons/flags/Download-All at full parity (z57) |
 | **API engine** (V3 assist) | `strategies/detect/api-detector.ts` behind `Detector` port + OAuth via `BrowserPort`; **promotion stays post-G4** per master plan R7 | S13+ | *none filed — file it* | Stub only (`src/engines/v3/`); no `identity` permission, no client id |
 
 Shared foundation all four sit on: **S3 — `contracts/ports.ts`,
@@ -41,7 +41,7 @@ fitness suite** (gate G1). Nothing above can start cleanly without it.
 | S7 naming core | `core/name/{derive,strip,sanitize,verify}`; locale TypeLabelRegistry; fixes D10 (#541) | — | `1yf.7` | **Done** (gh #541 verified closed 2026-09-13) |
 | S8 acquisition core | pure state machine; one correlation id replaces 4 pending maps; deadline → forced settle | — | `1yf.8` | **Done** |
 | S9 acquisition adapters | Direct/Drive-auth/BypassTab strategies; Chrome/Firefox BrowserPort adapters; #537/#546/#547 repro tests | — | `1yf.9` | **Done** (2026-09-13: authuser cycling fix + flow harness, commit af09ac05/fef5dfc0) |
-| S10 strip V1 detector | 1 observer, 0 heartbeats; V1 render-only | G3 | `1yf.10` | Blocked on S6 |
+| S10 strip V1 detector | 1 observer, 0 heartbeats; V1 render-only | G3 | `1yf.10` | **Done** (2026-09-17: DomPort multiplexer, heartbeats deleted, v2 default at interactive parity; V1 kept as rollback — see session log) |
 | S11 cross-browser & perf | browser smoke matrix in CI; `handleMutations` p95 < 6 ms | G5 | `1yf.11` | Blocked on S10 |
 | S12 ratchet & closeout | floors up, mutation ≥ 80%, decision trace, docs | G4, G6 | `1yf.12` | Blocked on S11 |
 | S13+ API assist | OAuth client id + `identity`; `ApiDetector` strategy; consent + fallback | — | *to file* | Post-G4 by plan (R7); seam may be laid early |
