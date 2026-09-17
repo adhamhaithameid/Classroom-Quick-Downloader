@@ -52,11 +52,24 @@ export default defineContentScript({
       ]);
 
       // 1. Register engine instances
+      const engineV2 = new EngineV2();
       engineRegistry.register(new EngineV1());
-      engineRegistry.register(new EngineV2());
+      engineRegistry.register(engineV2);
       engineRegistry.register(new EngineV3());
 
       console.log('[CQD V2 Bootstrap] Engines registered:', engineRegistry.getSummary());
+
+      // 1b. S11 additive: extension-world perf probe — `__cqdPerfSnapshot()`
+      //     returns the V2 engine's live timing histograms (currently the
+      //     handleMutations fast-pass label, the <6ms p95 budget metric).
+      //     Getter-shaped like __cqdDomPortInfo so every call reads current
+      //     state, and plain-object/number-only so it serializes over CDP.
+      //     Content scripts run in an isolated world, so the page's main
+      //     world never sees this; qa-perf reads it over CDP Runtime.evaluate.
+      const perfHost = window as unknown as {
+        __cqdPerfSnapshot?: () => { handleMutations: import('../src/v2/telemetry/performance-monitor').TimingPercentiles | null };
+      };
+      perfHost.__cqdPerfSnapshot ??= () => ({ handleMutations: engineV2.getMutationTimings() });
 
       // 2. Initialize mode controller
       //    Reads cqdV2Mode from chrome.storage.local (default: 'legacy' —

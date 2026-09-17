@@ -88,7 +88,7 @@ import { CorrectionQueue } from '../../v2/repair/correction-queue';
 import { BudgetController } from '../../v2/telemetry/budget-controller';
 import { PerformanceMonitor } from '../../v2/telemetry/performance-monitor';
 import type { BudgetSnapshot } from '../../v2/telemetry/budget-controller';
-import type { PerformanceSummary } from '../../v2/telemetry/performance-monitor';
+import type { PerformanceSummary, TimingPercentiles } from '../../v2/telemetry/performance-monitor';
 
 // ============================================================================
 // V2 ENGINE CLASS
@@ -265,6 +265,13 @@ export class EngineV2 implements CQDEngine {
   handleMutations(mutations: MutationRecord[]): void {
     if (!this.isActive || !this.postScorer) return;
 
+    // S11: time the REAL mutation handling — the relevance scan plus any
+    // fullScan dispatch — into the 'handleMutations' histogram, using the
+    // same startTimer/stopTimer pattern fullScan uses for 'fullScan'. The
+    // early return above stays untimed (nothing was handled), mirroring how
+    // fullScan excludes its own guards. p95 of this label is the fast-pass
+    // budget metric (<6ms, budget-controller FAST_PASS_TARGET).
+    this.performanceMonitor.startTimer('handleMutations');
     const startTime = performance.now();
     let needsRescan = false;
 
@@ -312,6 +319,7 @@ export class EngineV2 implements CQDEngine {
 
     const elapsed = performance.now() - startTime;
     this.totalScanMs += elapsed;
+    this.performanceMonitor.stopTimer('handleMutations');
   }
 
   // ========================================================================
@@ -990,6 +998,18 @@ export class EngineV2 implements CQDEngine {
    */
   getPerformanceSummary(): PerformanceSummary {
     return this.performanceMonitor.getPerformanceSummary();
+  }
+
+  /**
+   * Get the handleMutations timing histogram (S11 additive).
+   *
+   * The p95 of this label is the fast-pass budget metric (<6ms per mutation
+   * batch, budget-controller FAST_PASS_TARGET). The qa-perf journey reads it
+   * through the `window.__cqdPerfSnapshot()` debug probe, and the debug panel
+   * can read it here without reaching into the private monitor.
+   */
+  getMutationTimings(): TimingPercentiles | null {
+    return this.performanceMonitor.getPercentiles('handleMutations');
   }
 
   /**
