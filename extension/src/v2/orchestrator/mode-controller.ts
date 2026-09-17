@@ -55,26 +55,39 @@ const STORAGE_KEY = 'cqdV2Mode';
 /**
  * The default mode when no setting is found in storage.
  *
- * S10 Task 4 (2026-09): FLIPPED to 'v2' — rollout step 2 of the plan
- * below. The readiness gate passed (accuracy corpus runs the V2 detector
- * on Tier B), the six V1 self-starting stacks are mode-gated inert in
- * 'v2' (entrypoints/content/mode-gate.ts), and the popup still offers a
- * one-click rollback to 'legacy'.
+ * S10 acceptance rollback (2026-09-17): DEFAULT_MODE returns to 'legacy'.
+ * The T4 flip to 'v2' (eb93be36) shipped a rendering layer with NO
+ * interactive download path: EngineV2 renders `.cqd-v2-btn` markers and
+ * `.cqd-v2-flag` badges, but nothing ever calls
+ * button-renderer.setupDelegatedClickHandler and nothing publishes
+ * 'download:requested' on the page bus, so in 'v2' mode clicking any
+ * download button does nothing and the Download All state machine
+ * (progress/hold-to-cancel/error) does not exist. V2 file discovery also
+ * misses the docs.google.com document/spreadsheet anchors that V1's
+ * DRIVE_ANCHOR_SELECTOR covers, so Docs/Sheets materials lose their
+ * buttons. All six qa-chromium journeys that exercise the product's core
+ * value fail on every fresh build in v2-default (bead 0fe).
+ *
+ * S11 entry item: restore the 'v2' flip only once V2 reaches interactive
+ * parity — delegated click wiring → bridge relay → background download,
+ * a Download All state machine, and docs/sheets anchor discovery.
  *
  * Rollout history:
  * 1. 'shadow' was reverted to an explicit opt-in (2026-08) after it
  *    shipped double scanning as a permanent CPU/battery tax (D9)
- * 2. Default flipped to 'v2' (S10 T4) once V2 owned rendering end to end
+ * 2. Default flipped to 'v2' (S10 T4, eb93be36) — REVERTED here after
+ *    fresh-build QA acceptance failed; 'v2' remains an explicit opt-in
+ *    via the popup's engine-mode control
  * 3. 'v3' stays behind a flag until the identity permission lands
  *
- * To roll back manually: set cqdV2Mode='legacy' in chrome.storage.local
+ * To try V2 manually: set cqdV2Mode='v2' in chrome.storage.local
  * (or use the popup's engine-mode control).
  */
 /**
  * The shipped default mode, exported so tests (and docs) can assert it:
  * docs and code must never disagree about this again (D9).
  */
-export const DEFAULT_MODE: EngineMode = 'v2';
+export const DEFAULT_MODE: EngineMode = 'legacy';
 
 // ============================================================================
 // READ / WRITE
