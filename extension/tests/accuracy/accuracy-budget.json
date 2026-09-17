@@ -11,8 +11,6 @@
     "coverage": 1
   },
   "knownFailures": [
-    "fx-classwork-material-comments",
-    "fx-mixed-links-comments",
     "syn-hu-both-flags",
     "syn-hu-edited-only"
   ]

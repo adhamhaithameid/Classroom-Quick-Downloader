@@ -157,4 +157,18 @@ describe('KeywordDetector', () => {
     expect(obs.comment.strength).toBeLessThan(40);
     expect(obs.comment.present).toBe(true); // observation-level fact only
   });
+
+  it('scores the captured .comment-count chip shell at golden confidence (S12)', () => {
+    // Google's own comment-count chip class as captured in the live fixtures
+    // (classwork-material-post-en.html, mixed-links-post-en.html). Unlike the
+    // drifted `post-comment-count` shape above, the real chip class is golden
+    // layer evidence — the count must clear the decide threshold on its own,
+    // with no edited marker to corroborate it.
+    const post = createPost('<div class="comment-count">2 class comments</div>');
+    const obs = detector.observe(post, { postId: 'p14', viewKind: ViewKind.STREAM, lang: 'en' });
+
+    expect(obs.comment.count).toBe(2);
+    expect(obs.comment.strength).toBeGreaterThanOrEqual(40);
+    expect(obs.comment.present).toBe(true);
+  });
 });

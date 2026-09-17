@@ -605,6 +605,14 @@ export const GOLDEN_SELECTORS = {
     // Click area / comment button selectors
     '.yqQS0c',
     '.gVJHxe',
+    // Captured comment-count chip shells (S12): the live fixtures
+    // (classwork-material-post-en.html, mixed-links-post-en.html,
+    // stream-flagged-post-en.html, rtl-flagged-post-ar.html) all carry the
+    // count text in a dedicated .comment-count/.comment-text container. These
+    // are golden-layer evidence — a count+keyword match there must clear the
+    // decide threshold on its own, not die in the L4 TreeWalker below it.
+    '.comment-count',
+    '.comment-text',
     // Semantic fallbacks
     '[aria-label*="comment"]',
     '[aria-label*="Comment"]',
