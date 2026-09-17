@@ -19,6 +19,8 @@ import {
   createWorkerRuntimeBridge,
   BRIDGE_REQUEST_TYPE,
   BRIDGE_RESPONSE_TYPE,
+  BRIDGE_TRACKING_CAP,
+  capInsertionOrder,
 } from '../src/adapters/bridge/runtime-bridge';
 
 const req = (id: string, payload: unknown = { url: 'x' }): BridgeRequest => ({
@@ -268,5 +270,69 @@ describe('runtime bridge worker: tab-directed responses (z57)', () => {
     expect(tabSent).toHaveLength(1);
     expect(tabSent[0].tabId).toBe(7);
     expect(sent).toHaveLength(1); // duplicate went over the runtime broadcast
+  });
+
+  it('bounds the requestingTab memory: answers beyond the FIFO window fall back to runtime', () => {
+    const worker = createWorkerRuntimeBridge();
+    worker.onRequest(() => {
+      // accepted but never answered — exactly the unbounded-growth case
+    });
+
+    dispatch(
+      { type: BRIDGE_REQUEST_TYPE, requestId: 'old-1', payload: {} },
+      { id: 'ext', tab: { id: 42 } },
+    );
+    for (let i = 2; i <= BRIDGE_TRACKING_CAP + 1; i++) {
+      dispatch(
+        { type: BRIDGE_REQUEST_TYPE, requestId: `old-${i}`, payload: {} },
+        { id: 'ext', tab: { id: 42 } },
+      );
+    }
+
+    worker.respond('old-1', { status: 'saved' });
+
+    // old-1 fell out of the bounded map FIFO — the answer degrades to the
+    // runtime broadcast instead of pinning a tab id forever.
+    expect(tabSent).toHaveLength(0);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].body.requestId).toBe('old-1');
+  });
+});
+
+// ===========================================================================
+// Bounded worker-side tracking (unbounded-growth fix): the requestingTab map
+// and the service's accepted/settled sets are capped FIFO-oldest-out.
+// ===========================================================================
+describe('capInsertionOrder (bounded tracking helper)', () => {
+  it('evicts the oldest entries FIFO once the cap is exceeded (Map)', () => {
+    const m = new Map<string, number>();
+    for (let i = 1; i <= 7; i++) m.set(`k${i}`, i);
+
+    capInsertionOrder(m, 5);
+
+    expect(m.size).toBe(5);
+    expect(m.has('k1')).toBe(false);
+    expect(m.has('k2')).toBe(false);
+    expect(m.has('k3')).toBe(true);
+    expect(m.has('k7')).toBe(true);
+  });
+
+  it('evicts the oldest entries FIFO once the cap is exceeded (Set)', () => {
+    const s = new Set<string>();
+    for (let i = 1; i <= 7; i++) s.add(`k${i}`);
+
+    capInsertionOrder(s, 5);
+
+    expect(s.size).toBe(5);
+    expect(s.has('k1')).toBe(false);
+    expect(s.has('k2')).toBe(false);
+    expect([...s][0]).toBe('k3');
+  });
+
+  it('is a no-op under the cap and ships a sane production cap', () => {
+    const s = new Set(['a', 'b']);
+    capInsertionOrder(s, 10);
+    expect(s.size).toBe(2);
+    expect(BRIDGE_TRACKING_CAP).toBeGreaterThanOrEqual(100);
   });
 });

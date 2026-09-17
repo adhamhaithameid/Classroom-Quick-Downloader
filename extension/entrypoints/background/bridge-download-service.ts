@@ -26,6 +26,7 @@ import type { AcquireOutcome, AcquireOutcomeStatus } from '../../src/contracts/t
 import type { DownloadStatus } from './types';
 import { handleDownloadRequest } from './download-handler';
 import { setDownloadStatusListener } from './message-sender';
+import { capInsertionOrder } from '../../src/adapters/bridge/runtime-bridge';
 
 interface BridgeDownloadPayload {
   file: { url: string; ext?: string; name?: string };
@@ -72,6 +73,10 @@ export function startBridgeDownloadService(worker: BridgePort): () => void {
   const settleOnce = (requestId: string, outcome: AcquireOutcome): void => {
     if (settled.has(requestId)) return;
     settled.add(requestId);
+    // Bounded memory: ancient settled ids fall out FIFO (the "exactly once"
+    // guarantee holds for any live request — 500+ newer settles mean the old
+    // page is long gone).
+    capInsertionOrder(settled);
     worker.respond(requestId, outcome);
   };
 
@@ -85,6 +90,8 @@ export function startBridgeDownloadService(worker: BridgePort): () => void {
   const offRequests = worker.onRequest(({ requestId, payload }) => {
     const { file } = (payload ?? {}) as BridgeDownloadPayload;
     accepted.add(requestId);
+    // Bounded memory: requests unanswered for 500+ newer requests age out.
+    capInsertionOrder(accepted);
     if (!file?.url) {
       settleOnce(requestId, { status: 'blocked', detail: 'Bridge request missing file URL.' });
       return;

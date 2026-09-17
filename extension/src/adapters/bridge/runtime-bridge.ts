@@ -33,6 +33,26 @@ interface ResponseMessage {
 
 type MessageListener = (message: unknown, sender: unknown) => void;
 
+/**
+ * Bounded worker-side tracking: Maps/Sets that correlate requests must not
+ * grow without bound (a request that is never answered would otherwise pin
+ * its entry forever). The cap is FIFO — the OLDEST entries fall out first —
+ * so recent correlation always survives. Applies to any insertion-ordered
+ * store exposing size/keys/delete (Map and Set both qualify).
+ */
+export const BRIDGE_TRACKING_CAP = 500;
+
+export function capInsertionOrder<K>(
+  store: { readonly size: number; keys(): IterableIterator<K>; delete(key: K): boolean },
+  cap: number = BRIDGE_TRACKING_CAP,
+): void {
+  while (store.size > cap) {
+    const oldest = store.keys().next().value;
+    if (oldest === undefined) return;
+    store.delete(oldest);
+  }
+}
+
 function subscribe(listener: MessageListener): Unsubscribe {
   const wrapped = (message: unknown, sender: unknown): boolean => {
     // Same-extension traffic only, per the repo's listener convention; the
@@ -122,6 +142,8 @@ export function createWorkerRuntimeBridge(): BridgePort {
     if (m?.type !== BRIDGE_REQUEST_TYPE || typeof m.requestId !== 'string') return;
     const tabId = (sender as { tab?: { id?: number } } | undefined)?.tab?.id;
     requestingTab.set(m.requestId, tabId);
+    // A request whose handler never answers would pin its tab entry forever.
+    capInsertionOrder(requestingTab);
     try {
       handler?.({ requestId: m.requestId, payload: m.payload });
     } catch {

@@ -156,6 +156,25 @@ describe('bridge download service (worker side)', () => {
     expect(workerResponds).toEqual([]);
   });
 
+  it('bounds the accepted-set memory: statuses beyond the FIFO window are ignored', () => {
+    startBridgeDownloadService(worker);
+    const listener = mocks.setDownloadStatusListener.mock.calls.at(-1)![0] as (
+      p: PendingDownload,
+      status: string,
+    ) => void;
+
+    // 501 accepted-but-never-settled requests: the FIRST must fall out FIFO.
+    page.send({ requestId: 'old-1', payload: { file: FILE, nameHint: NAME_HINT } });
+    for (let i = 2; i <= 501; i++) {
+      page.send({ requestId: `old-${i}`, payload: { file: FILE, nameHint: NAME_HINT } });
+    }
+
+    listener(makePending('old-1'), 'success');
+
+    // old-1 was evicted from the bounded accepted set — no stale settle.
+    expect(workerResponds).toEqual([]);
+  });
+
   it('the returned off fn detaches the listener and stops serving requests', () => {
     const off = startBridgeDownloadService(worker);
     off();
