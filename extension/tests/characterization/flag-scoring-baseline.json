@@ -89,12 +89,12 @@
   "assignment-details-en.html": [],
   "classwork-material-post-en.html": [
     {
-      "commentScore": 20,
+      "commentScore": 45,
       "editedScore": 0,
       "commentCount": 3,
       "editedDiff": null,
-      "finalVerdict": "none",
-      "confidence": "low",
+      "finalVerdict": "comment",
+      "confidence": "medium",
       "exclusionPenalties": [],
       "layers": [
         {
@@ -124,10 +124,10 @@
         {
           "layerName": "comment-L3",
           "layerIndex": 3,
-          "score": 0,
-          "matched": false,
-          "matchedText": null,
-          "details": "L3: No golden selector match"
+          "score": 45,
+          "matched": true,
+          "matchedText": "3 class comments",
+          "details": "L3-Golden-Leaf: \"comments\" via \".comment-text\" (count: 3)"
         },
         {
           "layerName": "comment-L4",
@@ -171,18 +171,18 @@
         }
       ],
       "exclusionRuleIds": [],
-      "finalScore": 20
+      "finalScore": 45
     }
   ],
   "material-details-en.html": [],
   "mixed-links-post-en.html": [
     {
-      "commentScore": 20,
+      "commentScore": 45,
       "editedScore": 0,
       "commentCount": 2,
       "editedDiff": null,
-      "finalVerdict": "none",
-      "confidence": "low",
+      "finalVerdict": "comment",
+      "confidence": "medium",
       "exclusionPenalties": [],
       "layers": [
         {
@@ -212,10 +212,10 @@
         {
           "layerName": "comment-L3",
           "layerIndex": 3,
-          "score": 0,
-          "matched": false,
-          "matchedText": null,
-          "details": "L3: No golden selector match"
+          "score": 45,
+          "matched": true,
+          "matchedText": "2 class comments",
+          "details": "L3-Golden-Leaf: \"comments\" via \".comment-count\" (count: 2)"
         },
         {
           "layerName": "comment-L4",
@@ -259,12 +259,12 @@
         }
       ],
       "exclusionRuleIds": [],
-      "finalScore": 20
+      "finalScore": 45
     }
   ],
   "rtl-flagged-post-ar.html": [
     {
-      "commentScore": 40,
+      "commentScore": 45,
       "editedScore": 40,
       "commentCount": 5,
       "editedDiff": null,
@@ -299,10 +299,10 @@
         {
           "layerName": "comment-L3",
           "layerIndex": 3,
-          "score": 0,
-          "matched": false,
-          "matchedText": null,
-          "details": "L3: No golden selector match"
+          "score": 45,
+          "matched": true,
+          "matchedText": "٥ تعليقات صفية",
+          "details": "L3-Golden-Leaf: \"تعليقات\" via \".comment-count\" (count: 5)"
         },
         {
           "layerName": "comment-L4",
@@ -346,12 +346,12 @@
         }
       ],
       "exclusionRuleIds": [],
-      "finalScore": 40
+      "finalScore": 45
     }
   ],
   "stream-flagged-post-en.html": [
     {
-      "commentScore": 40,
+      "commentScore": 45,
       "editedScore": 40,
       "commentCount": 5,
       "editedDiff": null,
@@ -386,10 +386,10 @@
         {
           "layerName": "comment-L3",
           "layerIndex": 3,
-          "score": 0,
-          "matched": false,
-          "matchedText": null,
-          "details": "L3: No golden selector match"
+          "score": 45,
+          "matched": true,
+          "matchedText": "5 class comments",
+          "details": "L3-Golden-Leaf: \"comments\" via \".comment-count\" (count: 5)"
         },
         {
           "layerName": "comment-L4",
@@ -433,7 +433,7 @@
         }
       ],
       "exclusionRuleIds": [],
-      "finalScore": 40
+      "finalScore": 45
     }
   ],
   "student-submissions-en.html": [
