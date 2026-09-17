@@ -164,11 +164,13 @@ test.describe("qa-08 single-observer", () => {
     });
     await captureIsolatedWorlds();
     await page.goto(`https://classroom.google.com${STREAM}`, { waitUntil: "domcontentloaded" });
-    // A v2 button proves the full stack ran (orchestrator, engine scan,
-    // placement, renderer) in default v2 mode; the v1 button selector is
-    // mode-gated off. Then let the page settle so the content-ready
-    // transient unwound.
-    await page.waitForSelector("button.cqd-v2-btn", { timeout: 20_000 });
+    // A product download button proves the default-mode stack ran (V1 scan
+    // stack on the legacy default — the shipped DEFAULT_MODE after the S10
+    // acceptance rollback; 'v2' renders .cqd-v2-btn instead). The DomPort
+    // gate asserted below is mode-independent: every mode multiplexes over
+    // the same port singleton. Then let the page settle so scan debounces
+    // unwound.
+    await page.waitForSelector("button.cqd-download-btn", { timeout: 20_000 });
     await page.waitForTimeout(3_000);
   });
 
