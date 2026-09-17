@@ -58,6 +58,7 @@ import type {
   FlagDecision,
   PlacementDecision,
   DecisionTrace,
+  SelectorStats,
 } from '../types';
 import {
   createPostScorer,
@@ -1293,6 +1294,31 @@ export class EngineV2 implements CQDEngine {
    */
   getMutationTimings(): TimingPercentiles | null {
     return this.performanceMonitor.getPercentiles('handleMutations');
+  }
+
+  /**
+   * S11 #615 selector audit: how the CURRENT file map's canonical ids
+   * resolved. `extractFileNode` resolves ids through a priority chain
+   * (data-drive-id → URL parse → data-id combo → URL hash); url-hash is the
+   * last-resort fallback that depends on volatile URL text, so a rising
+   * hashIdRate is the early warning that Classroom changed its attachment
+   * markup (ENGINE_V4_SYSTEM_DESIGN §5 rule 1). Exposed through the
+   * `window.__cqdPerfSnapshot()` debug probe alongside the timings.
+   */
+  getSelectorStats(): SelectorStats {
+    let totalFiles = 0;
+    let hashIdCount = 0;
+    for (const post of this.postMap.values()) {
+      for (const file of post.files) {
+        totalFiles++;
+        if (file.idSource === 'url-hash') hashIdCount++;
+      }
+    }
+    return {
+      hashIdCount,
+      totalFiles,
+      hashIdRate: totalFiles > 0 ? hashIdCount / totalFiles : 0,
+    };
   }
 
   /**

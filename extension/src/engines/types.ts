@@ -160,6 +160,22 @@ export interface FileNode {
   idSource: 'data-drive-id' | 'url-parse' | 'data-id-combo' | 'url-hash';
 }
 
+/**
+ * S11 #615 selector audit: how the CURRENT file map's canonical ids resolved.
+ *
+ * url-hash is the last-resort fallback (ENGINE_V4_SYSTEM_DESIGN §5 rule 1: a
+ * hash id is a fallback, never a default), so hashIdRate is the markup-drift
+ * early warning — exposed through the `window.__cqdPerfSnapshot()` probe.
+ */
+export interface SelectorStats {
+  /** Files whose canonical id resolved through the URL-hash fallback */
+  hashIdCount: number;
+  /** Files currently tracked across all posts */
+  totalFiles: number;
+  /** hashIdCount / totalFiles (0 when no files are tracked) */
+  hashIdRate: number;
+}
+
 // ============================================================================
 // FLAG DECISIONS
 // ============================================================================
