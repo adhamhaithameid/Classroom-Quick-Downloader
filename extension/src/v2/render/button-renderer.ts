@@ -357,6 +357,8 @@ export function renderDownloadAllButton(
   if (subEl) {
     subEl.textContent = `${files.length} ${files.length === 1 ? 'file' : 'files'}`;
   }
+  // The group machine's reset restores the idle sub-text from this count.
+  btn.dataset.cqdGroupCount = String(files.length);
 
   // Apply dark mode
   if (isDark) {

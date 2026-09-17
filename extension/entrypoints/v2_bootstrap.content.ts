@@ -90,6 +90,13 @@ export default defineContentScript({
       const { wireDownloadPath } = await import('../src/v2/render/download-controller');
       wireDownloadPath(orchestrator.getBus());
 
+      // 3d. Download All group machine (z57 S3): the Download All run state
+      //     machine driving staggered per-file requests through the same bus
+      //     path, with cancel over the existing CQD_CANCEL_DOWNLOAD message.
+      await import('../src/v2/render/download-all-controller').then((m) =>
+        m.installDownloadAllController(),
+      );
+
       // 4. Initialize debug panel (Ctrl+Shift+D to toggle)
       try {
         const { initDebugPanel } = await import('../src/v2/debug/debug-panel');

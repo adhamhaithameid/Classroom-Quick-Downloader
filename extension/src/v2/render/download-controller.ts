@@ -39,7 +39,9 @@ interface PendingEntry {
 
 const pending = new Map<RequestId, PendingEntry>();
 /** Secondary settled listeners — the Download All group controller registers here. */
-const settledListeners = new Set<(requestId: RequestId) => void>();
+const settledListeners = new Set<
+  (requestId: RequestId, outcome: PageTopicMap['download:settled']['outcome']) => void
+>();
 
 let requestSeq = 0;
 let busRef: EventBus<PageTopicMap> | null = null;
@@ -80,7 +82,7 @@ export function wireDownloadPath(
     // Fan out to dependent controllers (Download All group machine).
     for (const listener of settledListeners) {
       try {
-        listener(requestId);
+        listener(requestId, outcome);
       } catch (e) {
         console.warn('[CQD V2 Download] settled listener failed:', e);
       }
@@ -94,7 +96,9 @@ export function wireDownloadPath(
 }
 
 /** Register a secondary settled listener (group controller). Returns off fn. */
-export function onSettled(listener: (requestId: RequestId) => void): Unsubscribe {
+export function onSettled(
+  listener: (requestId: RequestId, outcome: PageTopicMap['download:settled']['outcome']) => void,
+): Unsubscribe {
   settledListeners.add(listener);
   return () => {
     settledListeners.delete(listener);
@@ -132,6 +136,9 @@ export function ensurePostClickWiring(postEl: HTMLElement): void {
  * the button's own dataset (discovery already resolved the download URL),
  * publish 'download:requested', and flip the button to loading. A second
  * click while mid-flight cancels (V1's cancel affordance, parity outcome).
+ * Returns the request id (null when no request was published) — the Download
+ * All group machine uses the SAME publish path so there is exactly one
+ * request issuer per file, per page.
  */
 export function handleSingleDownloadClickV2(
   button: HTMLButtonElement,
@@ -139,15 +146,15 @@ export function handleSingleDownloadClickV2(
   url: string,
   name: string,
   ext: string,
-): void {
-  if (!url) return;
+): RequestId | null {
+  if (!url) return null;
 
   const state = getButtonStateV2(button);
   if (state === 'loading' || state === 'trying') {
     cancelInFlight(button);
-    return;
+    return null;
   }
-  if (state !== 'idle') return;
+  if (state !== 'idle') return null;
 
   const requestId = nextRequestId();
   pending.set(requestId, { button, startedAt: Date.now() });
@@ -157,6 +164,7 @@ export function handleSingleDownloadClickV2(
 
   setButtonStateV2(button, 'loading');
   publishRequest(requestId, { fileId, url, ext, name });
+  return requestId;
 }
 
 // ============================================================================

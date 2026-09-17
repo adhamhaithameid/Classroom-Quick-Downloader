@@ -76,6 +76,7 @@ import { runComparison, installCompareGlobals } from '../../compare/compare-runn
 import type { ScannedPost, ScannedFile } from '../../v2/model/dom-scanner';
 import { renderBatch, removeStaleButtons, removeAllV2Buttons } from '../../v2/render/button-renderer';
 import { ensurePostClickWiring, resetDownloadController } from '../../v2/render/download-controller';
+import { resetDownloadAllController } from '../../v2/render/download-all-controller';
 import { resolveDownloadUrl } from '../../v2/decision/download-url';
 import { sanitizeFileName } from '../../core/name/sanitize';
 import { injectV2Styles, removeV2Styles } from '../../v2/render/button-styles';
@@ -214,6 +215,7 @@ export class EngineV2 implements CQDEngine {
 
     // Drop in-flight download state (pending buttons died with the page)
     resetDownloadController();
+    resetDownloadAllController();
 
     // Flush Phase 5 systems
     this.correctionQueue.flush();
