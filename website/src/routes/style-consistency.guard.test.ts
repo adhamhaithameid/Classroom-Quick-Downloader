@@ -36,7 +36,13 @@ const AMBIENT_COPIES_GONE: Array<{ file: string; marker: string; label: string }
   { file: './uninstall/+page.svelte', marker: 'class="un-grid-bg"', label: 'uninstall' },
   { file: './404/+page.svelte', marker: 'class="nf-orbs"', label: '404' },
   { file: './404/+page.svelte', marker: 'class="nf-grid-bg"', label: '404' },
-  { file: './+error.svelte', marker: 'class="err-orbs"', label: 'error page' }
+  { file: './+error.svelte', marker: 'class="err-orbs"', label: 'error page' },
+  {
+    file: '../lib/components/SiteFooter.svelte',
+    marker: 'class="ft-pattern"',
+    label: 'footer'
+  },
+  { file: '../lib/components/SiteFooter.svelte', marker: 'ft-orb', label: 'footer' }
 ];
 
 describe('style consistency: shared glass design system', () => {

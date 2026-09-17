@@ -205,6 +205,14 @@
       let rebuildTimer: ReturnType<typeof setTimeout> | null = null;
       const canHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
+      /* ── Effect switches — flip these while experimenting ──
+         ENABLE_WATER_DROP_RIPPLE: pointer entry and clicks fire a wavefront
+         pulse that ripples the whole text like a drop on a water surface.
+         ENABLE_CURSOR_CIRCLE: while the pointer stays inside, the repulsion
+         field pushes dots aside and holds a clear circle open around it. */
+      const ENABLE_WATER_DROP_RIPPLE = true;
+      const ENABLE_CURSOR_CIRCLE = true;
+
       function drawAll(): void {
         if (!ctx) return;
         ctx.clearRect(0, 0, cw, ch);
@@ -245,7 +253,7 @@
         pulses = pulses.filter((pulse) => (now - pulse.t0) * PULSE_SPEED < maxFront);
         let energy = false;
         for (const p of dots) {
-          if (pointerInside) {
+          if (pointerInside && ENABLE_CURSOR_CIRCLE) {
             const dx = p.x - px;
             const dy = p.y - py;
             const d = Math.hypot(dx, dy);
@@ -392,7 +400,10 @@
         px = x;
         py = y;
         pointerInside = true;
-        firePulse(x, y);
+        if (ENABLE_WATER_DROP_RIPPLE) firePulse(x, y);
+        /* The pulse used to spin the loop up on entry; with the ripple off,
+           entry must still start it so the circle can form without a move. */
+        startLoop();
       };
       const onPointerMove = (event: PointerEvent): void => {
         if (pointerTicking) return;
@@ -415,7 +426,7 @@
       };
       const onPointerDown = (event: PointerEvent): void => {
         const { x, y } = toCanvasCoords(event.clientX, event.clientY);
-        firePulse(x, y);
+        if (ENABLE_WATER_DROP_RIPPLE) firePulse(x, y);
       };
       const onPointerLeave = (): void => {
         moveSeq++; // invalidate any queued pointermove sample
@@ -469,11 +480,6 @@
 </script>
 
 <footer class="cqd-footer" bind:this={footerEl}>
-  <div class="ft-pattern" aria-hidden="true">
-    <span class="ft-orb ft-orb-a"></span>
-    <span class="ft-orb ft-orb-b"></span>
-  </div>
-
   <!-- Layer 1 — final installation CTA -->
   <section class="ft-cta" aria-labelledby="ft-cta-title">
     <div class="ft-inner ft-cta-inner cqd-reveal">
@@ -599,8 +605,9 @@
 <style>
   .cqd-footer {
     /* Footer-scoped palette — mirrors the light site tokens so the footer
-       reads as the same visual world, grounded by the green brand rule. */
-    --ft-bg: var(--bg);
+       reads as the same visual world, grounded by the green brand rule.
+       No background of its own: the footer sits over the shared ambient
+       background (page canvas + orbs + cursor-lens grid) like any section. */
     --ft-text: var(--text);
     --ft-text-2: #5b6b7d;
     --ft-text-3: #64748b;
@@ -609,49 +616,11 @@
     --ft-green-hover: var(--gc-green-dark);
 
     position: relative;
-    background: var(--ft-bg);
     color: var(--ft-text);
     font-family: var(--font-ui);
     /* Interaction transforms may push letters toward the edge — clip the
        axis instead of creating a horizontal scrollbar. */
     overflow-x: clip;
-  }
-
-  .ft-pattern {
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    overflow: hidden;
-    pointer-events: none;
-    /* Same 60px grid texture the overview page uses. */
-    background-image:
-      linear-gradient(rgba(26, 26, 46, 0.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(26, 26, 46, 0.04) 1px, transparent 1px);
-    background-size: 60px 60px;
-  }
-
-  .ft-orb {
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(90px);
-  }
-
-  .ft-orb-a {
-    width: 420px;
-    height: 420px;
-    top: 2%;
-    left: -120px;
-    background: #bbf7d0;
-    opacity: 0.55;
-  }
-
-  .ft-orb-b {
-    width: 380px;
-    height: 380px;
-    bottom: 4%;
-    right: -100px;
-    background: #a5f3fc;
-    opacity: 0.45;
   }
 
   .ft-cta,
