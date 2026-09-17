@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>30,000 Particles — Interactive Demo</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin:0; width:100%; height:100%; overflow:hidden; background:#111; }
+  canvas { display:block; width:100%; height:100%; }
+  .info {
+    position:fixed; left:28px; top:28px; z-index:2; color:#fff;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    max-width:340px; padding:18px 20px; background:rgba(0,0,0,.72);
+    border:1px solid rgba(255,255,255,.1); backdrop-filter: blur(8px);
+  }
+  h1,h2,h3,p { margin:0; }
+  h1 { font-size:22px; letter-spacing:-.8px; }
+  h2 { font-size:13px; font-weight:400; opacity:.7; margin-top:7px; line-height:1.5; }
+  h3 { font-size:11px; text-transform:uppercase; opacity:.85; margin-top:18px; letter-spacing:.08em; }
+  .controls { position:fixed; right:18px; bottom:18px; z-index:2; color:#aaa; font:11px ui-monospace, monospace; }
+  @media (max-width:600px) {
+    .info { left:14px; top:14px; right:14px; max-width:none; }
+  }
+</style>
+</head>
+<body>
+<div class="info">
+  <h1>30,000 Particles</h1>
+  <h2>A modern recreation of the Canvas 2D particle study.</h2>
+  <h3>Move your pointer</h3>
+</div>
+<div class="controls" id="stats"></div>
+<canvas id="canvas"></canvas>
+
+<script>
+(() => {
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const stats = document.getElementById('stats');
+
+  const MAX_PARTICLES = 30000;
+  const THICKNESS = 80 * 80;
+  const DRAG = 0.95;
+  const EASE = 0.25;
+  const COLOR = 220;
+
+  let particles = [];
+  let mouseX = 0, mouseY = 0, hasPointer = false;
+  let w = 0, h = 0, dpr = 1;
+  let last = performance.now(), frames = 0, fpsTime = last;
+
+  function buildParticles() {
+    particles = [];
+    const area = w * h;
+    const target = Math.min(MAX_PARTICLES, Math.max(3500, Math.floor(area / 32)));
+    const aspect = w / h;
+    const cols = Math.ceil(Math.sqrt(target * aspect));
+    const rows = Math.ceil(target / cols);
+    const spacingX = w / cols;
+    const spacingY = h / rows;
+
+    for (let i = 0; i < target; i++) {
+      const c = i % cols, r = Math.floor(i / cols);
+      const x = (c + .5) * spacingX;
+      const y = (r + .5) * spacingY;
+      particles.push({ x, y, ox:x, oy:y, vx:0, vy:0 });
+    }
+  }
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    w = window.innerWidth;
+    h = window.innerHeight;
+    canvas.width = Math.floor(w * dpr);
+    canvas.height = Math.floor(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    buildParticles();
+  }
+
+  function pointerMove(e) {
+    const rect = canvas.getBoundingClientRect();
+    mouseX = e.clientX - rect.left;
+    mouseY = e.clientY - rect.top;
+    hasPointer = true;
+  }
+
+  window.addEventListener('pointermove', pointerMove, { passive:true });
+  window.addEventListener('pointerleave', () => hasPointer = false);
+  window.addEventListener('resize', resize);
+
+  function update(time) {
+    let mx = mouseX, my = mouseY;
+
+    if (!hasPointer) {
+      const t = time * 0.001;
+      mx = w * .5 + Math.cos(t * 2.1) * Math.cos(t * .9) * w * .35;
+      my = h * .5 + Math.sin(t * 3.2) * Math.sin(t * .8) * h * .28;
+    }
+
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      const dx = mx - p.x;
+      const dy = my - p.y;
+      const dist2 = dx * dx + dy * dy;
+
+      if (dist2 > 1 && dist2 < THICKNESS) {
+        const f = -THICKNESS / dist2;
+        const invDist = 1 / Math.sqrt(dist2);
+        p.vx += f * dx * invDist;
+        p.vy += f * dy * invDist;
+      }
+
+      p.vx *= DRAG;
+      p.vy *= DRAG;
+      p.x += p.vx + (p.ox - p.x) * EASE;
+      p.y += p.vy + (p.oy - p.y) * EASE;
+    }
+  }
+
+  function render() {
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, w, h);
+
+    // Batched path instead of 30,000 fillRect calls.
+    const image = ctx.createImageData(Math.floor(w), Math.floor(h));
+    const data = image.data;
+
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      const x = p.x | 0, y = p.y | 0;
+      if (x < 0 || y < 0 || x >= w || y >= h) continue;
+      const n = (x + y * (w | 0)) * 4;
+      data[n] = data[n+1] = data[n+2] = COLOR;
+      data[n+3] = 255;
+    }
+    ctx.putImageData(image, 0, 0);
+  }
+
+  function loop(time) {
+    update(time);
+    render();
+
+    frames++;
+    if (time - fpsTime > 1000) {
+      stats.textContent = `${particles.length.toLocaleString()} particles · ${frames} fps`;
+      frames = 0;
+      fpsTime = time;
+    }
+    requestAnimationFrame(loop);
+  }
+
+  resize();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
