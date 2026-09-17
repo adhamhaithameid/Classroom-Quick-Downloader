@@ -249,10 +249,11 @@ describe('v2 Download All group machine (z57 S3)', () => {
     // (v2_bootstrap.content.ts) — cancel must fall back to chrome.runtime
     // .sendMessage exactly like the single-file controller does.
     const chromeSend = vi.fn();
+    const g = globalThis as { chrome?: { runtime?: Record<string, unknown> } };
     (globalThis as unknown as { chrome: unknown }).chrome = {
-      ...(globalThis as { chrome?: unknown }).chrome,
+      ...g.chrome,
       runtime: {
-        ...((globalThis as { chrome?: { runtime?: object } }).chrome?.runtime ?? {}),
+        ...g.chrome?.runtime,
         sendMessage: chromeSend,
         lastError: undefined,
       },
