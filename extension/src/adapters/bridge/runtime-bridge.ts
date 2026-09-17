@@ -31,7 +31,7 @@ interface ResponseMessage {
   response: unknown;
 }
 
-type MessageListener = (message: unknown) => void;
+type MessageListener = (message: unknown, sender: unknown) => void;
 
 function subscribe(listener: MessageListener): Unsubscribe {
   const wrapped = (message: unknown, sender: unknown): boolean => {
@@ -40,7 +40,9 @@ function subscribe(listener: MessageListener): Unsubscribe {
     // so every invocation returns false synchronously.
     const senderId = (sender as { id?: string } | undefined)?.id;
     if (senderId !== chrome.runtime.id) return false;
-    listener(message);
+    // z57: the sender is forwarded — the worker side needs the asking tab to
+    // answer over tabs.sendMessage (worker→content requires a tab hop).
+    listener(message, sender);
     return false;
   };
   chrome.runtime.onMessage.addListener(wrapped);
@@ -104,9 +106,22 @@ export function createPageRuntimeBridge(): BridgePort {
 export function createWorkerRuntimeBridge(): BridgePort {
   let handler: ((request: BridgeRequest) => void) | null = null;
 
-  subscribe((message) => {
+  /**
+   * z57: answers must reach the CONTENT SCRIPT that asked. chrome.runtime
+   * .sendMessage from the worker does not deliver to content-script onMessage
+   * listeners — every other worker→content path in this codebase (V1's
+   * CQD_DOWNLOAD_STATUS, the popup toggles) rides chrome.tabs.sendMessage.
+   * The request sender carries the asking tab, so remember it per requestId
+   * and answer over tabs; extension-page requesters (no tab) keep the
+   * runtime broadcast.
+   */
+  const requestingTab = new Map<string, number | undefined>();
+
+  subscribe((message, sender) => {
     const m = message as Partial<RequestMessage>;
     if (m?.type !== BRIDGE_REQUEST_TYPE || typeof m.requestId !== 'string') return;
+    const tabId = (sender as { tab?: { id?: number } } | undefined)?.tab?.id;
+    requestingTab.set(m.requestId, tabId);
     try {
       handler?.({ requestId: m.requestId, payload: m.payload });
     } catch {
@@ -125,12 +140,21 @@ export function createWorkerRuntimeBridge(): BridgePort {
         requestId,
         response,
       };
+      const tabId = requestingTab.get(requestId);
       try {
-        chrome.runtime.sendMessage(message, () => {
-          void chrome.runtime.lastError;
-        });
+        if (typeof tabId === 'number') {
+          chrome.tabs.sendMessage(tabId, message, () => {
+            void chrome.runtime.lastError;
+          });
+        } else {
+          chrome.runtime.sendMessage(message, () => {
+            void chrome.runtime.lastError;
+          });
+        }
       } catch {
         // Page gone before the answer — nothing to do.
+      } finally {
+        if (requestingTab.has(requestId)) requestingTab.delete(requestId);
       }
     },
     onRequest(h: (request: BridgeRequest) => void): Unsubscribe {

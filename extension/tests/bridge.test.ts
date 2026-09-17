@@ -177,3 +177,96 @@ describe('runtime bridge adapters (chrome.runtime pair)', () => {
     ).not.toThrow();
   });
 });
+
+// ===========================================================================
+// z57 — worker answers are TAB-directed. chrome.runtime.sendMessage from the
+// MV3 worker does not reach content-script onMessage listeners, so a request
+// whose sender carries a tab must be answered over chrome.tabs.sendMessage;
+// extension-page requesters (no tab) keep the runtime broadcast.
+// ===========================================================================
+describe('runtime bridge worker: tab-directed responses (z57)', () => {
+  type Listener = (message: any, sender: any, respond: (r?: any) => void) => unknown;
+  let onMessageListeners: Listener[];
+  let sent: Array<{ type: string; body: any }>;
+  let tabSent: Array<{ tabId: number; body: any }>;
+
+  beforeEach(() => {
+    vi.resetModules();
+    onMessageListeners = [];
+    sent = [];
+    tabSent = [];
+    (globalThis as any).chrome = {
+      ...(globalThis as any).chrome,
+      runtime: {
+        ...(globalThis as any).chrome?.runtime,
+        id: 'ext',
+        sendMessage: vi.fn((msg: any) => {
+          sent.push({ type: msg.type, body: msg });
+          return true;
+        }),
+        onMessage: {
+          addListener: vi.fn((l: Listener) => onMessageListeners.push(l)),
+          removeListener: vi.fn(),
+        },
+        lastError: undefined,
+      },
+      tabs: {
+        sendMessage: vi.fn((tabId: number, msg: any) => {
+          tabSent.push({ tabId, body: msg });
+          return true;
+        }),
+      },
+    };
+  });
+
+  const dispatch = (message: any, sender: any) => {
+    for (const l of onMessageListeners) l(message, sender, vi.fn());
+  };
+
+  it('responds over tabs.sendMessage to the tab that sent the request', () => {
+    const worker = createWorkerRuntimeBridge();
+    worker.onRequest((r) => worker.respond(r.requestId, { status: 'saved' }));
+
+    dispatch(
+      { type: BRIDGE_REQUEST_TYPE, requestId: 'tab-1', payload: {} },
+      { id: 'ext', tab: { id: 42 } },
+    );
+
+    expect(tabSent).toHaveLength(1);
+    expect(tabSent[0].tabId).toBe(42);
+    expect(tabSent[0].body.type).toBe(BRIDGE_RESPONSE_TYPE);
+    expect(tabSent[0].body.requestId).toBe('tab-1');
+    expect(sent).toHaveLength(0);
+  });
+
+  it('keeps the runtime broadcast for requesters without a tab', () => {
+    const worker = createWorkerRuntimeBridge();
+    worker.onRequest((r) => worker.respond(r.requestId, { status: 'saved' }));
+
+    dispatch({ type: BRIDGE_REQUEST_TYPE, requestId: 'page-1', payload: {} }, { id: 'ext' });
+
+    expect(tabSent).toHaveLength(0);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].body.requestId).toBe('page-1');
+  });
+
+  it('forgets the tab after answering — a late duplicate answer falls back to runtime', () => {
+    const worker = createWorkerRuntimeBridge();
+    worker.onRequest((r) => {
+      worker.respond(r.requestId, { status: 'saved' });
+      worker.respond(r.requestId, { status: 'saved' });
+    });
+
+    dispatch(
+      { type: BRIDGE_REQUEST_TYPE, requestId: 'tab-2', payload: {} },
+      { id: 'ext', tab: { id: 7 } },
+    );
+
+    // First (correct) answer rides tabs; the tab entry is dropped afterwards
+    // (one answer per request — the service guards double settles upstream),
+    // so a late duplicate cannot re-message the tab.
+    expect(tabSent).toHaveLength(1);
+    expect(tabSent[0].tabId).toBe(7);
+    expect(sent).toHaveLength(1); // duplicate went over the runtime broadcast
+  });
+});

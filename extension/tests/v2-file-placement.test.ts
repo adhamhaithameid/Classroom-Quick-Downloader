@@ -449,3 +449,57 @@ describe('File Placement: Edge Cases', () => {
     expect(getInjectedAttr()).toBe('data-cqd-injected');
   });
 });
+
+// ===========================================================================
+// z57 S3 — Download All placement fallback: with NO header anchor the target
+// is the post root, and a 'before' insertion would land the button OUTSIDE
+// the post card. The fallback degrades to 'append' (inside the card) — the
+// V1 outcome qa-02 pins ("Download All lives inside its post card").
+// ===========================================================================
+describe('computePlacement: Download All post-root fallback insertion (z57)', () => {
+  it('appends into the post root when the header anchor falls back', () => {
+    document.body.innerHTML = '';
+    const postEl = document.createElement('article');
+    postEl.setAttribute('data-stream-item-id', 'fb-post-1');
+    // A file the registry matches, and NO header-ish element at all.
+    const anchor = document.createElement('a');
+    anchor.href = 'https://drive.google.com/file/d/FALLBACKID1/view';
+    postEl.appendChild(anchor);
+    const second = anchor.cloneNode(true) as HTMLAnchorElement;
+    second.href = 'https://drive.google.com/file/d/FALLBACKID2/view';
+    postEl.appendChild(second);
+    document.body.appendChild(postEl);
+
+    const post = {
+      id: 'fb-post-1',
+      element: postEl,
+      fingerprint: 'fb',
+      files: [
+        {
+          canonicalId: 'drive-FALLBACKID1',
+          element: anchor,
+          idSource: 'url-parse' as const,
+          name: 'a.pdf',
+          ext: 'pdf',
+          downloadUrl: anchor.href,
+        },
+        {
+          canonicalId: 'drive-FALLBACKID2',
+          element: second,
+          idSource: 'url-parse' as const,
+          name: 'b.pdf',
+          ext: 'pdf',
+          downloadUrl: second.href,
+        },
+      ],
+      isExpanded: true,
+      isConnected: true,
+    };
+
+    const decisions = computePlacement(post, 'stream' as never);
+    const all = decisions.find((d) => d.fileId === 'download-all:fb-post-1');
+    expect(all).toBeDefined();
+    expect(all!.targetElement).toBe(postEl);
+    expect(all!.insertionPoint).toBe('append');
+  });
+});
