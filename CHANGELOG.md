@@ -4,12 +4,12 @@ This is the main engineering changelog for Classroom Quick Downloader.
 It focuses on meaningful product, reliability, security, and architecture changes instead of raw commit history.
 
 ## Versioning Notes
-- Current extension release line: `1.7.10`
-- The `1.5.6`→`1.6.19` ladder below is the materialized internal history: every point version is anchored to the commit record and file-change dates of its window
+- Current extension release line: `1.8.0`
+- The `1.5.6`→`1.8.0` ladder below is the materialized internal history: every point version is anchored to the commit record and file-change dates of its window; patches never reach `.10` — the next minor takes over (`1.6.9` → `1.7.0`, `1.7.9` → `1.8.0`)
 - Planned next engine milestone: post-1.6 acquisition strategy wiring (API download tier behind the consent gate)
 - Pre-`1.0.0` bootstrap work is intentionally omitted from the user-facing release ledger
 
-## [1.7.10] - 2026-09-17
+## [1.8.0] - 2026-09-17
 
 ### Summary
 The no-dead-ends release: adversarial test program (outcome corpus run differentially against the pure machine AND production, fast-check property invariants, six new simulator failure shapes), the full interrupt taxonomy, the stall deadline, completion verification, the acquisition strategy chain, and the qa-08 resilience journey.
@@ -138,7 +138,7 @@ The zero-tab contract completed and verified in real browsers.
 - Fixed a late 403 from a still-bound tab resurrecting the cycle on an already-successful pending (finalized guard, covered by a flow test written red-first).
 - Added the `authlocked-` simulator fixture (403 unless `authuser=1`) proving 403 → invisible sweep → bytes → button success end-to-end in qa-06.
 
-## [1.6.8] - 2026-09-13
+## [1.6.9] - 2026-09-13
 
 ### Summary
 The account-cycling fix for #537/#547 and the endpoint switch.
@@ -151,7 +151,7 @@ The account-cycling fix for #537/#547 and the endpoint switch.
 ### Fixed
 - Fixed #537 (zen/Firefox, severity 5: "never ever works") and #547 (Brave: "download is unavailable") — downloads that start but fail now sweep accounts invisibly first.
 
-## [1.6.7] - 2026-09-13
+## [1.6.8] - 2026-09-13
 
 ### Summary
 The Manual-QA Replay pipeline completed: real-browser journeys for every runbook check, real download verification, the generated runbook report, and the gated live-Classroom canary.
@@ -160,7 +160,7 @@ The Manual-QA Replay pipeline completed: real-browser journeys for every runbook
 - Journeys qa-01…qa-06 drive the built extension over the deterministic simulator: per-file downloads verify real bytes over TLS plus served Content-Disposition, the Drive gated-file flow runs the interstitial click-through, and the Download All, flags, popup and navigation flows are asserted end-to-end.
 - Added the artifact-based report generator (`qa-artifacts/report.md` rebuilt from per-check `result.json` files only) and the `QA_LIVE_CLASSROOM=1`-gated read-only production canary.
 
-## [1.6.6] - 2026-09-12
+## [1.6.7] - 2026-09-12
 
 ### Summary
 The Manual-QA Replay pipeline foundation: a deterministic Classroom-shaped simulator served over a local MITM proxy, because route interception cannot feed Chromium's download manager — real downloads need real sockets.
@@ -168,7 +168,7 @@ The Manual-QA Replay pipeline foundation: a deterministic Classroom-shaped simul
 ### Added
 - Added the typed scenario model, page builder, SPA router and Drive/Docs byte servers (`tests/simulator/`), a test-only CA with per-origin certificates, and the simulator-sanity journey proving the served surface under the real `classroom.google.com` origin.
 
-## [1.6.5] - 2026-09-12
+## [1.6.6] - 2026-09-12
 
 ### Summary
 Detection and naming hardening: the naming core extracted, the download registry rebuilt on one authoritative map, and four more labeled defects closed.
@@ -182,7 +182,7 @@ Detection and naming hardening: the naming core extracted, the download registry
 - Fixed V2-primary rendering through the render strategy (D8) and the docs/code default-mode mismatch (D9).
 - Fixed locale-driven type labels (D10) and Google Sheets attachments not receiving download buttons (#546).
 
-## [1.6.4] - 2026-09-12
+## [1.6.5] - 2026-09-12
 
 ### Summary
 Corpus-first fixes for the second defect wave: count corroboration, chip-gated text, the canonical exclusion table, whole-token exclusions, and Unicode month keys.
@@ -193,7 +193,7 @@ Corpus-first fixes for the second defect wave: count corroboration, chip-gated t
 - Fixed V2 text exclusion rules still substring-matching — moved to the shared whole-token matcher (D14).
 - Fixed `parseUnicodeDate` month keys matching substrings (D15).
 
-## [1.6.3] - 2026-09-11
+## [1.6.4] - 2026-09-11
 
 ### Summary
 Whole-token matching for exclusion and phrase rules (D6), with its corpus cases written red-first.
@@ -201,7 +201,7 @@ Whole-token matching for exclusion and phrase rules (D6), with its corpus cases 
 ### Fixed
 - Fixed substring false positives in exclusion matching: the shared matcher operates on whole tokens with an attribute-context phrase policy (D6).
 
-## [1.6.2] - 2026-09-10
+## [1.6.3] - 2026-09-10
 
 ### Summary
 Detection defenses: the numeral layer sanity-checks the DOM truth it trusts, and the D6 false-positive corpus was captured red.
@@ -210,7 +210,7 @@ Detection defenses: the numeral layer sanity-checks the DOM truth it trusts, and
 - Fixed blind trust in the L0 DOM signal — the numeral layer sanity-checks it (D5).
 - Added the D6 false-positive corpus cases (red) pinning the substring-matching defect.
 
-## [1.6.1] - 2026-09-10
+## [1.6.2] - 2026-09-10
 
 ### Summary
 First labeled-defect wave: Armenian keyword coverage, token-exact word numbers, and Arabic tashkeel folding.
@@ -219,7 +219,7 @@ First labeled-defect wave: Armenian keyword coverage, token-exact word numbers, 
 - Fixed Armenian keyword coverage (D1), substring word-number matching (D2), and Arabic tashkeel folding in keyword matching (D7).
 - Added an own-property guard on the word-number token lookup.
 
-## [1.6.0] - 2026-09-10
+## [1.6.1] - 2026-09-10
 
 ### Summary
 The Engine V4 foundation (gates G0/G1): a labeled accuracy corpus with ratcheting floors, typed contracts + event bus + pure acquisition state machine, the extracted pure detection core, and hardened release gates.
@@ -232,30 +232,24 @@ The Engine V4 foundation (gates G0/G1): a labeled accuracy corpus with ratchetin
 ### Changed
 - Extracted the detection core into pure modules: `core/detect/{normalize,numerals,matching,action-buttons,ceilings}`.
 
-## [1.5.11] - 2026-09-06
+## [1.6.0] - 2026-09-10
 
 ### Summary
-Toolchain, typing and gate hardening across the extended development window.
+The Engine V4 foundation (gates G0/G1): a labeled accuracy corpus with ratcheting floors, typed contracts + event bus + pure acquisition state machine, the extracted pure detection core — plus the security-audit and gate-hardening roll-up that closed the 1.5 line.
 
 ### Added
-- Added hardened e2e, accuracy, and release gates (#762).
+- Added the accuracy corpus and gate: labeled expectations across locales, exact-match C1 with a ratcheting `knownFailures` list, statistical floors C2 (ADR-0008).
+- Added `contracts/` (ports, topics), `bus/event-bus.ts` with subscriber isolation, the pure `core/acquire/state-machine.ts` (bounded authuser rotation as data, forced-deadline timeout, every path settles), and the architecture fitness suite (ADR-0007).
+- Added hardened e2e, accuracy, and release gates to CI (#762), including the security audit, dependency updates and CI hardening roll-in (#665).
+- Added `crypto.randomUUID()`-based secure identifiers and student-work trust-boundary coverage.
 
 ### Changed
-- Adopted the wxt 0.21 tsconfig with `verbatimModuleSyntax` and `noImplicitOverride`; held TypeScript at 6 until the ecosystem caught up.
-- Updated extension dependencies to patched versions.
-- Hardened index access in detection keyword lookups.
-
-## [1.5.10] - 2026-06-26
-
-### Summary
-Security audit wave and the race-condition fix that preceded the Engine V4 program.
+- Extracted the detection core into pure modules: `core/detect/{normalize,numerals,matching,action-buttons,ceilings}`.
+- Adopted the wxt 0.21 strict tsconfig (`verbatimModuleSyntax`, `noImplicitOverride`); hardened index access in detection keyword lookups.
 
 ### Fixed
 - Fixed the `pendingByUrl` race condition — concurrent same-URL downloads are now tracked independently (#672).
 - Removed the unused `tabs` permission from the manifest (least privilege).
-
-### Changed
-- Rolled in the security audit results, dependency updates and CI hardening (#665); documented the engine architecture map and refactor PRD (#686).
 
 ## [1.5.9] - 2026-06-10
 
