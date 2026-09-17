@@ -38,6 +38,16 @@ import path from 'node:path';
  */
 const EXTENSION_PATH = path.resolve(__dirname, 'extension/.output/chrome-mv3');
 
+/**
+ * Signed Firefox leg (S11 T3): QA_SIGNED_XPI must point at an AMO-signed xpi
+ * (produced by extension/tools/sign-extension.mjs). When set, an extra
+ * qa-firefox-signed project exists; when unset this config is byte-for-byte
+ * the pre-S11 behavior. The signed xpi survives Playwright's bundled Firefox
+ * startup, so qa journeys run there instead of being skipped (see
+ * tests/e2e/qa/harness.ts and global-setup's ensureFirefoxProfile).
+ */
+const QA_SIGNED_XPI = process.env.QA_SIGNED_XPI;
+
 export default defineConfig({
   testDir: './tests/e2e',
   timeout: 60_000,
@@ -125,6 +135,24 @@ export default defineConfig({
         acceptDownloads: true,
       },
     },
+
+    // ────────────────────────────────────────────────────────────────────
+    // Signed Firefox leg (S11 T3) — only exists when QA_SIGNED_XPI is set.
+    // Mirrors qa-firefox; global-setup installs the signed xpi into the
+    // shared prepared profile instead of the unsigned zip.
+    // ────────────────────────────────────────────────────────────────────
+    ...(QA_SIGNED_XPI
+      ? [
+          {
+            name: 'qa-firefox-signed',
+            testMatch: /tests\/e2e\/qa\/.*\.spec\.ts/,
+            use: {
+              browserName: 'firefox',
+              acceptDownloads: true,
+            },
+          },
+        ]
+      : []),
   ],
 
   // Global setup builds the extension before running tests.

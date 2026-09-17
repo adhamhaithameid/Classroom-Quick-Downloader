@@ -15,6 +15,7 @@ import {
   captureConsole,
   runCheck,
   withExtensionBackground,
+  projectBrowser,
 } from "./harness";
 import { createScenario, streamPath, drive } from "../../simulator/scenario";
 import { installSimulator } from "../../simulator/server";
@@ -54,7 +55,7 @@ test.describe("qa-04 popup", () => {
   let extensionBase: string;
 
   test.beforeAll(async ({}, testInfo) => {
-    browser = testInfo.project.name === "qa-firefox" ? "firefox" : "chromium";
+    browser = projectBrowser(testInfo.project.name);
     const session = await launchQaContext(
       browser,
       createScenario({

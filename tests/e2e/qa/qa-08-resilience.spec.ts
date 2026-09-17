@@ -24,6 +24,7 @@ import {
   SELECTORS,
   instrumentSw,
   type SwProbe,
+  projectBrowser,
 } from "./harness";
 import { createScenario, streamPath, drive, sheets } from "../../simulator/scenario";
 
@@ -65,7 +66,7 @@ test.describe("qa-08 resilience", () => {
   let readProbe: (() => Promise<SwProbe>) | null = null;
 
   test.beforeAll(async ({}, testInfo) => {
-    browser = testInfo.project.name === "qa-firefox" ? "firefox" : "chromium";
+    browser = projectBrowser(testInfo.project.name);
     const session = await launchQaContext(browser, scenario());
     context = session.context;
     closeQa = session.close;

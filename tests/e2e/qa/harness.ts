@@ -81,6 +81,15 @@ export function skipWhenExtensionUnavailable(): void {
 }
 
 /**
+ * Map a Playwright project name to the QA browser it drives. qa-firefox and
+ * its signed sibling qa-firefox-signed drive Firefox; everything else is
+ * Chromium.
+ */
+export function projectBrowser(projectName: string): QaBrowser {
+  return projectName.startsWith("qa-firefox") ? "firefox" : "chromium";
+}
+
+/**
  * Run one QA check: body executes against a live page; every assertion goes
  * through the check collector; the result artifact is always written; the
  * re-thrown error makes the Playwright test itself reflect the outcome.
@@ -93,7 +102,7 @@ export async function runCheck(
   runbookReference: string,
   body: (check: QaCheck) => Promise<void>,
 ): Promise<void> {
-  const browser: QaBrowser = testInfo.project.name === "qa-firefox" ? "firefox" : "chromium";
+  const browser: QaBrowser = projectBrowser(testInfo.project.name);
   skipWhenExtensionUnavailable();
   const check = new QaCheck(
     { browser, checkId, runbookReference, runId: currentRunId() },
@@ -191,8 +200,14 @@ export async function launchQaContext(
   // therefore cannot run there; runCheck skips them with this evidence instead
   // of failing. Chromium journeys must still fail hard (e.g. the
   // .cqd-download-btn rename detection criterion), so the probe never skips.
+  //
+  // Signed mode (S11 T3): with QA_SIGNED_XPI set, global-setup installed an
+  // AMO-signed xpi, which Firefox accepts — the skip downgrade does not
+  // apply. A missing background page then fails hard downstream
+  // (getExtensionBase), which is the correct signal for a signed build.
   let extensionAvailable = true;
-  if (browser === "firefox" && opts.skipIfExtensionUnavailable !== false) {
+  const signedXpiMode = Boolean(process.env.QA_SIGNED_XPI);
+  if (browser === "firefox" && !signedXpiMode && opts.skipIfExtensionUnavailable !== false) {
     let pages = context.backgroundPages();
     if (pages.length === 0) {
       await context

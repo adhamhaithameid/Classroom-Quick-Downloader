@@ -17,6 +17,7 @@ import {
   captureConsole,
   runCheck,
   SELECTORS,
+  projectBrowser,
 } from "./harness";
 import { createScenario, streamPath, drive } from "../../simulator/scenario";
 import { installSimulator } from "../../simulator/server";
@@ -66,7 +67,7 @@ test.describe("qa-02 download all", () => {
   let closeQa: () => Promise<void>;
 
   test.beforeAll(async ({}, testInfo) => {
-    browser = testInfo.project.name === "qa-firefox" ? "firefox" : "chromium";
+    browser = projectBrowser(testInfo.project.name);
     const session = await launchQaContext(browser, scenario());
     context = session.context;
     closeQa = session.close;

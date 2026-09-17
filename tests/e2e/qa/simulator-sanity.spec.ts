@@ -14,7 +14,7 @@
  * (HARNESS/ENVIRONMENT), never the assertions.
  */
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
-import { launchQaContext, captureConsole } from "./harness";
+import { launchQaContext, captureConsole, projectBrowser } from "./harness";
 import { createScenario, streamPath, classworkPath, drive, sheets, forms, youtube, external } from "../../simulator/scenario";
 
 const STREAM = streamPath();
@@ -70,7 +70,7 @@ test.describe("simulator sanity", () => {
   let closeQa: () => Promise<void>;
 
   test.beforeAll(async ({}, testInfo) => {
-    browser = testInfo.project.name === "qa-firefox" ? "firefox" : "chromium";
+    browser = projectBrowser(testInfo.project.name);
     testInfo.annotations.push({ type: "runbook", description: "harness sanity — not a manual check" });
     // Sanity must run even where the extension cannot (Firefox): it tests the
     // simulator itself, so opt out of the harness extension-availability skip.

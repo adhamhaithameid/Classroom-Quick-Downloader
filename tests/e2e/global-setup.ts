@@ -158,8 +158,24 @@ function ensureChromeBuild(): void {
 /**
  * Firefox has no --load-extension: the supported route is a prepared profile
  * with the extension present as an .xpi and prefs allowing unsigned install.
+ * Signed mode (S11 T3): when QA_SIGNED_XPI points at an AMO-signed xpi, that
+ * file is installed instead of the unsigned zip (no firefox build needed —
+ * the signed xpi survives Playwright's bundled Firefox startup).
  */
 function ensureFirefoxProfile(): void {
+  const extensionsDir = path.join(FIREFOX_PROFILE_DIR, "extensions");
+  const signedXpi = process.env.QA_SIGNED_XPI;
+  if (signedXpi) {
+    if (!fs.existsSync(signedXpi)) {
+      throw new Error(`QA_SIGNED_XPI is set but the file does not exist: ${signedXpi}`);
+    }
+    fs.mkdirSync(extensionsDir, { recursive: true });
+    fs.copyFileSync(signedXpi, path.join(extensionsDir, `${FIREFOX_GECKO_ID}.xpi`));
+    writeFirefoxUserPrefs();
+    console.log("✅ Firefox profile prepared with the AMO-SIGNED xpi (QA_SIGNED_XPI)\n");
+    return;
+  }
+
   const manifestPath = path.join(FIREFOX_OUTPUT_DIR, "manifest.json");
   const firefoxZips = fs.existsSync(path.join(EXTENSION_DIR, ".output"))
     ? fs
@@ -179,11 +195,15 @@ function ensureFirefoxProfile(): void {
     throw new Error("Firefox zip not found in extension/.output — run pnpm -C extension run firefox first.");
   }
 
-  const extensionsDir = path.join(FIREFOX_PROFILE_DIR, "extensions");
   fs.mkdirSync(extensionsDir, { recursive: true });
   fs.copyFileSync(sourceZip, path.join(extensionsDir, `${FIREFOX_GECKO_ID}.xpi`));
 
-  // user.js prefs: allow the unsigned MV2 build at startup, every start.
+  writeFirefoxUserPrefs();
+  console.log("✅ Firefox profile prepared with the MV2 extension\n");
+}
+
+/** user.js prefs: allow the unsigned MV2 build at startup, every start. */
+function writeFirefoxUserPrefs(): void {
   const userJs = [
     'user_pref("xpinstall.signatures.required", false);',
     'user_pref("extensions.autoDisableScopes", 0);',
@@ -191,14 +211,14 @@ function ensureFirefoxProfile(): void {
     'user_pref("extensions.experiments.enabled", true);',
   ].join("\n");
   fs.writeFileSync(path.join(FIREFOX_PROFILE_DIR, "user.js"), `${userJs}\n`);
-  console.log("✅ Firefox profile prepared with the MV2 extension\n");
 }
 
 export default async function globalSetup(): Promise<void> {
   ensureChromeBuild();
 
   const projects = (process.env.PLAYWRIGHT_PROJECTS ?? "").split(",").filter(Boolean);
-  if (projects.length === 0 || projects.includes("qa-firefox")) {
+  const firefoxProjects = ["qa-firefox", "qa-firefox-signed"];
+  if (projects.length === 0 || projects.some((p) => firefoxProjects.includes(p))) {
     ensureFirefoxProfile();
   }
 }

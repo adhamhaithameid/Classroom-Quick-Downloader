@@ -35,6 +35,7 @@ import {
   runCheck,
   currentRunId,
   HarnessFailure,
+  projectBrowser,
 } from "./harness";
 import {
   createScenario,
@@ -157,7 +158,7 @@ test.describe("qa-perf fast-pass budget", () => {
   }
 
   test.beforeAll(async ({}, testInfo) => {
-    const browser = testInfo.project.name === "qa-firefox" ? "firefox" : "chromium";
+    const browser = projectBrowser(testInfo.project.name);
     const session = await launchQaContext(browser, scenario());
     context = session.context;
     closeQa = session.close;

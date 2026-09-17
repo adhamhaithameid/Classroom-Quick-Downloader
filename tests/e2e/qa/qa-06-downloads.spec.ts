@@ -15,7 +15,7 @@
  * Nothing is mocked: the download genuinely flows browser → proxy → bytes.
  */
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
-import { launchQaContext, captureConsole, runCheck, SELECTORS, instrumentSw, type SwProbe } from "./harness";
+import { launchQaContext, captureConsole, runCheck, SELECTORS, instrumentSw, projectBrowser, type SwProbe } from "./harness";
 import { createScenario, streamPath, drive, sheets } from "../../simulator/scenario";
 
 const STREAM = streamPath();
@@ -57,7 +57,7 @@ test.describe("qa-06 downloads", () => {
   let readProbe: () => Promise<SwProbe>;
 
   test.beforeAll(async ({}, testInfo) => {
-    browser = testInfo.project.name === "qa-firefox" ? "firefox" : "chromium";
+    browser = projectBrowser(testInfo.project.name);
     const session = await launchQaContext(browser, scenario());
     context = session.context;
     closeQa = session.close;

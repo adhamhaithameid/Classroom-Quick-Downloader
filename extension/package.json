@@ -32,6 +32,7 @@
     "postinstall": "wxt prepare",
     "edge": "wxt build -b edge && wxt zip -b edge",
     "firefox": "wxt build -b firefox && wxt zip -b firefox",
+    "sign:extension": "node tools/sign-extension.mjs",
     "chrome": "wxt build -b chrome && wxt zip -b chrome",
     "safari": "node -e \"console.error('Safari support is temporarily disabled.'); process.exit(1)\"",
     "safari:xcode": "node -e \"console.error('Safari support is temporarily disabled.'); process.exit(1)\"",
@@ -41,6 +42,7 @@
     "zip:all": "wxt zip -b chrome && wxt zip -b firefox && wxt zip -b edge",
     "test:qa": "playwright test --config ../playwright.config.ts --project=qa-chromium",
     "test:qa:firefox": "playwright test --config ../playwright.config.ts --project=qa-firefox",
+    "test:qa:firefox-signed": "playwright test --config ../playwright.config.ts --project=qa-firefox-signed",
     "test:qa:live": "QA_LIVE_CLASSROOM=1 playwright test --config ../playwright.config.ts --project=qa-chromium tests/e2e/qa/qa-07-live-canary.spec.ts",
     "test:qa:report": "node ../tests/e2e/qa/report-generator.mjs"
   },

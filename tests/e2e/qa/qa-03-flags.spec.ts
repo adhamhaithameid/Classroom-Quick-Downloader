@@ -19,6 +19,7 @@ import {
   runCheck,
   SELECTORS,
   withExtensionBackground,
+  projectBrowser,
 } from "./harness";
 import { createScenario, streamPath, drive, sheets } from "../../simulator/scenario";
 import { installSimulator } from "../../simulator/server";
@@ -72,7 +73,7 @@ test.describe("qa-03 flags", () => {
   let closeQa: () => Promise<void>;
 
   test.beforeAll(async ({}, testInfo) => {
-    browser = testInfo.project.name === "qa-firefox" ? "firefox" : "chromium";
+    browser = projectBrowser(testInfo.project.name);
     const session = await launchQaContext(browser, scenario("en", "ltr", "light"));
     context = session.context;
     closeQa = session.close;

@@ -17,6 +17,7 @@ import {
   runCheck,
   SELECTORS,
   currentRunId,
+  projectBrowser,
 } from "./harness";
 import {
   createScenario,
@@ -89,7 +90,7 @@ test.describe("qa-01 buttons", () => {
   let closeQa: () => Promise<void>;
 
   test.beforeAll(async ({}, testInfo) => {
-    browser = testInfo.project.name === "qa-firefox" ? "firefox" : "chromium";
+    browser = projectBrowser(testInfo.project.name);
     const session = await launchQaContext(browser, scenario());
     context = session.context;
     closeQa = session.close;

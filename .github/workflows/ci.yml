@@ -138,8 +138,19 @@ jobs:
   extension-e2e:
     name: Extension — Real Browser E2E
     runs-on: ubuntu-latest
-    # 20 min for the Chromium leg + 5 for the Edge smoke leg (S11 gate G5).
-    timeout-minutes: 25
+    # 20 min for the Chromium leg + 5 for the Edge smoke leg (S11 gate G5)
+    # + headroom for the conditional signed Firefox leg (S11 T3).
+    timeout-minutes: 35
+    # Secrets cannot be referenced in `if:` directly — map them to job env
+    # (absent repo secrets resolve to "") and branch on env in the steps
+    # below. Required repo secrets for the signed Firefox leg (S11 T3):
+    #   AMO_JWT_ISSUER — Mozilla addons-server API key issuer
+    #                    (https://addons.mozilla.org/developers/addon/api/key/)
+    #   AMO_JWT_SECRET — the matching API key secret
+    # Without them the signed leg is skipped with a log line, not a failure.
+    env:
+      AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+      AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -169,6 +180,25 @@ jobs:
 
       - name: Run Extension E2E (Edge smoke)
         run: xvfb-run -a pnpm run test:e2e:edge
+
+      # Signed Firefox leg (S11 T3): AMO-sign the firefox-mv2 zip, then run
+      # the qa journeys against the signed xpi (it survives Playwright's
+      # bundled Firefox, unlike the unsigned sideload). Only runs when both
+      # secrets exist; QA_SIGNED_XPI is scoped to this step so the config
+      # gains the qa-firefox-signed project only here.
+      - name: Sign extension (AMO) + signed Firefox QA leg
+        if: ${{ env.AMO_JWT_ISSUER != '' && env.AMO_JWT_SECRET != '' }}
+        env:
+          QA_SIGNED_XPI: ${{ github.workspace }}/extension/.output/signed.xpi
+        run: |
+          pnpm exec playwright install firefox
+          pnpm -C extension firefox
+          pnpm -C extension sign:extension
+          xvfb-run -a pnpm -C extension test:qa:firefox-signed
+
+      - name: Signed Firefox QA leg skipped (no AMO credentials)
+        if: ${{ env.AMO_JWT_ISSUER == '' || env.AMO_JWT_SECRET == '' }}
+        run: echo "Signed Firefox QA leg skipped — set repo secrets AMO_JWT_ISSUER and AMO_JWT_SECRET to enable (see extension/tools/sign-extension.mjs)."
 
       - name: Upload Playwright Report
         if: failure()
