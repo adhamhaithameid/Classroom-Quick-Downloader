@@ -43,6 +43,7 @@
     "indexing:submit": "node tools/submit-search-indexing.mjs",
     "test:e2e": "playwright test --project=extension-chromium",
     "test:e2e:headed": "playwright test --project=extension-chromium --headed",
+    "test:e2e:edge": "playwright test --project=extension-edge",
     "prepare": "husky"
   },
   "_meta": {

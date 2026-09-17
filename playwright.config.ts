@@ -75,6 +75,35 @@ export default defineConfig({
     },
 
     // ────────────────────────────────────────────────────────────────────
+    // Edge smoke (S11 gate G5: Chrome + Edge smoke green in CI).
+    // Mirrors extension-chromium — same extension launch args, same qa/
+    // testIgnore scheme — but on the msedge channel and restricted to the
+    // smoke subset: the qa/ journeys stay on the qa-* projects (they launch
+    // their own contexts via the harness) and the heavier specs stay
+    // chromium-only.
+    // ────────────────────────────────────────────────────────────────────
+    {
+      name: 'extension-edge',
+      testMatch: [/[/\\]core-flow\.spec\.ts/, /[/\\]extension-smoke\.spec\.ts/],
+      testIgnore: /[/\\]qa[/\\]/,
+      use: {
+        ...devices['Desktop Chrome'],
+        channel: 'msedge',
+
+        launchOptions: {
+          headless: false,
+          args: [
+            `--disable-extensions-except=${EXTENSION_PATH}`,
+            `--load-extension=${EXTENSION_PATH}`,
+            '--disable-blink-features=AutomationControlled',
+            '--no-first-run',
+            '--disable-default-apps',
+          ],
+        },
+      },
+    },
+
+    // ────────────────────────────────────────────────────────────────────
     // Manual-QA Replay (docs/superpowers/specs/2026-09-12-manual-qa-replay-design.md)
     // These specs launch their own persistent contexts via the harness —
     // per-browser project selection is what the specs read to pick the

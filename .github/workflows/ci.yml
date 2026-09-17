@@ -128,7 +128,8 @@ jobs:
   extension-e2e:
     name: Extension — Real Browser E2E
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 20 min for the Chromium leg + 5 for the Edge smoke leg (S11 gate G5).
+    timeout-minutes: 25
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -147,14 +148,17 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
+      - name: Install Playwright Chromium + Edge
+        run: pnpm exec playwright install --with-deps chromium msedge
 
       - name: Build Extension
         run: pnpm -C extension build
 
       - name: Run Extension E2E
         run: xvfb-run -a pnpm run test:e2e
+
+      - name: Run Extension E2E (Edge smoke)
+        run: xvfb-run -a pnpm run test:e2e:edge
 
       - name: Upload Playwright Report
         if: failure()

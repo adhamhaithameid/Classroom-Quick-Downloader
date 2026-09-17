@@ -42,8 +42,17 @@ function page(fixtureName: string, dir: 'ltr' | 'rtl' = 'ltr'): string {
 </html>`;
 }
 
-async function launchWithExtension(): Promise<BrowserContext> {
+/**
+ * Launch a persistent context with the extension loaded.
+ *
+ * The browser flavor follows the Playwright project: `channel` is undefined
+ * for extension-chromium (vanilla Chromium) and 'msedge' for extension-edge —
+ * without passing it through, the Edge project would silently launch vanilla
+ * Chromium and the Edge leg would be a fake pass.
+ */
+async function launchWithExtension(channel?: string): Promise<BrowserContext> {
   return chromium.launchPersistentContext('', {
+    channel,
     headless: false,
     args: [
       `--disable-extensions-except=${EXTENSION_PATH}`,
@@ -76,8 +85,8 @@ async function serveFixture(context: BrowserContext, html: string): Promise<() =
 test.describe('Core flow — attachments and flags', () => {
   let context: BrowserContext;
 
-  test.beforeAll(async () => {
-    context = await launchWithExtension();
+  test.beforeAll(async ({}, testInfo) => {
+    context = await launchWithExtension(testInfo.project.use.channel);
   });
 
   test.afterAll(async () => {
