@@ -136,32 +136,31 @@ describe('isV1Suppressed', () => {
     await expect(isV1Suppressed()).resolves.toBe(false);
   });
 
-  it('empty storage follows DEFAULT_MODE — legacy after the S10 acceptance rollback', async () => {
+  it('empty storage follows DEFAULT_MODE — v2 after the z57 parity flip', async () => {
     vi.resetModules();
     storedMode(undefined);
     const { isV1Suppressed } = await import('../entrypoints/content/mode-gate');
-    // S10 acceptance rollback (2026-09-17): the T4 'v2' default shipped a
-    // rendering layer with no click→download wiring (nothing calls
-    // setupDelegatedClickHandler; nothing publishes 'download:requested'),
-    // so a fresh install must land on the fully-functional legacy world
-    // until V2 reaches interactive parity (S11 entry item, bead 0fe).
-    expect(DEFAULT_MODE).toBe('legacy');
-    await expect(isV1Suppressed()).resolves.toBe(false);
+    // z57 (2026-09-17): the flip to 'v2' is restored — v2 owns the full
+    // interactive download path now, so a fresh install lands on V2 and the
+    // V1 self-starting stacks stay inert. Legacy remains the explicit
+    // rollback mode via cqdV2Mode='legacy'.
+    expect(DEFAULT_MODE).toBe('v2');
+    await expect(isV1Suppressed()).resolves.toBe(true);
   });
 
-  it('invalid stored value falls back to the default (legacy — V1 renders)', async () => {
+  it('invalid stored value falls back to the default (v2 — V2 renders)', async () => {
     vi.resetModules();
     storedMode('not-a-mode');
     const { isV1Suppressed } = await import('../entrypoints/content/mode-gate');
-    await expect(isV1Suppressed()).resolves.toBe(false);
+    await expect(isV1Suppressed()).resolves.toBe(true);
   });
 
-  it('storage read failure falls back to the default (legacy — V1 renders)', async () => {
+  it('storage read failure falls back to the default (v2 — V2 renders)', async () => {
     vi.resetModules();
     storedMode(undefined);
     chrome.storage.local.get = vi.fn(() => Promise.reject(new Error('quota exceeded')));
     const { isV1Suppressed } = await import('../entrypoints/content/mode-gate');
-    await expect(isV1Suppressed()).resolves.toBe(false);
+    await expect(isV1Suppressed()).resolves.toBe(true);
   });
 });
 
@@ -206,9 +205,9 @@ describe('onEngineModeChange', () => {
     onChangedListeners[0]!({ cqdV2Mode: { newValue: 'v2' } }, 'local');
     expect(cb).toHaveBeenLastCalledWith(true);
 
-    // An invalid value falls back to the default (legacy → unsuppressed).
+    // An invalid value falls back to the default (v2 → suppressed).
     onChangedListeners[0]!({ cqdV2Mode: { newValue: 'garbage' } }, 'local');
-    expect(cb).toHaveBeenLastCalledWith(false);
+    expect(cb).toHaveBeenLastCalledWith(true);
 
     // Other keys and other storage areas never fire.
     cb.mockClear();

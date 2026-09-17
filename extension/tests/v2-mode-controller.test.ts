@@ -40,25 +40,24 @@ describe('Mode Controller', () => {
   // ========================================================================
 
   describe('readMode', () => {
-    // S10 acceptance rollback (2026-09-17): the T4 flip to 'v2' shipped a
-    // default whose rendering layer never wires clicks to downloads — V2
-    // renders .cqd-v2-btn but nothing calls setupDelegatedClickHandler and
-    // nothing publishes 'download:requested', so in 'v2' the extension's
-    // core value (downloading) is dead. Default returns to 'legacy' until
-    // V2 reaches interactive parity (S11 entry item, bead 0fe).
-    it('returns "legacy" as default mode (S10 acceptance rollback)', async () => {
+    // z57 (2026-09-17): the flip to 'v2' is restored — v2 has the full
+    // interactive download path now (delegated clicks → page bus → S6
+    // bridge → background machine, Download All group machine, docs
+    // anchors, V1-contract badges). Verified by the qa-chromium journeys
+    // on a fresh v2-default build.
+    it('returns "v2" as default mode (z57 parity flip)', async () => {
       const { modeController } = await loadModeControllerModule();
       const mode = await modeController.readMode();
-      expect(mode).toBe('legacy');
+      expect(mode).toBe('v2');
     });
 
     // Docs and code must assert the same constant — the shipped default is
-    // 'legacy' again after the S10 acceptance rollback (D9 rule stands).
-    it('ships DEFAULT_MODE = "legacy", matching the docs (D9/S10)', async () => {
+    // 'v2' (D9 rule stands).
+    it('ships DEFAULT_MODE = "v2", matching the docs (D9/z57)', async () => {
       const { modeController } = await loadModeControllerModule();
       expect(
         (modeController as { DEFAULT_MODE?: string }).DEFAULT_MODE,
-      ).toBe('legacy');
+      ).toBe('v2');
     });
 
     it('reads mode from chrome.storage.local', async () => {
@@ -72,22 +71,22 @@ describe('Mode Controller', () => {
       expect(mode).toBe('shadow');
     });
 
-    it('returns the default "legacy" for invalid stored value', async () => {
+    it('returns the default "v2" for invalid stored value', async () => {
       chrome.storage.local.get = vi.fn().mockResolvedValue({
         cqdV2Mode: 'invalid-mode',
       });
 
       const { modeController } = await loadModeControllerModule();
       const mode = await modeController.readMode();
-      expect(mode).toBe('legacy');
+      expect(mode).toBe('v2');
     });
 
-    it('returns the default "legacy" when storage read fails', async () => {
+    it('returns the default "v2" when storage read fails', async () => {
       chrome.storage.local.get = vi.fn().mockRejectedValue(new Error('quota exceeded'));
 
       const { modeController } = await loadModeControllerModule();
       const mode = await modeController.readMode();
-      expect(mode).toBe('legacy');
+      expect(mode).toBe('v2');
     });
 
     it('reads v2 and v3 modes correctly', async () => {
@@ -192,13 +191,13 @@ describe('Mode Controller', () => {
       expect(addListenerSpy).toHaveBeenCalled();
     });
 
-    it('defaults to legacy when storage is empty (S10 acceptance rollback)', async () => {
+    it('defaults to v2 when storage is empty (z57 parity flip)', async () => {
       chrome.storage.local.get = vi.fn().mockResolvedValue({});
 
       const { modeController, registry } = await loadModeControllerModule();
       await modeController.initModeController();
 
-      expect(registry.getMode()).toBe('legacy');
+      expect(registry.getMode()).toBe('v2');
     });
   });
 });

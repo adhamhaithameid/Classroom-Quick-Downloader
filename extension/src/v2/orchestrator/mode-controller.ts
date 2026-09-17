@@ -55,39 +55,35 @@ const STORAGE_KEY = 'cqdV2Mode';
 /**
  * The default mode when no setting is found in storage.
  *
- * S10 acceptance rollback (2026-09-17): DEFAULT_MODE returns to 'legacy'.
- * The T4 flip to 'v2' (eb93be36) shipped a rendering layer with NO
- * interactive download path: EngineV2 renders `.cqd-v2-btn` markers and
- * `.cqd-v2-flag` badges, but nothing ever calls
- * button-renderer.setupDelegatedClickHandler and nothing publishes
- * 'download:requested' on the page bus, so in 'v2' mode clicking any
- * download button does nothing and the Download All state machine
- * (progress/hold-to-cancel/error) does not exist. V2 file discovery also
- * misses the docs.google.com document/spreadsheet anchors that V1's
- * DRIVE_ANCHOR_SELECTOR covers, so Docs/Sheets materials lose their
- * buttons. All six qa-chromium journeys that exercise the product's core
- * value fail on every fresh build in v2-default (bead 0fe).
- *
- * S11 entry item: restore the 'v2' flip only once V2 reaches interactive
- * parity — delegated click wiring → bridge relay → background download,
- * a Download All state machine, and docs/sheets anchor discovery.
+ * z57 (S10 tail, 2026-09-17): the flip to 'v2' is RESTORED. The S10
+ * rollback (back to 'legacy', after eb93be36) existed because v2 mode had
+ * no interactive download path. That parity gap is closed:
+ * - delegated button clicks publish 'download:requested' on the page bus
+ *   and the S6 bridge relay → background machine settles them (S1)
+ * - v2 discovers docs/sheets/slides/drawings anchors like V1 (S2)
+ * - the Download All group machine runs staggered bus requests with
+ *   cancel over CQD_CANCEL_DOWNLOAD (S3)
+ * - v2 badges carry the exact V1 markup contract the QA journeys pin (S4)
+ * Legacy stays available as the explicit rollback mode via the popup's
+ * engine-mode control (cqdV2Mode='legacy').
  *
  * Rollout history:
  * 1. 'shadow' was reverted to an explicit opt-in (2026-08) after it
  *    shipped double scanning as a permanent CPU/battery tax (D9)
- * 2. Default flipped to 'v2' (S10 T4, eb93be36) — REVERTED here after
- *    fresh-build QA acceptance failed; 'v2' remains an explicit opt-in
- *    via the popup's engine-mode control
- * 3. 'v3' stays behind a flag until the identity permission lands
+ * 2. Default flipped to 'v2' (S10 T4, eb93be36) — REVERTED to 'legacy'
+ *    after fresh-build QA acceptance failed (interactive parity gap)
+ * 3. Re-flipped to 'v2' (z57) once V2 reached interactive parity and the
+ *    qa-chromium journeys passed on a fresh v2-default build
+ * 4. 'v3' stays behind a flag until the identity permission lands
  *
- * To try V2 manually: set cqdV2Mode='v2' in chrome.storage.local
+ * To roll back: set cqdV2Mode='legacy' in chrome.storage.local
  * (or use the popup's engine-mode control).
  */
 /**
  * The shipped default mode, exported so tests (and docs) can assert it:
  * docs and code must never disagree about this again (D9).
  */
-export const DEFAULT_MODE: EngineMode = 'legacy';
+export const DEFAULT_MODE: EngineMode = 'v2';
 
 // ============================================================================
 // READ / WRITE
