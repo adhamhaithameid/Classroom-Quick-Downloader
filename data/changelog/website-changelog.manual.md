@@ -22,6 +22,53 @@ A major download-engine overhaul: zero-window downloads with multi-account fallb
 ### Security
 - Hardened download URL validation: the allowlist now covers all legitimate Google attachment shapes while external look-alike links stay blocked.
 
+## v1.6.15
+### Summary
+A stabilization release that finished the Download All overhaul: groups always settle, background tabs stay live, and automated QA coverage reached the full manual runbook.
+### Fixed
+- Fixed Download All groups that could stay stuck on "Downloading…" forever — the root cause of the long-running hang reports.
+- Fixed Download All progress not updating when the Classroom tab was open in the background.
+### Changed
+- Extended the automated manual-check suite to cover every runbook flow (submissions rows, popup analytics, back-navigation, error states), with real download verification.
+
+## v1.6.10
+### Summary
+Download reliability milestone: invisible multi-account fallback, completely window-free downloads through Google's direct file endpoint, and the new Engine Mode switch.
+### Added
+- Added invisible multi-account fallback: files the active account cannot access now try the other signed-in accounts quietly.
+- Added the Engine Mode switch in popup settings (Legacy / New) with one-click rollback and live switching.
+- Added an event-bus architecture connecting page detection to the download engine through one typed bridge.
+### Changed
+- Downloads now use Google's modern byte-serving endpoint directly — one hop, faster, no interstitial pages.
+- Downloads are now window-free on every browser: the old background-tab workaround was removed entirely.
+### Fixed
+- Fixed the visible "403 Access Forbidden" window that could appear and never close.
+- Fixed "Download All always fails" reports where one broken file left the group hanging.
+- Fixed Google Sheets attachments not getting download buttons.
+
+## v1.6.5
+### Summary
+An accuracy blitz: fifteen detection and naming defects fixed, each locked in by an automated regression corpus, plus a fully automated QA pipeline that replays the manual test runbook in real browsers.
+### Added
+- Added a locale-aware filename cleanup registry so download names stay clean in every language (Hungarian, Arabic, Russian, Japanese, Chinese, French, German, Spanish and more).
+- Added the automated Manual-QA Replay pipeline: real-browser journeys covering buttons, Download All, flags, popup, navigation and real downloads, plus a gated live-Classroom canary.
+### Fixed
+- Fixed comment-count false positives from dates and digits in complex Classroom layouts.
+- Fixed edited/comment verdicts being lost when page markup drifted.
+- Fixed download state races where concurrent downloads of the same file could cross wires.
+- Fixed localized type labels (like "Tömörített archívum") leaking into downloaded filenames.
+- Fixed substring false positives in keyword and exclusion matching across scripts (Arabic tashkeel, Armenian, word-numerals).
+
+## v1.6.0
+### Summary
+The Engine V4 foundation: a measurable accuracy standard for the detection engine, a pure download state machine, and hardened release gates. Everything after this version is measured against a fixed corpus.
+### Added
+- Added the accuracy corpus and gates: detection decisions are held to labeled expectations across locales, with floors that may only move up.
+- Added typed contracts, an event bus, and a pure acquisition state machine with bounded account rotation and forced deadlines.
+- Added hardened e2e, accuracy and release gates to CI.
+### Changed
+- Extracted the detection core into pure modules: normalization, word-numerals, action-button exclusions, and count ceilings.
+
 ## v1.5.5
 ### Summary
 A leaner packaging release focused on reducing extension size while preserving the same classroom behavior.
