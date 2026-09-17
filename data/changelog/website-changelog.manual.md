@@ -4,6 +4,7 @@
 - The footer now shares the page's ambient background (orbs + interactive grid) instead of painting its own.
 ### Fixed
 - Fixed a duplicated static grid showing on the FAQ, Privacy, and Changelog pages.
+- Fixed a slight horizontal scroll caused by decorative background glow bleeding past the screen edge.
 
 ## v1.8.0
 ### Summary

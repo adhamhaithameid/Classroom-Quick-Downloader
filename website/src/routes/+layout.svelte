@@ -1075,6 +1075,11 @@
        or it would cover the fixed ambient layer painted behind it. */
     background: transparent;
     color: var(--text);
+    /* Decorative layers (ambient orbs, marquee track) bleed past the edges
+       by design; clip the axis so they never create a horizontal scrollbar.
+       `clip` — not `hidden` — because hidden would create a scroll container
+       and break the sticky navbar. */
+    overflow-x: clip;
   }
   .site-shell.o2-fullscreen {
     overflow: hidden;
