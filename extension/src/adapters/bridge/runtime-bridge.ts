@@ -132,8 +132,14 @@ export function createWorkerRuntimeBridge(): BridgePort {
    * listeners — every other worker→content path in this codebase (V1's
    * CQD_DOWNLOAD_STATUS, the popup toggles) rides chrome.tabs.sendMessage.
    * The request sender carries the asking tab, so remember it per requestId
-   * and answer over tabs; extension-page requesters (no tab) keep the
-   * runtime broadcast.
+   * and answer over tabs. S11 (S10 parked): when the tab is UNKNOWN — never
+   * seen, evicted from the bounded FIFO, or already forgotten after a first
+   * answer — the response is DROPPED, not broadcast: a runtime broadcast
+   * cannot reach the asking content script anyway, but it WOULD land in
+   * extension pages (popup/options) that have no business receiving stray
+   * bridge responses. A known-but-closed tab is indistinguishable from a live
+   * one before sending; tabs.sendMessage then fails silently into
+   * chrome.runtime.lastError, which likewise never reaches extension pages.
    */
   const requestingTab = new Map<string, number | undefined>();
 
@@ -157,22 +163,23 @@ export function createWorkerRuntimeBridge(): BridgePort {
       // The worker side never originates requests in this design.
     },
     respond(requestId: string, response: unknown): void {
+      const tabId = requestingTab.get(requestId);
+      // S11: no requesting tab (unknown / evicted / already answered) → DROP.
+      // The runtime broadcast that used to sit here sprayed CQD_BRIDGE_RESPONSE
+      // into extension pages (popup/options) — never the asking content script.
+      if (typeof tabId !== 'number') {
+        requestingTab.delete(requestId);
+        return;
+      }
       const message: ResponseMessage = {
         type: BRIDGE_RESPONSE_TYPE,
         requestId,
         response,
       };
-      const tabId = requestingTab.get(requestId);
       try {
-        if (typeof tabId === 'number') {
-          chrome.tabs.sendMessage(tabId, message, () => {
-            void chrome.runtime.lastError;
-          });
-        } else {
-          chrome.runtime.sendMessage(message, () => {
-            void chrome.runtime.lastError;
-          });
-        }
+        chrome.tabs.sendMessage(tabId, message, () => {
+          void chrome.runtime.lastError;
+        });
       } catch {
         // Page gone before the answer — nothing to do.
       } finally {

@@ -87,15 +87,18 @@ describe('runtime bridge adapters (chrome.runtime pair)', () => {
   type Listener = (message: any, sender: any, respond: (r?: any) => void) => unknown;
   let onMessageListeners: Listener[];
   let sent: Array<{ type: string; body: any }>;
+  let tabSent: Array<{ tabId: number; body: any }>;
 
   beforeEach(() => {
     vi.resetModules();
     onMessageListeners = [];
     sent = [];
+    tabSent = [];
     (globalThis as any).chrome = {
       ...(globalThis as any).chrome,
       runtime: {
         ...(globalThis as any).chrome?.runtime,
+        id: 'test-ext',
         sendMessage: vi.fn((msg: any) => {
           sent.push({ type: msg.type, body: msg });
           return true;
@@ -109,11 +112,19 @@ describe('runtime bridge adapters (chrome.runtime pair)', () => {
         },
         lastError: undefined,
       },
+      tabs: {
+        sendMessage: vi.fn((tabId: number, msg: any) => {
+          tabSent.push({ tabId, body: msg });
+          return true;
+        }),
+      },
     };
   });
 
   const dispatch = (message: any, respond: (r?: any) => void = vi.fn()) => {
-    for (const l of onMessageListeners) l(message, {}, respond);
+    for (const l of onMessageListeners) {
+      l(message, { id: 'test-ext', tab: { id: 3 } }, respond);
+    }
   };
 
   it('page bridge sends CQD_BRIDGE_REQUEST with the correlation id', () => {
@@ -136,14 +147,18 @@ describe('runtime bridge adapters (chrome.runtime pair)', () => {
       worker.respond(r.requestId, { status: 'success' });
     });
 
-    // Simulate the runtime delivering a request sent by the page bridge.
+    // Simulate the runtime delivering a request sent by the page bridge. The
+    // sender carries a tab, so the answer rides chrome.tabs.sendMessage —
+    // the no-tab case is dropped (see the z57 describe below), never broadcast.
     dispatch({ type: BRIDGE_REQUEST_TYPE, requestId: 'r-7', payload: { a: 1 } });
 
     expect(seen).toEqual([{ requestId: 'r-7', payload: { a: 1 } }]);
-    expect(sent).toHaveLength(1);
-    expect(sent[0].type).toBe(BRIDGE_RESPONSE_TYPE);
-    expect(sent[0].body.requestId).toBe('r-7');
-    expect(sent[0].body.response).toEqual({ status: 'success' });
+    expect(tabSent).toHaveLength(1);
+    expect(tabSent[0].tabId).toBe(3);
+    expect(tabSent[0].body.type).toBe(BRIDGE_RESPONSE_TYPE);
+    expect(tabSent[0].body.requestId).toBe('r-7');
+    expect(tabSent[0].body.response).toEqual({ status: 'success' });
+    expect(sent).toHaveLength(0);
   });
 
   it('page bridge routes a CQD_BRIDGE_RESPONSE to its onResponse handler', () => {
@@ -183,8 +198,12 @@ describe('runtime bridge adapters (chrome.runtime pair)', () => {
 // ===========================================================================
 // z57 — worker answers are TAB-directed. chrome.runtime.sendMessage from the
 // MV3 worker does not reach content-script onMessage listeners, so a request
-// whose sender carries a tab must be answered over chrome.tabs.sendMessage;
-// extension-page requesters (no tab) keep the runtime broadcast.
+// whose sender carries a tab must be answered over chrome.tabs.sendMessage.
+// S10 parked + S11: when the requesting tab is unknown (never seen, evicted
+// from the bounded FIFO, or forgotten after answering) the response is
+// DROPPED — never broadcast. A runtime broadcast cannot reach the content
+// script that asked anyway, but it DOES reach extension pages (popup/options),
+// which must not receive stray bridge responses.
 // ===========================================================================
 describe('runtime bridge worker: tab-directed responses (z57)', () => {
   type Listener = (message: any, sender: any, respond: (r?: any) => void) => unknown;
@@ -241,18 +260,19 @@ describe('runtime bridge worker: tab-directed responses (z57)', () => {
     expect(sent).toHaveLength(0);
   });
 
-  it('keeps the runtime broadcast for requesters without a tab', () => {
+  it('drops the response for requesters without a tab (no broadcast)', () => {
     const worker = createWorkerRuntimeBridge();
     worker.onRequest((r) => worker.respond(r.requestId, { status: 'saved' }));
 
     dispatch({ type: BRIDGE_REQUEST_TYPE, requestId: 'page-1', payload: {} }, { id: 'ext' });
 
+    // Extension pages must not receive stray bridge responses; the runtime
+    // broadcast is gone entirely (S11).
     expect(tabSent).toHaveLength(0);
-    expect(sent).toHaveLength(1);
-    expect(sent[0].body.requestId).toBe('page-1');
+    expect(sent).toHaveLength(0);
   });
 
-  it('forgets the tab after answering — a late duplicate answer falls back to runtime', () => {
+  it('forgets the tab after answering — a late duplicate answer is dropped', () => {
     const worker = createWorkerRuntimeBridge();
     worker.onRequest((r) => {
       worker.respond(r.requestId, { status: 'saved' });
@@ -266,13 +286,13 @@ describe('runtime bridge worker: tab-directed responses (z57)', () => {
 
     // First (correct) answer rides tabs; the tab entry is dropped afterwards
     // (one answer per request — the service guards double settles upstream),
-    // so a late duplicate cannot re-message the tab.
+    // so a late duplicate cannot re-message the tab — and is NOT broadcast.
     expect(tabSent).toHaveLength(1);
     expect(tabSent[0].tabId).toBe(7);
-    expect(sent).toHaveLength(1); // duplicate went over the runtime broadcast
+    expect(sent).toHaveLength(0); // duplicate is dropped, no runtime broadcast
   });
 
-  it('bounds the requestingTab memory: answers beyond the FIFO window fall back to runtime', () => {
+  it('bounds the requestingTab memory: answers beyond the FIFO window are dropped', () => {
     const worker = createWorkerRuntimeBridge();
     worker.onRequest(() => {
       // accepted but never answered — exactly the unbounded-growth case
@@ -291,11 +311,10 @@ describe('runtime bridge worker: tab-directed responses (z57)', () => {
 
     worker.respond('old-1', { status: 'saved' });
 
-    // old-1 fell out of the bounded map FIFO — the answer degrades to the
-    // runtime broadcast instead of pinning a tab id forever.
+    // old-1 fell out of the bounded map FIFO — the answer is dropped instead
+    // of pinning a tab id forever or spraying the runtime channel.
     expect(tabSent).toHaveLength(0);
-    expect(sent).toHaveLength(1);
-    expect(sent[0].body.requestId).toBe('old-1');
+    expect(sent).toHaveLength(0);
   });
 });
 
