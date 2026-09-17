@@ -83,6 +83,13 @@ export default defineContentScript({
       const { wireBridgeRelay } = await import('../src/v2/orchestrator/bridge-relay');
       wireBridgeRelay(orchestrator.getBus(), createPageRuntimeBridge());
 
+      // 3c. Download path (z57 S1): the page-side caller for the bridge —
+      //     delegated button clicks publish download:requested on the page
+      //     bus and drive button states from download:settled. Wired before
+      //     the orchestrator's first scan so a click can never race the bus.
+      const { wireDownloadPath } = await import('../src/v2/render/download-controller');
+      wireDownloadPath(orchestrator.getBus());
+
       // 4. Initialize debug panel (Ctrl+Shift+D to toggle)
       try {
         const { initDebugPanel } = await import('../src/v2/debug/debug-panel');

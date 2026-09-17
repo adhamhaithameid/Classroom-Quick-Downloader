@@ -80,7 +80,7 @@ describe('Button Renderer: renderButton', () => {
 
     expect(btn).not.toBeNull();
     expect(btn!.tagName).toBe('BUTTON');
-    expect(btn!.classList.contains('cqd-v2-btn')).toBe(true);
+    expect(btn!.classList.contains('cqd-download-btn')).toBe(true);
     expect(btn!.getAttribute(getInjectedAttr())).toBe('true');
     expect(btn!.getAttribute(getFileIdAttr())).toBe('drive:struct_20chars_paddi');
   });
@@ -91,8 +91,8 @@ describe('Button Renderer: renderButton', () => {
     document.body.appendChild(target);
     const btn = renderButton(mockDecision(file.canonicalId, target), file);
 
-    const icon = btn!.querySelector('.cqd-v2-icon');
-    const label = btn!.querySelector('.cqd-v2-label');
+    const icon = btn!.querySelector('.cqd-download-icon');
+    const label = btn!.querySelector('.cqd-label');
 
     expect(icon).not.toBeNull();
     expect(label).not.toBeNull();
@@ -115,7 +115,8 @@ describe('Button Renderer: renderButton', () => {
     document.body.appendChild(target);
     const btn = renderButton(mockDecision(file.canonicalId, target), file);
 
-    expect(btn!.dataset.cqdUrl).toBe(file.downloadUrl);
+    // z57 S1: the dataset carries the CONVERTED direct-download URL
+    expect(btn!.dataset.cqdUrl).toContain('drive.usercontent.google.com/download');
     expect(btn!.dataset.cqdName).toBe('report.xlsx');
     expect(btn!.dataset.cqdExt).toBe('xlsx');
   });
@@ -174,7 +175,7 @@ describe('Button Renderer: Idempotency', () => {
     renderButton(decision, file);
     renderButton(decision, file);
 
-    const buttons = target.querySelectorAll('.cqd-v2-btn');
+    const buttons = target.querySelectorAll('.cqd-download-btn');
     expect(buttons).toHaveLength(1);
   });
 });
@@ -307,7 +308,7 @@ describe('Button Renderer: Download All', () => {
     const btn = renderDownloadAllButton(decision, files);
 
     expect(btn).not.toBeNull();
-    expect(btn!.classList.contains('cqd-download-all')).toBe(true);
+    expect(btn!.classList.contains('cqd-download-all-btn')).toBe(true);
   });
 
   it('renders file count in count badge', () => {
@@ -321,10 +322,10 @@ describe('Button Renderer: Download All', () => {
     const decision = mockDecision('download-all:post-2', target);
 
     const btn = renderDownloadAllButton(decision, files);
-    const countEl = btn!.querySelector('.cqd-v2-count');
+    const subEl = btn!.querySelector('.cqd-download-all-sub');
 
-    expect(countEl).not.toBeNull();
-    expect(countEl!.textContent).toBe('3');
+    expect(subEl).not.toBeNull();
+    expect(subEl!.textContent).toBe('3 files');
   });
 
   it('Download All button is idempotent', () => {
@@ -459,7 +460,7 @@ describe('Button Renderer: Delegated Click Handler', () => {
 
     // Create and append a button
     const btn = document.createElement('button');
-    btn.classList.add('cqd-v2-btn');
+    btn.classList.add('cqd-download-btn');
     btn.setAttribute(getFileIdAttr(), 'drive:clickTest_file');
     btn.dataset.cqdUrl = 'https://example.com/file.pdf';
     btn.dataset.cqdName = 'file.pdf';
@@ -489,7 +490,7 @@ describe('Button Renderer: Delegated Click Handler', () => {
     setupDelegatedClickHandler(postRoot, onSingle, onAll);
 
     const btn = document.createElement('button');
-    btn.classList.add('cqd-v2-btn');
+    btn.classList.add('cqd-download-all-btn');
     btn.setAttribute(getFileIdAttr(), 'download-all:post-123');
     postRoot.appendChild(btn);
 

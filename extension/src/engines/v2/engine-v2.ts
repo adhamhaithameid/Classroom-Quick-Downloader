@@ -75,6 +75,9 @@ import { keywordDetector } from '../../detect/keyword/keyword-detector';
 import { runComparison, installCompareGlobals } from '../../compare/compare-runner';
 import type { ScannedPost, ScannedFile } from '../../v2/model/dom-scanner';
 import { renderBatch, removeStaleButtons, removeAllV2Buttons } from '../../v2/render/button-renderer';
+import { ensurePostClickWiring, resetDownloadController } from '../../v2/render/download-controller';
+import { resolveDownloadUrl } from '../../v2/decision/download-url';
+import { sanitizeFileName } from '../../core/name/sanitize';
 import { injectV2Styles, removeV2Styles } from '../../v2/render/button-styles';
 import { renderFlagBadge, removeAllV2Badges } from '../../v2/render/flag-renderer';
 import { removeFlagStyles } from '../../v2/render/flag-styles';
@@ -208,6 +211,9 @@ export class EngineV2 implements CQDEngine {
 
     // Let the detector drop whatever it cached for this page, to free memory
     keywordDetector.reset();
+
+    // Drop in-flight download state (pending buttons died with the page)
+    resetDownloadController();
 
     // Flush Phase 5 systems
     this.correctionQueue.flush();
@@ -509,10 +515,12 @@ export class EngineV2 implements CQDEngine {
    * (due to authuser, hl params) will get the same canonical ID.
    */
   private extractFileNode(el: HTMLElement): FileNode | null {
-    // Determine the source URL
+    // Determine the source URL — Drive AND Docs anchors qualify (z57 S2).
     const href = el.tagName === 'A'
       ? (el as HTMLAnchorElement).href
-      : el.querySelector<HTMLAnchorElement>('a[href*="drive.google.com"]')?.href;
+      : el.querySelector<HTMLAnchorElement>(
+          'a[href*="drive.google.com"], a[href*="docs.google.com"], a[href*="classroom.google.com/drive"]',
+        )?.href;
 
     if (!href) return null;
 
@@ -559,11 +567,20 @@ export class EngineV2 implements CQDEngine {
     let name = '';
     let ext = '';
 
-    // Try aria-label first (most complete name)
+    // Try aria-label first (most complete name). Classroom prefixes
+    // attachment aria-labels with "Attachment: " — V1's text-based extraction
+    // never carried the prefix, so strip it to keep data-cqd-name identical.
     const ariaLabel = el.getAttribute('aria-label') ||
       el.querySelector('[aria-label]')?.getAttribute('aria-label');
     if (ariaLabel) {
-      name = ariaLabel;
+      name = ariaLabel.replace(/^attachment:\s*/i, '').trim() || ariaLabel;
+    }
+
+    // Fall back to the anchor's visible text (first non-empty line), mirroring
+    // V1's extractFileMeta text fallback.
+    if (!name) {
+      const line = (el.textContent || '').split('\n').map(l => l.trim()).find(Boolean);
+      if (line) name = line;
     }
 
     // Try to extract extension from the URL or name
@@ -574,9 +591,12 @@ export class EngineV2 implements CQDEngine {
 
     return {
       canonicalId,
-      name: name || 'Untitled',
+      name: name ? sanitizeFileName(name) : 'Untitled',
       ext,
-      downloadUrl: href,
+      // The model carries the CONVERTED direct-download URL (docs → Drive
+      // byte-serving endpoint), so every downstream consumer (button dataset,
+      // click request, group enumeration) sees one canonical URL.
+      downloadUrl: resolveDownloadUrl(href),
       element: el,
       idSource,
     };
@@ -916,6 +936,17 @@ export class EngineV2 implements CQDEngine {
       validIds.add(`download-all:${post.id}`);
       removeStaleButtons(post.element, validIds);
     }
+
+    // z57 S1: the render seam owns the button lifecycle, so the delegated
+    // click wiring lives here too — every rendered post root gets the one
+    // delegated handler routing clicks into the download pipeline.
+    for (const post of this.postMap.values()) {
+      try {
+        ensurePostClickWiring(post.element);
+      } catch (err) {
+        console.warn(`[Engine V2] Click wiring failed for post ${post.id}:`, err);
+      }
+    }
   }
 
   // ========================================================================
@@ -1084,7 +1115,8 @@ export class EngineV2 implements CQDEngine {
     if (
       el.querySelector?.('[data-stream-item-id]') ||
       el.querySelector?.('[data-drive-id]') ||
-      el.querySelector?.('a[href*="drive.google.com"]')
+      el.querySelector?.('a[href*="drive.google.com"]') ||
+      el.querySelector?.('a[href*="docs.google.com"]')
     ) {
       return true;
     }
