@@ -4,12 +4,12 @@ This is the main engineering changelog for Classroom Quick Downloader.
 It focuses on meaningful product, reliability, security, and architecture changes instead of raw commit history.
 
 ## Versioning Notes
-- Current extension release line: `1.6.19`
+- Current extension release line: `1.7.10`
 - The `1.5.6`→`1.6.19` ladder below is the materialized internal history: every point version is anchored to the commit record and file-change dates of its window
 - Planned next engine milestone: post-1.6 acquisition strategy wiring (API download tier behind the consent gate)
 - Pre-`1.0.0` bootstrap work is intentionally omitted from the user-facing release ledger
 
-## [1.6.19] - 2026-09-17
+## [1.7.10] - 2026-09-17
 
 ### Summary
 The no-dead-ends release: adversarial test program (outcome corpus run differentially against the pure machine AND production, fast-check property invariants, six new simulator failure shapes), the full interrupt taxonomy, the stall deadline, completion verification, the acquisition strategy chain, and the qa-08 resilience journey.
@@ -34,7 +34,7 @@ The no-dead-ends release: adversarial test program (outcome corpus run different
 ### Security
 - Kept the Google-only download surface; validator allowlist covers every legitimate attachment shape while external look-alikes stay blocked.
 
-## [1.6.18] - 2026-09-17
+## [1.7.9] - 2026-09-17
 
 ### Summary
 Firefox success honesty, the acquisition strategy chain as data, the BrowserPort chrome adapter, and the reserved API download tier design.
@@ -46,7 +46,7 @@ Firefox success honesty, the acquisition strategy chain as data, the BrowserPort
 ### Changed
 - Firefox `onCreated` now correlates downloads only; success waits for the browser's own `complete` event, matching Chromium — a download that merely started is not a download that finished.
 
-## [1.6.17] - 2026-09-17
+## [1.7.8] - 2026-09-17
 
 ### Summary
 The stall deadline and the HTML response guards.
@@ -58,7 +58,7 @@ The stall deadline and the HTML response guards.
 - Fixed non-Drive HTML responses being saved as garbage: both the Chromium filename hook and the Firefox mime guard now refuse them with "This link requires signing in…" on every host, not just Drive.
 - Fixed the URL layer: the validator accepts Sheets exports, and content Drive patterns are scoped to Google hosts so external `/file/d/` links no longer produce download buttons that could only dead-end.
 
-## [1.6.16] - 2026-09-17
+## [1.7.7] - 2026-09-17
 
 ### Summary
 The interrupt taxonomy: every failure class classified, transient failures retried once, the user's own cancellations respected.
@@ -67,7 +67,7 @@ The interrupt taxonomy: every failure class classified, transient failures retri
 - Added classified handling for every `chrome.downloads` interrupt: transient (`NETWORK_FAILED`, `SERVER_FAILED`, `NETWORK_TIMED_OUT`) retry once in place with a 2 s backoff; `USER_CANCELED` reports cancelled — never an error; permanent classes get specific actionable guidance (disk full, file failed, crash, bad content, virus-infected, blocked type).
 - Browser-start refusals retry once, then settle with "Browser blocked the download — check site permissions and try again."
 
-## [1.6.15] - 2026-09-17
+## [1.7.6] - 2026-09-17
 
 ### Summary
 The adversarial test program: the download-outcome corpus, the scripted production harness, and the differential contract between the pure machine and the real flow.
@@ -77,7 +77,7 @@ The adversarial test program: the download-outcome corpus, the scripted producti
 - Added the scripted flow harness (`tests/helpers/background-flow.ts`): the real background listeners over a scriptable browser host (`id` / `lastError` / `never` per attempt).
 - Every corpus case runs twice — the pure state machine AND production — and they must agree; a divergence is a defect by definition.
 
-## [1.6.14] - 2026-09-14
+## [1.7.5] - 2026-09-14
 
 ### Summary
 Property-based testing and the adversarial simulator vocabulary.
@@ -86,7 +86,7 @@ Property-based testing and the adversarial simulator vocabulary.
 - Added the fast-check property suite (`tests/acquire-properties.test.ts`): terminal states absorb every event, the authuser sweep is monotonic and bounded, the deadline closes every non-terminal phase, settle effects are disciplined, and the simulator resolver plus the outcome mapper are deterministic/total.
 - Added six adversarial simulator failure shapes: `srvfail-` (503), `signin-` (redirect), `resetmid-` (mid-stream destroy), `slow-` (chunked trickle), `zerobyte-` (empty success), `quota-` (HTML quota page) — with `destroyAfterSend` and `slowChunks` transport support in the MITM proxy.
 
-## [1.6.13] - 2026-09-14
+## [1.7.4] - 2026-09-14
 
 ### Summary
 S10 groundwork: the shared DOM port multiplexes all observation over one platform MutationObserver, and the V2 stack observes through it.
@@ -94,7 +94,7 @@ S10 groundwork: the shared DOM port multiplexes all observation over one platfor
 ### Changed
 - `src/adapters/dom/mutation-observer-dom-port.ts` multiplexes subscriptions over one platform observer; the V2 engine, route classifier and orchestrator observe through the port (S10 groundwork for gate G3 — the V1 strip itself remains gated on a clean store release).
 
-## [1.6.12] - 2026-09-14
+## [1.7.3] - 2026-09-14
 
 ### Summary
 Download All fully stabilized and the QA runbook reached full automated coverage.
@@ -104,7 +104,7 @@ Download All fully stabilized and the QA runbook reached full automated coverage
 - Fixed group rendering in background tabs: requestAnimationFrame is suspended in occluded tabs, so `scheduleRefresh` now flushes on a 250 ms timer when the document is hidden.
 - Fixed the last three harness gaps in the QA journeys: the anchored-popup stub (synthetic active Classroom tab), the simulator submissions-container contract (`/g/tg/` viewer anchors; a function-as-attribute bug that dropped `data-submission-attachment-id` entirely), and journey corrections (popstate target, duplicate load-more id, delayed-post timer race).
 
-## [1.6.11] - 2026-09-14
+## [1.7.2] - 2026-09-14
 
 ### Summary
 Gate G2 complete: the S6 bridge (typed BridgePort, page relay, worker download service) and the Engine Mode popup control shipped; S5 closed.
@@ -116,7 +116,7 @@ Gate G2 complete: the S6 bridge (typed BridgePort, page relay, worker download s
 ### Changed
 - The page bus's `download:requested`/`download:settled` topics cross the BridgePort (`bridge-relay.ts`); decision topics flow through the S5 role bus.
 
-## [1.6.10] - 2026-09-13
+## [1.7.1] - 2026-09-13
 
 ### Summary
 S5 complete: the four roles (Detect/Compute/Render/Harden) wrap the existing engines verbatim behind the page event bus, with zero behavior change proven by the full suite.
@@ -125,7 +125,7 @@ S5 complete: the four roles (Detect/Compute/Render/Harden) wrap the existing eng
 - Added the page event bus topics (`route:changed`, `post:scanned`, `file:discovered`, `decision:flags`, `decision:placement`, `render:applied`, `correction:needed`, `budget:throttle`) published by the roles after each scan cycle.
 - Added the architecture fitness rule banning role-to-role imports.
 
-## [1.6.9] - 2026-09-13
+## [1.7.0] - 2026-09-13
 
 ### Summary
 The zero-tab contract completed and verified in real browsers.

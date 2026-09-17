@@ -1,4 +1,4 @@
-## v1.6.19
+## v1.7.10
 ### Summary
 The no-dead-ends release: every download either succeeds or tells you exactly what to do next — with automatic retries, honest timeouts, and an adversarial test program proving it.
 ### Added
@@ -10,13 +10,13 @@ The no-dead-ends release: every download either succeeds or tells you exactly wh
 ### Fixed
 - Fixed Sheets attachment downloads being rejected as invalid URLs.
 
-## v1.6.18
+## v1.7.9
 ### Summary
 Firefox download reporting is now fully honest: success is only reported when the browser confirms the file finished.
 ### Changed
 - Firefox downloads report success only on actual completion — no more phantom successes that later vanish.
 
-## v1.6.17
+## v1.7.8
 ### Summary
 Stalled downloads now resolve honestly, and sign-in/error pages are never saved as fake downloads.
 ### Added
@@ -24,7 +24,7 @@ Stalled downloads now resolve honestly, and sign-in/error pages are never saved 
 ### Fixed
 - Fixed sign-in and error pages being saved as fake download files — they are now detected and reported as sign-in errors.
 
-## v1.6.16
+## v1.7.7
 ### Summary
 Every download failure now has a classified, actionable outcome.
 ### Added
@@ -33,34 +33,34 @@ Every download failure now has a classified, actionable outcome.
 ### Fixed
 - Fixed cancellations made from the browser's own download panel showing as errors — they now correctly show as cancelled.
 
-## v1.6.15
+## v1.7.6
 ### Summary
 Internal hardening: a corpus of eleven real-world download failure scenarios now runs against both the engine's brain and its implementation, and they must agree on every outcome.
 
-## v1.6.14
+## v1.7.5
 ### Summary
 The test simulator learned six new real-world failure shapes — server errors, sign-in redirects, mid-download connection drops, slow streams, empty files and quota pages — so the engine can be verified against them.
 
-## v1.6.13
+## v1.7.4
 ### Summary
 Rendering groundwork for the next engine generation: all page observation now flows through one shared, throttled observer.
 
-## v1.6.12
+## v1.7.3
 ### Summary
 Download All is now fully stabilized and the automated QA suite covers the entire manual runbook.
 ### Fixed
 - Fixed the root cause of Download All groups hanging on "Downloading…" forever.
 - Fixed Download All progress not updating when the Classroom tab was in the background.
 
-## v1.6.11
+## v1.7.2
 ### Summary
 The Engine Mode switch shipped in popup settings (Legacy / New) with live switching and one-click rollback, and page detection is now wired to the download engine through one typed bridge.
 
-## v1.6.10
+## v1.7.1
 ### Summary
 The engine's internals now communicate through a typed event bus — the architectural groundwork that lets every later change be measured and rolled back independently.
 
-## v1.6.9
+## v1.7.0
 ### Summary
 Zero-window downloads verified end-to-end: the old background-tab workaround is fully removed, and a locked test file proves the invisible account fallback completes real downloads.
 
