@@ -49,8 +49,21 @@ jobs:
         id: tests
         run: pnpm run test:strict
 
+      # S12: mutation testing on extension/src/core (stryker). `stryker run`
+      # exits 0 (thresholds.break is null — see extension/stryker.config.json:
+      # high 80 / low 70), so the >= 80 gate is enforced by the score check
+      # below; failing this step makes the job fail and auto-file an issue.
+      # Incremental results live in extension/.stryker/incremental.json
+      # (committed) which keeps reruns fast and documents accepted survivors.
+      - name: Mutation testing (src/core >= 80)
+        id: mutation
+        timeout-minutes: 90
+        run: |
+          pnpm -C extension run test:mutation
+          node extension/tools/mutation-score-check.mjs 80
+
       - name: File failure issue
-        if: failure()
+        if: failure() && steps.tests.conclusion == 'failure'
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -65,6 +78,27 @@ jobs:
             --label "ci-failure" \
             --title "${TITLE}" \
             --body "The nightly \`pnpm run test:strict\` run failed.
+
+          **Run log:** ${RUN_URL}
+
+          <sub>Auto-filed by Nightly Full Test Suite. Close this when green again.</sub>"
+
+      - name: File mutation failure issue
+        if: failure() && steps.mutation.conclusion == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          TITLE="🔴 Nightly mutation testing failed ($(date -u +%Y-%m-%d))"
+          if gh issue list --repo "${{ github.repository }}" --label ci-failure --state open --json title --jq '.[].title' | grep -q "^🔴 Nightly mutation testing failed"; then
+            echo "Open mutation-failure issue already exists — not duplicating."
+            exit 0
+          fi
+          gh issue create --repo "${{ github.repository }}" \
+            --label "ci-failure" \
+            --title "${TITLE}" \
+            --body "The nightly mutation run (\`pnpm -C extension run test:mutation\`, Stryker on extension/src/core) failed — see the run's mutation report for surviving mutants.
 
           **Run log:** ${RUN_URL}
 
