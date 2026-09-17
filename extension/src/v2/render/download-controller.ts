@@ -35,9 +35,19 @@ import { setupDelegatedClickHandler } from './button-renderer';
 interface PendingEntry {
   button: HTMLButtonElement;
   startedAt: number;
+  /** Settle watchdog (V1 student-work parity): fires when no settled ever lands. */
+  watchdog: ReturnType<typeof setTimeout> | null;
 }
 
 const pending = new Map<RequestId, PendingEntry>();
+
+/**
+ * V1 parity (src/student_work/button.ts STUDENT_WORK_DOWNLOAD_WATCHDOG_MS):
+ * a request the bridge never settles must not spin its button forever — the
+ * watchdog settles it to an honest error and drops the pending entry.
+ */
+export const SETTLE_WATCHDOG_MS = 45_000;
+const SETTLE_WATCHDOG_MESSAGE = 'Download did not finish in time. Please retry.';
 /** Secondary settled listeners — the Download All group controller registers here. */
 const settledListeners = new Set<
   (requestId: RequestId, outcome: PageTopicMap['download:settled']['outcome']) => void
@@ -81,6 +91,7 @@ export function wireDownloadPath(
     const entry = pending.get(requestId);
     if (entry) {
       pending.delete(requestId);
+      clearSettleWatchdog(entry);
       applyOutcome(entry.button, outcome.status, outcome.detail);
     }
     // Fan out to dependent controllers (Download All group machine).
@@ -161,7 +172,7 @@ export function handleSingleDownloadClickV2(
   if (state !== 'idle') return null;
 
   const requestId = nextRequestId();
-  pending.set(requestId, { button, startedAt: Date.now() });
+  pending.set(requestId, { button, startedAt: Date.now(), watchdog: armSettleWatchdog(requestId, button) });
   try {
     (button.dataset as Record<string, string>).cqdRequestId = requestId;
   } catch { /* ignore */ }
@@ -212,6 +223,7 @@ function publishRequest(
     const entry = pending.get(requestId);
     if (entry) {
       pending.delete(requestId);
+      clearSettleWatchdog(entry);
       applyOutcome(entry.button, 'failed', 'Download pipeline unavailable.');
     }
     return;
@@ -238,10 +250,35 @@ export function cancelInFlight(button: HTMLButtonElement): void {
   const ds = button.dataset as Record<string, string>;
   const requestId = ds.cqdRequestId;
   if (requestId && pending.has(requestId)) {
+    const entry = pending.get(requestId);
     pending.delete(requestId);
+    if (entry) clearSettleWatchdog(entry);
     getRuntime()?.sendMessage({ type: 'CQD_CANCEL_DOWNLOAD', requestId });
   }
   setButtonStateV2(button, 'cancelled');
+}
+
+// ============================================================================
+// SETTLE WATCHDOG — V1 student-work parity (45 s honest error)
+// ============================================================================
+
+function armSettleWatchdog(requestId: RequestId, button: HTMLButtonElement): ReturnType<typeof setTimeout> {
+  return setTimeout(() => {
+    const entry = pending.get(requestId);
+    if (!entry || entry.button !== button) return; // already settled/cancelled
+    pending.delete(requestId);
+    clearSettleWatchdog(entry);
+    // Settle honestly: the pipeline never answered, say so on the button.
+    setButtonStateV2(button, 'error', { message: SETTLE_WATCHDOG_MESSAGE });
+    scheduleReset(button, 3000);
+  }, SETTLE_WATCHDOG_MS);
+}
+
+function clearSettleWatchdog(entry: PendingEntry): void {
+  if (entry.watchdog !== null) {
+    clearTimeout(entry.watchdog);
+    entry.watchdog = null;
+  }
 }
 
 /** The pending entry for a request id (group controller bookkeeping). */

@@ -229,6 +229,37 @@ describe('download controller (page side)', () => {
     expect(seen).toEqual([requestId]);
   });
 
+  it('a request that never settles watchdogs the button to an honest error after 45 s (V1 parity)', () => {
+    const requested: Array<PageTopicMap['download:requested']> = [];
+    bus.subscribe('download:requested', (p) => requested.push(p));
+    const btn = makeButton();
+    handleSingleDownloadClickV2(btn, 'drive-F1', btn.dataset.cqdUrl!, 'lecture.pdf', 'pdf');
+    expect(getButtonStateV2(btn)).toBe('loading');
+
+    // No download:settled ever arrives — V1's student-work watchdog (45 s).
+    vi.advanceTimersByTime(45_000);
+
+    expect(getButtonStateV2(btn)).toBe('error');
+    expect(btn.querySelector('.cqd-error-detail')?.textContent).toBe(
+      'Download did not finish in time. Please retry.',
+    );
+    expect(isRequestInFlight(requested[0].requestId)).toBe(false);
+  });
+
+  it('a settled request disarms the watchdog (no late error after success)', () => {
+    const requested: Array<PageTopicMap['download:requested']> = [];
+    bus.subscribe('download:requested', (p) => requested.push(p));
+    const btn = makeButton();
+    handleSingleDownloadClickV2(btn, 'drive-F1', btn.dataset.cqdUrl!, 'lecture.pdf', 'pdf');
+    bus.publish('download:settled', { requestId: requested[0].requestId, outcome: { status: 'saved' } });
+    expect(getButtonStateV2(btn)).toBe('success');
+
+    vi.advanceTimersByTime(45_000);
+
+    // Success auto-reset (2 s) already landed; the watchdog must NOT error it.
+    expect(getButtonStateV2(btn)).toBe('idle');
+  });
+
   it('the terminal-state priority gate keeps terminal states sticky until reset', () => {
     const btn = makeButton();
     setButtonStateV2(btn, 'success');
