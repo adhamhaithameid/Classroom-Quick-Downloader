@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "डाउनलोड",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "डाउनलोड होत आहे…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "प्रयत्न करत आहे…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "पूर्ण",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "त्रुटी",
+    "description": "error"
+  },
+  "failed": {
+    "message": "अयशस्वी",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "डाउनलोड",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "त्वरित डाउनलोड",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "टिप्पण्या",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "संपादित",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "सर्व डाउनलोड करा",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "फाईल",
+    "description": "file"
+  },
+  "files": {
+    "message": "फाईल्स",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "या पोस्टवरील टिप्पण्यांची संख्या",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "डाउनलोड व्यत्यय आला.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "रनटाइम उपलब्ध नाही",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "सुरू होऊ शकले नाही.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "संपर्क त्रुटी.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "पोस्टिंग आणि शेवटच्या संपादानामधील दिवस",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "टिप्पण्या",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "रद्द करा",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "रद्द केले",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "सर्व रद्द करा",
+    "description": "cancelAll"
+  }
+}

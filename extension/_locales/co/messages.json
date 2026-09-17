@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Scaricà",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Scaricamentu…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Prova…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Scaricatu",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Errore",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Fallutu.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Scaricà",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Scaricamentu rapidu",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "cumenti",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "cumentu",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Mudificatu",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Scaricà tuttu",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "schedarium",
+    "description": "file"
+  },
+  "files": {
+    "message": "schedarii",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Numeru di cumenti nantu à stu post",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Scaricamentu interrottu.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime micca dispunibule",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Ùn pò micca principià.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Errore di cumunicazione.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "Annullà",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Annullatu",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

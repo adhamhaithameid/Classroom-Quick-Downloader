@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Niżżel",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Qed iniżżel…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Qed jipprova…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Lest",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Żball",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Falli.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Niżżel",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Niżżel malajr",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "kummenti",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Editjat",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Niżżel kollha",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "fajl",
+    "description": "file"
+  },
+  "files": {
+    "message": "fajls",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Numru ta' kummenti fuq din il-kariga",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Tniżżil interrott.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime mhux disponibbli",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Ma setax jibda.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Żball fil-komunikazzjoni.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "kummenti",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Ikkanċella",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Ikkanċellat",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

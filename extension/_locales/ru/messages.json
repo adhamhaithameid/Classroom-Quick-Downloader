@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Скачать",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Скачивание…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Попытка…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Скачано",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Ошибка",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Сбой.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Скачать",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Быстрое скачивание",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "комментариев",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Изменено",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Скачать всё",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "файл",
+    "description": "file"
+  },
+  "files": {
+    "message": "файлов",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Количество комментариев к этой записи",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Загрузка прервана.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Среда выполнения недоступна",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Не удалось запустить.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Ошибка связи.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Дней между публикацией и последним редактированием",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "комментарий",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Отмена",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Отменено",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Отменить все",
+    "description": "cancelAll"
+  }
+}

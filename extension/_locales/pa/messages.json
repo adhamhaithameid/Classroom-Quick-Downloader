@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "ਡਾਉਨਲੋਡ",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "ਡਾਉਨਲੋਡ ਹੋ ਰਿਹਾ…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "ਕੋਸ਼ਿਸ਼ ਜਾਰੀ…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "ਮੁਕੰਮਲ",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "ਗਲਤੀ",
+    "description": "error"
+  },
+  "failed": {
+    "message": "ਅਸਫਲ",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "ਡਾਉਨਲੋਡ",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "ਤੇਜ਼ ਡਾਉਨਲੋਡ",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "ਟਿੱਪਣੀਆਂ",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "ਸੰਪਾਦਿਤ",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "ਸਭ ਡਾਉਨਲੋਡ ਕਰੋ",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "ਫਾਇਲ",
+    "description": "file"
+  },
+  "files": {
+    "message": "ਫਾਇਲਾਂ",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "ਇਸ ਪੋਸਟ ਤੇ ਟਿੱਪਣੀਆਂ ਦੀ ਗਿਣਤੀ",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "ਡਾਊਨਲੋਡ ਵਿੱਚ ਵਿਘਨ ਪਿਆ।",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "ਰਨਟਾਈਮ ਉਪਲਬਧ ਨਹੀਂ ਹੈ",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "ਸ਼ੁਰੂ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "ਸੰਚਾਰ ਗਲਤੀ।",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "ਟਿੱਪਣੀਆਂ",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "ਰੱਦ ਕਰੋ",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "ਰੱਦ ਕੀਤਾ",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "ਸਭ ਰੱਦ ਕਰੋ",
+    "description": "cancelAll"
+  }
+}

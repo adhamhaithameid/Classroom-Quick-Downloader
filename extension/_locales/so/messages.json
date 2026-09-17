@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Soo deji",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Soo dejinayaa…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Isku dayayaa…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "La soo dejiyey",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Khalad",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Wuu fashilmay",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Soo deji",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Soo dejin degdeg ah",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "faallooyin",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "La bedelay",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Soo deji dhammaan",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "fayl",
+    "description": "file"
+  },
+  "files": {
+    "message": "faylal",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Tirada faallooyinka qoraalkan",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Soo dejinta waa la joojiyay",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Waqtiga shaqada lama heli karo",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Ma bilaabi karin",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Cilad isgaarsiineed.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "faallooyin",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Jooji",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "La joojiyay",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Buusi",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Buusaa jira…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Yaalu jira…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Buufame",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Dogoggora",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Hinfanne.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Buusi",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Buusi saffisaa",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "yaadota",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "yaada",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Fooyya'e",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Hunda buusi",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "faayilii",
+    "description": "file"
+  },
+  "files": {
+    "message": "faayilota",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Baay'ina yaadota poostii kanaa irratti",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Buusuun addaan citee jira.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Yeroo run hin argamu",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Eegaluu hin dandeenye.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Dogoggora quunnamtii.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "Haqii",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Haqameera",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

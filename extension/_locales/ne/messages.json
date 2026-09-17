@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "डाउनलोड",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "डाउनलोड हुँदै…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "प्रयास गर्दै…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "पूरा भयो",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "त्रुटि",
+    "description": "error"
+  },
+  "failed": {
+    "message": "असफल भयो",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "डाउनलोड",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "छिटो डाउनलोड",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "टिप्पणीहरू",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "सम्पादित",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "सबै डाउनलोड गर्नुहोस्",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "फाइल",
+    "description": "file"
+  },
+  "files": {
+    "message": "फाइलहरू",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "यस पोस्टमा टिप्पणीहरूको संख्या",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "डाउनलोड अवरोध भयो।",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "रनटाइम उपलब्ध छैन",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "सुरु गर्न सकिएन।",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "सञ्चार त्रुटि।",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "टिप्पणीहरू",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "रद्द गर्नुहोस्",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "रद्द गरियो",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

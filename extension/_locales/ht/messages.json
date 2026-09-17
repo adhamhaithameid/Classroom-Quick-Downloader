@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Telechaje",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Ap telechaje…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Ap eseye…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Telechaje",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Erè",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Pa reyisi.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Telechaje",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Telechaje vit",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "kòmantè",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "kòmantè",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Modifye",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Telechaje tout",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "dosye",
+    "description": "file"
+  },
+  "files": {
+    "message": "dosye",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Kantite kòmantè sou pòs sa a",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Telechajman entèwonpi.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime pa disponib",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Pa kapab kòmanse.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Erè kominikasyon.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "Anile",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Anile",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

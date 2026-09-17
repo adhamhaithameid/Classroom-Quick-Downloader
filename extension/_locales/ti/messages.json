@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "ምውራድ",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "ይወርድ ኣሎ…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "ይፍትን ኣሎ…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "ወሪዱ",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "ጌጋ",
+    "description": "error"
+  },
+  "failed": {
+    "message": "ኣይተዓወተን።",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "ምውራድ",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "ቅልጡፍ ምውራድ",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "ርእይቶታት",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "ርእይቶ",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "ተኣርሚ",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "ኩሉ ምውራድ",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "ፋይል",
+    "description": "file"
+  },
+  "files": {
+    "message": "ፋይላት",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "ብዝሒ ርእይቶታት ኣብዚ ጽሑፍ",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "ምውራድ ተቋሪጹ።",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "ራንታይም ኣይተረኽበን",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "ክጅምር ኣይከኣለን።",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "ጌጋ ርክብ።",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "ሰርዝ",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "ተሰሪዙ",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

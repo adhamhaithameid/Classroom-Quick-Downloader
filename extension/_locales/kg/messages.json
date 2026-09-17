@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Download",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Downloading…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Trying…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Downloaded",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Error",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Download failed.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Download",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Quick download",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "mazonzila",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "nzonzila",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Basonikini",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Download all",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "file",
+    "description": "file"
+  },
+  "files": {
+    "message": "files",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Number of comments on this post",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Download interrupted.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime not available",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Could not start.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Communication error.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "Kulula",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Bakuludi",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

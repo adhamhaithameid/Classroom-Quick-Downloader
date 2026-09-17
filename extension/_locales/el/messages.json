@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Λήψη",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Λήψη…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Προσπάθεια…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Ολοκληρώθηκε",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Σφάλμα",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Απέτυχε.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Λήψη",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Γρήγορη λήψη",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "σχόλια",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Επεξεργασμένο",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Λήψη όλων",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "αρχείο",
+    "description": "file"
+  },
+  "files": {
+    "message": "αρχεία",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Αριθμός σχολίων σε αυτήν την ανάρτηση",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Η λήψη διακόπηκε.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Ο χρόνος εκτέλεσης δεν είναι διαθέσιμος",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Δεν ήταν δυνατή η εκκίνηση.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Σφάλμα επικοινωνίας.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Ημέρες μεταξύ δημοσίευσης και τελευταίας επεξεργασίας",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "σχόλια",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Ακύρωση",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Ακυρώθηκε",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Ακύρωση όλων",
+    "description": "cancelAll"
+  }
+}

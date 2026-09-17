@@ -1,0 +1,102 @@
+{
+  "download": {
+    "message": "Last ned",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Lastar ned…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Prøver…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Lasta ned",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Feil",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Mislukkast.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Last ned",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Rask nedlasting",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "kommentarar",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "kommentar",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Redigert",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Last ned alt",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "fil",
+    "description": "file"
+  },
+  "files": {
+    "message": "filer",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Tal på kommentarar på dette innlegget",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Dagar mellom publisering og siste redigering",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Nedlasting avbroten.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime ikkje tilgjengeleg",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Kunne ikkje starta.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Kommunikasjonsfeil.",
+    "description": "commError"
+  },
+  "modified": {
+    "message": "Endra",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "etter publisering",
+    "description": "after_posting"
+  },
+  "cancel": {
+    "message": "Avbryt",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Avbroten",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Avbryt alt",
+    "description": "cancelAll"
+  }
+}

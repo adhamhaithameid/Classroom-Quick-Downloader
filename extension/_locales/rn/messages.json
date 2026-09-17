@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Kuramo",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Birakurwa…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Turarakwa…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Byarakuwe",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Ikosa",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Vyanze.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Kuramo",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Kuramo vuba",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "ivyiyumviro",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "iciyumviro",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Vyahinduwe",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Kuramo vyose",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "dosiye",
+    "description": "file"
+  },
+  "files": {
+    "message": "dosiye",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Igitigiri c'ivyiyumviro kuri iyi post",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Gukurura vyahagaritswe.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime ntiboneka",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Vyanze gutangura.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Ikosa ry'uguhabwa amakuru.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "Guhagarika",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Vyahagaze",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

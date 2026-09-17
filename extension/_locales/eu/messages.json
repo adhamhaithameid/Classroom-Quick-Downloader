@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Deskargatu",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Deskargatzen…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Saiatzen…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Eginda",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Errorea",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Huts egin du.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Deskargatu",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Deskarga azkarra",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "iruzkin",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Editatua",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Deskargatu dena",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "fitxategia",
+    "description": "file"
+  },
+  "files": {
+    "message": "fitxategiak",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Iruzkin kopurua mezu honetan",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Deskarga eten da.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Exekuzio-denbora ez dago erabilgarri",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Ezin izan da hasi.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Komunikazio errorea.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "iruzkin",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Utzi",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Bertan behera",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

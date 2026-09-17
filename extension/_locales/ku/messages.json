@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Daxistin",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Tê daxistin…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Diceribîne…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Hat daxistin",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Çewtî",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Bi ser neket.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Daxistin",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Daxistina bilez",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "şîrove",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "şîrove",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Hate guhertin",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Hemûyan daxîne",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "pel",
+    "description": "file"
+  },
+  "files": {
+    "message": "pel",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Hejmara şîroveyan li ser vê postê",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Daxistin hate qutakirin.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime ne peyda ye",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Nikarî dest pê bike.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Çewtiya danûstendinê.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "Betal bike",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Hate betalkirin",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

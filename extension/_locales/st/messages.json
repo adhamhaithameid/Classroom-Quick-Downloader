@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Khoasolla",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Ea khoasolla…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Ea leka…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "E qetile",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Phoso",
+    "description": "error"
+  },
+  "failed": {
+    "message": "E hlole hile.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Khoasolla",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Khoasolla kapele",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "maikutlo",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "E hlophisitsoe",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Khoasolla tsohle",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "faele",
+    "description": "file"
+  },
+  "files": {
+    "message": "lifaele",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Palo ea maikutlo posong ena",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Khoasollo e sitisitsoe.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Nako ea ho sebetsa ha e fumanehe",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Ha e ea khona ho qala.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Phosoto ea puisano.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "maikutlo",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Hlakola",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "E hlakotsoe",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

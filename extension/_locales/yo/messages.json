@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Ṣe igbasilẹ",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Nṣe igbasilẹ…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Ngbiyanju…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "O ti pari",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Aṣiṣe",
+    "description": "error"
+  },
+  "failed": {
+    "message": "O kuna.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Ṣe igbasilẹ",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Igbasilẹ iyara",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "awọn asọye",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Ṣatunkọ",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Ṣe igbasilẹ gbogbo rẹ",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "faili",
+    "description": "file"
+  },
+  "files": {
+    "message": "awọn faili",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Nọmba awọn asọye lori ifiweranṣẹ yii",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Igbasilẹ ti daduro.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Akoko ṣiṣe ko wa",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Ko le bẹrẹ.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Aṣiṣe ibaraẹnisọrọ.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "awọn asọye",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Fagilee",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Fagilee",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

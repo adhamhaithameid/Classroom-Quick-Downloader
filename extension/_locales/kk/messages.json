@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Жүктеп алу",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Жүктелуде…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Әрекет…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Аяқталды",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Қате",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Сәтсіз.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Жүктеп алу",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Жылдам жүктеу",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "пікір",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Өзгертілді",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Барлығын жүктеп алу",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "файл",
+    "description": "file"
+  },
+  "files": {
+    "message": "файлдар",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Осы жазбадағы пікірлер саны",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Жүктеп алу үзілді.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Орындау уақыты қолжетімсіз",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Бастау мүмкін болмады.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Байланыс қатесі.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "пікір",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Болдырмау",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Болдырылмады",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Ampidino",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Mampiditra…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Manandrana…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Vita",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Hadisoana",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Tsy nahomby.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Ampidino",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Fampidinana haingana",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "hevitra",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Novana",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Ampidino ny rehetra",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "rakitra",
+    "description": "file"
+  },
+  "files": {
+    "message": "rakitra",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Isan'ny hevitra momba ity lahatsoratra ity",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Tapaka ny fampidinana.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Tsy misy ny fe-potoana",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Tsy afaka nanomboka.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Hadisoana fifandraisana.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "hevitra",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Aoka indray",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Nofoanana",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

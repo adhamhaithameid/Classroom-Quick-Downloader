@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Hent",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Henter…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Prøver…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Hentet",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Fejl",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Mislykkedes.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Hent",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Hurtig download",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "kommentarer",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Redigeret",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Hent alle",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "fil",
+    "description": "file"
+  },
+  "files": {
+    "message": "filer",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Antal kommentarer på dette indlæg",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Download afbrudt.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime ikke tilgængelig",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Kunne ikke starte.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Kommunikationsfejl.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Dage mellem opslag og sidste redigering",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "kommentarer",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Annuller",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Annulleret",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Annuller alle",
+    "description": "cancelAll"
+  }
+}

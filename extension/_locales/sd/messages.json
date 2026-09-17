@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "ڊائون لوڊ",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "ڊائون لوڊ ٿي رهيو آهي…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "ڪوشش ڪري رهيو آهي…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "مڪمل",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "غلطي",
+    "description": "error"
+  },
+  "failed": {
+    "message": "ناڪام ٿيو.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "ڊائون لوڊ",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "جلدي ڊائون لوڊ ڪريو",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "تبصرا",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "تبديل ٿيل",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "سڀ ڊائون لوڊ ڪريو",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "فائل",
+    "description": "file"
+  },
+  "files": {
+    "message": "فائلون",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "هن پوسٽ تي تبصرن جو تعداد",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "ڊائون لوڊ ۾ رڪاوٽ.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "رن ٽائم دستياب ناهي",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "شروع نه ٿي سگهيو.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "مواصلاتي غلطي.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "تبصرا",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "رد ڪريو",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "رد ڪيو ويو",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

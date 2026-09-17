@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Prenos",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Prenašanje…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Poskušam…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Končano",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Napaka",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Ni uspelo.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Prenos",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Hiter prenos",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "komentarjev",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Urejeno",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Prenesi vse",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "datoteka",
+    "description": "file"
+  },
+  "files": {
+    "message": "datoteke",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Število komentarjev na to objavo",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Prenos prekinjen.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Izvajalno okolje ni na voljo",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Ni bilo mogoče začeti.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Napaka v komunikaciji.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Dnevi med objavo in zadnjim urejanjem",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "komentarjev",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Prekliči",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Preklicano",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Prekliči vse",
+    "description": "cancelAll"
+  }
+}

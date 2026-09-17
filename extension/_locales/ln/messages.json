@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Kokitisa",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Ezali kokitisa…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Komeka…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Ekitisami",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Libunga",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Elongi te.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Kokitisa",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Kokitisa noki",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "makanisi",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "likanisi",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Ebongisami",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Kokitisa nyonso",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "fisyé",
+    "description": "file"
+  },
+  "files": {
+    "message": "ba fisyé",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Motango ya makanisi na post oyo",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Kokitisa ekatami.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime ezali te",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Ekoki kobanda te.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Libunga ya boyokani.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "Longola",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Elongolami",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

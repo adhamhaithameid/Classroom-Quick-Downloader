@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "ডাউন্লোড",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "ডাউন্লোড হৈ আছে…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "চেষ্টা কৰি আছে…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "সম্পূৰ্ণ",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "ত্ৰুটি",
+    "description": "error"
+  },
+  "failed": {
+    "message": "বিফল হ’ল",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "ডাউন্লোড",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "দ্ৰুত ডাউন্লোড",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "মন্তব্য",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "সম্পাদিত",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "সকলো ডাউন্লোড কৰক",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "ফাইল",
+    "description": "file"
+  },
+  "files": {
+    "message": "ফাইলসমূহ",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "এই পোষ্টত মন্তব্যৰ সংখ্যা",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "ডাউনলড বাধাগ্ৰস্ত হৈছে।",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "ৰানটাইম উপলব্ধ নহয়",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "আৰম্ভ কৰিব পৰা নগ’ল।",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "যোগাযোগৰ ত্ৰুটি।",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "মন্তব্য",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "বাতিল কৰক",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "বাতিল কৰা হ’ল",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

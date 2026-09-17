@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "ڈاؤن لوڈ",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "ڈاؤن لوڈ ہو رہا ہے…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "کوشش جاری…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "مکمل",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "غلطی",
+    "description": "error"
+  },
+  "failed": {
+    "message": "ناکام",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "ڈاؤن لوڈ",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "فوری ڈاؤن لوڈ",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "تبصرے",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "ترمیم شدہ",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "سب ڈاؤن لوڈ کریں",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "فائل",
+    "description": "file"
+  },
+  "files": {
+    "message": "فائلیں",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "اس پوسٹ پر تبصروں کی تعداد",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "ڈاؤن لوڈ منقطع ہو گیا۔",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "رن ٹائم دستیاب نہیں ہے",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "شروع نہیں ہو سکا۔",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "مواصلاتی خرابی۔",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "پوسٹنگ اور آخری ترمیم کے درمیان دن",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "تبصرے",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "منسوخ",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "منسوخ",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "سب منسوخ کریں",
+    "description": "cancelAll"
+  }
+}

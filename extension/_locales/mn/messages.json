@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Татах",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Татаж байна…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Орлдож байна…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Татсан",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Алдаа",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Амжилтгүй.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Татах",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Хурдан татах",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "сэтгэгдэл",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Зассан",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Бүгдийг татах",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "файл",
+    "description": "file"
+  },
+  "files": {
+    "message": "файлууд",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Энэ нийтлэл дээрх сэтгэгдлийн тоо",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Татаж авалт тасалдлаа.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Ажиллах хугацаа боломжгүй",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Эхлүүлж чадсангүй.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Харилцааны алдаа.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "сэтгэгдэл",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Цуцлах",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Цуцлагдсан",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

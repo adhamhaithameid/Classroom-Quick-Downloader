@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Atsisiųsti",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Siunčiama…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Bandoma…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Baigta",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Klaida",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Nepavyko.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Atsisiųsti",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Greitas atsisiuntimas",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "komentarai",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Redaguota",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Atsisiųsti viską",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "failas",
+    "description": "file"
+  },
+  "files": {
+    "message": "failai",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Komentarų skaičius šiame įraše",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Atsisiuntimas pertrauktas.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Vykdymo laikas negalimas",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Nepavyko paleisti.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Ryšio klaida.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Dienos nuo paskelbimo iki paskutinio redagavimo",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "komentarai",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Atšaukti",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Atšaukta",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Atšaukti viską",
+    "description": "cancelAll"
+  }
+}

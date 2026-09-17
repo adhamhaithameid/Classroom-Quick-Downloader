@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "ទាញយក",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "កំពុងទាញយក…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "កំពុងព្យាយាម…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "បានបញ្ចប់",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "កំហុស",
+    "description": "error"
+  },
+  "failed": {
+    "message": "បរាជ័យ",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "ទាញយក",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "ទាញយកលឿន",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "មតិ",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "បានកែសម្រួល",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "ទាញយកទាំងអស់",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "ឯកសារ",
+    "description": "file"
+  },
+  "files": {
+    "message": "ឯកសារ",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "ចំនួនមតិយោបល់លើការបង្ហោះនេះ",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "ការទាញយកត្រូវបានរំខាន។",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "មិនមាន Runtime ទេ",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "មិនអាចចាប់ផ្តើមបានទេ។",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "កំហុសក្នុងការទំនាក់ទំនង។",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "មតិ",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "បោះបង់",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "បានបោះបង់",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

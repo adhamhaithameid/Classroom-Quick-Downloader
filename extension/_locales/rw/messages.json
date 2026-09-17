@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Kuramo",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Birakurwa…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Birarakwa…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Byarakuwe",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Ikosa",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Byanze.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Kuramo",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Kuramo vuba",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "ibitekerezo",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "igitekerezo",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Byahinduwe",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Kuramo byose",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "dosiye",
+    "description": "file"
+  },
+  "files": {
+    "message": "dosiye",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Umubare w'ibitekerezo kuri iyi post",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Gukurura byahagaritswe.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime ntiboneka",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Byanze gutangira.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Ikosa ryo guhabwa amakuru.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "Kureka",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Byaretse",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

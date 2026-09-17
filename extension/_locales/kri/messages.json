@@ -1,0 +1,102 @@
+{
+  "download": {
+    "message": "Dɔnlod",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "De dɔnlod…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "De tray…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Dɔn dɔnlod",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Erɔ",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Dɔnlod nɔ wok.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Dɔnlod",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Kwik dɔnlod",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "kɔmɛnt dɛn",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "kɔmɛnt",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Dɔn edit",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Dɔnlod ɔl",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "fayl",
+    "description": "file"
+  },
+  "files": {
+    "message": "fayl dɛn",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Nɔmba fɔ kɔmɛnt dɛn pan dis post",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Dez bitwin postin ɛn di las edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Dɔnlod dɔn kɔt.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Rɔntaym nɔ de",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Nɔ ebul stat.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Kɔmyunikeshɔn erɔ.",
+    "description": "commError"
+  },
+  "modified": {
+    "message": "Chenj",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "afta postin",
+    "description": "after_posting"
+  },
+  "cancel": {
+    "message": "Kansul",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Dɔn kansul",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Kansul Ɔl",
+    "description": "cancelAll"
+  }
+}

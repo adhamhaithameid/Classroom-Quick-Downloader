@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "डाउनलोड",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "डाउनलोड हो रहल बा…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "कोशिश हो रहल बा…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "डाउनलोड हो गइल",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "गलती",
+    "description": "error"
+  },
+  "failed": {
+    "message": "ना भइल।",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "डाउनलोड",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "तेज डाउनलोड",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "टिप्पणी सब",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "टिप्पणी",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "संपादित भइल",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "सब डाउनलोड करीं",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "फाइल",
+    "description": "file"
+  },
+  "files": {
+    "message": "फाइल सब",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "ई पोस्ट पर टिप्पणी के संख्या",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "डाउनलोड रुक गइल।",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime उपलब्ध नइखे",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "शुरू ना हो पइलस।",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "संचार में गलती।",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "रद्द करीं",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "रद्द कइल गइल",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

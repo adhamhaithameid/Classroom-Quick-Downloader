@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Íoslódáil",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Ag íoslódáil…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Ag iarraidh…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Íoslódáilte",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Earráid",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Theip air.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Íoslódáil",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Íoslódáil tapa",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "trácht",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Eagraithe",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Íoslódáil gach rud",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "comhad",
+    "description": "file"
+  },
+  "files": {
+    "message": "comhaid",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Líon na dtráchtanna ar an bpostáil seo",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Íoslódáil.briste.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Níl an t-am rite ar fáil",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Níorbh fhéidir tosú.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Earráid chumarsáide.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "trácht",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Cealaigh",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Cealaithe",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Download",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Mengunduh…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Mencoba…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Selesai",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Kesalahan",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Gagal.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Download",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Download cepat",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "komentar",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Diedit",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Unduh semua",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "file",
+    "description": "file"
+  },
+  "files": {
+    "message": "file",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Jumlah komentar di postingan ini",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Unduhan terganggu.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime tidak tersedia",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Tidak dapat memulai.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Kesalahan komunikasi.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Hari antara posting dan pengeditan terakhir",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "komentar",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Batal",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Dibatalkan",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Batalkan semua",
+    "description": "cancelAll"
+  }
+}

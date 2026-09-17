@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "داگرتن",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "دادەگیرێت…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "هەوڵدەدات…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "داگیرا",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "هەڵە",
+    "description": "error"
+  },
+  "failed": {
+    "message": "سەرنەکەوت.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "داگرتن",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "داگرتنی خێرا",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "بۆچوونەکان",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "بۆچوون",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "دەستکاریکرا",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "داگرتنی هەموو",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "فایل",
+    "description": "file"
+  },
+  "files": {
+    "message": "فایلەکان",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "ژمارەی بۆچوونەکان لەسەر ئەم بابەتە",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "داگرتن پچڕا.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime بەردەست نییە",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "نەتوانرا دەست پێبکات.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "هەڵەی پەیوەندی.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "هەڵوەشاندنەوە",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "هەڵوەشایەوە",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

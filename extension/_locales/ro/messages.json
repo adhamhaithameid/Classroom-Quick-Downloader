@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Descărcați",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Se descarcă…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Se încearcă…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Finalizat",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Eroare",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Eșuat.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Descărcați",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Descărcare rapidă",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "comentarii",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Modificat",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Descărcați tot",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "fișier",
+    "description": "file"
+  },
+  "files": {
+    "message": "fișiere",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Numărul de comentarii la această postare",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Descărcare întreruptă.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime indisponibil",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Nu s-a putut porni.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Eroare de comunicare.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Zile între postare și ultima editare",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "comentarii",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Anulare",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Anulat",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Anulează tot",
+    "description": "cancelAll"
+  }
+}

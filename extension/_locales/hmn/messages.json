@@ -1,0 +1,86 @@
+{
+  "download": {
+    "message": "Download",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Downloading…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Trying…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Downloaded",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Error",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Download failed.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Download",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Quick download",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "comments",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Edited",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Download all",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "file",
+    "description": "file"
+  },
+  "files": {
+    "message": "files",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Cov lus hauv qhov post no",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Kev rub tawm raug cuam tshuam.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime tsis muaj",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Pib tsis tau.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Kev sib txuas lus yuam kev.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "Tso tseg",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Tso tseg lawm",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

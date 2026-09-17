@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Yeb",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Yàngum de nañu…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Jéema…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Yebees nañu",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Njuumte",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Bañ na.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Yeb",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Yeb gu gaaw",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "kàddu yi",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "kàddu",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Soppi nañu",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Yeb lépp",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "dencukaay",
+    "description": "file"
+  },
+  "files": {
+    "message": "dencukaay yi",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Limu kàddu ci mb-bind mii",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Yeb gi doxu na.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime amul",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Mënu na tambalee.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Njuumte ci waxtaan.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "Bëy",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Bëy nañu",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

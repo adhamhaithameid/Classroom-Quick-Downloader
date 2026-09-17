@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "अवतारयतु",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "अवतारयति…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "प्रयत्नं करोति…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "अवतारितम्",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "दोषः",
+    "description": "error"
+  },
+  "failed": {
+    "message": "विफलम्।",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "अवतारयतु",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "शीघ्रं अवतारणम्",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "टिप्पण्यः",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "टिप्पणी",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "सम्पादितम्",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "सर्वं अवतारयतु",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "संचिका",
+    "description": "file"
+  },
+  "files": {
+    "message": "संचिकाः",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "अस्मिन् प्रकाशने टिप्पणीनां संख्या",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "अवतारणं विच्छिन्नम्।",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime उपलब्धं नास्ति",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "आरम्भं कर्तुं न शक्नोति।",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "संवादे दोषः।",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "निरस्तम्",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "निरस्तित",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "डाउनलोड",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "डाउनलोडिंग…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "कोशिश जारी…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "पूर्ण",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "त्रुटि",
+    "description": "error"
+  },
+  "failed": {
+    "message": "विफल रहा",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "डाउनलोड",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "त्वरित डाउनलोड",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "टिप्पणियाँ",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "संपादित",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "सभी डाउनलोड करें",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "फ़ाइल",
+    "description": "file"
+  },
+  "files": {
+    "message": "फ़ाइलें",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "इस पोस्ट पर टिप्पणियों की संख्या",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "डाउनलोड बाधित हुआ।",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "रनटाइम उपलब्ध नहीं है",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "शुरू नहीं हो सका।",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "संचार त्रुटि।",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "पोस्ट करने और अंतिम संपादन के बीच के दिन",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "टिप्पणियाँ",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "रद्द करें",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "रद्द",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "सभी रद्द करें",
+    "description": "cancelAll"
+  }
+}

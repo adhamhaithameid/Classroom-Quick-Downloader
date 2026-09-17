@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Mboguejy",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Omboguejýva…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Oñeha'ãva…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Oguejyma",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Javy",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Ndojapói.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Mboguejy",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Mboguejy pya'e",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "marandu",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "marandu",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Oñemoambuéva",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Mboguejy opavave",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "archivo",
+    "description": "file"
+  },
+  "files": {
+    "message": "archivokuéra",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Mboy pa marandu oĩ ko momarandu rehegua",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Mboguejy opyta.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime ndojejuhúi",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Ndaikatúi ñepyrũ.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Ñeñe'ẽ rehegua javy.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "Mbotove",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Oñembotove",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

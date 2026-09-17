@@ -1,0 +1,102 @@
+{
+  "download": {
+    "message": "Download",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Pe download…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Pe eseye…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Fini download",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Erer",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Pa finn marse.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Download",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Download vit",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "komanter",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "komanter",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Modifye",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Download tou",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "file",
+    "description": "file"
+  },
+  "files": {
+    "message": "files",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Kantite komanter lor sa post la",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Zour ant poste ek dernie modifikasion",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Download finn aret.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime pa disponib",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Pa kapav koumanse.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Erer kominikasyon.",
+    "description": "commError"
+  },
+  "modified": {
+    "message": "Modifye",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "apre poste",
+    "description": "after_posting"
+  },
+  "cancel": {
+    "message": "Anile",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Anile",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Anile Tou",
+    "description": "cancelAll"
+  }
+}

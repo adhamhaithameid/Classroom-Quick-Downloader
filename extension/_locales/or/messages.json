@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "ଡାଉନଲୋଡ୍",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "ଡାଉନଲୋଡ୍ ହେଉଛି…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "ଚେଷ୍ଟା କରୁଛି…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "ସମ୍ପୂର୍ଣ୍ଣ",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "ତ୍ରୁଟି",
+    "description": "error"
+  },
+  "failed": {
+    "message": "ବିଫଳ ହେଲା",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "ଡାଉନଲୋଡ୍",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "ଶୀଘ୍ର ଡାଉନଲୋଡ୍",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "ମନ୍ତବ୍ୟ",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "ସମ୍ପାଦିତ",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "ସମସ୍ତ ଡାଉନଲୋଡ୍ କରନ୍ତୁ",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "ଫାଇଲ୍",
+    "description": "file"
+  },
+  "files": {
+    "message": "ଫାଇଲ୍",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "ଏହି ପୋଷ୍ଟରେ ମନ୍ତବ୍ୟ ସଂଖ୍ୟା",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "ଡାଉନଲୋଡ୍ ବାଧାପ୍ରାପ୍ତ ହେଲା |",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "ରନ୍ଟାଇମ୍ ଉପଲବ୍ଧ ନାହିଁ |",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "ଆରମ୍ଭ ହୋଇପାରିଲା ନାହିଁ |",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "ଯୋଗାଯୋଗ ତ୍ରୁଟି |",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "ମନ୍ତବ୍ୟ",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "ବାତିଲ କରନ୍ତୁ",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "ବାତିଲ ହେଲା",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

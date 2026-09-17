@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Tsitsani",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Kutsitsa…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Kuyesa…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Kutsiriza",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Zolakwika",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Zalephereka.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Tsitsani",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Kutsitsa mwachangu",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "ndemanga",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Zasinthidwa",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Tsitsani zonse",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "fayilo",
+    "description": "file"
+  },
+  "files": {
+    "message": "mafayilo",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Chiwerengero cha ndemanga pa positiyi",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Kutsitsa kwasokonezedwa.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Nthawi yothamanga palibe",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Zinalephera kuyamba.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Zolakwika zolumikizirana.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "ndemanga",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Letsani",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Zaletsedwa",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

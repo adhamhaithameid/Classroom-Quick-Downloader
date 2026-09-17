@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Letöltés",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Letöltés…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Próbálkozás…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Kész",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Hiba",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Sikertelen.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Letöltés",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Gyors letöltés",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "megjegyzés",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Szerkesztve",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Összes letöltése",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "fájl",
+    "description": "file"
+  },
+  "files": {
+    "message": "fájlok",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Hozzászólások száma ehhez a bejegyzéshez",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "A letöltés megszakadt.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "A futási környezet nem elérhető",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Nem sikerült elindítani.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Kommunikációs hiba.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "A közzététel és az utolsó szerkesztés között eltelt napok",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "megjegyzés",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Mégse",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Megszakítva",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Mind törlése",
+    "description": "cancelAll"
+  }
+}

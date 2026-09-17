@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Unduh",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Ngunduh…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Nyoba…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Rengse",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Kasalahan",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Gagal.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Unduh",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Unduh gancang",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "koméntar",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Diédit",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Unduh sadayana",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "file",
+    "description": "file"
+  },
+  "files": {
+    "message": "file",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Jumlah koméntar dina postingan ieu",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Unduh kaganggu.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Wanci jalan teu sadia",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Teu bisa ngamimitian.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Kasalahan komunikasi.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "koméntar",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Batal",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Dibatalakeun",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

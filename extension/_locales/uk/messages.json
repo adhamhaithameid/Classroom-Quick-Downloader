@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Завантажити",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Завантаження…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Спроба…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Готово",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Помилка",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Невдача.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Завантажити",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Швидке завантаження",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "коментарів",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Змінено",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Завантажити все",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "файл",
+    "description": "file"
+  },
+  "files": {
+    "message": "файлів",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Кількість коментарів до цієї записи",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Завантаження перервано.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Середовище виконання недоступне",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Не вдалося запустити.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Помилка зв’язку.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Днів між публікацією та останнім редагуванням",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "коментарів",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Отмена",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Отменено",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Отменить все",
+    "description": "cancelAll"
+  }
+}

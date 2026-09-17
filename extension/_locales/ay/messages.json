@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Apakataña",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Apakatasaxa…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Yatiña…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Apakatatawa",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Pantjawi",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Janiw apakatkänti.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Apakataña",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Jak'a apakataña",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "aruskipawinaka",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "aruskipawi",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Mayjt'ayata",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Taqpach apakataña",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "archivo",
+    "description": "file"
+  },
+  "files": {
+    "message": "archivonaka",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Qawqha aruskipawinakasa aka qillqatana",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Apakataña jaytjatawa.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime janiw utjkiti",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Janiw qalltañjamäkiti.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Aruskipawi pantjawi.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "Jan sa",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Jan sata",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Yuklash",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Yuklanmoqda…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Urinilmoqda…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Tayyor",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Xato",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Muvaffaqiyatsiz.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Yuklash",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Tez yuklash",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "sharhlar",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Tahrirlangan",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Hammasini yuklash",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "fayl",
+    "description": "file"
+  },
+  "files": {
+    "message": "fayllar",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Ushbu postdagi sharhlar soni",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Yuklash to‘xtatildi.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Ish vaqti mavjud emas",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Boshlab bo‘lmadi.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Aloqa xatosi.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "sharhlar",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Bekor qilish",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Bekor qilindi",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

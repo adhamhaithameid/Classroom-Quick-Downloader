@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Télécharger",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Téléchargement…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Essai…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Téléchargé",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Erreur",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Échec.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Télécharger",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Téléchargement rapide",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "commentaires",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Modification",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Tout télécharger",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "fichier",
+    "description": "file"
+  },
+  "files": {
+    "message": "fichiers",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Nombre de commentaires sur ce post",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Téléchargement interrompu.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime non disponible",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Impossible de démarrer.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Erreur de communication.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Jours entre la publication et la dernière modification",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "commentaire",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Annuler",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Annulé",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Tout annuler",
+    "description": "cancelAll"
+  }
+}

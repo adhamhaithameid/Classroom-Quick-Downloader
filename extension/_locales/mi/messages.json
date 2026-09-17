@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Tikiake",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Kei te tikiake…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Kei te ngana…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Kua oti",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Hapa",
+    "description": "error"
+  },
+  "failed": {
+    "message": "I rahua.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Tikiake",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Tikiake tere",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "korero",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Kua whakatikahia",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Tikiake katoa",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "kōnae",
+    "description": "file"
+  },
+  "files": {
+    "message": "kōnae",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Te maha o nga korero mo tenei panui",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Kua haukotia te tikiake.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Kaore i te waatea te wa whakahaere",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Kaore i taea te timata.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Hapa korero.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "korero",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Whakakore",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Kua whakakorehia",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

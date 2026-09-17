@@ -1,0 +1,86 @@
+{
+  "download": {
+    "message": "I-download",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Nagda-download…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Sinusubukan…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Tapos na",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Error",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Nabigo.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "I-download",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Mabilis na download",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "mga komento",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Na-edit",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "I-download lahat",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "file",
+    "description": "file"
+  },
+  "files": {
+    "message": "mga file",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Bilang ng mga komento sa post na ito",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Naantala ang pag-download.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Hindi available ang runtime",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Hindi masimulan.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Error sa komunikasyon.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "Kanselahin",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Kinansela",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Kanselahin lahat",
+    "description": "cancelAll"
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Downloaden",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Downloaden…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Proberen…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Klaar",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Fout",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Mislukt.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Downloaden",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Snel downloaden",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "reacties",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Bewerkt",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Alles downloaden",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "bestand",
+    "description": "file"
+  },
+  "files": {
+    "message": "bestanden",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Aantal reacties op dit bericht",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Download onderbroken.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime niet beschikbaar",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Kon niet starten.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Communicatiefout.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Dagen tussen plaatsen en laatste bewerking",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "opmerking",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Annuleren",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Geannuleerd",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Alles annuleren",
+    "description": "cancelAll"
+  }
+}

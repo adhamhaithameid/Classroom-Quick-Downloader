@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "ດາວໂຫລດ",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "ກຳລັງດາວໂຫລດ…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "ກຳລັງພະຍາຍາມ…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "ສຳເລັດ",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "ຜິດພາດ",
+    "description": "error"
+  },
+  "failed": {
+    "message": "ລົ້ມເຫລວ",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "ດາວໂຫລດ",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "ດາວໂຫລດດ່ວນ",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "ຄຳເຫັນ",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "ແກ້ໄຂແລ້ວ",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "ດາວໂຫລດທັງຫມົດ",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "ໄຟລ໌",
+    "description": "file"
+  },
+  "files": {
+    "message": "ໄຟລ໌",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "ຈຳນວນຄຳເຫັນໃນໂພສນີ້",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "ການດາວໂຫຼດຖືກຂັດຈັງຫວະ.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime ບໍ່ສາມາດໃຊ້ໄດ້",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "ບໍ່ສາມາດເລີ່ມຕົ້ນໄດ້.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "ຂໍ້ຜິດພາດໃນການສື່ສານ.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "ຄຳເຫັນ",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "ຍົກເລີກ",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "ຍົກເລີກແລ້ວ",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

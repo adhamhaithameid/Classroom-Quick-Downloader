@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Sauke",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Ana saukewa…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Ana gwadawa…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "An gama",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Kuskure",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Ya gaza.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Sauke",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Saukewa da sauri",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "sharhi",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "An gyara",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Sauke duk",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "fayil",
+    "description": "file"
+  },
+  "files": {
+    "message": "fayiloli",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Yawan sharhi akan wannan rubutun",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "An katse saukewa.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Lokacin gudu baya samuwa",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Ba a iya fara ba.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Kuskuren sadarwa.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "sharhi",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Soke",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "An soke",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}
