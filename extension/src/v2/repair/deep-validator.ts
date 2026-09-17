@@ -241,8 +241,13 @@ export function validatePost(
     }
   }
 
-  // CHECK 2: Orphaned buttons — CQD buttons exist but no matching file in model
-  const injectedButtons = postEl.querySelectorAll<HTMLElement>('[data-cqd-injected][data-cqd-file-id]');
+  // CHECK 2: Orphaned buttons — CQD buttons exist but no matching file in model.
+  // The Download All control shares the file-id attribute but is a GROUP
+  // control keyed by the post id, not a per-file button (z57) — never an
+  // orphan, and CHECK 6's per-file dedup must not count it either.
+  const injectedButtons = Array.from(
+    postEl.querySelectorAll<HTMLElement>('[data-cqd-injected][data-cqd-file-id]'),
+  ).filter((btn) => !(btn.getAttribute('data-cqd-file-id') || '').startsWith('download-all:'));
   const modelFileIds = new Set(post.files.map(f => f.canonicalId));
   for (const btn of injectedButtons) {
     const fileId = btn.getAttribute('data-cqd-file-id');
