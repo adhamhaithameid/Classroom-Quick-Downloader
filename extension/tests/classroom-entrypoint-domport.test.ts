@@ -318,18 +318,16 @@ async function loadByStatus() {
   });
 
   vi.doMock('../entrypoints/content/flags', () => ({ subscribeToGlobalState }));
-  vi.doMock('../entrypoints/content/styles', () => ({ injectStyles: vi.fn() }));
+  vi.doMock('../entrypoints/content/styles', () => ({ injectStudentWorkStyles: vi.fn() }));
   vi.doMock('../entrypoints/content/file-meta', () => ({
     extractFileMeta: vi.fn(() => ({ name: 'F', ext: 'pdf', kind: 'other' })),
   }));
   vi.doMock('../src/student_work/button', () => ({ createStudentWorkButton }));
   vi.doMock('../src/download-all/group-manager', () => ({ registerButtonsInSubtree: vi.fn() }));
   vi.doMock('../src/download-all/refresh', () => ({ scheduleRefresh: vi.fn() }));
-  // S10 T4: lifecycle suite — engine mode gate passes through (its own
-  // suite is v4-mode-gate.test.ts).
-  vi.doMock('../entrypoints/content/mode-gate', () => ({
-    gateV1Stack: ({ start, stop }: { start: () => void; stop: () => void }) => ({ start, stop }),
-  }));
+  // z57 tail: the student-work stacks are download-feature stacks and run in
+  // every engine mode — they do not import the mode gate at all (its real
+  // behavior is pinned in v4-mode-gate.test.ts).
 
   const mod = await import('../entrypoints/student_work_by_status.content');
   (mod.default as unknown as { main: (ctx: unknown) => void }).main({});
@@ -440,17 +438,15 @@ async function loadSidecar() {
   });
 
   vi.doMock('../entrypoints/content/flags', () => ({ subscribeToGlobalState }));
-  vi.doMock('../entrypoints/content/styles', () => ({ injectStyles: vi.fn() }));
+  vi.doMock('../entrypoints/content/styles', () => ({ injectStudentWorkStyles: vi.fn() }));
   vi.doMock('../entrypoints/content/file-meta', () => ({
     extractFileMeta: vi.fn(() => ({ name: 'F', ext: 'pdf', kind: 'other' })),
   }));
   vi.doMock('../src/student_work/button', () => ({ createStudentWorkButton }));
 
-  // S10 T4: lifecycle suite — engine mode gate passes through (its own
-  // suite is v4-mode-gate.test.ts).
-  vi.doMock('../entrypoints/content/mode-gate', () => ({
-    gateV1Stack: ({ start, stop }: { start: () => void; stop: () => void }) => ({ start, stop }),
-  }));
+  // z57 tail: the student-work stacks are download-feature stacks and run in
+  // every engine mode — they do not import the mode gate at all (its real
+  // behavior is pinned in v4-mode-gate.test.ts).
 
   const mod = await import('../entrypoints/student_work_sidecar.content');
   (mod.default as unknown as { main: (ctx: unknown) => void }).main({});

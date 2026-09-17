@@ -24,6 +24,7 @@ async function loadByStatusSidecar() {
 
   vi.doMock('../entrypoints/content/styles', () => ({
     injectStyles: vi.fn(),
+    injectStudentWorkStyles: vi.fn(),
   }));
 
   vi.doMock('../entrypoints/content/file-meta', () => ({
@@ -517,5 +518,45 @@ describe('student_work_by_status content script', () => {
     mod.resetStudentWorkByStatusForTest();
 
     expect(anchor?.hasAttribute('data-cqd-sw-bs-processed')).toBe(false);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* z57 tail: all-modes download stack + scoped stylesheet              */
+/* ------------------------------------------------------------------ */
+
+describe('z57 tail: student_work_by_status runs in ALL engine modes', () => {
+  const entrypointSource = (): string =>
+    readFileSync(resolve(process.cwd(), 'entrypoints/student_work_by_status.content.ts'), 'utf-8');
+
+  it('is NOT wrapped in the S10 v2 mode gate (row buttons must render in v2)', () => {
+    const source = entrypointSource();
+    expect(source).not.toContain('gateV1Stack');
+    expect(source).not.toContain("from './content/mode-gate'");
+  });
+
+  it('injects the student-work SCOPED stylesheet, not the full V1 sheet', () => {
+    const source = entrypointSource();
+    expect(source).toContain('injectStudentWorkStyles');
+    expect(source).not.toMatch(/\binjectStyles\(/);
+  });
+
+  it('scoped stylesheet never emits selectors that hit V2-owned shared buttons', async () => {
+    vi.resetModules();
+    vi.doUnmock('../entrypoints/content/styles');
+    // Real styles module — no doMock.
+    const styles = await import('../entrypoints/content/styles');
+    styles.injectStudentWorkStyles();
+
+    const css = document.getElementById('cqd-sw-style')?.textContent ?? '';
+    expect(css).toContain('data-cqd-sw-bs="true"');
+
+    // Every .cqd-download-btn occurrence must be the scope argument inside
+    // :is(...[data-cqd-sw...]) — a bare occurrence would restyle V2's own
+    // buttons (shared markup contract) and reintroduce the qa-06 overlap.
+    expect(css.match(/(?<!\()\.cqd-download-btn(?!\[data-cqd-sw)/)).toBeNull();
+    // Every .cqd-download-all-btn occurrence must descend from the
+    // by-status host marker, never page-wide.
+    expect(css.match(/(?<!\] )\.cqd-download-all-btn/)).toBeNull();
   });
 });

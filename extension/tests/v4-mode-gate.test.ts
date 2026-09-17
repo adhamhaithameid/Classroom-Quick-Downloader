@@ -349,3 +349,347 @@ describe('gate integration: observers.ts scan stack', () => {
     expect(FakeMutationObserver.instances[0]!.disconnectCount).toBe(1);
   });
 });
+
+/* ------------------------------------------------------------------ */
+/* z57 tail: student-work row stacks run in ALL modes                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The two student-work entrypoints are DOWNLOAD-FEATURE stacks (they
+ * inject the row download buttons into Student Work submissions), not
+ * V1 detection — qa-05 found zero row buttons in v2 because the S10 gate
+ * suppressed them and v2 renders no row buttons of its own there. They
+ * must start in EVERY engine mode, and a live mode flip must not stop
+ * them. The detection stacks (observers, comment/edited frames) and the
+ * V1 download-all stack stay gated. Load idiom: the domport suites'
+ * doMock lists, but mode-gate is deliberately NOT mocked — these tests
+ * exercise the real gate against the fake chrome.storage.
+ */
+
+const byStatusLocation = () =>
+  vi.stubGlobal(
+    'location',
+    new URL('https://classroom.google.com/c/C/a/A/submissions/by-status/and-sort-name/all/all'),
+  );
+const studentWorkLocation = () =>
+  vi.stubGlobal('location', new URL('https://classroom.google.com/c/C/a/A/submissions/student-1'));
+
+function makeSwButtonMarker(swBs: boolean): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.className = 'cqd-download-btn';
+  if (swBs) button.dataset.cqdSwBs = 'true';
+  else button.dataset.cqdSw = 'true';
+  return button;
+}
+
+/** A submissions row card matching the student-work container contract. */
+function mountSubmissionRow(): void {
+  const card = document.createElement('div');
+  card.className = 'WkZsyc';
+  card.setAttribute('data-submission-attachment-id', 'att-1');
+  card.innerHTML =
+    '<a class="vwNuXe" aria-label="Attachment: Image: f.png" ' +
+    'href="https://classroom.google.com/g/tg/c/a/s?id=FILE123">f.png</a>';
+  document.body.appendChild(card);
+}
+
+async function loadByStatusStack() {
+  vi.resetModules();
+  const subscribeToGlobalState = vi.fn();
+  const createStudentWorkButton = vi.fn(() => makeSwButtonMarker(true));
+
+  vi.doMock('../entrypoints/content/flags', () => ({ subscribeToGlobalState }));
+  vi.doMock('../entrypoints/content/styles', () => ({ injectStudentWorkStyles: vi.fn() }));
+  vi.doMock('../entrypoints/content/file-meta', () => ({
+    extractFileMeta: vi.fn(() => ({ name: 'F', ext: 'pdf', kind: 'other' })),
+  }));
+  vi.doMock('../src/student_work/button', () => ({ createStudentWorkButton }));
+  vi.doMock('../src/download-all/group-manager', () => ({ registerButtonsInSubtree: vi.fn() }));
+  vi.doMock('../src/download-all/refresh', () => ({ scheduleRefresh: vi.fn() }));
+
+  const mod = await import('../entrypoints/student_work_by_status.content');
+  (mod.default as unknown as { main: (ctx: unknown) => void }).main({});
+  const calls = subscribeToGlobalState.mock.calls[0] as [() => void, () => void];
+  return { createStudentWorkButton, start: calls[0], stop: calls[1] };
+}
+
+async function loadSidecarStack() {
+  vi.resetModules();
+  const subscribeToGlobalState = vi.fn();
+  const createStudentWorkButton = vi.fn(() => makeSwButtonMarker(false));
+
+  vi.doMock('../entrypoints/content/flags', () => ({ subscribeToGlobalState }));
+  vi.doMock('../entrypoints/content/styles', () => ({ injectStudentWorkStyles: vi.fn() }));
+  vi.doMock('../entrypoints/content/file-meta', () => ({
+    extractFileMeta: vi.fn(() => ({ name: 'F', ext: 'pdf', kind: 'other' })),
+  }));
+  vi.doMock('../src/student_work/button', () => ({ createStudentWorkButton }));
+
+  const mod = await import('../entrypoints/student_work_sidecar.content');
+  (mod.default as unknown as { main: (ctx: unknown) => void }).main({});
+  const calls = subscribeToGlobalState.mock.calls[0] as [() => void, () => void];
+  return { createStudentWorkButton, start: calls[0], stop: calls[1] };
+}
+
+async function loadDownloadAllStack() {
+  vi.resetModules();
+  const subscribeToGlobalState = vi.fn();
+
+  vi.doMock('../entrypoints/content/styles', () => ({ injectStyles: vi.fn() }));
+  vi.doMock('../entrypoints/content/i18n', () => ({ t: (key: string) => key }));
+  vi.doMock('../entrypoints/content/theme', () => ({ isPageDark: () => false }));
+  vi.doMock('../entrypoints/content/icons', () => ({
+    CANCEL_ICON_SVG_URL: 'cancel',
+    DOWNLOAD_ICON_SVG_URL: 'download',
+  }));
+  vi.doMock('../entrypoints/content/tab-detector', () => ({
+    isClassworkPost: () => false,
+    isTopicView: () => false,
+  }));
+  vi.doMock('../entrypoints/content/flags', () => ({ subscribeToGlobalState }));
+  vi.doMock('../entrypoints/utils/analytics', () => ({
+    getCancelHoldDelayMs: vi.fn(async () => 1000),
+  }));
+
+  const mod = await import('../entrypoints/download_all.content');
+  (mod.default as unknown as { main: (ctx: unknown) => void }).main({});
+  const calls = subscribeToGlobalState.mock.calls[0] as [() => void, () => void];
+  return { start: calls[0], stop: calls[1] };
+}
+
+async function loadCommentFrameStack() {
+  vi.resetModules();
+  const subscribeToGlobalState = vi.fn();
+
+  vi.doMock('../entrypoints/content/icons', () => ({ COMMENT_ICON_URL: 'comment' }));
+  vi.doMock('../entrypoints/content/styles', () => ({ injectStyles: vi.fn() }));
+  vi.doMock('../entrypoints/content/i18n', () => ({
+    t: (key: string) => key,
+    getCurrentCachedLanguage: () => 'en',
+  }));
+  vi.doMock('../entrypoints/content/smart-detector', () => ({
+    detectComments: vi.fn(() => ({ count: 0 })),
+  }));
+  vi.doMock('../entrypoints/content/theme', () => ({ isPageDark: () => false }));
+  vi.doMock('../entrypoints/content/flags', () => ({
+    subscribeToGlobalState,
+    createCommentBadge: vi.fn(),
+  }));
+  vi.doMock('../entrypoints/content/both-badge', () => ({
+    triggerPostClick: vi.fn(),
+    upgradeCombinedBadge: vi.fn(),
+    ATTR_COMMENT_COUNT: 'data-cqd-comment-count',
+  }));
+  vi.doMock('../entrypoints/content/pulse-effect', () => ({
+    triggerPulseEffect: vi.fn(),
+    markTargetElements: vi.fn(),
+  }));
+  vi.doMock('../entrypoints/content/post-card-utils', () => ({
+    queryPostCards: vi.fn(() => []),
+  }));
+
+  const mod = await import('../entrypoints/comment_frame.content');
+  (mod.default as unknown as { main: (ctx: unknown) => void }).main({});
+  const calls = subscribeToGlobalState.mock.calls[0] as [() => void, () => void];
+  return { start: calls[0], stop: calls[1] };
+}
+
+async function loadEditedFrameStack() {
+  vi.resetModules();
+  const subscribeToGlobalState = vi.fn();
+
+  vi.doMock('../entrypoints/content/icons', () => ({
+    EDIT_ICON_SVG_RAW: 'edit',
+    appendSvgFromString: vi.fn(),
+  }));
+  vi.doMock('../entrypoints/content/styles', () => ({ injectStyles: vi.fn() }));
+  vi.doMock('../entrypoints/content/theme', () => ({ isPageDark: () => false }));
+  vi.doMock('../entrypoints/content/i18n', () => ({
+    t: (key: string) => key,
+    getCurrentCachedLanguage: () => 'en',
+  }));
+  vi.doMock('../entrypoints/content/smart-detector', () => ({
+    detectEdited: vi.fn(() => ({ edited: false })),
+  }));
+  vi.doMock('../entrypoints/content/flags', () => ({
+    subscribeToGlobalState,
+    createEditedBadge: vi.fn(),
+  }));
+  vi.doMock('../entrypoints/content/both-badge', () => ({
+    triggerPostClick: vi.fn(),
+    upgradeCombinedBadge: vi.fn(),
+    ATTR_EDIT_DIFF: 'data-cqd-edit-diff',
+  }));
+  vi.doMock('../entrypoints/content/pulse-effect', () => ({
+    triggerPulseEffect: vi.fn(),
+    markTargetElements: vi.fn(),
+  }));
+  vi.doMock('../entrypoints/content/post-card-utils', () => ({
+    queryPostCards: vi.fn(() => []),
+  }));
+
+  const mod = await import('../entrypoints/edited_frame.content');
+  (mod.default as unknown as { main: (ctx: unknown) => void }).main({});
+  const calls = subscribeToGlobalState.mock.calls[0] as [() => void, () => void];
+  return { start: calls[0], stop: calls[1] };
+}
+
+describe('z57 tail: student-work row stacks run in ALL modes', () => {
+  beforeEach(() => {
+    FakeMutationObserver.instances = [];
+    document.body.innerHTML = '';
+    delete portHost().__cqdDomPort;
+    vi.clearAllTimers();
+  });
+
+  it('student_work_by_status STARTS in v2 — row buttons inject (gate bypassed)', async () => {
+    byStatusLocation();
+    storedMode('v2');
+    const { createStudentWorkButton, start, stop } = await loadByStatusStack();
+    mountSubmissionRow();
+
+    start();
+
+    expect(getPageDomPort().subscriptionCount).toBe(1);
+    expect(createStudentWorkButton).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('.cqd-download-btn[data-cqd-sw-bs="true"]')).not.toBeNull();
+
+    stop();
+    expect(getPageDomPort().subscriptionCount).toBe(0);
+  });
+
+  it('student_work_by_status still starts in legacy (rollback sanity)', async () => {
+    byStatusLocation();
+    storedMode('legacy');
+    const { createStudentWorkButton, start, stop } = await loadByStatusStack();
+    mountSubmissionRow();
+
+    start();
+
+    expect(getPageDomPort().subscriptionCount).toBe(1);
+    expect(createStudentWorkButton).toHaveBeenCalledTimes(1);
+
+    stop();
+  });
+
+  it('a live storage flip legacy → v2 does NOT touch student_work_by_status', async () => {
+    byStatusLocation();
+    storedMode('legacy');
+    const { createStudentWorkButton, start, stop } = await loadByStatusStack();
+    mountSubmissionRow();
+
+    start();
+    expect(getPageDomPort().subscriptionCount).toBe(1);
+
+    // Download-feature stack: un-gated, it never subscribed to engine-mode
+    // changes, so no flip listener exists to stop it. Fire any stray storage
+    // listeners (there should be none from this stack) and assert survival.
+    for (const listener of [...onChangedListeners]) {
+      listener({ cqdV2Mode: { newValue: 'v2' } }, 'local');
+    }
+
+    expect(getPageDomPort().subscriptionCount).toBe(1);
+    expect(createStudentWorkButton).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('.cqd-download-btn[data-cqd-sw-bs="true"]')).not.toBeNull();
+
+    stop();
+  });
+
+  it('student_work_sidecar STARTS in v2 — row buttons inject (gate bypassed)', async () => {
+    studentWorkLocation();
+    storedMode('v2');
+    const { createStudentWorkButton, start, stop } = await loadSidecarStack();
+    mountSubmissionRow();
+
+    start();
+
+    expect(getPageDomPort().subscriptionCount).toBe(1);
+    expect(createStudentWorkButton).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('.cqd-download-btn[data-cqd-sw="true"]')).not.toBeNull();
+
+    stop();
+    expect(getPageDomPort().subscriptionCount).toBe(0);
+  });
+
+  it('student_work_sidecar still starts in legacy (rollback sanity)', async () => {
+    studentWorkLocation();
+    storedMode('legacy');
+    const { createStudentWorkButton, start, stop } = await loadSidecarStack();
+    mountSubmissionRow();
+
+    start();
+
+    expect(getPageDomPort().subscriptionCount).toBe(1);
+    expect(createStudentWorkButton).toHaveBeenCalledTimes(1);
+
+    stop();
+  });
+
+  it('download_all STAYS gated in v2 — no port subscriptions, no group controls', async () => {
+    storedMode('v2');
+    const { start, stop } = await loadDownloadAllStack();
+
+    start();
+    vi.advanceTimersByTime(1600); // the settle scan would have rendered groups
+
+    expect(getPageDomPort().subscriptionCount).toBe(0);
+    expect(document.querySelectorAll('.cqd-download-all-btn')).toHaveLength(0);
+
+    stop();
+  });
+
+  it('download_all still serves legacy — V1 group machine is the rollback path', async () => {
+    storedMode('legacy');
+    const { start, stop } = await loadDownloadAllStack();
+
+    start();
+    expect(getPageDomPort().subscriptionCount).toBe(2); // dom watcher + attribute dispatch
+
+    stop();
+    expect(getPageDomPort().subscriptionCount).toBe(0);
+  });
+
+  it('comment_frame STAYS gated in v2 (detection stack)', async () => {
+    storedMode('v2');
+    const { start, stop } = await loadCommentFrameStack();
+
+    start();
+
+    expect(getPageDomPort().subscriptionCount).toBe(0);
+
+    stop();
+  });
+
+  it('comment_frame still starts in legacy', async () => {
+    storedMode('legacy');
+    const { start, stop } = await loadCommentFrameStack();
+
+    start();
+    expect(getPageDomPort().subscriptionCount).toBe(2); // dom watcher + url watcher
+
+    stop();
+    expect(getPageDomPort().subscriptionCount).toBe(0);
+  });
+
+  it('edited_frame STAYS gated in v2 (detection stack)', async () => {
+    storedMode('v2');
+    const { start, stop } = await loadEditedFrameStack();
+
+    start();
+
+    expect(getPageDomPort().subscriptionCount).toBe(0);
+
+    stop();
+  });
+
+  it('edited_frame still starts in legacy', async () => {
+    storedMode('legacy');
+    const { start, stop } = await loadEditedFrameStack();
+
+    start();
+    expect(getPageDomPort().subscriptionCount).toBe(2); // dom watcher + url watcher
+
+    stop();
+    expect(getPageDomPort().subscriptionCount).toBe(0);
+  });
+});

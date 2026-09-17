@@ -1,6 +1,5 @@
 import { subscribeToGlobalState } from './content/flags';
-import { gateV1Stack } from './content/mode-gate';
-import { injectStyles } from './content/styles';
+import { injectStudentWorkStyles } from './content/styles';
 import { extractFileMeta } from './content/file-meta';
 import { createStudentWorkButton } from '../src/student_work/button';
 import {
@@ -675,7 +674,10 @@ function startSidecar(): void {
   if (running) return;
   running = true;
 
-  injectStyles();
+  // z57 tail: scoped sheet — the full V1 sheet would restyle V2's own
+  // .cqd-download-btn buttons (shared markup contract) and make neighbors
+  // intercept each other's clicks.
+  injectStudentWorkStyles();
   scanStudentWorkByStatus(document);
 
   portUnsubscribe = getPageDomPort().observe(
@@ -736,13 +738,12 @@ export default defineContentScript({
   matches: ['https://classroom.google.com/*'],
   runAt: 'document_idle',
   main() {
-    // S10 T4: mode gate — while the engine mode is 'v2' the V2 engine
-    // renders and this V1 stack stays inert; live cqdV2Mode flips hot
-    // stop/start it. The global enabled flag behaves exactly as before.
-    const gated = gateV1Stack({
-      start: startSidecar,
-      stop: stopSidecar,
-    });
-    subscribeToGlobalState(gated.start, gated.stop);
+    // z57 tail: this is a DOWNLOAD-FEATURE stack (it injects the row
+    // download buttons into Student Work submissions), not V1 detection —
+    // it must run in EVERY engine mode; v2 renders no row buttons of its
+    // own on submissions routes. The S10 mode gate wrongly silenced it in
+    // v2, so it is NOT gated. The global enabled flag behaves exactly as
+    // before, and a live cqdV2Mode flip is a no-op for this stack.
+    subscribeToGlobalState(startSidecar, stopSidecar);
   },
 });

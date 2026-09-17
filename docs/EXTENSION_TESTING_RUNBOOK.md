@@ -129,7 +129,7 @@ pnpm -C extension test:qa:live     # gated live-Classroom canary (read-only)
 | RTL ownership/geometry | qa-03-rtl | Full |
 | 4. Live flag toggles (popup message path) | qa-03 | Full |
 | 5. Popup render/settings/storage write | qa-04 | Full (anchored-popup stub resolves a synthetic active Classroom tab) |
-| Student-work submissions buttons | qa-05 | Full (simulator rows now satisfy the student-work container contracts) |
+| Student-work submissions buttons | qa-05 | Full (student-work row stacks run in all engine modes — z57 un-gated them; their stylesheet is scoped to their own buttons so V2's shared-class buttons stay untouched) |
 | SPA navigation, delayed posts, load-more, churn dedup | qa-05 | Full |
 | Production DOM drift | qa-07 (gated, read-only canary) | Canary |
 
