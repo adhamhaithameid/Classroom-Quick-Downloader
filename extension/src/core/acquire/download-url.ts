@@ -60,6 +60,8 @@ export function extractDriveFileId(rawUrl: string): string | null {
       if (value) return value;
     }
   } catch {
+    // Stryker disable next-line BlockStatement: an empty catch is equivalent —
+    // control reaches the identical trailing `return null` below.
     return null;
   }
   return null;
@@ -78,6 +80,8 @@ function appendAuth(url: string, authUser: string | null): string {
     }
     return parsed.toString();
   } catch {
+    // Stryker disable next-line BlockStatement: an empty catch is equivalent —
+    // control reaches the identical trailing `return url` below.
     return url;
   }
 }

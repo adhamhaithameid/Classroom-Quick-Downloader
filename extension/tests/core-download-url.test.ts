@@ -104,3 +104,112 @@ describe('core download-url mapping', () => {
     expect(extractDriveFileId('https://example.com/nothing')).toBe('https://example.com/nothing'.slice(0, 0) || null);
   });
 });
+
+// ============================================================================
+// MUTATION HARDENING (S12) — anchors, param precedence, depth cap, append-only
+// authuser. Each test pins one branch boundary the corpus used to cover.
+// ============================================================================
+
+describe('core download-url mapping — mutation hardening (S12)', () => {
+  it('strips a multi-digit /u/{n} prefix', () => {
+    expect(toDownloadUrlFrom('https://drive.google.com/u/12/file/d/PRE12/view', null)).toBe(
+      buildDriveDownloadUrlFrom('PRE12'),
+    );
+    expect(extractDriveFileId('https://drive.google.com/u/12/file/d/PRE12/view')).toBe('PRE12');
+  });
+
+  it('does not strip a mid-path /u/{n}-like segment (anchored match only)', () => {
+    expect(toDownloadUrlFrom('https://drive.google.com/x/u/1/file/d/NOPE/view', null)).toBe(
+      'https://drive.google.com/x/u/1/file/d/NOPE/view',
+    );
+    expect(extractDriveFileId('https://example.com/x/file/d/NOPE')).toBeNull();
+  });
+
+  it('extractDriveFileId reads a bare fileId param', () => {
+    expect(extractDriveFileId('https://classroom.google.com/drive/x?fileId=FID3')).toBe('FID3');
+  });
+
+  it('appendAuth never duplicates or overrides an existing authuser', () => {
+    expect(toDownloadUrlFrom('https://example.com/a?authuser=3', '1')).toBe(
+      'https://example.com/a?authuser=3',
+    );
+    const converted = toDownloadUrlFrom('https://drive.google.com/file/d/A1/view?authuser=3', '1');
+    expect(converted).toContain('id=A1');
+    expect(converted).toContain('authuser=1');
+  });
+
+  it('auth_warmup prefers its continue target over an id param', () => {
+    const inner = 'https://drive.google.com/open?id=REAL9';
+    expect(
+      toDownloadUrlFrom(`https://drive.google.com/auth_warmup?continue=${encodeURIComponent(inner)}&id=FAKE1`, null),
+    ).toBe(buildDriveDownloadUrlFrom('REAL9'));
+  });
+
+  it('caps continue-chain depth: the fourth hop is returned raw, unconverted', () => {
+    const url3 = 'https://drive.google.com/file/d/TAIL/view';
+    // Build a 3-warmup chain into a file URL:
+    const one = `https://drive.google.com/auth_warmup?continue=${encodeURIComponent(url3)}`;
+    const two = `https://drive.google.com/auth_warmup?continue=${encodeURIComponent(one)}`;
+    const three = `https://drive.google.com/auth_warmup?continue=${encodeURIComponent(two)}`;
+    const four = `https://drive.google.com/auth_warmup?continue=${encodeURIComponent(three)}`;
+
+    // depth 0 → 1 → 2 → 3 (warmup) → 4 (file): the file URL is entered at
+    // depth 4 > 3, so it is returned verbatim, NOT converted.
+    expect(toDownloadUrlFrom(four, null)).toBe(url3);
+
+    // Three warmups still convert the inner file URL (cap not yet hit).
+    expect(toDownloadUrlFrom(three, null)).toBe(buildDriveDownloadUrlFrom('TAIL'));
+  });
+
+  it('does not convert file paths on foreign hosts', () => {
+    expect(toDownloadUrlFrom('https://example.com/file/d/X/view', null)).toBe(
+      'https://example.com/file/d/X/view',
+    );
+    expect(toDownloadUrlFrom('https://evil.example.com/document/d/Y/edit', null)).toBe(
+      'https://evil.example.com/document/d/Y/edit',
+    );
+  });
+
+  it('drive /open and /uc without an id pass through with only the authuser appended', () => {
+    expect(toDownloadUrlFrom('https://drive.google.com/open', '2')).toBe(
+      'https://drive.google.com/open?authuser=2',
+    );
+    expect(toDownloadUrlFrom('https://drive.google.com/uc', '2')).toBe(
+      'https://drive.google.com/uc?authuser=2',
+    );
+  });
+
+  it('classroom drive-proxy id params win in id → resourceId → fileId order', () => {
+    expect(
+      toDownloadUrlFrom('https://classroom.google.com/drive/p?fileId=ONLYFILE', null),
+    ).toBe(buildDriveDownloadUrlFrom('ONLYFILE'));
+    expect(
+      toDownloadUrlFrom('https://classroom.google.com/drive/p?id=I1&fileId=F1', null),
+    ).toBe(buildDriveDownloadUrlFrom('I1'));
+    expect(
+      toDownloadUrlFrom('https://classroom.google.com/drive/p?resourceId=R1&fileId=F1', null),
+    ).toBe(buildDriveDownloadUrlFrom('R1'));
+  });
+
+  it('warmup without continue or id passes through with the authuser appended', () => {
+    expect(toDownloadUrlFrom('https://drive.google.com/auth_warmup', '1')).toBe(
+      'https://drive.google.com/auth_warmup?authuser=1',
+    );
+  });
+
+  it('warmup with an id (no continue) converts via the id param (S12)', () => {
+    expect(toDownloadUrlFrom('https://drive.google.com/auth_warmup?id=WARM1', null)).toBe(
+      buildDriveDownloadUrlFrom('WARM1'),
+    );
+  });
+
+  it('foreign URLs carrying an id param are never classroom-converted (S12)', () => {
+    expect(toDownloadUrlFrom('https://example.com/?id=Q9', null)).toBe('https://example.com/?id=Q9');
+    expect(toDownloadUrlFrom('https://docs.google.com/drive/x?id=Q9', null)).toBe(
+      'https://docs.google.com/drive/x?id=Q9',
+    );
+    expect(toDownloadUrlFrom('https://drive.google.com/other?id=Y7', null)).toBe(
+      'https://drive.google.com/other?id=Y7',
+    );
+  });
+});

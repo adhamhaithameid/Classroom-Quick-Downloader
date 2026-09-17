@@ -45,8 +45,9 @@ export function hasDigit(text: string): boolean {
  */
 export function digitValue(char: string): number {
   if (!isDigit(char)) return -1;
-
   const cp = char.codePointAt(0);
+  // The guard above guarantees a digit, so cp is always defined here.
+  // Stryker disable next-line ConditionalExpression,UnaryOperator
   if (cp === undefined) return -1;
 
   for (let value = 0; value <= 9; value++) {
@@ -56,6 +57,9 @@ export function digitValue(char: string): number {
     }
   }
 
+  // Unreachable: every \p{Nd} run start sits within 9 codepoints of its own
+  // digits, so the loop above always returns. Defensive fallback only.
+  // Stryker disable next-line UnaryOperator
   return -1;
 }
 

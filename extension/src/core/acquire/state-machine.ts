@@ -139,6 +139,12 @@ function rotateAuthUser(state: AcquireMachineState): {
   };
 }
 
+// Stryker disable all: orphaned transition helper — since the zero-tab
+// contract (S11) removed the bypass-tab fallback, no reducer path enters the
+// bypass-tab phase, so this helper can never run and its mutants are
+// unkillable dead code. Kept as Engine V4 design §7 scaffolding; the
+// bypass-tab-opened event contract is exercised directly with a constructed
+// state in tests/core/acquire/state-machine.test.ts.
 function toBypassTab(state: AcquireMachineState): {
   state: AcquireMachineState;
   effects: AcquireEffect[];
@@ -148,6 +154,7 @@ function toBypassTab(state: AcquireMachineState): {
     effects: [{ type: 'open-bypass-tab' }, { type: 'set-deadline', ms: ATTEMPT_DEADLINE_MS }],
   };
 }
+// Stryker restore all
 
 function saveOutcome(state: AcquireMachineState, downloadId?: number): AcquireOutcome {
   const inherited = state.phase === 'direct' || state.phase === 'drive-auth'

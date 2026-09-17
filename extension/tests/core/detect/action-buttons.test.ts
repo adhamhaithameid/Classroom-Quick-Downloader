@@ -47,6 +47,10 @@ describe('core/detect/action-buttons', () => {
   it('looks patterns up by source and fails loudly on a miss', () => {
     expect(findActionButtonPattern('add\\s+(?:class\\s+)?comment').test('Add comment')).toBe(true);
     expect(() => findActionButtonPattern('nonexistent.*pattern')).toThrow();
+    // The error carries the drifted source so the maintainer can diff the tables.
+    expect(() => findActionButtonPattern('nonexistent.*pattern')).toThrow(
+      'action-button pattern is not in the canonical table: nonexistent.*pattern',
+    );
   });
 
   // D3 fitness — the whole point of the canonical table is that copies die.

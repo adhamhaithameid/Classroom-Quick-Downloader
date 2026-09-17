@@ -10,6 +10,21 @@ describe('core/detect/normalize', () => {
     expect(normalizeText(dirty)).toBe('5 comments');
   });
 
+  it('strips every BiDi class individually (S12)', () => {
+    // Isolates U+2066-U+2069
+    expect(normalizeText('\u2066a\u2067b\u2068c\u2069')).toBe('abc');
+    // Arabic letter mark U+061C
+    expect(normalizeText('\u061Cx')).toBe('x');
+    // BOM U+FEFF
+    expect(normalizeText('a\uFEFFb')).toBe('ab');
+    // Soft hyphen U+00AD
+    expect(normalizeText('x\u00ADy')).toBe('xy');
+    // Zero-width joiners U+200B-U+200D
+    expect(normalizeText('a\u200Bb\u200Cc\u200Dd')).toBe('abcd');
+    // Directional embeddings/overrides U+202A-U+202E
+    expect(normalizeText('\u202Ba\u202Eb')).toBe('ab');
+  });
+
   it('collapses exotic whitespace variants to plain spaces', () => {
     expect(normalizeText('a\u00A0b\u2003c\u3000d')).toBe('a b c d');
   });

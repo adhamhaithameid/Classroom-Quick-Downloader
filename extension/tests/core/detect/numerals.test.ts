@@ -44,6 +44,12 @@ describe('core/detect/numerals', () => {
 
   it('strips BiDi controls around RTL numerals before parsing', () => {
     expect(extractDigitCount('\u200F٥\u200E')).toBe(5);
+    // A BiDi control AFTER the run starts must not split the run (S12).
+    expect(extractDigitCount('1\u200F2')).toBe(12);
+  });
+
+  it('a run that lands exactly on the parser ceiling is still an id (S12)', () => {
+    expect(extractDigitCount(String(PARSER_SANITY_CEILING))).toBeNull();
   });
 });
 
@@ -91,5 +97,26 @@ describe('parseCountChip (D5 — chip acceptance for the DOM-truth layers)', () 
     expect(parseCountChip('')).toBeNull();
     expect(parseCountChip('   ')).toBeNull();
     expect(parseCountChip('No class comments')).toBeNull();
+  });
+
+  // ── Mutation hardening (S12) ──────────────────────────────────────────────
+
+  it('a cleaned chip of exactly MAX_COUNT_CHIP_LENGTH chars is accepted when the value is plausible', () => {
+    // 2-digit first run + 15 single digits + 15 separating spaces = 32 chars.
+    const chip = '11 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6';
+    expect(chip.length).toBe(MAX_COUNT_CHIP_LENGTH);
+    const parsed = parseCountChip(chip);
+    expect(parsed?.count).toBe(11);
+  });
+
+  it('a chip one char over the limit is rejected', () => {
+    const chip = '111 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6';
+    expect(chip.length).toBe(MAX_COUNT_CHIP_LENGTH + 1);
+    expect(parseCountChip(chip)).toBeNull();
+  });
+  it('digitValue at a run start (zero) and run end (nine) in any script', () => {
+    expect(digitValue('٠')).toBe(0); // Arabic-Indic zero
+    expect(digitValue('۹')).toBe(9); // Extended Arabic-Indic nine
+    expect(digitValue('०')).toBe(0); // Devanagari zero
   });
 });

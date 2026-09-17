@@ -87,6 +87,9 @@ export function matchesNormalizedKeyword(
     // Phrase keyword: the keyword's tokens must appear as a consecutive run
     // of whole tokens in the text.
     const textTokens = comparisonTokens(normalizedText);
+    // Stryker disable next-line ArithmeticOperator: the upper bound is only a
+    // loop cap — overrunning it compares undefined tokens, which never equal a
+    // keyword token, so every mutant here is behaviorally identical.
     const lastStart = textTokens.length - keywordTokens.length;
     for (let start = 0; start <= lastStart; start++) {
       let matched = true;
