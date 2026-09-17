@@ -11,6 +11,8 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { createEventBus } from '../src/bus/event-bus';
 import type { PageTopicMap } from '../src/contracts/topics';
+import { EngineV2 } from '../src/engines/v2/engine-v2';
+import type { ViewKind } from '../src/engines/types';
 import {
   wireDownloadPath,
   handleSingleDownloadClickV2,
@@ -156,7 +158,7 @@ describe('download controller (page side)', () => {
     expect(getButtonStateV2(btn)).toBe('loading');
   });
 
-  it('reset drops all in-flight state and detaches listeners (unmount cleanup)', () => {
+  it('engine destroy (reset) drops in-flight state but keeps the page-lifetime wiring alive', () => {
     const settled = vi.fn();
     onSettled(settled);
     const btn = makeButton();
@@ -167,9 +169,51 @@ describe('download controller (page side)', () => {
 
     resetDownloadController();
 
+    // In-flight state is gone…
     expect(getPendingButton(requestId)).toBeUndefined();
+    // …but the bus wiring survives: the settled fan-out (group machine) and a
+    // fresh click publish must both still work after a navigation cycle.
     bus.publish('download:settled', { requestId, outcome: { status: 'saved' } });
-    expect(settled).not.toHaveBeenCalled();
+    expect(settled).toHaveBeenCalledWith(requestId, { status: 'saved' });
+
+    const btn2 = makeButton();
+    const requested: Array<PageTopicMap['download:requested']> = [];
+    bus.subscribe('download:requested', (p) => requested.push(p));
+    handleSingleDownloadClickV2(btn2, 'drive-F2', btn2.dataset.cqdUrl!, 'notes.pdf', 'pdf');
+    expect(requested).toHaveLength(1);
+    expect(getButtonStateV2(btn2)).toBe('loading');
+  });
+
+  it('survives a full init→destroy→init cycle (orchestrator navigation): a click after re-init publishes and settles', async () => {
+    const requested: Array<PageTopicMap['download:requested']> = [];
+    bus.subscribe('download:requested', (p) => requested.push(p));
+
+    // The orchestrator aborts and re-inits engines on EVERY SPA navigation;
+    // each init/destroy pair drives the download-controller reset exactly as
+    // production does (EngineV2.destroy → resetDownloadController).
+    const initEngine = async (): Promise<EngineV2> => {
+      const engine = new EngineV2();
+      const controller = new AbortController();
+      controller.abort(); // skip waitForContentReady
+      await engine.init('stream' as ViewKind, controller.signal);
+      return engine;
+    };
+
+    const firstPage = await initEngine();
+    firstPage.destroy(); // first navigation
+
+    const secondPage = await initEngine(); // new page, same document
+    const btn = makeButton();
+    handleSingleDownloadClickV2(btn, 'drive-F1', btn.dataset.cqdUrl!, 'lecture.pdf', 'pdf');
+
+    expect(requested).toHaveLength(1);
+    bus.publish('download:settled', {
+      requestId: requested[0].requestId,
+      outcome: { status: 'saved' },
+    });
+    expect(getButtonStateV2(btn)).toBe('success');
+    expect(isRequestInFlight(requested[0].requestId)).toBe(false);
+    void secondPage;
   });
 
   it('settled fan-out notifies secondary listeners (group controller hook)', () => {

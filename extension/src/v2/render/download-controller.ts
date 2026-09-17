@@ -53,13 +53,17 @@ export interface DownloadRuntime {
 
 let runtime: DownloadRuntime | null = null;
 
-/** Test/destroy hook: drop all in-flight state and detach the bus. */
+/**
+ * Engine-destroy hook (runs on EVERY view change via EngineV2.destroy): drops
+ * the per-engine in-flight state ONLY — pending buttons died with the page.
+ * Page-lifetime wiring (busRef, runtime, settledListeners, requestSeq)
+ * intentionally SURVIVES: v2_bootstrap wires the pipeline once per document,
+ * while the orchestrator aborts and re-inits engines on every SPA navigation
+ * and mode flip. Nulling the bus here killed every click after the first
+ * navigation ("Download pipeline unavailable.").
+ */
 export function resetDownloadController(): void {
   pending.clear();
-  settledListeners.clear();
-  requestSeq = 0;
-  busRef = null;
-  runtime = null;
 }
 
 /**

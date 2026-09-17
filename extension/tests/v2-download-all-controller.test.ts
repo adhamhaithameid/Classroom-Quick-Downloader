@@ -11,6 +11,8 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { createEventBus } from '../src/bus/event-bus';
 import type { PageTopicMap } from '../src/contracts/topics';
+import { EngineV2 } from '../src/engines/v2/engine-v2';
+import type { ViewKind } from '../src/engines/types';
 import {
   wireDownloadPath,
   resetDownloadController,
@@ -240,5 +242,33 @@ describe('v2 Download All group machine (z57 S3)', () => {
     handleDownloadAllClickV2('post-1', group);
     vi.advanceTimersByTime(PER_FILE_STAGGER_MS * 3);
     expect(requested).toHaveLength(2); // one per unique file id
+  });
+
+  it('the group machine survives an init→destroy→init cycle (orchestrator navigation)', async () => {
+    // EngineV2.destroy() runs on EVERY view change; the group machine's run
+    // state dies with the page, but the machine itself (click handler +
+    // settled listener + bus) is wired once per document and must survive.
+    const initEngine = async (): Promise<void> => {
+      const engine = new EngineV2();
+      const controller = new AbortController();
+      controller.abort(); // skip waitForContentReady
+      await engine.init('stream' as ViewKind, controller.signal);
+      engine.destroy();
+    };
+
+    await initEngine(); // first navigation
+    await initEngine(); // a second one — the very next Classroom view
+
+    const { group, files } = makePost(2);
+    handleDownloadAllClickV2('post-1', group);
+    vi.advanceTimersByTime(PER_FILE_STAGGER_MS * 3);
+    expect(requested).toHaveLength(2);
+    expect(getButtonStateV2(files[0])).toBe('loading');
+
+    for (const p of requestedPayloads()) {
+      bus.publish('download:settled', { requestId: p.requestId, outcome: { status: 'saved' } });
+    }
+    expect(group.classList.contains('cqd-all-success')).toBe(true);
+    expect(group.querySelector('.cqd-download-all-main')?.textContent).toBe('Downloaded');
   });
 });
