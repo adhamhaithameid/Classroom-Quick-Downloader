@@ -1,0 +1,808 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--
+  PROTOTYPE — THROWAWAY, NOT PART OF THE SITE. Answers one question:
+  "does the cursor-bending grid background stay tasteful, and at what intensity?"
+  Faithful replica of AmbientBackground.svelte + app.css tokens (orbs, 60px grid
+  at opacity 0.05, glass panels). Presets + sliders find the safe space.
+  Open directly in a browser — no dev server, no build.
+-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE — grid cursor bend (throwaway)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gc-green: #1a8b55;
+    --gc-green-light: #57bb8a;
+    --gc-green-dark: #137a47;
+    --bg: #fafcfb;
+    --surface: rgba(255, 255, 255, 0.65);
+    --border: rgba(226, 232, 240, 0.6);
+    --text: #1a1a2e;
+    --text-secondary: #64748b;
+    --glass-ease: cubic-bezier(0.32, 1.35, 0.42, 1);
+    --glass-bg: linear-gradient(120deg, #ffffff, #f8fcf9);
+    --glass-border: rgba(255, 255, 255, 0.72);
+    --glass-highlight: rgba(255, 255, 255, 0.85);
+    --radius: 18px;
+    --font-ui: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-ui), sans-serif;
+    color: var(--text);
+    min-height: 100%;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  html { background: var(--bg); }
+  body { background: transparent; }
+
+  /* ── body washes (app.css replica) ─────────────────────────────────── */
+  body::before,
+  body::after {
+    content: '';
+    position: fixed;
+    z-index: -1;
+    border-radius: 50%;
+    filter: blur(100px);
+    pointer-events: none;
+    animation: floatOrb 20s ease-in-out infinite;
+  }
+  body::before {
+    width: 500px; height: 500px;
+    background: rgba(26, 139, 85, 0.07);
+    left: -150px; top: -100px;
+  }
+  body::after {
+    width: 400px; height: 400px;
+    background: rgba(87, 187, 138, 0.06);
+    right: -120px; bottom: 10vh;
+    animation-delay: -8s;
+  }
+  @keyframes floatOrb {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-20px) scale(1.04); }
+  }
+
+  .site-shell {
+    position: relative;
+    min-height: 100vh;
+    background: transparent;
+  }
+
+  /* ── AmbientBackground replica (verbatim values) ───────────────────── */
+  .l2-page-orbs,
+  .l2-page-grid {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .orb { position: absolute; border-radius: 50%; filter: blur(120px); }
+  .orb-1 { width: 560px; height: 560px; background: #bbf7d0; top: 1%; right: -4%; opacity: 0.35; animation: orb-drift 18s ease-in-out infinite alternate; }
+  .orb-2 { width: 480px; height: 480px; background: #a5f3fc; top: 8%; left: -4%; opacity: 0.28; animation: orb-drift 22s ease-in-out infinite alternate-reverse; }
+  .orb-3 { width: 360px; height: 360px; background: #e0e7ff; top: 5%; left: 42%; opacity: 0.22; animation: orb-drift 15s ease-in-out infinite alternate; }
+  .orb-4 { width: 500px; height: 500px; background: #bbf7d0; top: 30%; left: -3%; opacity: 0.25; animation: orb-drift 20s ease-in-out infinite alternate; }
+  .orb-5 { width: 440px; height: 440px; background: #a5f3fc; top: 45%; right: -2%; opacity: 0.22; animation: orb-drift 24s ease-in-out infinite alternate-reverse; }
+  .orb-6 { width: 520px; height: 520px; background: #bbf7d0; top: 65%; right: 5%; opacity: 0.28; animation: orb-drift 19s ease-in-out infinite alternate; }
+  .orb-7 { width: 400px; height: 400px; background: #e0e7ff; top: 80%; left: 5%; opacity: 0.2; animation: orb-drift 26s ease-in-out infinite alternate-reverse; }
+  .orb-8 { width: 380px; height: 380px; background: #bbf7d0; top: 20%; right: 15%; opacity: 0.2; animation: orb-drift 21s ease-in-out infinite alternate; }
+  .orb-9 { width: 420px; height: 420px; background: #a5f3fc; top: 38%; left: 20%; opacity: 0.18; animation: orb-drift 25s ease-in-out infinite alternate-reverse; }
+  .orb-10 { width: 460px; height: 460px; background: #e0e7ff; top: 55%; right: -2%; opacity: 0.2; animation: orb-drift 17s ease-in-out infinite alternate; }
+  .orb-11 { width: 340px; height: 340px; background: #bbf7d0; top: 72%; left: 30%; opacity: 0.22; animation: orb-drift 23s ease-in-out infinite alternate-reverse; }
+  .orb-12 { width: 480px; height: 480px; background: #a5f3fc; top: 90%; right: 8%; opacity: 0.18; animation: orb-drift 27s ease-in-out infinite alternate; }
+
+  @keyframes orb-drift {
+    0% { transform: translate(0, 0); }
+    100% { transform: translate(30px, -40px); }
+  }
+
+  .l2-page-grid {
+    opacity: 0.05;
+    background-image: linear-gradient(var(--text) 1px, transparent 1px),
+      linear-gradient(90deg, var(--text) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+  /* While the canvas paints the grid, the CSS grid stands down. */
+  .l2-page-grid.bend-live { background-image: none; }
+
+  .l2-grid-canvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.05;
+    pointer-events: none;
+    z-index: 0;
+    display: none;
+  }
+
+  /* ── Representative content ────────────────────────────────────────── */
+  main { position: relative; z-index: 1; max-width: 1080px; margin: 0 auto; padding: 96px 32px 160px; }
+
+  .badge {
+    display: inline-block;
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--gc-green-dark);
+    background: rgba(26, 139, 85, 0.08);
+    border: 1px solid rgba(26, 139, 85, 0.18);
+    border-radius: 999px;
+    padding: 7px 14px;
+  }
+  h1 {
+    font-size: 54px;
+    line-height: 1.08;
+    letter-spacing: -0.025em;
+    font-weight: 800;
+    margin: 22px 0 18px;
+    max-width: 15ch;
+  }
+  .sub { font-size: 18px; line-height: 1.6; color: var(--text-secondary); max-width: 52ch; margin: 0 0 30px; }
+
+  .cta-row { display: flex; gap: 14px; margin-bottom: 64px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    font: inherit; font-weight: 700; font-size: 15.5px;
+    text-decoration: none;
+    border-radius: 999px;
+    padding: 13px 26px;
+  }
+  .btn.primary { background: var(--gc-green); color: #fff; box-shadow: 0 4px 24px rgba(26, 139, 85, 0.28); }
+  .btn.ghost { color: var(--gc-green-dark); border: 1.5px solid rgba(26, 139, 85, 0.35); background: rgba(255,255,255,0.55); }
+
+  .glass-panel {
+    position: relative;
+    overflow: hidden;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow:
+      0 1px 2px rgba(15, 20, 25, 0.05),
+      0 12px 30px rgba(15, 20, 25, 0.1),
+      0 8px 24px rgba(26, 139, 85, 0.08),
+      inset 0 1px 0 var(--glass-highlight);
+    border-radius: var(--radius);
+  }
+
+  .demo-card { padding: 26px 28px; max-width: 560px; }
+  .demo-row { display: flex; align-items: center; gap: 14px; padding: 12px 0; }
+  .demo-row + .demo-row { border-top: 1px solid var(--border); }
+  .dot { width: 34px; height: 34px; border-radius: 10px; background: rgba(26, 139, 85, 0.1); flex: none; }
+  .dot.b { background: rgba(66, 133, 244, 0.1); }
+  .dot.c { background: rgba(251, 188, 4, 0.14); }
+  .demo-row strong { display: block; font-size: 14.5px; }
+  .demo-row span { display: block; font-size: 12.5px; color: var(--text-secondary); margin-top: 2px; }
+
+  .trio { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 72px; }
+  .trio .glass-panel { padding: 24px; }
+  .trio h3 { margin: 0 0 8px; font-size: 16.5px; }
+  .trio p { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--text-secondary); }
+
+  .tall { min-height: 130vh; padding-top: 140px; }
+  .tall h2 { font-size: 34px; letter-spacing: -0.02em; margin: 0 0 12px; }
+  .tall p { color: var(--text-secondary); max-width: 55ch; line-height: 1.65; }
+  .tall .glass-panel { margin-top: 40px; padding: 26px 28px; max-width: 640px; }
+
+  /* ── Prototype chrome (obviously not part of the site) ─────────────── */
+  .proto-banner {
+    position: fixed; top: 14px; left: 14px; z-index: 50;
+    font: 700 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    color: #ffd7d7; background: #7f1d1d;
+    padding: 7px 12px; border-radius: 8px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+    pointer-events: none;
+  }
+  .proto-bar {
+    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    z-index: 50;
+    display: flex; align-items: center; flex-wrap: wrap; gap: 10px 18px;
+    background: #101418; color: #e5e9ee;
+    border: 1px solid #2c3440;
+    border-radius: 14px;
+    padding: 12px 18px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    font-size: 12.5px;
+  }
+  .variants, .presets { display: flex; gap: 6px; }
+  .variants button, .presets button {
+    font: inherit; font-weight: 600; color: #cdd5df;
+    background: #1c232c; border: 1px solid #2c3440;
+    border-radius: 8px; padding: 6px 12px; cursor: pointer;
+  }
+  .variants button.active, .presets button.active { background: #2563eb; border-color: #2563eb; color: #fff; }
+  .variants button:disabled, .presets button:disabled { opacity: 0.35; cursor: not-allowed; }
+  #presetRow.disabled { opacity: 0.35; pointer-events: none; }
+  .proto-bar label.dim { opacity: 0.35; }
+  .proto-bar label { display: flex; align-items: center; gap: 7px; color: #9aa5b1; }
+  .proto-bar input[type="range"] { width: 92px; accent-color: #2563eb; }
+  .proto-bar output { min-width: 38px; color: #e5e9ee; font-variant-numeric: tabular-nums; }
+  .proto-bar .hint { color: #6b7683; font-size: 11.5px; }
+  .proto-bar .gate-note { color: #fbbf24; font-size: 11.5px; display: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .orb { animation: none; }
+    body::before, body::after { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="proto-banner">prototype · throwaway</div>
+
+<div class="site-shell">
+  <div class="l2-page-orbs" aria-hidden="true">
+    <div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div>
+    <div class="orb orb-4"></div><div class="orb orb-5"></div><div class="orb orb-6"></div>
+    <div class="orb orb-7"></div><div class="orb orb-8"></div><div class="orb orb-9"></div>
+    <div class="orb orb-10"></div><div class="orb orb-11"></div><div class="orb orb-12"></div>
+  </div>
+  <div class="l2-page-grid" id="gridLayer" aria-hidden="true"></div>
+  <canvas class="l2-grid-canvas" id="gridCanvas" aria-hidden="true"></canvas>
+
+  <main>
+    <section class="hero">
+      <span class="badge">Google Classroom companion</span>
+      <h1>Grab every attachment. Skip the clicking marathon.</h1>
+      <p class="sub">
+        Classroom Quick Downloader lives in your browser and pulls course files
+        straight from Google Classroom — one file or all of them at once.
+        This page is a stand-in so you can judge the background effect against
+        real content density.
+      </p>
+      <div class="cta-row">
+        <a class="btn primary" href="#">Add to Chrome</a>
+        <a class="btn ghost" href="#">See how it works</a>
+      </div>
+      <div class="glass-panel demo-card">
+        <div class="demo-row">
+          <span class="dot"></span>
+          <div><strong>Algebra II — Worksheet 4.pdf</strong><span>2.1 MB · posted yesterday</span></div>
+        </div>
+        <div class="demo-row">
+          <span class="dot b"></span>
+          <div><strong>Biology — Lab slides.pptx</strong><span>18.4 MB · posted Tuesday</span></div>
+        </div>
+        <div class="demo-row">
+          <span class="dot c"></span>
+          <div><strong>History — Reading pack.pdf</strong><span>5.7 MB · posted last week</span></div>
+        </div>
+      </div>
+
+      <div class="trio">
+        <div class="glass-panel">
+          <h3>One click per course</h3>
+          <p>Download a single attachment or sweep a whole course without opening each announcement.</p>
+        </div>
+        <div class="glass-panel">
+          <h3>Stays out of the way</h3>
+          <p>No accounts, no servers in the middle — files move from Classroom to your downloads folder.</p>
+        </div>
+        <div class="glass-panel">
+          <h3>Keeps names tidy</h3>
+          <p>Files land with course-aware names so your downloads folder stays human-readable.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="tall">
+      <h2>Scroll check</h2>
+      <p>
+        Scroll down and back: the grid must stay locked to the document exactly
+        like the static site — the bend follows the cursor, the lines never
+        slide on their own.
+      </p>
+      <div class="glass-panel">
+        <div class="demo-row">
+          <span class="dot"></span>
+          <div><strong>Long-page card</strong><span>Hover near the lines around this card to see the wrap.</span></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="proto-bar" id="protoBar" role="toolbar" aria-label="Prototype effect controls">
+  <div class="variants" id="variantRow" aria-label="Effect variant">
+    <button type="button" data-variant="field" class="active">Field</button>
+    <button type="button" data-variant="dots">Dots</button>
+    <button type="button" data-variant="lens">Lens</button>
+    <button type="button" data-variant="ripple">Ripple</button>
+    <button type="button" data-variant="springs">Springs</button>
+  </div>
+  <div class="presets" id="presetRow">
+    <button type="button" data-preset="off">Off</button>
+    <button type="button" data-preset="whisper">Whisper</button>
+    <button type="button" data-preset="circle" class="active">Circle</button>
+    <button type="button" data-preset="magnetic">Magnetic</button>
+    <button type="button" data-preset="flow">Flow</button>
+  </div>
+  <label>radius <input type="range" id="ctlRadius" min="80" max="340" step="10" value="190"><output id="outRadius">190</output></label>
+  <label>bend <input type="range" id="ctlStrength" min="0" max="24" step="1" value="10"><output id="outStrength">10px</output></label>
+  <label id="swirlLabel">swirl <input type="range" id="ctlSwirl" min="0" max="100" step="5" value="35"><output id="outSwirl">35%</output></label>
+  <label>follow <input type="range" id="ctlFollow" min="5" max="40" step="1" value="16"><output id="outFollow">.16</output></label>
+  <span class="hint">move the mouse · ←/→ switches variant</span>
+  <span class="gate-note" id="gateNote"></span>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ── Constants (mirrors what production would use) ─────────────────────
+  const CELL = 60;          // grid pitch, px — matches background-size
+  const SAMPLE = 6;         // px between displaced samples: dense enough that
+                            // bent lines read as one continuous stroke, not
+                            // segmented dashes ("points")
+  const DPR_CAP = 2;        // cap device pixel ratio for the canvas
+  const FADE_EPS = 0.004;   // falloff below this = draw straight
+  const PRESETS = {
+    off: null,
+    whisper: { radius: 150, strength: 6, swirl: 0.15, follow: 0.14 },
+    circle:  { radius: 190, strength: 10, swirl: 0.35, follow: 0.16 },
+    magnetic:{ radius: 240, strength: 16, swirl: 0.55, follow: 0.20 },
+    // Physics variant: swirl-dominant — lines slide around the cursor
+    // instead of being pushed away, if "escaping" still reads too strong.
+    flow:    { radius: 190, strength: 10, swirl: 1.0, follow: 0.16 },
+  };
+  const VARIANTS = ['field', 'dots', 'lens', 'ripple', 'springs'];
+
+  // ── State ─────────────────────────────────────────────────────────────
+  const canvas = document.getElementById('gridCanvas');
+  const gridLayer = document.getElementById('gridLayer');
+  const ctx = canvas.getContext('2d');
+  const params = { radius: 190, strength: 10, swirl: 0.35, follow: 0.16 };
+  let enabled = false;
+  let vw = 0, vh = 0, dpr = 1;
+  let target = { x: -1e5, y: -1e5 };
+  let smooth = { x: -1e5, y: -1e5 };
+  let influence = 0, influenceTarget = 0;
+  let dirty = true;
+  let rafId = 0;
+  let lastT = 0;
+  let lineColor = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#1a1a2e';
+
+  // ── Variant state ─────────────────────────────────────────────────────
+  let variant = 'field';
+  let rippleAmp = 0;              // wave energy, fed by cursor speed, decays
+  let prevTargetX = -1e5, prevTargetY = -1e5;
+  let springsMoving = false;
+  const springNodes = new Map();  // 'gx|gy' -> {x,y,vx,vy} in document coords
+
+  const finePointer = matchMedia('(pointer: fine)');
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const gateNote = document.getElementById('gateNote');
+
+  function gatesAllow() {
+    return finePointer.matches && !reducedMotion.matches;
+  }
+
+  // ── Sizing ────────────────────────────────────────────────────────────
+  function resize() {
+    vw = window.innerWidth;
+    vh = window.innerHeight;
+    dpr = Math.min(window.devicePixelRatio || 1, DPR_CAP);
+    canvas.width = Math.round(vw * dpr);
+    canvas.height = Math.round(vh * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    dirty = true;
+  }
+
+  // ── Variant renderers ─────────────────────────────────────────────────
+  // All variants share the scroll-locked 60px grid baseline and gates; they
+  // differ only in the displacement model. Line samples are dense (SAMPLE
+  // px) with round caps/joins so a bent line always reads as ONE continuous
+  // stroke, never segmented dashes.
+
+  function fieldDisplace(px, py, cx, cy, R2, kick, sw) {
+    const dx = px - cx, dy = py - cy;
+    const fall = Math.exp(-(dx * dx + dy * dy) / R2);
+    if (fall <= FADE_EPS || kick <= 0.05) return null;
+    const r = Math.sqrt(dx * dx + dy * dy) || 1;
+    const m = fall * kick;
+    const ux = dx / r, uy = dy / r;
+    return { x: px + (ux - uy * sw) * m, y: py + (uy + ux * sw) * m };
+  }
+
+  // FIELD — the validated default: radial push + swirl, Gaussian falloff.
+  function drawFieldLines(sx, sy, cx, cy, R2, kick) {
+    const sw = params.swirl;
+    for (let x = Math.floor(sx / CELL) * CELL; x <= sx + vw + CELL; x += CELL) {
+      ctx.beginPath();
+      for (let y = sy; y <= sy + vh + SAMPLE; y += SAMPLE) {
+        let px = x + 0.5, py = y;
+        const d = fieldDisplace(px, py, cx, cy, R2, kick, sw);
+        if (d) { px = d.x; py = d.y; }
+        if (y === sy) ctx.moveTo(px - sx, py - sy); else ctx.lineTo(px - sx, py - sy);
+      }
+      ctx.stroke();
+    }
+    for (let y = Math.floor(sy / CELL) * CELL; y <= sy + vh + CELL; y += CELL) {
+      ctx.beginPath();
+      for (let x = sx; x <= sx + vw + SAMPLE; x += SAMPLE) {
+        let px = x, py = y + 0.5;
+        const d = fieldDisplace(px, py, cx, cy, R2, kick, sw);
+        if (d) { px = d.x; py = d.y; }
+        if (x === sx) ctx.moveTo(px - sx, py - sy); else ctx.lineTo(px - sx, py - sy);
+      }
+      ctx.stroke();
+    }
+  }
+
+  // DOTS — the classic cursor-aware dot grid: intersections become points
+  // that repel from the cursor and swell slightly inside its radius.
+  function drawDots(sx, sy, cx, cy, R2, kick) {
+    const R = params.radius;
+    for (let x = Math.floor(sx / CELL) * CELL; x <= sx + vw + CELL; x += CELL) {
+      for (let y = Math.floor(sy / CELL) * CELL; y <= sy + vh + CELL; y += CELL) {
+        let px = x, py = y, rad = 1.4;
+        const dx = px - cx, dy = py - cy;
+        const r = Math.sqrt(dx * dx + dy * dy);
+        if (kick > 0.05 && r < R) {
+          const t = (1 - r / R) ** 2;
+          const m = t * kick;
+          px += (dx / (r || 1)) * m;
+          py += (dy / (r || 1)) * m;
+          rad += t * 1.8;
+        }
+        ctx.beginPath();
+        ctx.arc(px - sx, py - sy, rad, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  // LENS — fisheye warp: space inside the radius is magnified away from the
+  // cursor (smooth quadratic bump, zero displacement at the exact center's
+  // neighborhood edges), so lines spread apart like under a magnifier.
+  function lensDisplace(px, py, cx, cy, R2, kick) {
+    const dx = px - cx, dy = py - cy;
+    const r2 = dx * dx + dy * dy;
+    if (r2 >= R2) return null;
+    const q = 1 - r2 / R2;
+    const scale = 1 + (kick / 55) * q * q;
+    return { x: cx + dx * scale, y: cy + dy * scale };
+  }
+
+  function strokeDisplacedLines(sx, sy, cx, cy, displace) {
+    for (let x = Math.floor(sx / CELL) * CELL; x <= sx + vw + CELL; x += CELL) {
+      ctx.beginPath();
+      for (let y = sy; y <= sy + vh + SAMPLE; y += SAMPLE) {
+        const d = displace(x + 0.5, y);
+        const px = d ? d.x : x + 0.5, py = d ? d.y : y;
+        if (y === sy) ctx.moveTo(px - sx, py - sy); else ctx.lineTo(px - sx, py - sy);
+      }
+      ctx.stroke();
+    }
+    for (let y = Math.floor(sy / CELL) * CELL; y <= sy + vh + CELL; y += CELL) {
+      ctx.beginPath();
+      for (let x = sx; x <= sx + vw + SAMPLE; x += SAMPLE) {
+        const d = displace(x, y + 0.5);
+        const px = d ? d.x : x, py = d ? d.y : y + 0.5;
+        if (x === sx) ctx.moveTo(px - sx, py - sy); else ctx.lineTo(px - sx, py - sy);
+      }
+      ctx.stroke();
+    }
+  }
+
+  function drawLens(sx, sy, cx, cy, R2, kick) {
+    strokeDisplacedLines(sx, sy, cx, cy, (px, py) => lensDisplace(px, py, cx, cy, R2, kick));
+  }
+
+  // RIPPLE — water waves: radial sine waves propagate outward from the
+  // cursor; energy is fed by cursor speed and decays when it rests.
+  function drawRipple(sx, sy, cx, cy, R2, kick, now) {
+    strokeDisplacedLines(sx, sy, cx, cy, (px, py) => {
+      const dx = px - cx, dy = py - cy;
+      const r2 = dx * dx + dy * dy;
+      const env = Math.exp(-r2 / R2);
+      if (env <= FADE_EPS || rippleAmp < 0.02 || kick <= 0.05) return null;
+      const r = Math.sqrt(r2) || 1;
+      const a = Math.sin(r / 34 - now * 0.006) * env * rippleAmp * kick * 0.6;
+      return { x: px + (dx / r) * a, y: py + (dy / r) * a };
+    });
+  }
+
+  // SPRINGS — elastic mesh: every intersection is a mass connected to its
+  // home by a spring; the cursor shoveles nodes away and they wobble back
+  // with real inertia. Nodes are simulated in document space and drawn as
+  // connected rows/columns, so the net stays one continuous lattice.
+  function simSprings(sx, sy, cx, cy, R, kick, step) {
+    const damp = Math.pow(0.88, step);
+    let maxV = 0;
+    for (let gx = Math.floor((sx - CELL * 2) / CELL) * CELL; gx <= sx + vw + CELL * 2; gx += CELL) {
+      for (let gy = Math.floor((sy - CELL * 2) / CELL) * CELL; gy <= sy + vh + CELL * 2; gy += CELL) {
+        const key = gx + '|' + gy;
+        let n = springNodes.get(key);
+        if (!n) { n = { x: gx, y: gy, vx: 0, vy: 0 }; springNodes.set(key, n); }
+        let ax = (gx - n.x) * 0.09, ay = (gy - n.y) * 0.09;
+        const dx = n.x - cx, dy = n.y - cy;
+        const r = Math.sqrt(dx * dx + dy * dy);
+        if (kick > 0.05 && r < R && r > 0.001) {
+          const f = (1 - r / R) * kick * 0.09;
+          ax += (dx / r) * f;
+          ay += (dy / r) * f;
+        }
+        n.vx = (n.vx + ax * step) * damp;
+        n.vy = (n.vy + ay * step) * damp;
+        n.x += n.vx * step;
+        n.y += n.vy * step;
+        const v = Math.abs(n.vx) + Math.abs(n.vy);
+        if (v > maxV) maxV = v;
+      }
+    }
+    if (springNodes.size > 800) {
+      for (const [key, n] of springNodes) {
+        if (n.x < sx - CELL * 4 || n.x > sx + vw + CELL * 4 || n.y < sy - CELL * 4 || n.y > sy + vh + CELL * 4) {
+          springNodes.delete(key);
+        }
+      }
+    }
+    return maxV > 0.06;
+  }
+
+  function drawSprings(sx, sy) {
+    for (let gy = Math.floor(sy / CELL) * CELL; gy <= sy + vh + CELL; gy += CELL) {
+      ctx.beginPath();
+      for (let gx = Math.floor(sx / CELL) * CELL; gx <= sx + vw + CELL; gx += CELL) {
+        const n = springNodes.get(gx + '|' + gy);
+        if (!n) continue;
+        ctx.lineTo(n.x - sx, n.y - sy);
+      }
+      ctx.stroke();
+    }
+    for (let gx = Math.floor(sx / CELL) * CELL; gx <= sx + vw + CELL; gx += CELL) {
+      ctx.beginPath();
+      for (let gy = Math.floor(sy / CELL) * CELL; gy <= sy + vh + CELL; gy += CELL) {
+        const n = springNodes.get(gx + '|' + gy);
+        if (!n) continue;
+        ctx.lineTo(n.x - sx, n.y - sy);
+      }
+      ctx.stroke();
+    }
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, vw, vh);
+    if (!enabled) return;
+    const sx = window.scrollX, sy = window.scrollY;
+    const cx = smooth.x + sx, cy = smooth.y + sy;
+    const R2 = params.radius * params.radius;
+    const kick = params.strength * influence;
+    ctx.strokeStyle = lineColor;
+    ctx.fillStyle = lineColor;
+    ctx.lineWidth = 1;
+    // Round caps/joins fuse polyline samples into seamless strokes —
+    // butt caps on curved segments read as separated points.
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    if (variant === 'field') drawFieldLines(sx, sy, cx, cy, R2, kick);
+    else if (variant === 'dots') drawDots(sx, sy, cx, cy, R2, kick);
+    else if (variant === 'lens') drawLens(sx, sy, cx, cy, R2, kick);
+    else if (variant === 'ripple') drawRipple(sx, sy, cx, cy, R2, kick, performance.now());
+    else if (variant === 'springs') drawSprings(sx, sy);
+  }
+
+  // ── Frame loop (draws only while something can still change) ──────────
+  function tick(t) {
+    rafId = requestAnimationFrame(tick);
+    const dt = Math.min(50, lastT ? t - lastT : 16.7);
+    lastT = t;
+    const step = dt / 16.7;
+    const f = 1 - Math.pow(1 - params.follow, step);
+    smooth.x += (target.x - smooth.x) * f;
+    smooth.y += (target.y - smooth.y) * f;
+    influence += (influenceTarget - influence) * (1 - Math.pow(0.88, step));
+
+    // Ripple energy: fed by cursor speed, decays while the cursor rests.
+    if (target.x > -9000) {
+      const sp = Math.hypot(target.x - prevTargetX, target.y - prevTargetY);
+      rippleAmp = Math.min(1.5, rippleAmp * Math.pow(0.94, step) + Math.min(60, sp) * 0.028 * step);
+      prevTargetX = target.x;
+      prevTargetY = target.y;
+    }
+
+    let simActive = false;
+    if (variant === 'ripple' && rippleAmp > 0.02) simActive = true;
+    if (variant === 'springs' && enabled) {
+      const sx = window.scrollX, sy = window.scrollY;
+      springsMoving = simSprings(sx, sy, smooth.x + sx, smooth.y + sy, params.radius, params.strength * influence, step);
+      if (springsMoving) simActive = true;
+    }
+
+    const settled =
+      influence < 0.002 &&
+      !simActive &&
+      Math.abs(target.x - smooth.x) < 0.05 &&
+      Math.abs(target.y - smooth.y) < 0.05;
+    if (!dirty && settled) return;
+
+    draw();
+    dirty = false;
+  }
+
+  function startLoop() {
+    if (!rafId) {
+      lastT = 0;
+      rafId = requestAnimationFrame(tick);
+    }
+  }
+  function stopLoop() {
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+    }
+  }
+
+  // ── Activation ────────────────────────────────────────────────────────
+  function activate(on) {
+    enabled = on;
+    canvas.style.display = on ? 'block' : 'none';
+    gridLayer.classList.toggle('bend-live', on);
+    if (!on) {
+      influenceTarget = 0;
+      influence = 0;
+      draw(); // clears the canvas
+      stopLoop();
+    } else {
+      dirty = true;
+      startLoop();
+    }
+  }
+
+  // ── Input (passive, no layout reads per event) ────────────────────────
+  window.addEventListener('pointermove', (e) => {
+    if (!enabled) return;
+    if (smooth.x < -9000) { smooth.x = e.clientX; smooth.y = e.clientY; }
+    target.x = e.clientX;
+    target.y = e.clientY;
+    influenceTarget = 1;
+    dirty = true;
+  }, { passive: true });
+
+  document.documentElement.addEventListener('mouseleave', () => {
+    influenceTarget = 0;
+    dirty = true;
+  });
+
+  window.addEventListener('scroll', () => { dirty = true; }, { passive: true });
+  window.addEventListener('resize', resize);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopLoop();
+    else if (enabled) startLoop();
+  });
+
+  // ── Prototype controls ────────────────────────────────────────────────
+  const ctl = {
+    radius: document.getElementById('ctlRadius'),
+    strength: document.getElementById('ctlStrength'),
+    swirl: document.getElementById('ctlSwirl'),
+    follow: document.getElementById('ctlFollow'),
+  };
+  const out = {
+    radius: document.getElementById('outRadius'),
+    strength: document.getElementById('outStrength'),
+    swirl: document.getElementById('outSwirl'),
+    follow: document.getElementById('outFollow'),
+  };
+  const presetButtons = Array.from(document.querySelectorAll('#presetRow button'));
+  const variantButtons = Array.from(document.querySelectorAll('#variantRow button'));
+  const presetRow = document.getElementById('presetRow');
+  const swirlLabel = document.getElementById('swirlLabel');
+
+  function showGateNote() {
+    gateNote.textContent = reducedMotion.matches
+      ? 'unavailable: prefers-reduced-motion is set — static grid is the shipped fallback'
+      : 'unavailable: no fine pointer (touch) — static grid is the shipped fallback';
+    gateNote.style.display = 'inline';
+  }
+
+  function applyVariant(v) {
+    if (!gatesAllow()) {
+      showGateNote();
+      return;
+    }
+    gateNote.style.display = 'none';
+    variant = v;
+    for (const b of variantButtons) b.classList.toggle('active', b.dataset.variant === v);
+    // Presets and swirl are Field-only concepts.
+    presetRow.classList.toggle('disabled', v !== 'field');
+    swirlLabel.classList.toggle('dim', v !== 'field');
+    springNodes.clear();
+    rippleAmp = 0;
+    if (v !== 'field' && !enabled) activate(true);
+    dirty = true;
+  }
+
+  for (const b of variantButtons) {
+    b.addEventListener('click', () => applyVariant(b.dataset.variant));
+  }
+
+  function syncOutputs() {
+    out.radius.value = String(Math.round(params.radius));
+    out.strength.value = params.strength + 'px';
+    out.swirl.value = Math.round(params.swirl * 100) + '%';
+    out.follow.value = '.' + String(Math.round(params.follow * 100)).padStart(2, '0');
+  }
+  function syncSliders() {
+    ctl.radius.value = String(params.radius);
+    ctl.strength.value = String(params.strength);
+    ctl.swirl.value = String(Math.round(params.swirl * 100));
+    ctl.follow.value = String(Math.round(params.follow * 100));
+    syncOutputs();
+  }
+  function markActive(name) {
+    for (const b of presetButtons) b.classList.toggle('active', b.dataset.preset === name);
+  }
+
+  function applyPreset(name) {
+    if (!gatesAllow() && name !== 'off') {
+      showGateNote();
+      markActive('off');
+      applyPreset('off');
+      return;
+    }
+    gateNote.style.display = 'none';
+    const preset = PRESETS[name];
+    markActive(name);
+    if (preset) {
+      Object.assign(params, preset);
+      syncSliders();
+      activate(true);
+    } else {
+      activate(false);
+    }
+  }
+
+  for (const b of presetButtons) {
+    b.addEventListener('click', () => applyPreset(b.dataset.preset));
+  }
+
+  for (const [key, input] of Object.entries(ctl)) {
+    input.addEventListener('input', () => {
+      const v = Number(input.value);
+      if (key === 'swirl' || key === 'follow') params[key] = v / 100;
+      else params[key] = v;
+      if (!enabled && gatesAllow()) activate(true);
+      markActive(''); // custom
+      syncOutputs();
+      dirty = true;
+    });
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.target instanceof HTMLInputElement) return;
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    const current = variantButtons.find((b) => b.classList.contains('active'));
+    const name = current ? current.dataset.variant : 'field';
+    const i = VARIANTS.indexOf(name);
+    const next = VARIANTS[(i + (e.key === 'ArrowRight' ? 1 : VARIANTS.length - 1)) % VARIANTS.length];
+    applyVariant(next);
+  });
+
+  reducedMotion.addEventListener?.('change', () => {
+    if (!gatesAllow()) applyPreset('off');
+  });
+  finePointer.addEventListener?.('change', () => {
+    if (!gatesAllow()) applyPreset('off');
+  });
+
+  // ── Boot: default variant + preset ────────────────────────────────────
+  resize();
+  applyVariant('field');
+  applyPreset('circle');
+})();
+</script>
+</body>
+</html>
