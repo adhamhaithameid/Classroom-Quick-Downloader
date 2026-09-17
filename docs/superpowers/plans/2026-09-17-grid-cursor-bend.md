@@ -121,3 +121,6 @@ cursor-hover on desktop and mobile widths, judged; idle shot compared for seamle
   not committed with this work.
 - Production rewrite, not prototype promotion: no preset/slider chrome, constants
   locked, action returns `destroy` cleanup.
+- Note (2026-09-17): the shipped displacement model is the **Lens** variant (user
+  choice after evaluating five variants in the prototype); `bendOffset` is a fisheye
+  lens, not radial+swirl; peak offset ≈ 10px at radius 190 / strength 10.
