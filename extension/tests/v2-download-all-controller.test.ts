@@ -244,6 +244,34 @@ describe('v2 Download All group machine (z57 S3)', () => {
     expect(requested).toHaveLength(2); // one per unique file id
   });
 
+  it('cancel reaches the background with NO injected runtime (lazy chrome.runtime fallback)', () => {
+    // Production bootstrap installs the group controller WITHOUT a runtime
+    // (v2_bootstrap.content.ts) — cancel must fall back to chrome.runtime
+    // .sendMessage exactly like the single-file controller does.
+    const chromeSend = vi.fn();
+    (globalThis as unknown as { chrome: unknown }).chrome = {
+      ...(globalThis as { chrome?: unknown }).chrome,
+      runtime: {
+        ...((globalThis as { chrome?: { runtime?: object } }).chrome?.runtime ?? {}),
+        sendMessage: chromeSend,
+        lastError: undefined,
+      },
+    };
+    installDownloadAllController(null); // explicit NO runtime, as in production
+
+    const { group } = makePost(2);
+    handleDownloadAllClickV2('post-1', group); // file 0 enters the pipeline
+    handleDownloadAllClickV2('post-1', group); // Cancel All
+
+    expect(group.classList.contains('cqd-all-cancelled')).toBe(true);
+    // The lazy wrapper mirrors chrome.runtime.sendMessage(message, callback);
+    // the MESSAGE shape is the contract under test.
+    expect(chromeSend.mock.calls[0]?.[0]).toEqual({
+      type: 'CQD_CANCEL_DOWNLOAD',
+      requestId: requestedPayloads()[0].requestId,
+    });
+  });
+
   it('the group machine survives an init→destroy→init cycle (orchestrator navigation)', async () => {
     // EngineV2.destroy() runs on EVERY view change; the group machine's run
     // state dies with the page, but the machine itself (click handler +

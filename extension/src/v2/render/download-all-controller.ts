@@ -85,9 +85,11 @@ let offSettled: (() => void) | null = null;
 /**
  * Install the group controller: registers the Download All click handler and
  * the settled listener. Returns the uninstall fn (tests, engine destroy).
+ * Passing `null` explicitly installs with NO runtime — production bootstrap
+ * does this and cancel falls back to chrome.runtime (see getRuntime).
  */
 export function installDownloadAllController(injectRuntime?: GroupRuntime | null): () => void {
-  runtime = injectRuntime ?? runtime;
+  if (injectRuntime !== undefined) runtime = injectRuntime;
   setDownloadAllHandler(handleDownloadAllClickV2);
   offSettled = onSettled(handleFileSettled);
   return uninstallDownloadAllController;
@@ -400,6 +402,20 @@ function isRunSettled(run: GroupRun): boolean {
 }
 
 function getRuntime(): GroupRuntime | null {
+  // Lazy chrome.runtime fallback — same idiom as download-controller.ts.
+  // The bootstrap installs this controller with no runtime; without the
+  // fallback, CQD_CANCEL_DOWNLOAD messages were silently dropped (UI flipped
+  // to cancelled while the background kept downloading).
+  if (runtime) return runtime;
+  if (typeof chrome !== 'undefined' && chrome?.runtime?.sendMessage) {
+    runtime = {
+      sendMessage: (message: unknown) => {
+        try {
+          chrome.runtime.sendMessage(message, () => void chrome.runtime.lastError);
+        } catch { /* channel down — nothing to cancel */ }
+      },
+    };
+  }
   return runtime;
 }
 
