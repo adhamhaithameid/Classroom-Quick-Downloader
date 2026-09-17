@@ -7,158 +7,400 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.6.19-1",
       "version": "1.6.19",
-      "date": "2026-09-17T01:38:01.135Z",
-      "summary": "A major download-engine overhaul: zero-window downloads with multi-account fallback, honest failure reporting for every error class, and the new Engine Mode switch. Every download now either succeeds or tells you exactly what to do next.",
+      "date": "2026-09-17T01:56:22.275Z",
+      "summary": "The no-dead-ends release: every download either succeeds or tells you exactly what to do next — with automatic retries, honest timeouts, and an adversarial test program proving it.",
       "changes": [
-        "Summary: A major download-engine overhaul: zero-window downloads with multi-account fallback, honest failure reporting for every error class, and the new Engine Mode switch. Every download now either succeeds or tells you exactly what to do next.",
-        "Added: Added invisible multi-account fallback: when the active Google account cannot access a file, the extension now quietly tries your other signed-in accounts instead of failing.",
-        "Added: Added the Engine Mode switch in popup settings (Legacy / New) with one-click rollback — switching applies live, no page reload.",
-        "Added: Added a 150-second download deadline: a stalled download now reports \"This download timed out. Try again.\" instead of hanging forever.",
-        "Added: Added automatic retry (with a short backoff) for temporary network and server failures.",
-        "Added: Added specific, actionable failure messages: disk full, file unavailable, browser blocked the download, sign-in required, and more.",
-        "Changed: Downloads now target Google's modern byte-serving endpoint directly — faster downloads with no interstitial hop.",
-        "Changed: Downloads are now completely window-free: no new tabs or windows are ever opened, on any browser.",
-        "Changed: Firefox downloads now report success only when the browser confirms the file finished — no more phantom successes.",
-        "Changed: Student Work pages and form links no longer receive download buttons that could never work.",
-        "Changed: Hardened download URL validation: the allowlist now covers all legitimate Google attachment shapes while external look-alike links stay blocked.",
-        "Fixed: Fixed the \"Download All always hangs\" family: a group with a broken file now settles correctly (success, partial, or error) instead of sticking on the running state.",
-        "Fixed: Fixed downloads silently disappearing after the browser already reported success (Firefox).",
-        "Fixed: Fixed Drive error and quota pages being saved as fake \".html\" downloads — these are now detected and handled as access errors.",
-        "Fixed: Fixed the visible \"403 Access Forbidden\" window that could appear and never close.",
+        "Summary: The no-dead-ends release: every download either succeeds or tells you exactly what to do next — with automatic retries, honest timeouts, and an adversarial test program proving it.",
+        "Added: Added automatic retry with backoff for temporary network and server failures.",
+        "Added: Added a 150-second download deadline: stalled downloads report \"This download timed out. Try again.\" instead of hanging forever.",
+        "Added: Added specific failure messages for every error class: disk full, file unavailable, browser blocked, sign-in required, virus-blocked, and more.",
+        "Changed: Downloads now verify what actually landed — Drive error and quota pages are detected and handled, never saved as fake files.",
         "Fixed: Fixed Sheets attachment downloads being rejected as invalid URLs."
       ],
       "added": [
-        "Added invisible multi-account fallback: when the active Google account cannot access a file, the extension now quietly tries your other signed-in accounts instead of failing.",
-        "Added the Engine Mode switch in popup settings (Legacy / New) with one-click rollback — switching applies live, no page reload.",
-        "Added a 150-second download deadline: a stalled download now reports \"This download timed out. Try again.\" instead of hanging forever.",
-        "Added automatic retry (with a short backoff) for temporary network and server failures.",
-        "Added specific, actionable failure messages: disk full, file unavailable, browser blocked the download, sign-in required, and more."
+        "Added automatic retry with backoff for temporary network and server failures.",
+        "Added a 150-second download deadline: stalled downloads report \"This download timed out. Try again.\" instead of hanging forever.",
+        "Added specific failure messages for every error class: disk full, file unavailable, browser blocked, sign-in required, virus-blocked, and more."
       ],
       "changed": [
-        "Downloads now target Google's modern byte-serving endpoint directly — faster downloads with no interstitial hop.",
-        "Downloads are now completely window-free: no new tabs or windows are ever opened, on any browser.",
-        "Firefox downloads now report success only when the browser confirms the file finished — no more phantom successes.",
-        "Student Work pages and form links no longer receive download buttons that could never work.",
-        "Hardened download URL validation: the allowlist now covers all legitimate Google attachment shapes while external look-alike links stay blocked."
+        "Downloads now verify what actually landed — Drive error and quota pages are detected and handled, never saved as fake files."
       ],
       "fixed": [
-        "Fixed the \"Download All always hangs\" family: a group with a broken file now settles correctly (success, partial, or error) instead of sticking on the running state.",
-        "Fixed downloads silently disappearing after the browser already reported success (Firefox).",
-        "Fixed Drive error and quota pages being saved as fake \".html\" downloads — these are now detected and handled as access errors.",
-        "Fixed the visible \"403 Access Forbidden\" window that could appear and never close.",
         "Fixed Sheets attachment downloads being rejected as invalid URLs."
       ],
       "isImportant": false
     },
     {
-      "id": "manual-1.6.15-2",
-      "version": "1.6.15",
-      "date": "2026-09-16T01:38:01.135Z",
-      "summary": "A stabilization release that finished the Download All overhaul: groups always settle, background tabs stay live, and automated QA coverage reached the full manual runbook.",
+      "id": "manual-1.6.18-2",
+      "version": "1.6.18",
+      "date": "2026-09-16T01:56:22.275Z",
+      "summary": "Firefox download reporting is now fully honest: success is only reported when the browser confirms the file finished.",
       "changes": [
-        "Summary: A stabilization release that finished the Download All overhaul: groups always settle, background tabs stay live, and automated QA coverage reached the full manual runbook.",
-        "Changed: Extended the automated manual-check suite to cover every runbook flow (submissions rows, popup analytics, back-navigation, error states), with real download verification.",
-        "Fixed: Fixed Download All groups that could stay stuck on \"Downloading…\" forever — the root cause of the long-running hang reports.",
-        "Fixed: Fixed Download All progress not updating when the Classroom tab was open in the background."
+        "Summary: Firefox download reporting is now fully honest: success is only reported when the browser confirms the file finished.",
+        "Changed: Firefox downloads report success only on actual completion — no more phantom successes that later vanish."
       ],
       "added": [],
       "changed": [
-        "Extended the automated manual-check suite to cover every runbook flow (submissions rows, popup analytics, back-navigation, error states), with real download verification."
-      ],
-      "fixed": [
-        "Fixed Download All groups that could stay stuck on \"Downloading…\" forever — the root cause of the long-running hang reports.",
-        "Fixed Download All progress not updating when the Classroom tab was open in the background."
-      ],
-      "isImportant": false
-    },
-    {
-      "id": "manual-1.6.10-3",
-      "version": "1.6.10",
-      "date": "2026-09-15T01:38:01.135Z",
-      "summary": "Download reliability milestone: invisible multi-account fallback, completely window-free downloads through Google's direct file endpoint, and the new Engine Mode switch.",
-      "changes": [
-        "Summary: Download reliability milestone: invisible multi-account fallback, completely window-free downloads through Google's direct file endpoint, and the new Engine Mode switch.",
-        "Added: Added invisible multi-account fallback: files the active account cannot access now try the other signed-in accounts quietly.",
-        "Added: Added the Engine Mode switch in popup settings (Legacy / New) with one-click rollback and live switching.",
-        "Added: Added an event-bus architecture connecting page detection to the download engine through one typed bridge.",
-        "Changed: Downloads now use Google's modern byte-serving endpoint directly — one hop, faster, no interstitial pages.",
-        "Changed: Downloads are now window-free on every browser: the old background-tab workaround was removed entirely.",
-        "Fixed: Fixed the visible \"403 Access Forbidden\" window that could appear and never close.",
-        "Fixed: Fixed \"Download All always fails\" reports where one broken file left the group hanging.",
-        "Fixed: Fixed Google Sheets attachments not getting download buttons."
-      ],
-      "added": [
-        "Added invisible multi-account fallback: files the active account cannot access now try the other signed-in accounts quietly.",
-        "Added the Engine Mode switch in popup settings (Legacy / New) with one-click rollback and live switching.",
-        "Added an event-bus architecture connecting page detection to the download engine through one typed bridge."
-      ],
-      "changed": [
-        "Downloads now use Google's modern byte-serving endpoint directly — one hop, faster, no interstitial pages.",
-        "Downloads are now window-free on every browser: the old background-tab workaround was removed entirely."
-      ],
-      "fixed": [
-        "Fixed the visible \"403 Access Forbidden\" window that could appear and never close.",
-        "Fixed \"Download All always fails\" reports where one broken file left the group hanging.",
-        "Fixed Google Sheets attachments not getting download buttons."
-      ],
-      "isImportant": false
-    },
-    {
-      "id": "manual-1.6.5-4",
-      "version": "1.6.5",
-      "date": "2026-09-14T01:38:01.135Z",
-      "summary": "An accuracy blitz: fifteen detection and naming defects fixed, each locked in by an automated regression corpus, plus a fully automated QA pipeline that replays the manual test runbook in real browsers.",
-      "changes": [
-        "Summary: An accuracy blitz: fifteen detection and naming defects fixed, each locked in by an automated regression corpus, plus a fully automated QA pipeline that replays the manual test runbook in real browsers.",
-        "Added: Added a locale-aware filename cleanup registry so download names stay clean in every language (Hungarian, Arabic, Russian, Japanese, Chinese, French, German, Spanish and more).",
-        "Added: Added the automated Manual-QA Replay pipeline: real-browser journeys covering buttons, Download All, flags, popup, navigation and real downloads, plus a gated live-Classroom canary.",
-        "Fixed: Fixed comment-count false positives from dates and digits in complex Classroom layouts.",
-        "Fixed: Fixed edited/comment verdicts being lost when page markup drifted.",
-        "Fixed: Fixed download state races where concurrent downloads of the same file could cross wires.",
-        "Fixed: Fixed localized type labels (like \"Tömörített archívum\") leaking into downloaded filenames.",
-        "Fixed: Fixed substring false positives in keyword and exclusion matching across scripts (Arabic tashkeel, Armenian, word-numerals)."
-      ],
-      "added": [
-        "Added a locale-aware filename cleanup registry so download names stay clean in every language (Hungarian, Arabic, Russian, Japanese, Chinese, French, German, Spanish and more).",
-        "Added the automated Manual-QA Replay pipeline: real-browser journeys covering buttons, Download All, flags, popup, navigation and real downloads, plus a gated live-Classroom canary."
-      ],
-      "changed": [],
-      "fixed": [
-        "Fixed comment-count false positives from dates and digits in complex Classroom layouts.",
-        "Fixed edited/comment verdicts being lost when page markup drifted.",
-        "Fixed download state races where concurrent downloads of the same file could cross wires.",
-        "Fixed localized type labels (like \"Tömörített archívum\") leaking into downloaded filenames.",
-        "Fixed substring false positives in keyword and exclusion matching across scripts (Arabic tashkeel, Armenian, word-numerals)."
-      ],
-      "isImportant": false
-    },
-    {
-      "id": "manual-1.6.0-5",
-      "version": "1.6.0",
-      "date": "2026-09-13T01:38:01.135Z",
-      "summary": "The Engine V4 foundation: a measurable accuracy standard for the detection engine, a pure download state machine, and hardened release gates. Everything after this version is measured against a fixed corpus.",
-      "changes": [
-        "Summary: The Engine V4 foundation: a measurable accuracy standard for the detection engine, a pure download state machine, and hardened release gates. Everything after this version is measured against a fixed corpus.",
-        "Added: Added the accuracy corpus and gates: detection decisions are held to labeled expectations across locales, with floors that may only move up.",
-        "Added: Added typed contracts, an event bus, and a pure acquisition state machine with bounded account rotation and forced deadlines.",
-        "Added: Added hardened e2e, accuracy and release gates to CI.",
-        "Changed: Extracted the detection core into pure modules: normalization, word-numerals, action-button exclusions, and count ceilings."
-      ],
-      "added": [
-        "Added the accuracy corpus and gates: detection decisions are held to labeled expectations across locales, with floors that may only move up.",
-        "Added typed contracts, an event bus, and a pure acquisition state machine with bounded account rotation and forced deadlines.",
-        "Added hardened e2e, accuracy and release gates to CI."
-      ],
-      "changed": [
-        "Extracted the detection core into pure modules: normalization, word-numerals, action-button exclusions, and count ceilings."
+        "Firefox downloads report success only on actual completion — no more phantom successes that later vanish."
       ],
       "fixed": [],
       "isImportant": false
     },
     {
-      "id": "manual-1.5.5-6",
+      "id": "manual-1.6.17-3",
+      "version": "1.6.17",
+      "date": "2026-09-15T01:56:22.275Z",
+      "summary": "Stalled downloads now resolve honestly, and sign-in/error pages are never saved as fake downloads.",
+      "changes": [
+        "Summary: Stalled downloads now resolve honestly, and sign-in/error pages are never saved as fake downloads.",
+        "Added: Added a hard timeout: a stalled download cancels itself and reports \"This download timed out. Try again.\" instead of hanging.",
+        "Fixed: Fixed sign-in and error pages being saved as fake download files — they are now detected and reported as sign-in errors."
+      ],
+      "added": [
+        "Added a hard timeout: a stalled download cancels itself and reports \"This download timed out. Try again.\" instead of hanging."
+      ],
+      "changed": [],
+      "fixed": [
+        "Fixed sign-in and error pages being saved as fake download files — they are now detected and reported as sign-in errors."
+      ],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.6.16-4",
+      "version": "1.6.16",
+      "date": "2026-09-14T01:56:22.275Z",
+      "summary": "Every download failure now has a classified, actionable outcome.",
+      "changes": [
+        "Summary: Every download failure now has a classified, actionable outcome.",
+        "Added: Added automatic retry for temporary network and server failures.",
+        "Added: Added specific messages for permanent failures: disk full, file unavailable, browser crashed, file blocked, and more.",
+        "Fixed: Fixed cancellations made from the browser's own download panel showing as errors — they now correctly show as cancelled."
+      ],
+      "added": [
+        "Added automatic retry for temporary network and server failures.",
+        "Added specific messages for permanent failures: disk full, file unavailable, browser crashed, file blocked, and more."
+      ],
+      "changed": [],
+      "fixed": [
+        "Fixed cancellations made from the browser's own download panel showing as errors — they now correctly show as cancelled."
+      ],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.6.15-5",
+      "version": "1.6.15",
+      "date": "2026-09-13T01:56:22.275Z",
+      "summary": "Internal hardening: a corpus of eleven real-world download failure scenarios now runs against both the engine's brain and its implementation, and they must agree on every outcome.",
+      "changes": [
+        "Summary: Internal hardening: a corpus of eleven real-world download failure scenarios now runs against both the engine's brain and its implementation, and they must agree on every outcome."
+      ],
+      "added": [],
+      "changed": [],
+      "fixed": [],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.6.14-6",
+      "version": "1.6.14",
+      "date": "2026-09-12T01:56:22.275Z",
+      "summary": "The test simulator learned six new real-world failure shapes — server errors, sign-in redirects, mid-download connection drops, slow streams, empty files and quota pages — so the engine can be verified against them.",
+      "changes": [
+        "Summary: The test simulator learned six new real-world failure shapes — server errors, sign-in redirects, mid-download connection drops, slow streams, empty files and quota pages — so the engine can be verified against them."
+      ],
+      "added": [],
+      "changed": [],
+      "fixed": [],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.6.13-7",
+      "version": "1.6.13",
+      "date": "2026-09-11T01:56:22.275Z",
+      "summary": "Rendering groundwork for the next engine generation: all page observation now flows through one shared, throttled observer.",
+      "changes": [
+        "Summary: Rendering groundwork for the next engine generation: all page observation now flows through one shared, throttled observer."
+      ],
+      "added": [],
+      "changed": [],
+      "fixed": [],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.6.12-8",
+      "version": "1.6.12",
+      "date": "2026-09-10T01:56:22.275Z",
+      "summary": "Download All is now fully stabilized and the automated QA suite covers the entire manual runbook.",
+      "changes": [
+        "Summary: Download All is now fully stabilized and the automated QA suite covers the entire manual runbook.",
+        "Fixed: Fixed the root cause of Download All groups hanging on \"Downloading…\" forever.",
+        "Fixed: Fixed Download All progress not updating when the Classroom tab was in the background."
+      ],
+      "added": [],
+      "changed": [],
+      "fixed": [
+        "Fixed the root cause of Download All groups hanging on \"Downloading…\" forever.",
+        "Fixed Download All progress not updating when the Classroom tab was in the background."
+      ],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.6.11-9",
+      "version": "1.6.11",
+      "date": "2026-09-09T01:56:22.275Z",
+      "summary": "The Engine Mode switch shipped in popup settings (Legacy / New) with live switching and one-click rollback, and page detection is now wired to the download engine through one typed bridge.",
+      "changes": [
+        "Summary: The Engine Mode switch shipped in popup settings (Legacy / New) with live switching and one-click rollback, and page detection is now wired to the download engine through one typed bridge."
+      ],
+      "added": [],
+      "changed": [],
+      "fixed": [],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.6.10-10",
+      "version": "1.6.10",
+      "date": "2026-09-08T01:56:22.275Z",
+      "summary": "The engine's internals now communicate through a typed event bus — the architectural groundwork that lets every later change be measured and rolled back independently.",
+      "changes": [
+        "Summary: The engine's internals now communicate through a typed event bus — the architectural groundwork that lets every later change be measured and rolled back independently."
+      ],
+      "added": [],
+      "changed": [],
+      "fixed": [],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.6.9-11",
+      "version": "1.6.9",
+      "date": "2026-09-07T01:56:22.275Z",
+      "summary": "Zero-window downloads verified end-to-end: the old background-tab workaround is fully removed, and a locked test file proves the invisible account fallback completes real downloads.",
+      "changes": [
+        "Summary: Zero-window downloads verified end-to-end: the old background-tab workaround is fully removed, and a locked test file proves the invisible account fallback completes real downloads."
+      ],
+      "added": [],
+      "changed": [],
+      "fixed": [],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.6.8-12",
+      "version": "1.6.8",
+      "date": "2026-09-06T01:56:22.275Z",
+      "summary": "The fix for the most-reported download bug: files that start but fail now quietly try your other signed-in accounts, and downloads go straight through Google's direct file endpoint.",
+      "changes": [
+        "Summary: The fix for the most-reported download bug: files that start but fail now quietly try your other signed-in accounts, and downloads go straight through Google's direct file endpoint.",
+        "Fixed: Fixed \"files start but fail\" reports on Firefox-family browsers (zen) and Brave.",
+        "Fixed: Fixed Download All groups with one broken file hanging instead of settling."
+      ],
+      "added": [],
+      "changed": [],
+      "fixed": [
+        "Fixed \"files start but fail\" reports on Firefox-family browsers (zen) and Brave.",
+        "Fixed Download All groups with one broken file hanging instead of settling."
+      ],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.6.7-13",
+      "version": "1.6.7",
+      "date": "2026-09-05T01:56:22.275Z",
+      "summary": "The automated QA pipeline now replays the entire manual test runbook in real browsers — including real downloads verified byte-for-byte.",
+      "changes": [
+        "Summary: The automated QA pipeline now replays the entire manual test runbook in real browsers — including real downloads verified byte-for-byte."
+      ],
+      "added": [],
+      "changed": [],
+      "fixed": [],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.6.6-14",
+      "version": "1.6.6",
+      "date": "2026-09-04T01:56:22.275Z",
+      "summary": "Foundation for the automated QA program: a local, deterministic Google Classroom simulator that serves real downloadable files under the real Classroom origins.",
+      "changes": [
+        "Summary: Foundation for the automated QA program: a local, deterministic Google Classroom simulator that serves real downloadable files under the real Classroom origins."
+      ],
+      "added": [],
+      "changed": [],
+      "fixed": [],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.6.5-15",
+      "version": "1.6.5",
+      "date": "2026-09-03T01:56:22.275Z",
+      "summary": "Detection and naming hardening: localized type labels no longer leak into filenames, download state races are fixed, and Sheets attachments get their buttons back.",
+      "changes": [
+        "Summary: Detection and naming hardening: localized type labels no longer leak into filenames, download state races are fixed, and Sheets attachments get their buttons back.",
+        "Fixed: Fixed localized type labels (like \"Tömörített archívum\") leaking into downloaded filenames.",
+        "Fixed: Fixed download state races where concurrent downloads of the same file could cross wires.",
+        "Fixed: Fixed Google Sheets attachments not getting download buttons."
+      ],
+      "added": [],
+      "changed": [],
+      "fixed": [
+        "Fixed localized type labels (like \"Tömörített archívum\") leaking into downloaded filenames.",
+        "Fixed download state races where concurrent downloads of the same file could cross wires.",
+        "Fixed Google Sheets attachments not getting download buttons."
+      ],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.6.4-16",
+      "version": "1.6.4",
+      "date": "2026-09-02T01:56:22.275Z",
+      "summary": "More detection accuracy fixes: comment counts survive markup drift, exclusions match whole tokens, and localized dates parse correctly.",
+      "changes": [
+        "Summary: More detection accuracy fixes: comment counts survive markup drift, exclusions match whole tokens, and localized dates parse correctly."
+      ],
+      "added": [],
+      "changed": [],
+      "fixed": [],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.6.3-17",
+      "version": "1.6.3",
+      "date": "2026-09-01T01:56:22.275Z",
+      "summary": "Exclusion matching now operates on whole words, eliminating a family of false-positive detections.",
+      "changes": [
+        "Summary: Exclusion matching now operates on whole words, eliminating a family of false-positive detections."
+      ],
+      "added": [],
+      "changed": [],
+      "fixed": [],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.6.2-18",
+      "version": "1.6.2",
+      "date": "2026-08-31T01:56:22.275Z",
+      "summary": "Detection defenses: number extraction now sanity-checks the page before trusting it.",
+      "changes": [
+        "Summary: Detection defenses: number extraction now sanity-checks the page before trusting it."
+      ],
+      "added": [],
+      "changed": [],
+      "fixed": [],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.6.1-19",
+      "version": "1.6.1",
+      "date": "2026-08-30T01:56:22.275Z",
+      "summary": "Detection accuracy across scripts: Armenian keywords, exact word-number matching, and Arabic diacritic folding fixed.",
+      "changes": [
+        "Summary: Detection accuracy across scripts: Armenian keywords, exact word-number matching, and Arabic diacritic folding fixed."
+      ],
+      "added": [],
+      "changed": [],
+      "fixed": [],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.6.0-20",
+      "version": "1.6.0",
+      "date": "2026-08-29T01:56:22.275Z",
+      "summary": "The Engine V4 foundation: a measurable accuracy standard for the detection engine, a pure download state machine, and hardened release gates. Everything after this version is measured against a fixed corpus.",
+      "changes": [
+        "Summary: The Engine V4 foundation: a measurable accuracy standard for the detection engine, a pure download state machine, and hardened release gates. Everything after this version is measured against a fixed corpus.",
+        "Added: Added the accuracy corpus and gates: detection decisions are held to labeled expectations across locales, with floors that may only move up.",
+        "Added: Added typed contracts, an event bus, and a pure acquisition state machine with bounded account rotation and forced deadlines."
+      ],
+      "added": [
+        "Added the accuracy corpus and gates: detection decisions are held to labeled expectations across locales, with floors that may only move up.",
+        "Added typed contracts, an event bus, and a pure acquisition state machine with bounded account rotation and forced deadlines."
+      ],
+      "changed": [],
+      "fixed": [],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.5.11-21",
+      "version": "1.5.11",
+      "date": "2026-08-28T01:56:22.275Z",
+      "summary": "Under-the-hood hardening: stricter typing, updated dependencies, and stronger release gates.",
+      "changes": [
+        "Summary: Under-the-hood hardening: stricter typing, updated dependencies, and stronger release gates."
+      ],
+      "added": [],
+      "changed": [],
+      "fixed": [],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.5.10-22",
+      "version": "1.5.10",
+      "date": "2026-08-27T01:56:22.275Z",
+      "summary": "A security-and-stability release: an external audit rolled in, one download-tracking race fixed, and the extension now requests fewer browser permissions.",
+      "changes": [
+        "Summary: A security-and-stability release: an external audit rolled in, one download-tracking race fixed, and the extension now requests fewer browser permissions."
+      ],
+      "added": [],
+      "changed": [],
+      "fixed": [],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.5.9-23",
+      "version": "1.5.9",
+      "date": "2026-08-26T01:56:22.275Z",
+      "summary": "A batch of reviewed, low-risk fixes and cleanups rolled into one stable release.",
+      "changes": [
+        "Summary: A batch of reviewed, low-risk fixes and cleanups rolled into one stable release."
+      ],
+      "added": [],
+      "changed": [],
+      "fixed": [],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.5.8-24",
+      "version": "1.5.8",
+      "date": "2026-08-25T01:56:22.275Z",
+      "summary": "Faster page scanning and a fully accessible popup.",
+      "changes": [
+        "Summary: Faster page scanning and a fully accessible popup.",
+        "Changed: Optimized DOM traversal with combined CSS selectors for faster scans on busy pages."
+      ],
+      "added": [],
+      "changed": [
+        "Optimized DOM traversal with combined CSS selectors for faster scans on busy pages."
+      ],
+      "fixed": [],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.5.7-25",
+      "version": "1.5.7",
+      "date": "2026-08-24T01:56:22.275Z",
+      "summary": "A security-hardening release: the developer debug surface now escapes all runtime values before rendering.",
+      "changes": [
+        "Summary: A security-hardening release: the developer debug surface now escapes all runtime values before rendering."
+      ],
+      "added": [],
+      "changed": [],
+      "fixed": [],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.5.6-26",
+      "version": "1.5.6",
+      "date": "2026-08-23T01:56:22.275Z",
+      "summary": "A security-and-accessibility release: cryptographically secure download identifiers, fully labeled controls, and deeper Student Work test coverage.",
+      "changes": [
+        "Summary: A security-and-accessibility release: cryptographically secure download identifiers, fully labeled controls, and deeper Student Work test coverage."
+      ],
+      "added": [],
+      "changed": [],
+      "fixed": [],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.5.5-27",
       "version": "1.5.5",
-      "date": "2026-09-12T01:38:01.135Z",
+      "date": "2026-08-22T01:56:22.275Z",
       "summary": "A leaner packaging release focused on reducing extension size while preserving the same classroom behavior.",
       "changes": [
         "Summary: A leaner packaging release focused on reducing extension size while preserving the same classroom behavior.",
@@ -178,9 +420,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.5.4-7",
+      "id": "manual-1.5.4-28",
       "version": "1.5.4",
-      "date": "2026-09-11T01:38:01.135Z",
+      "date": "2026-08-21T01:56:22.275Z",
       "summary": "A performance-focused release with two measurable speed upgrades in scan and download orchestration paths.",
       "changes": [
         "Summary: A performance-focused release with two measurable speed upgrades in scan and download orchestration paths.",
@@ -202,9 +444,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.5.3-8",
+      "id": "manual-1.5.3-29",
       "version": "1.5.3",
-      "date": "2026-09-10T01:38:01.135Z",
+      "date": "2026-08-20T01:56:22.275Z",
       "summary": "Introduced a new detection layer for flags and files to keep ownership mapping stable across complex Classroom layouts.",
       "changes": [
         "Summary: Introduced a new detection layer for flags and files to keep ownership mapping stable across complex Classroom layouts.",
@@ -224,9 +466,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.5.2-9",
+      "id": "manual-1.5.2-30",
       "version": "1.5.2",
-      "date": "2026-09-09T01:38:01.135Z",
+      "date": "2026-08-19T01:56:22.275Z",
       "summary": "A focused stabilization release delivering bug fixes and stronger security hardening for production classrooms.",
       "changes": [
         "Summary: A focused stabilization release delivering bug fixes and stronger security hardening for production classrooms.",
@@ -246,9 +488,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.5.1-10",
+      "id": "manual-1.5.1-31",
       "version": "1.5.1",
-      "date": "2026-09-08T01:38:01.135Z",
+      "date": "2026-08-18T01:56:22.275Z",
       "summary": "Expanded real-world support for the Student Work tap so teachers can download attached files and media directly from submissions.",
       "changes": [
         "Summary: Expanded real-world support for the Student Work tap so teachers can download attached files and media directly from submissions.",
@@ -268,9 +510,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.5.0-11",
+      "id": "manual-1.5.0-32",
       "version": "1.5.0",
-      "date": "2026-09-07T01:38:01.135Z",
+      "date": "2026-08-17T01:56:22.275Z",
       "summary": "This is the best and most reliable state the extension has reached so far. Download buttons, flag placement, and post detection are now much more accurate in real Google Classroom usage.",
       "changes": [
         "Summary: This is the best and most reliable state the extension has reached so far. Download buttons, flag placement, and post detection are now much more accurate in real Google Classroom usage.",
@@ -300,9 +542,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.4.0-12",
+      "id": "manual-1.4.0-33",
       "version": "1.4.0",
-      "date": "2026-09-06T01:38:01.135Z",
+      "date": "2026-08-16T01:56:22.275Z",
       "summary": "A major under-the-hood release that introduced the V2 engine foundation. It made the extension safer to improve without breaking the stable experience you already rely on.",
       "changes": [
         "Summary: A major under-the-hood release that introduced the V2 engine foundation. It made the extension safer to improve without breaking the stable experience you already rely on.",
@@ -324,9 +566,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.3.9-13",
+      "id": "manual-1.3.9-34",
       "version": "1.3.9",
-      "date": "2026-09-05T01:38:01.135Z",
+      "date": "2026-08-15T01:56:22.275Z",
       "summary": "Improved release consistency and user-facing clarity across the website and extension experiences.",
       "changes": [
         "Summary: Improved release consistency and user-facing clarity across the website and extension experiences.",
@@ -352,9 +594,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.3.8-14",
+      "id": "manual-1.3.8-35",
       "version": "1.3.8",
-      "date": "2026-09-04T01:38:01.135Z",
+      "date": "2026-08-14T01:56:22.275Z",
       "summary": "Improved changelog reliability so users always receive updates, even when the version number stays the same.",
       "changes": [
         "Summary: Improved changelog reliability so users always receive updates, even when the version number stays the same.",
@@ -380,9 +622,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": true
     },
     {
-      "id": "manual-1.3.7-15",
+      "id": "manual-1.3.7-36",
       "version": "1.3.7",
-      "date": "2026-09-03T01:38:01.135Z",
+      "date": "2026-08-13T01:56:22.275Z",
       "summary": "Improved daily reliability and clearer release communication for normal users.",
       "changes": [
         "Summary: Improved daily reliability and clearer release communication for normal users.",
@@ -408,9 +650,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": true
     },
     {
-      "id": "manual-1.3.6-16",
+      "id": "manual-1.3.6-37",
       "version": "1.3.6",
-      "date": "2026-09-02T01:38:01.135Z",
+      "date": "2026-08-12T01:56:22.275Z",
       "summary": "Focused on stability and compatibility hardening for heavy classroom workloads.",
       "changes": [
         "Summary: Focused on stability and compatibility hardening for heavy classroom workloads.",
@@ -436,9 +678,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.3.0-17",
+      "id": "manual-1.3.0-38",
       "version": "1.3.0",
-      "date": "2026-09-01T01:38:01.135Z",
+      "date": "2026-08-11T01:56:22.275Z",
       "summary": "Delivered major reliability, remote-config, and analytics improvements.",
       "changes": [
         "Summary: Delivered major reliability, remote-config, and analytics improvements.",
@@ -464,9 +706,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.2.7-18",
+      "id": "manual-1.2.7-39",
       "version": "1.2.7",
-      "date": "2026-08-31T01:38:01.135Z",
+      "date": "2026-08-10T01:56:22.275Z",
       "summary": "Broad security and reliability hardening across extension behavior.",
       "changes": [
         "Summary: Broad security and reliability hardening across extension behavior.",
@@ -492,9 +734,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.2.3-19",
+      "id": "manual-1.2.3-40",
       "version": "1.2.3",
-      "date": "2026-08-30T01:38:01.135Z",
+      "date": "2026-08-09T01:56:22.275Z",
       "summary": "Usability and telemetry consistency release.",
       "changes": [
         "Summary: Usability and telemetry consistency release.",
@@ -514,9 +756,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.2.2-20",
+      "id": "manual-1.2.2-41",
       "version": "1.2.2",
-      "date": "2026-08-29T01:38:01.135Z",
+      "date": "2026-08-08T01:56:22.275Z",
       "summary": "Cancel-flow polish release.",
       "changes": [
         "Summary: Cancel-flow polish release.",
@@ -536,9 +778,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.2.1-21",
+      "id": "manual-1.2.1-42",
       "version": "1.2.1",
-      "date": "2026-08-28T01:38:01.135Z",
+      "date": "2026-08-07T01:56:22.275Z",
       "summary": "Unified cancel-system iteration release.",
       "changes": [
         "Summary: Unified cancel-system iteration release.",
@@ -558,9 +800,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.2.0-22",
+      "id": "manual-1.2.0-43",
       "version": "1.2.0",
-      "date": "2026-08-27T01:38:01.135Z",
+      "date": "2026-08-06T01:56:22.275Z",
       "summary": "Cancel feature baseline release.",
       "changes": [
         "Summary: Cancel feature baseline release.",
@@ -580,9 +822,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.1.10-23",
+      "id": "manual-1.1.10-44",
       "version": "1.1.10",
-      "date": "2026-08-26T01:38:01.135Z",
+      "date": "2026-08-05T01:56:22.275Z",
       "summary": "Late 1.1 line reliability release.",
       "changes": [
         "Summary: Late 1.1 line reliability release.",
@@ -602,9 +844,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.1.5-24",
+      "id": "manual-1.1.5-45",
       "version": "1.1.5",
-      "date": "2026-08-25T01:38:01.135Z",
+      "date": "2026-08-04T01:56:22.275Z",
       "summary": "Mid 1.1 quality and compatibility release.",
       "changes": [
         "Summary: Mid 1.1 quality and compatibility release.",
@@ -624,9 +866,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.1.1-25",
+      "id": "manual-1.1.1-46",
       "version": "1.1.1",
-      "date": "2026-08-24T01:38:01.135Z",
+      "date": "2026-08-03T01:56:22.275Z",
       "summary": "Post-1.1 stabilization release.",
       "changes": [
         "Summary: Post-1.1 stabilization release.",
@@ -646,9 +888,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.1.0-26",
+      "id": "manual-1.1.0-47",
       "version": "1.1.0",
-      "date": "2026-08-23T01:38:01.135Z",
+      "date": "2026-08-02T01:56:22.275Z",
       "summary": "Feature and packaging expansion release.",
       "changes": [
         "Summary: Feature and packaging expansion release.",
@@ -668,9 +910,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.0.1-27",
+      "id": "manual-1.0.1-48",
       "version": "1.0.1",
-      "date": "2026-08-22T01:38:01.135Z",
+      "date": "2026-08-01T01:56:22.275Z",
       "summary": "Post-launch stabilization release.",
       "changes": [
         "Summary: Post-launch stabilization release.",
@@ -690,9 +932,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.0.0-28",
+      "id": "manual-1.0.0-49",
       "version": "1.0.0",
-      "date": "2026-08-21T01:38:01.135Z",
+      "date": "2026-07-31T01:56:22.275Z",
       "summary": "First stable production release.",
       "changes": [
         "Summary: First stable production release.",
@@ -736,11 +978,11 @@ export const EXTENSION_MANUAL_CHANGELOG = {
         "color": "default"
       }
     ],
-    "lastUpdated": 1789609081138
+    "lastUpdated": 1789610182275
   },
   "meta": {
     "applyMode": "manual",
-    "liveUpdatedAt": 1789609081138,
-    "contentChecksum": "manual-1789609081138"
+    "liveUpdatedAt": 1789610182275,
+    "contentChecksum": "manual-1789610182275"
   }
 } as const;

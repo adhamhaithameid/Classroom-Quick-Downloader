@@ -1,65 +1,107 @@
 ## v1.6.19
 ### Summary
-A major download-engine overhaul: zero-window downloads with multi-account fallback, honest failure reporting for every error class, and the new Engine Mode switch. Every download now either succeeds or tells you exactly what to do next.
+The no-dead-ends release: every download either succeeds or tells you exactly what to do next — with automatic retries, honest timeouts, and an adversarial test program proving it.
 ### Added
-- Added invisible multi-account fallback: when the active Google account cannot access a file, the extension now quietly tries your other signed-in accounts instead of failing.
-- Added the Engine Mode switch in popup settings (Legacy / New) with one-click rollback — switching applies live, no page reload.
-- Added a 150-second download deadline: a stalled download now reports "This download timed out. Try again." instead of hanging forever.
-- Added automatic retry (with a short backoff) for temporary network and server failures.
-- Added specific, actionable failure messages: disk full, file unavailable, browser blocked the download, sign-in required, and more.
+- Added automatic retry with backoff for temporary network and server failures.
+- Added a 150-second download deadline: stalled downloads report "This download timed out. Try again." instead of hanging forever.
+- Added specific failure messages for every error class: disk full, file unavailable, browser blocked, sign-in required, virus-blocked, and more.
 ### Changed
-- Downloads now target Google's modern byte-serving endpoint directly — faster downloads with no interstitial hop.
-- Downloads are now completely window-free: no new tabs or windows are ever opened, on any browser.
-- Firefox downloads now report success only when the browser confirms the file finished — no more phantom successes.
-- Student Work pages and form links no longer receive download buttons that could never work.
+- Downloads now verify what actually landed — Drive error and quota pages are detected and handled, never saved as fake files.
 ### Fixed
-- Fixed the "Download All always hangs" family: a group with a broken file now settles correctly (success, partial, or error) instead of sticking on the running state.
-- Fixed downloads silently disappearing after the browser already reported success (Firefox).
-- Fixed Drive error and quota pages being saved as fake ".html" downloads — these are now detected and handled as access errors.
-- Fixed the visible "403 Access Forbidden" window that could appear and never close.
 - Fixed Sheets attachment downloads being rejected as invalid URLs.
 
-### Security
-- Hardened download URL validation: the allowlist now covers all legitimate Google attachment shapes while external look-alike links stay blocked.
+## v1.6.18
+### Summary
+Firefox download reporting is now fully honest: success is only reported when the browser confirms the file finished.
+### Changed
+- Firefox downloads report success only on actual completion — no more phantom successes that later vanish.
 
-> See `data/changelog/website-changelog.manual.md` for unified changelog — extension and website are currently aligned across all versions.
+## v1.6.17
+### Summary
+Stalled downloads now resolve honestly, and sign-in/error pages are never saved as fake downloads.
+### Added
+- Added a hard timeout: a stalled download cancels itself and reports "This download timed out. Try again." instead of hanging.
+### Fixed
+- Fixed sign-in and error pages being saved as fake download files — they are now detected and reported as sign-in errors.
+
+## v1.6.16
+### Summary
+Every download failure now has a classified, actionable outcome.
+### Added
+- Added automatic retry for temporary network and server failures.
+- Added specific messages for permanent failures: disk full, file unavailable, browser crashed, file blocked, and more.
+### Fixed
+- Fixed cancellations made from the browser's own download panel showing as errors — they now correctly show as cancelled.
 
 ## v1.6.15
 ### Summary
-A stabilization release that finished the Download All overhaul: groups always settle, background tabs stay live, and automated QA coverage reached the full manual runbook.
+Internal hardening: a corpus of eleven real-world download failure scenarios now runs against both the engine's brain and its implementation, and they must agree on every outcome.
+
+## v1.6.14
+### Summary
+The test simulator learned six new real-world failure shapes — server errors, sign-in redirects, mid-download connection drops, slow streams, empty files and quota pages — so the engine can be verified against them.
+
+## v1.6.13
+### Summary
+Rendering groundwork for the next engine generation: all page observation now flows through one shared, throttled observer.
+
+## v1.6.12
+### Summary
+Download All is now fully stabilized and the automated QA suite covers the entire manual runbook.
 ### Fixed
-- Fixed Download All groups that could stay stuck on "Downloading…" forever — the root cause of the long-running hang reports.
-- Fixed Download All progress not updating when the Classroom tab was open in the background.
-### Changed
-- Extended the automated manual-check suite to cover every runbook flow (submissions rows, popup analytics, back-navigation, error states), with real download verification.
+- Fixed the root cause of Download All groups hanging on "Downloading…" forever.
+- Fixed Download All progress not updating when the Classroom tab was in the background.
+
+## v1.6.11
+### Summary
+The Engine Mode switch shipped in popup settings (Legacy / New) with live switching and one-click rollback, and page detection is now wired to the download engine through one typed bridge.
 
 ## v1.6.10
 ### Summary
-Download reliability milestone: invisible multi-account fallback, completely window-free downloads through Google's direct file endpoint, and the new Engine Mode switch.
-### Added
-- Added invisible multi-account fallback: files the active account cannot access now try the other signed-in accounts quietly.
-- Added the Engine Mode switch in popup settings (Legacy / New) with one-click rollback and live switching.
-- Added an event-bus architecture connecting page detection to the download engine through one typed bridge.
-### Changed
-- Downloads now use Google's modern byte-serving endpoint directly — one hop, faster, no interstitial pages.
-- Downloads are now window-free on every browser: the old background-tab workaround was removed entirely.
+The engine's internals now communicate through a typed event bus — the architectural groundwork that lets every later change be measured and rolled back independently.
+
+## v1.6.9
+### Summary
+Zero-window downloads verified end-to-end: the old background-tab workaround is fully removed, and a locked test file proves the invisible account fallback completes real downloads.
+
+## v1.6.8
+### Summary
+The fix for the most-reported download bug: files that start but fail now quietly try your other signed-in accounts, and downloads go straight through Google's direct file endpoint.
 ### Fixed
-- Fixed the visible "403 Access Forbidden" window that could appear and never close.
-- Fixed "Download All always fails" reports where one broken file left the group hanging.
-- Fixed Google Sheets attachments not getting download buttons.
+- Fixed "files start but fail" reports on Firefox-family browsers (zen) and Brave.
+- Fixed Download All groups with one broken file hanging instead of settling.
+
+## v1.6.7
+### Summary
+The automated QA pipeline now replays the entire manual test runbook in real browsers — including real downloads verified byte-for-byte.
+
+## v1.6.6
+### Summary
+Foundation for the automated QA program: a local, deterministic Google Classroom simulator that serves real downloadable files under the real Classroom origins.
 
 ## v1.6.5
 ### Summary
-An accuracy blitz: fifteen detection and naming defects fixed, each locked in by an automated regression corpus, plus a fully automated QA pipeline that replays the manual test runbook in real browsers.
-### Added
-- Added a locale-aware filename cleanup registry so download names stay clean in every language (Hungarian, Arabic, Russian, Japanese, Chinese, French, German, Spanish and more).
-- Added the automated Manual-QA Replay pipeline: real-browser journeys covering buttons, Download All, flags, popup, navigation and real downloads, plus a gated live-Classroom canary.
+Detection and naming hardening: localized type labels no longer leak into filenames, download state races are fixed, and Sheets attachments get their buttons back.
 ### Fixed
-- Fixed comment-count false positives from dates and digits in complex Classroom layouts.
-- Fixed edited/comment verdicts being lost when page markup drifted.
-- Fixed download state races where concurrent downloads of the same file could cross wires.
 - Fixed localized type labels (like "Tömörített archívum") leaking into downloaded filenames.
-- Fixed substring false positives in keyword and exclusion matching across scripts (Arabic tashkeel, Armenian, word-numerals).
+- Fixed download state races where concurrent downloads of the same file could cross wires.
+- Fixed Google Sheets attachments not getting download buttons.
+
+## v1.6.4
+### Summary
+More detection accuracy fixes: comment counts survive markup drift, exclusions match whole tokens, and localized dates parse correctly.
+
+## v1.6.3
+### Summary
+Exclusion matching now operates on whole words, eliminating a family of false-positive detections.
+
+## v1.6.2
+### Summary
+Detection defenses: number extraction now sanity-checks the page before trusting it.
+
+## v1.6.1
+### Summary
+Detection accuracy across scripts: Armenian keywords, exact word-number matching, and Arabic diacritic folding fixed.
 
 ## v1.6.0
 ### Summary
@@ -67,9 +109,32 @@ The Engine V4 foundation: a measurable accuracy standard for the detection engin
 ### Added
 - Added the accuracy corpus and gates: detection decisions are held to labeled expectations across locales, with floors that may only move up.
 - Added typed contracts, an event bus, and a pure acquisition state machine with bounded account rotation and forced deadlines.
-- Added hardened e2e, accuracy and release gates to CI.
+
+## v1.5.11
+### Summary
+Under-the-hood hardening: stricter typing, updated dependencies, and stronger release gates.
+
+## v1.5.10
+### Summary
+A security-and-stability release: an external audit rolled in, one download-tracking race fixed, and the extension now requests fewer browser permissions.
+
+## v1.5.9
+### Summary
+A batch of reviewed, low-risk fixes and cleanups rolled into one stable release.
+
+## v1.5.8
+### Summary
+Faster page scanning and a fully accessible popup.
 ### Changed
-- Extracted the detection core into pure modules: normalization, word-numerals, action-button exclusions, and count ceilings.
+- Optimized DOM traversal with combined CSS selectors for faster scans on busy pages.
+
+## v1.5.7
+### Summary
+A security-hardening release: the developer debug surface now escapes all runtime values before rendering.
+
+## v1.5.6
+### Summary
+A security-and-accessibility release: cryptographically secure download identifiers, fully labeled controls, and deeper Student Work test coverage.
 
 ## v1.5.5
 ### Summary
