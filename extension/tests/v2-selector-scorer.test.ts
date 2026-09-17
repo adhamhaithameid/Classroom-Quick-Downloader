@@ -767,3 +767,66 @@ describe('SelectorScorer: Edge Cases', () => {
     expect(summary).toContain('3');
   });
 });
+
+// ===========================================================================
+// z57 S2 — queryAllCandidates: the union across candidates. File discovery
+// needs every candidate's matches (a post can mix Drive + Docs attachments,
+// each matched by a DIFFERENT candidate at the same priority), which
+// queryAll's single-winner semantics cannot express.
+// ===========================================================================
+describe('SelectorScorer: queryAllCandidates (z57 S2 union semantics)', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('returns the union of two same-priority candidates, not just the winner', () => {
+    document.body.innerHTML = `
+      <div class="kind-a">A</div>
+      <div class="kind-b">B</div>`;
+    const scorer = new SelectorScorer('mixed kinds', [
+      makeCandidate({ id: 'a-cand', cssSelector: '.kind-a' }),
+      makeCandidate({ id: 'b-cand', cssSelector: '.kind-b' }),
+    ]);
+
+    const result = scorer.queryAllCandidates(document.body);
+    expect(result.allElements).toHaveLength(2);
+    expect(result.trace.find((t) => t.candidateId === 'a-cand')?.matched).toBe(true);
+    expect(result.trace.find((t) => t.candidateId === 'b-cand')?.matched).toBe(true);
+  });
+
+  it('deduplicates elements matched by multiple candidates', () => {
+    document.body.innerHTML = `<div class="both a-and-b"></div>`;
+    const scorer = new SelectorScorer('overlap', [
+      makeCandidate({ id: 'cand-a', cssSelector: '.both' }),
+      makeCandidate({ id: 'cand-b', cssSelector: '.a-and-b' }),
+    ]);
+
+    const result = scorer.queryAllCandidates(document.body);
+    expect(result.allElements).toHaveLength(1);
+  });
+
+  it('keeps the winner semantics (highest effective score) for reporting', () => {
+    document.body.innerHTML = `
+      <div class="low">L</div>
+      <div data-high="1">H</div>`;
+    const scorer = new SelectorScorer('winner check', [
+      makeCandidate({ id: 'low', cssSelector: '.low', level: SelectorLevel.L4_GOLDEN_CLASS }),
+      makeCandidate({ id: 'high', cssSelector: '[data-high]', level: SelectorLevel.L1_DATA_ATTR }),
+    ]);
+
+    const result = scorer.queryAllCandidates(document.body);
+    expect(result.allElements).toHaveLength(2);
+    expect(result.winner?.id).toBe('high');
+    expect(result.winnerLevel).toBe(SelectorLevel.L1_DATA_ATTR);
+  });
+
+  it('single-candidate behavior is unchanged from queryAll', () => {
+    document.body.innerHTML = `<div class="solo">S</div>`;
+    const scorer = new SelectorScorer('solo', [
+      makeCandidate({ id: 'only', cssSelector: '.solo' }),
+    ]);
+
+    const viaUnion = scorer.queryAllCandidates(document.body);
+    expect(viaUnion.allElements).toHaveLength(1);
+  });
+});

@@ -137,6 +137,17 @@ export const FILE_ANCHOR_CANDIDATES: SelectorCandidate[] = [
   candidate('file-l2-drive-uc', 'a[href*="drive.google.com/uc"]', SelectorLevel.L2_ARIA_SEMANTIC, 'drive download link', { baseReliability: 90 }),
   candidate('file-l2-classroom-drive', 'a[href*="classroom.google.com/drive"]', SelectorLevel.L2_ARIA_SEMANTIC, 'classroom drive link', { baseReliability: 90 }),
 
+  // L2: Docs-viewer anchors (z57 S2 — parity with V1's DRIVE_ANCHOR_SELECTOR).
+  // Google Docs/Sheets/Slides/Drawings attachments carry docs.google.com
+  // hrefs, NOT drive.google.com ones, so the drive-only candidates above miss
+  // them entirely. One candidate per downloadable viewer type; deliberately
+  // NO generic docs.google.com candidate — Forms lives at docs.google.com
+  // /forms/… and must stay button-free (qa-01 golden rule 3).
+  candidate('file-l2-docs-document', 'a[href*="docs.google.com/document/"]', SelectorLevel.L2_ARIA_SEMANTIC, 'docs document link', { baseReliability: 90 }),
+  candidate('file-l2-docs-spreadsheet', 'a[href*="docs.google.com/spreadsheets/"]', SelectorLevel.L2_ARIA_SEMANTIC, 'docs spreadsheet link', { baseReliability: 90 }),
+  candidate('file-l2-docs-presentation', 'a[href*="docs.google.com/presentation/"]', SelectorLevel.L2_ARIA_SEMANTIC, 'docs presentation link', { baseReliability: 90 }),
+  candidate('file-l2-docs-drawings', 'a[href*="docs.google.com/drawings/"]', SelectorLevel.L2_ARIA_SEMANTIC, 'docs drawings link', { baseReliability: 90 }),
+
   // L4: Golden class names
   candidate('file-l4-KlRXdf', '.KlRXdf', SelectorLevel.L4_GOLDEN_CLASS, 'attachment container'),
   candidate('file-l4-z3vRcc', '.z3vRcc', SelectorLevel.L4_GOLDEN_CLASS, 'attachment container alt'),

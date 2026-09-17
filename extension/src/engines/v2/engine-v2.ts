@@ -492,11 +492,18 @@ export class EngineV2 implements CQDEngine {
   private discoverFiles(postEl: HTMLElement): FileNode[] {
     if (!this.fileScorer) return [];
 
-    const fileResult = this.fileScorer.queryAll(postEl);
+    // z57 S2: the UNION across candidates — one post routinely mixes Drive
+    // and Docs attachments, each matched by a different candidate at the same
+    // priority, and queryAll's single-winner semantics would drop every kind
+    // but the best candidate's.
+    const fileResult = this.fileScorer.queryAllCandidates(postEl);
     const files: FileNode[] = [];
     const seenIds = new Set<string>();
+    const seenElements = new Set<HTMLElement>();
 
     for (const el of fileResult.allElements) {
+      if (seenElements.has(el)) continue;
+      seenElements.add(el);
       const file = this.extractFileNode(el);
       if (file && !seenIds.has(file.canonicalId)) {
         seenIds.add(file.canonicalId);
