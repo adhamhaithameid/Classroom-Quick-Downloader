@@ -46,10 +46,13 @@ describe('style consistency: shared glass design system', () => {
     expect(css).toContain('.glass-panel');
     expect(css).toContain('.glass-hover');
     expect(css).toContain('.glass-icon');
-    // Surface + sheen + sweep + guards all live in the shared file.
+    // Surface + focus/hover guards all live in the shared file. The static
+    // sheen and the cursor-tracked sweep were removed: the sheen painted
+    // ABOVE card content, and the stacked hover layers read as extreme.
     expect(css).toContain('var(--glass-bg)');
-    expect(css).toContain('linear-gradient(180deg, rgba(255, 255, 255, 0.8)');
-    expect(css).toContain('--card-mx');
+    expect(css).not.toContain('linear-gradient(180deg, rgba(255, 255, 255, 0.8)');
+    expect(css).not.toContain('.glass-panel::before');
+    expect(css).not.toContain('--card-mx');
     expect(css).toContain('prefers-reduced-motion');
     expect(css).toContain('prefers-reduced-transparency');
     expect(css).toContain('@keyframes card-glass-in');
@@ -151,6 +154,20 @@ describe('style consistency: one shared ambient background', () => {
   it.each(AMBIENT_COPIES_GONE)('$label no longer re-implements the background', ({ file, marker }) => {
     const source = read(file);
     expect(source).not.toContain(marker);
+  });
+
+  it('pins the cursor-bend canvas and its gating in the ambient component', () => {
+    const ambient = read('../lib/components/AmbientBackground.svelte');
+    // The bend canvas lives inside the grid wrapper; the action paints it
+    // only for fine pointers without reduced motion and toggles bend-live
+    // on the wrapper to stand down the CSS gradient while it draws.
+    expect(ambient).toContain('class="l2-grid-canvas"');
+    expect(ambient).toContain('use:gridBend');
+    expect(ambient).toContain('.bend-live');
+
+    const action = read('../lib/actions/gridBend.ts');
+    expect(action).toContain('prefers-reduced-motion');
+    expect(action).toContain('pointer: fine');
   });
 
   it('keeps the app-level body pseudo-orbs restored as part of the original look', () => {

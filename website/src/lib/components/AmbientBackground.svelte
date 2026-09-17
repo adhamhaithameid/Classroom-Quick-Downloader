@@ -1,3 +1,7 @@
+<script lang="ts">
+  import { gridBend } from '../actions/gridBend';
+</script>
+
 <div class="l2-page-orbs" aria-hidden="true">
   <div class="orb orb-1"></div>
   <div class="orb orb-2"></div>
@@ -12,7 +16,9 @@
   <div class="orb orb-11"></div>
   <div class="orb orb-12"></div>
 </div>
-<div class="l2-page-grid" aria-hidden="true"></div>
+<div class="l2-page-grid" aria-hidden="true">
+  <canvas class="l2-grid-canvas" aria-hidden="true" use:gridBend></canvas>
+</div>
 
 <style>
   /* ── Shared ambient background ───────────────────────────────────────
@@ -22,7 +28,9 @@
      Absolute positioning spans the whole document (the field scrolls
      with the page, like the old per-page layers). The floating entities
      are NOT part of this layer — the overview/editor render their own
-     editor-connected ones. */
+     editor-connected ones. On fine-pointer devices the grid lines bend
+     gently around the cursor (lib/actions/gridBend); reduced motion and
+     touch keep the static grid. */
   .l2-page-orbs,
   .l2-page-grid {
     position: absolute;
@@ -63,6 +71,27 @@
     background-image: linear-gradient(var(--text) 1px, transparent 1px),
       linear-gradient(90deg, var(--text) 1px, transparent 1px);
     background-size: 60px 60px;
+  }
+
+  /* Cursor-bend twin of the grid, painted by the gridBend action. It lives
+     inside the wrapper so the wrapper's opacity: 0.05 composites the whole
+     subtree — the canvas itself carries no opacity. */
+  .l2-grid-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+    display: none;
+  }
+
+  /* While the canvas paints, the CSS gradient stands down. bend-live is
+     toggled at runtime by the action, so the dynamic class must be
+     :global() to survive Svelte's scoped-CSS pruning. */
+  .l2-page-grid:global(.bend-live) {
+    background-image: none;
   }
 
   @keyframes orb-drift {
