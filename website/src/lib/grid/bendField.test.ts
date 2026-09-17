@@ -43,7 +43,7 @@ describe('bendOffset', () => {
     expect(o.dy).toBeLessThan(0);
   });
 
-  it('swirl 0.35 rotates the offset counter-clockwise relative to the radial direction', () => {
+  it('swirl 0.35 tilts the offset off the radial: dy/dx equals swirl exactly', () => {
     // Point right of cursor: radial = (1, 0), tangential = (0, 1); the offset
     // should sit between them, i.e. at a positive atan2 angle off the radial.
     const o = expectOffset(bendOffset(400, 300, 300, 300, BEND_DEFAULTS));

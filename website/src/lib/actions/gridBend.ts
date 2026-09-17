@@ -66,14 +66,19 @@ export function gridBend(canvas: HTMLCanvasElement): { destroy(): void } {
     // strokes land on the same pixels as the CSS 1px gradients.
     for (let x = Math.floor(ox / GRID_PITCH) * GRID_PITCH; x <= ox + vw; x += GRID_PITCH) {
       const baseX = x - ox + 0.5;
+      const lastSampleY = Math.floor(vh / SAMPLE_PX) * SAMPLE_PX;
+      let lastX = baseX;
       ctx.beginPath();
-      for (let py = 0; py <= vh; py += SAMPLE_PX) {
+      for (let py = 0; py <= lastSampleY; py += SAMPLE_PX) {
         const off = bendOffset(x, py + oy, cx, cy, params);
-        const lx = baseX + (off?.dx ?? 0);
+        lastX = baseX + (off?.dx ?? 0);
         const ly = py + (off?.dy ?? 0);
-        if (py === 0) ctx.moveTo(lx, ly);
-        else ctx.lineTo(lx, ly);
+        if (py === 0) ctx.moveTo(lastX, ly);
+        else ctx.lineTo(lastX, ly);
       }
+      // Tail-clamp: when vh is not a SAMPLE_PX multiple, extend the stroke
+      // to the exact bottom edge reusing the last sample's offset.
+      if (lastSampleY < vh) ctx.lineTo(lastX, vh);
       ctx.stroke();
     }
 
@@ -81,14 +86,19 @@ export function gridBend(canvas: HTMLCanvasElement): { destroy(): void } {
     // viewport.
     for (let y = Math.floor(oy / GRID_PITCH) * GRID_PITCH; y <= oy + vh; y += GRID_PITCH) {
       const baseY = y - oy + 0.5;
+      const lastSampleX = Math.floor(vw / SAMPLE_PX) * SAMPLE_PX;
+      let lastY = baseY;
       ctx.beginPath();
-      for (let px = 0; px <= vw; px += SAMPLE_PX) {
+      for (let px = 0; px <= lastSampleX; px += SAMPLE_PX) {
         const off = bendOffset(px + ox, y, cx, cy, params);
         const lx = px + (off?.dx ?? 0);
-        const ly = baseY + (off?.dy ?? 0);
-        if (px === 0) ctx.moveTo(lx, ly);
-        else ctx.lineTo(lx, ly);
+        lastY = baseY + (off?.dy ?? 0);
+        if (px === 0) ctx.moveTo(lx, lastY);
+        else ctx.lineTo(lx, lastY);
       }
+      // Tail-clamp: when vw is not a SAMPLE_PX multiple, extend the stroke
+      // to the exact right edge reusing the last sample's offset.
+      if (lastSampleX < vw) ctx.lineTo(vw, lastY);
       ctx.stroke();
     }
   }
@@ -171,6 +181,7 @@ export function gridBend(canvas: HTMLCanvasElement): { destroy(): void } {
   }
 
   function activate(): void {
+    if (!ctx) return; // no 2d context: never blank the grid behind the canvas
     active = true;
     canvas.style.display = 'block';
     canvas.parentElement?.classList.add('bend-live');

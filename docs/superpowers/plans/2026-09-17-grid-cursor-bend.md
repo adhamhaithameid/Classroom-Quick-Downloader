@@ -94,6 +94,9 @@ Run: `cd website && npx vitest run src/lib/grid/bendField.test.ts`
    `.l2-page-grid.bend-live { background-image: none; }` (note: `bend-live` toggled on
    the grid div = canvas's parent). Update the component's header comment (one line)
    to mention the cursor bend.
+   Ruling (review, 2026-09-17): `.l2-grid-canvas` must NOT carry its own opacity —
+   the wrapper's `opacity: 0.05` already composites the whole subtree, so an own
+   0.05 would double-apply to an effective 0.0025.
 3. `website/src/routes/style-consistency.guard.test.ts`: extend the ambient test
    (keep every existing assertion green) to also pin: canvas markup with
    `aria-hidden="true"` + `use:gridBend`, `.bend-live` fallback rule, and that

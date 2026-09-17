@@ -158,11 +158,17 @@ describe('style consistency: one shared ambient background', () => {
 
   it('pins the cursor-bend canvas and its gating in the ambient component', () => {
     const ambient = read('../lib/components/AmbientBackground.svelte');
-    // The bend canvas lives inside the grid wrapper; the action paints it
-    // only for fine pointers without reduced motion and toggles bend-live
-    // on the wrapper to stand down the CSS gradient while it draws.
-    expect(ambient).toContain('class="l2-grid-canvas"');
-    expect(ambient).toContain('use:gridBend');
+    // Full canvas markup, verbatim: aria-hidden AND nested inside the
+    // .l2-page-grid wrapper (the wrapper's opacity composites the canvas).
+    expect(ambient).toContain(
+      `<div class="l2-page-grid" aria-hidden="true">
+  <canvas class="l2-grid-canvas" aria-hidden="true" use:gridBend></canvas>
+</div>`
+    );
+    // The canvas is display:none until the action activates, and never
+    // intercepts pointers.
+    expect(ambient).toMatch(/\.l2-grid-canvas\s*\{[^}]*pointer-events:\s*none/);
+    // bend-live stands down the CSS gradient only while the canvas paints.
     expect(ambient).toContain('.bend-live');
 
     const action = read('../lib/actions/gridBend.ts');
