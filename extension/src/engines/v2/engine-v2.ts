@@ -801,12 +801,10 @@ export class EngineV2 implements CQDEngine {
         case 'remove-flag': {
           const post = this.postMap.get(item.postId);
           if (!post) return false;
-          const badge = post.element.querySelector('.cqd-v2-flag');
-          if (badge) badge.remove();
-          const overlay = post.element.querySelector('.cqd-v2-overlay');
-          if (overlay) overlay.remove();
-          post.element.removeAttribute('data-cqd-v2-flag');
-          post.element.removeAttribute('data-cqd-v2-flag-verdict');
+          // z57 S4: flag artifacts carry the V2 marker attribute.
+          for (const el of Array.from(post.element.querySelectorAll('[data-cqd-v2-flag]'))) {
+            el.remove();
+          }
           return true;
         }
 
@@ -1038,7 +1036,7 @@ export class EngineV2 implements CQDEngine {
       }
 
       // Check duplicate badges
-      const badges = post.element.querySelectorAll('.cqd-v2-flag');
+      const badges = post.element.querySelectorAll('[data-cqd-v2-flag="badge"]');
       if (badges.length > 1) {
         duplicates += badges.length - 1;
       }
@@ -1074,7 +1072,7 @@ export class EngineV2 implements CQDEngine {
       if (!post) continue;
       flagChecks++;
 
-      const badge = post.element.querySelector('.cqd-v2-flag');
+      const badge = post.element.querySelector('[data-cqd-v2-flag="badge"]');
       const hasBadge = !!badge;
       const wantsBadge = decision.finalVerdict !== 'none';
 

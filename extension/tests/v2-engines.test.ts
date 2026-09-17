@@ -290,7 +290,7 @@ describe('EngineV2', () => {
     engineRegistry.setMode('v2');
     (engine as unknown as { renderDetectedFlags: () => void }).renderDetectedFlags();
 
-    expect(post.querySelector('.cqd-v2-flag')).not.toBeNull();
+    expect(post.querySelector('[data-cqd-v2-flag="badge"]')).not.toBeNull();
     engineRegistry.setMode('shadow');
   });
 
@@ -307,7 +307,7 @@ describe('EngineV2', () => {
     engineRegistry.setMode('shadow');
     (engine as unknown as { renderDetectedFlags: () => void }).renderDetectedFlags();
 
-    expect(post.querySelector('.cqd-v2-flag')).toBeNull();
+    expect(post.querySelector('[data-cqd-v2-flag="badge"]')).toBeNull();
   });
 
   it('filters irrelevant mutations', async () => {

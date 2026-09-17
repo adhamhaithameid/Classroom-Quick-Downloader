@@ -1,364 +1,299 @@
 // filepath: extension/src/v2/render/flag-renderer.ts
 /**
  * ============================================================================
- * FLAG RENDERER — Idempotent Badge Injection for V2
+ * FLAG RENDERER (v2) — Idempotent Badge Injection, V1 markup contract (z57 S4)
  * ============================================================================
  *
- * V1 had 3 separate renderers:
- * - comment_frame.content.ts → createOverlay()
- * - edited_frame.content.ts → createEditedOverlay()
- * - both-badge.ts → upgradeCombinedBadge()
+ * V2's flag-scoring engine decides; this module renders. The markup is V1's
+ * exact badge contract (the QA journeys pin it):
  *
- * Each ran independently via its own MutationObserver, creating race
- * conditions when both needed to merge into a "both" badge.
+ *   comment → <div class="cqd-flag cqd-comment-badge">  icon + count + tooltip
+ *   edited  → <div class="cqd-flag cqd-edited-badge">   icon + ✓ + overlay
+ *   both    → ONE .cqd-overlay-container (red frame) holding ONE
+ *             .cqd-flag.cqd-both-badge (comment • + edit) — never two pills
  *
- * V2 has a single renderFlagBadge() function that handles all 3 badge
- * types (comment, edited, both) with no race conditions because the
- * verdict is already computed by flag-scoring.ts.
+ * V1's three independent renderers (comment_frame / edited_frame / both-badge)
+ * became one idempotent render because the verdict is already computed by
+ * flag-scoring.ts — no merge races.
  *
- * Key design decisions:
- * 1. Template cloning — build one template per badge type, then clone.
- *    Same pattern as button-renderer.ts.
- * 2. Idempotent — calling renderFlagBadge() twice with the same verdict
- *    is a no-op. Badge gets its own data-cqd-v2-flag attribute.
- * 3. CSS-only hover/animation — no JS mouseenter/mouseleave.
- * 4. Delegated click handler — one handler on the post root.
+ * Live toggles (qa-03 golden rule 8): the popup's cqd-flag-toggle message
+ * reaches applyFlagToggle (wired in v2_bootstrap), which strips badges of the
+ * disabled kind and re-renders enabled ones from the last-decision registry —
+ * no reload, no waiting for a scan.
  *
- * @author Adham — unified flag rendering, no more race conditions
- * @since v4.0.0
+ * RTL (golden rule 7): the product sets data-cqd-dir on <body> and the badge
+ * CSS anchors edge-ribbons by it, exactly like V1's styles.ts.
  */
 
 import type { FlagDecision } from '../../engines/types';
 import { injectFlagStyles } from './flag-styles';
 
 // ============================================================================
-// CONSTANTS
+// MARKERS
 // ============================================================================
-
-/** Data attribute marking a post as having a V2 flag badge */
-const FLAG_ATTR = 'data-cqd-v2-flag';
-
-/** Data attribute storing the current badge verdict */
-const FLAG_VERDICT_ATTR = 'data-cqd-v2-flag-verdict';
-
-/** Data attribute marking an injected CQD element */
-const CQD_INJECTED_ATTR = 'data-cqd-injected';
-
-// ============================================================================
-// TEMPLATE CACHE — Build once, clone many
-// ============================================================================
-
-/** Cached badge templates (built lazily) */
-const templateCache = new Map<string, HTMLElement>();
 
 /**
- * Build or retrieve a badge template for a verdict type.
- *
- * Templates are built once and then cloned via cloneNode(true).
- * This avoids creating elements from scratch on every render.
+ * Marks a badge as V2-injected. V1's badges share the cqd-flag classes and
+ * the data-cqd-injected attribute, so teardown scopes by THIS marker — in
+ * shadow mode a v2 destroy must never strip V1's live badges.
  */
-function getTemplate(verdict: 'comment' | 'edited' | 'both'): HTMLElement {
-  const cached = templateCache.get(verdict);
-  if (cached) return cached;
+const V2_FLAG_ATTR = 'data-cqd-v2-flag';
 
-  const badge = document.createElement('div');
-  badge.className = `cqd-v2-flag cqd-v2-flag-${verdict}`;
-  badge.setAttribute(CQD_INJECTED_ATTR, 'true');
-  badge.setAttribute('role', 'status');
+/** Registry of the last decision per post — the live-toggle re-render source. */
+const lastDecisions = new WeakMap<HTMLElement, FlagDecision>();
 
-  if (verdict === 'both') {
-    // Both badge: comment icon + separator + edit icon + text
-    const commentIcon = document.createElement('span');
-    commentIcon.className = 'cqd-v2-flag-icon';
-    commentIcon.style.backgroundImage = _getCommentIconUrl();
-
-    const separator = document.createElement('span');
-    separator.className = 'cqd-v2-flag-separator';
-
-    const editIcon = document.createElement('span');
-    editIcon.className = 'cqd-v2-flag-icon';
-    editIcon.style.backgroundImage = _getEditedIconUrl();
-
-    const text = document.createElement('span');
-    text.className = 'cqd-v2-flag-text';
-
-    badge.appendChild(commentIcon);
-    badge.appendChild(separator);
-    badge.appendChild(editIcon);
-    badge.appendChild(text);
-  } else {
-    // Single badge: icon + text
-    const icon = document.createElement('span');
-    icon.className = 'cqd-v2-flag-icon';
-
-    const text = document.createElement('span');
-    text.className = 'cqd-v2-flag-text';
-
-    badge.appendChild(icon);
-    badge.appendChild(text);
-  }
-
-  templateCache.set(verdict, badge);
-  return badge;
-}
-
-// ============================================================================
-// ICON URLS (inline SVG data URIs)
-// ============================================================================
-
-function _getCommentIconUrl(): string {
-  return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ffffff'%3E%3Cpath d='M21.99 4c0-1.1-.89-2-1.99-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4-.01-18z'/%3E%3C/svg%3E")`;
-}
-
-function _getEditedIconUrl(): string {
-  return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ffffff'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E")`;
-}
+/** Live flag enable state (popup toggles flip these without a reload). */
+const enabled = { comments: true, edited: true };
 
 // ============================================================================
 // PUBLIC API
 // ============================================================================
 
 /**
- * Render a flag badge on a post element.
- *
- * This is the single entry point for all flag rendering. It handles:
- * - Creating comment, edited, or both badges
- * - Updating existing badges when the verdict changes
- * - Removing badges when verdict is 'none'
- * - CSS-only hover expansion + click handling
- *
- * Idempotent: calling with the same verdict + count is a no-op.
- *
- * @param decision - The flag decision from flag-scoring.ts
- * @param post - The post element to attach the badge to
+ * Render the badge for one flag decision on a post. Idempotent: the same
+ * verdict + count re-renders nothing.
  */
 export function renderFlagBadge(decision: FlagDecision, post: HTMLElement): void {
-  // Ensure styles are injected
   injectFlagStyles();
+  lastDecisions.set(post, decision);
 
-  const { finalVerdict, commentCount, commentScore, editedScore } = decision;
+  applyDirection(post.ownerDocument || document);
 
-  // No flags → remove any existing badge
+  const { finalVerdict, commentCount } = decision;
+
   if (finalVerdict === 'none') {
-    removeStaleBadges(post);
+    removeFlagArtifacts(post);
     return;
   }
 
-  // Check for existing badge with same verdict
-  const existingVerdict = post.getAttribute(FLAG_VERDICT_ATTR);
-  const existingBadge = post.querySelector<HTMLElement>(`.cqd-v2-flag`);
+  const wantComment = enabled.comments && (finalVerdict === 'comment' || finalVerdict === 'both');
+  const wantEdited = enabled.edited && (finalVerdict === 'edited' || finalVerdict === 'both');
 
-  // If same verdict and same comment count, do nothing (idempotent)
-  if (existingVerdict === finalVerdict && existingBadge) {
-    const existingText = existingBadge.querySelector('.cqd-v2-flag-text');
-    const newLabel = _buildLabel(finalVerdict, commentCount);
-    if (existingText && existingText.textContent === newLabel) {
-      return; // No change needed
-    }
-
-    // Update the label if count changed
-    if (existingText) {
-      existingText.textContent = newLabel;
-    }
+  if (!wantComment && !wantEdited) {
+    removeFlagArtifacts(post);
     return;
   }
 
-  // Remove stale badge if verdict changed
-  if (existingBadge) {
-    existingBadge.remove();
-  }
+  const dark = isDarkMode();
+  const existing = post.querySelector<HTMLElement>(`[${V2_FLAG_ATTR}="badge"]`);
+  const existingKind = existing?.getAttribute('data-cqd-flag-kind') ?? null;
+  const existingCount = existing?.getAttribute('data-cqd-comment-count') ?? null;
 
-  // Ensure post has position:relative for absolute badge positioning
-  const postPosition = window.getComputedStyle(post).position;
-  if (postPosition === 'static') {
-    post.style.position = 'relative';
-  }
+  // Idempotence: same kind + same count → nothing to do.
+  const kind = wantComment && wantEdited ? 'both' : wantComment ? 'comment' : 'edited';
+  const countKey = wantComment ? String(commentCount ?? '') : null;
+  if (existing && existingKind === kind && existingCount === countKey) return;
 
-  // Clone the template for this verdict type
-  const template = getTemplate(finalVerdict);
-  const badge = template.cloneNode(true) as HTMLElement;
+  removeFlagArtifacts(post);
 
-  // Set text content
-  const textEl = badge.querySelector('.cqd-v2-flag-text');
-  if (textEl) {
-    textEl.textContent = _buildLabel(finalVerdict, commentCount);
-  }
-
-  // Set tooltip
-  const tooltip = _buildTooltip(finalVerdict, commentCount, commentScore, editedScore);
-  badge.title = tooltip;
-  badge.setAttribute('aria-label', tooltip);
-
-  // Dark mode
-  if (_isDarkMode()) {
-    badge.classList.add('cqd-theme-dark');
-  }
-
-  // Add to post
-  post.appendChild(badge);
-  post.setAttribute(FLAG_ATTR, 'true');
-  post.setAttribute(FLAG_VERDICT_ATTR, finalVerdict);
-
-  // Add overlay border
-  _addOverlayBorder(post, finalVerdict);
-
-  // Set up click handler (delegated — one per post)
-  if (!post.hasAttribute('data-cqd-v2-flag-click')) {
-    post.setAttribute('data-cqd-v2-flag-click', 'true');
-    post.addEventListener('click', _handleBadgeClick);
+  if (kind === 'comment') {
+    post.appendChild(buildCommentBadge(commentCount ?? 0, dark));
+  } else if (kind === 'edited') {
+    post.appendChild(buildOverlay('edited', dark));
+    post.appendChild(buildEditedBadge(dark));
+  } else {
+    const overlay = buildOverlay('both', dark);
+    overlay.appendChild(buildBothBadge(commentCount ?? 0, dark));
+    post.appendChild(overlay);
   }
 }
 
-/**
- * Remove any stale V2 flag badges from a post.
- */
+/** Remove badges + overlay from one post (verdict 'none' or kind change). */
 export function removeStaleBadges(post: HTMLElement): void {
-  // Remove badge
-  const badge = post.querySelector('.cqd-v2-flag');
-  if (badge) {
-    badge.remove();
-  }
-
-  // Remove overlay border
-  const overlay = post.querySelector('.cqd-v2-overlay');
-  if (overlay) {
-    overlay.remove();
-  }
-
-  // Clean up attributes
-  post.removeAttribute(FLAG_ATTR);
-  post.removeAttribute(FLAG_VERDICT_ATTR);
+  removeFlagArtifacts(post);
 }
 
-/**
- * Remove ALL V2 flag badges from a scope (defaults to document).
- * Used on engine destroy.
- */
+/** Remove ALL V2 flag artifacts in a scope (engine destroy). V1-safe. */
 export function removeAllV2Badges(scope?: HTMLElement): void {
   const root = scope || document.body;
   if (!root) return;
-
-  // Remove all badges
-  const badges = root.querySelectorAll('.cqd-v2-flag');
-  for (const badge of badges) {
-    badge.remove();
+  for (const el of Array.from(root.querySelectorAll<HTMLElement>(`[${V2_FLAG_ATTR}]`))) {
+    el.remove();
   }
+}
 
-  // Remove all overlays
-  const overlays = root.querySelectorAll('.cqd-v2-overlay');
-  for (const overlay of overlays) {
-    overlay.remove();
+/**
+ * Apply a live flag toggle (popup → cqd-flag-toggle). Strips badges of the
+ * disabled kind and re-renders enabled ones from the last-decision registry —
+ * live, no reload (qa-03 golden rule 8).
+ */
+export function applyFlagToggle(flag: 'commentsFlagEnabled' | 'editedFlagEnabled', isOn: boolean): void {
+  if (flag === 'commentsFlagEnabled') enabled.comments = isOn;
+  if (flag === 'editedFlagEnabled') enabled.edited = isOn;
+
+  // Re-render every post this page has a decision for (bounded to live posts).
+  for (const post of document.querySelectorAll<HTMLElement>('[data-stream-item-id]')) {
+    const decision = lastDecisions.get(post);
+    if (!decision) continue;
+    if (!post.isConnected) continue;
+    renderFlagBadge(decision, post);
   }
-
-  // Clean up attributes
-  const flagged = root.querySelectorAll(`[${FLAG_ATTR}]`);
-  for (const el of flagged) {
-    el.removeAttribute(FLAG_ATTR);
-    el.removeAttribute(FLAG_VERDICT_ATTR);
-    el.removeAttribute('data-cqd-v2-flag-click');
-  }
-
-  // Clear template cache
-  templateCache.clear();
 }
 
 // ============================================================================
-// INTERNAL HELPERS
+// BADGE BUILDERS — the V1 pill structures
 // ============================================================================
 
-/**
- * Build the label text for a badge.
- */
-function _buildLabel(verdict: string, count: number | null): string {
-  switch (verdict) {
-    case 'comment':
-      return count ? `${count}` : '';
-    case 'edited':
-      return '✎';
-    case 'both':
-      return count ? `${count} • ✎` : '✎';
-    default:
-      return '';
-  }
+const COMMENT_ICON_URL =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ffffff'%3E%3Cpath d='M21.99 4c0-1.1-.89-2-1.99-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4-.01-18z'/%3E%3C/svg%3E";
+
+const EDIT_ICON_SVG =
+  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ffffff'><path d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/></svg>";
+
+function buildCommentBadge(count: number, dark: boolean): HTMLElement {
+  const badge = document.createElement('div');
+  badge.className = 'cqd-comment-badge cqd-flag';
+  badge.setAttribute('data-cqd-injected', 'true');
+  badge.setAttribute(V2_FLAG_ATTR, 'badge');
+  badge.setAttribute('data-cqd-flag-kind', 'comment');
+  badge.setAttribute('data-cqd-comment-count', String(count));
+  if (dark) badge.classList.add('cqd-theme-dark');
+
+  const icon = document.createElement('div');
+  icon.className = 'cqd-flag-icon';
+  icon.style.backgroundImage = `url("${COMMENT_ICON_URL}")`;
+  icon.style.backgroundSize = '18px 18px';
+  icon.style.backgroundRepeat = 'no-repeat';
+  icon.style.backgroundPosition = 'center';
+  icon.style.filter = 'brightness(0) invert(1)';
+
+  const text = document.createElement('span');
+  text.className = 'cqd-flag-text';
+  text.textContent = String(count);
+
+  badge.appendChild(icon);
+  badge.appendChild(text);
+
+  const tooltip = `${count} comments`;
+  badge.title = tooltip;
+  badge.setAttribute('aria-label', tooltip);
+  return badge;
 }
 
-/**
- * Build tooltip text for a badge.
- */
-function _buildTooltip(
-  verdict: string,
-  count: number | null,
-  commentScore: number,
-  editedScore: number,
-): string {
-  const parts: string[] = [];
+function buildEditedBadge(dark: boolean): HTMLElement {
+  const badge = document.createElement('div');
+  badge.className = 'cqd-edited-badge cqd-flag';
+  badge.setAttribute('data-cqd-injected', 'true');
+  badge.setAttribute(V2_FLAG_ATTR, 'badge');
+  badge.setAttribute('data-cqd-flag-kind', 'edited');
+  if (dark) badge.classList.add('cqd-theme-dark');
 
-  if (verdict === 'comment' || verdict === 'both') {
-    parts.push(count ? `${count} comment${count !== 1 ? 's' : ''}` : 'Has comments');
-  }
-  if (verdict === 'edited' || verdict === 'both') {
-    parts.push('Post was edited');
-  }
+  const icon = document.createElement('div');
+  icon.className = 'cqd-flag-icon cqd-edited-icon';
+  icon.innerHTML = EDIT_ICON_SVG;
 
-  return parts.join(' | ');
+  const text = document.createElement('span');
+  text.className = 'cqd-flag-text';
+  text.textContent = '✓';
+
+  badge.appendChild(icon);
+  badge.appendChild(text);
+
+  const tooltip = 'Edited';
+  badge.title = tooltip;
+  badge.setAttribute('aria-label', tooltip);
+  return badge;
 }
 
-/**
- * Add a colored overlay border to the post.
- */
-function _addOverlayBorder(post: HTMLElement, verdict: string): void {
-  // Remove existing overlay
-  const existing = post.querySelector('.cqd-v2-overlay');
-  if (existing) existing.remove();
-
+/** The frame overlay a post gets for edited/both verdicts (V1 structure). */
+function buildOverlay(kind: 'edited' | 'both', dark: boolean): HTMLElement {
   const overlay = document.createElement('div');
-  overlay.className = `cqd-v2-overlay cqd-v2-flag-border-${verdict}`;
-  overlay.setAttribute(CQD_INJECTED_ATTR, 'true');
+  overlay.className = `cqd-overlay-container cqd-${kind}`;
+  overlay.setAttribute('data-cqd-injected', 'true');
+  overlay.setAttribute(V2_FLAG_ATTR, 'overlay');
+  if (dark) overlay.classList.add('cqd-theme-dark');
 
-  if (_isDarkMode()) {
-    overlay.classList.add('cqd-theme-dark');
+  const post = overlay.parentElement;
+  const radius = post ? parseInt(getComputedStyle(post).borderRadius || '0', 10) || 0 : 0;
+  overlay.style.setProperty('--cqd-overlay-radius', `${Math.max(radius, 16)}px`);
+  return overlay;
+}
+
+/** The combined pill inside a both-overlay (comment • + edit, V1 structure). */
+function buildBothBadge(count: number, dark: boolean): HTMLElement {
+  const badge = document.createElement('div');
+  badge.className = 'cqd-flag cqd-both-badge';
+  badge.setAttribute('data-cqd-injected', 'true');
+  badge.setAttribute(V2_FLAG_ATTR, 'badge');
+  badge.setAttribute('data-cqd-flag-kind', 'both');
+  badge.setAttribute('data-cqd-comment-count', String(count));
+  if (dark) badge.classList.add('cqd-theme-dark');
+
+  const commentSection = document.createElement('div');
+  commentSection.className = 'cqd-both-section';
+  const commentIcon = document.createElement('div');
+  commentIcon.className = 'cqd-both-icon cqd-both-icon-comment';
+  commentIcon.style.backgroundImage = `url("${COMMENT_ICON_URL}")`;
+  commentIcon.style.backgroundSize = '18px 18px';
+  commentIcon.style.backgroundRepeat = 'no-repeat';
+  commentIcon.style.backgroundPosition = 'center';
+  commentIcon.style.filter = 'brightness(0) invert(1)';
+  const commentValue = document.createElement('span');
+  commentValue.className = 'cqd-both-value';
+  commentValue.textContent = String(count);
+  commentSection.appendChild(commentIcon);
+  commentSection.appendChild(commentValue);
+
+  const plus = document.createElement('div');
+  plus.className = 'cqd-both-plus';
+  plus.textContent = '+';
+
+  const editSection = document.createElement('div');
+  editSection.className = 'cqd-both-section';
+  const editIcon = document.createElement('div');
+  editIcon.className = 'cqd-both-icon cqd-both-icon-edited';
+  editIcon.innerHTML = EDIT_ICON_SVG;
+  const editValue = document.createElement('span');
+  editValue.className = 'cqd-both-value';
+  editValue.textContent = '✓';
+  editSection.appendChild(editIcon);
+  editSection.appendChild(editValue);
+
+  badge.appendChild(commentSection);
+  badge.appendChild(plus);
+  badge.appendChild(editSection);
+
+  const tooltip = `${count} comments | Edited`;
+  badge.title = tooltip;
+  badge.setAttribute('aria-label', tooltip);
+  return badge;
+}
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+/** Strip every v2 flag artifact from a post. */
+function removeFlagArtifacts(post: HTMLElement): void {
+  for (const el of Array.from(post.querySelectorAll<HTMLElement>(`[${V2_FLAG_ATTR}]`))) {
+    el.remove();
   }
-
-  post.appendChild(overlay);
 }
 
 /**
- * Detect dark mode from document classes.
+ * Mirror V1's getPageDirection OUTCOME: element dir first, computed style as
+ * the fallback. Published on <body> as data-cqd-dir — the badge CSS anchors
+ * the edge-ribbons by it.
  */
-function _isDarkMode(): boolean {
+function applyDirection(doc: Document): void {
+  if (typeof document === 'undefined') return;
+  const docDir = doc.documentElement?.dir || doc.body?.dir;
+  let direction: 'ltr' | 'rtl' = 'ltr';
+  if (docDir === 'rtl') direction = 'rtl';
+  else if (typeof window !== 'undefined' && doc.body) {
+    try {
+      direction = window.getComputedStyle(doc.body).direction === 'rtl' ? 'rtl' : 'ltr';
+    } catch { /* keep ltr */ }
+  }
+  doc.body?.setAttribute('data-cqd-dir', direction);
+}
+
+function isDarkMode(): boolean {
   if (typeof document === 'undefined') return false;
-  return document.body?.classList.contains('cqd-theme-dark') ||
-         document.documentElement?.classList.contains('cqd-theme-dark') ||
-         false;
-}
-
-/**
- * Delegated click handler for badge clicks.
- * Opens the post by finding and clicking the title link.
- */
-function _handleBadgeClick(e: Event): void {
-  const target = e.target as HTMLElement;
-
-  // Only handle clicks on badge elements
-  if (!target.closest('.cqd-v2-flag')) return;
-
-  e.stopPropagation();
-
-  // Pulse animation
-  const badge = target.closest('.cqd-v2-flag') as HTMLElement;
-  if (badge) {
-    badge.classList.add('cqd-pulsing');
-    setTimeout(() => badge.classList.remove('cqd-pulsing'), 600);
-  }
-
-  // Navigate to the post
-  const post = target.closest(`[${FLAG_ATTR}]`) as HTMLElement;
-  if (post) {
-    const link = post.querySelector<HTMLElement>('a[href*="/details/"], h2 a');
-    if (link) {
-      link.click();
-    } else {
-      post.click();
-    }
-  }
+  const body = document.body;
+  return body?.classList.contains('cqd-theme-dark') ||
+    body?.getAttribute('data-theme') === 'dark' ||
+    document.documentElement?.classList.contains('cqd-theme-dark') ||
+    document.documentElement?.classList.contains('gm3-dark-theme') ||
+    false;
 }

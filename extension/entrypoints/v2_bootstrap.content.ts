@@ -97,6 +97,20 @@ export default defineContentScript({
         m.installDownloadAllController(),
       );
 
+      // 3e. Live flag toggles (z57 S4): the popup's cqd-flag-toggle message
+      //     flips badge visibility without a reload (qa-03 golden rule 8).
+      //     Inert in non-v2 modes — the badge registry is empty when V2
+      //     doesn't render, so V1's own listeners stay the only handlers.
+      if (typeof chrome !== 'undefined' && chrome?.runtime?.onMessage) {
+        const { applyFlagToggle } = await import('../src/v2/render/flag-renderer');
+        chrome.runtime.onMessage.addListener((message: { type?: string; flag?: string; enabled?: boolean }) => {
+          if (!message || message.type !== 'cqd-flag-toggle') return;
+          if (message.flag === 'commentsFlagEnabled' || message.flag === 'editedFlagEnabled') {
+            applyFlagToggle(message.flag, message.enabled !== false);
+          }
+        });
+      }
+
       // 4. Initialize debug panel (Ctrl+Shift+D to toggle)
       try {
         const { initDebugPanel } = await import('../src/v2/debug/debug-panel');

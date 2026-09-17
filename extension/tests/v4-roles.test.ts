@@ -468,7 +468,7 @@ describe('EngineV2 render-applied record (S5)', () => {
     (engine as unknown as { renderDetectedFlags: () => void }).renderDetectedFlags();
 
     // The badge rendered AND the record matches it — one entry per applied item
-    expect(post.querySelector('.cqd-v2-flag')).not.toBeNull();
+    expect(post.querySelector('[data-cqd-v2-flag="badge"]')).not.toBeNull();
     expect(engine.getLastRenderApplied()).toEqual([{ postId: 'render-post-1', kind: 'flag' }]);
     engineRegistry.setMode('shadow');
   });
@@ -520,7 +520,7 @@ describe('EngineV2 render-applied record (S5)', () => {
     // Both applications truly happened in the DOM. z57 S1: a button never
     // lands inside an anchor — append-onto-an-anchor degrades to insert-after
     // (V1 outcome parity), so the button is the anchor's sibling in the post.
-    expect(post.querySelector('.cqd-v2-flag')).not.toBeNull();
+    expect(post.querySelector('[data-cqd-v2-flag="badge"]')).not.toBeNull();
     expect(post.querySelector('button.cqd-download-btn')).not.toBeNull();
     engineRegistry.setMode('shadow');
   });

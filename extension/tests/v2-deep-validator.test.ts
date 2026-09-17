@@ -83,16 +83,19 @@ function addButton(el: HTMLElement, fileId: string): HTMLElement {
 
 function addBadge(el: HTMLElement, verdict: string): HTMLElement {
   const badge = document.createElement('div');
-  badge.className = `cqd-v2-flag cqd-v2-flag-${verdict}`;
+  badge.className = verdict === 'both' ? 'cqd-flag cqd-both-badge' : `cqd-flag cqd-${verdict}-badge`;
+  // z57 S4: the V2 marker + rendered kind live on the badge element itself.
+  badge.setAttribute('data-cqd-injected', 'true');
+  badge.setAttribute('data-cqd-v2-flag', 'badge');
+  badge.setAttribute('data-cqd-flag-kind', verdict);
   el.appendChild(badge);
-  el.setAttribute('data-cqd-v2-flag', 'true');
-  el.setAttribute('data-cqd-v2-flag-verdict', verdict);
   return badge;
 }
 
 function addOverlay(el: HTMLElement): HTMLElement {
   const overlay = document.createElement('div');
-  overlay.className = 'cqd-v2-overlay';
+  overlay.className = 'cqd-overlay-container';
+  overlay.setAttribute('data-cqd-v2-flag', 'overlay');
   el.appendChild(overlay);
   return overlay;
 }

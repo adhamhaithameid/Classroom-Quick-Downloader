@@ -261,9 +261,11 @@ export function validatePost(
     }
   }
 
-  // CHECK 3: Flag badge vs decision mismatch
-  const badge = postEl.querySelector('.cqd-v2-flag');
-  const currentVerdict = postEl.getAttribute('data-cqd-v2-flag-verdict');
+  // CHECK 3: Flag badge vs decision mismatch. Badges carry the V2 marker
+  // attribute (z57 S4 — the classes are now the shared V1 contract), and the
+  // rendered kind lives on the badge's data-cqd-flag-kind.
+  const badge = postEl.querySelector('[data-cqd-v2-flag="badge"]');
+  const currentVerdict = badge?.getAttribute('data-cqd-flag-kind') ?? null;
 
   if (flagDecision) {
     if (flagDecision.finalVerdict !== 'none') {
@@ -310,7 +312,7 @@ export function validatePost(
   }
 
   // CHECK 4: Overlay border mismatch
-  const overlay = postEl.querySelector('.cqd-v2-overlay');
+  const overlay = postEl.querySelector('[data-cqd-v2-flag="overlay"]');
   if (badge && !overlay) {
     corrections.push({
       id: `fix-overlay:${post.id}`,
@@ -324,8 +326,8 @@ export function validatePost(
     });
   }
 
-  // CHECK 5: Duplicate badges (should only have ONE .cqd-v2-flag per post)
-  const badges = postEl.querySelectorAll('.cqd-v2-flag');
+  // CHECK 5: Duplicate badges (only ONE v2 badge per post)
+  const badges = postEl.querySelectorAll('[data-cqd-v2-flag="badge"]');
   if (badges.length > 1) {
     corrections.push({
       id: `dedup-flag:${post.id}`,
