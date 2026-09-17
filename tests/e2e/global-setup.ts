@@ -10,11 +10,14 @@
  *             (tests/e2e/.firefox-profile) with prefs that allow unsigned
  *             installation — Firefox has no --load-extension flag.
  *
- * Chromium rebuild policy (S10 parked, bead 0fe): the build is reused only
- * when its source hash (extension/src + extension/entrypoints +
- * extension/package.json) matches the stamp in tests/e2e/.build-stamp
- * (gitignored); QA_FORCE_REBUILD=1 forces a rebuild. A stale build can no
- * longer mask source changes.
+ * Chromium rebuild policy (S10 parked, bead 0fe; widened in a6m): the
+ * chrome-mv3 build is reused only when its content hash (extension/src +
+ * extension/entrypoints + extension/package.json + extension/wxt.config.ts +
+ * the pnpm lockfile) matches the stamp in tests/e2e/.build-stamp
+ * (gitignored); QA_FORCE_REBUILD=1 forces a rebuild. Chromium-only
+ * guarantee: a stale build can no longer mask source or config changes.
+ * The Firefox leg is still presence-only — a stale firefox-mv2 zip CAN be
+ * reused — see ensureFirefoxProfile.
  *
  * @since v4.0.0
  */
@@ -36,10 +39,21 @@ const BUILD_STAMP_PATH = path.join(REPO_ROOT, "tests/e2e/.build-stamp");
 const FINGERPRINT_DIRS = ["src", "entrypoints"];
 
 /**
+ * Single files whose content the Chrome build depends on (relative to
+ * extension/). wxt.config.ts shapes the build itself; package.json pins
+ * scripts/browsers. There is no extension/pnpm-lock.yaml — this is a pnpm
+ * workspace with one lockfile at the repo root, so that is what is hashed.
+ */
+const FINGERPRINT_EXTENSION_FILES = ["package.json", "wxt.config.ts"];
+/** Repo-root-relative single files included in the fingerprint. */
+const FINGERPRINT_ROOT_FILES = ["pnpm-lock.yaml"];
+
+/**
  * Cheap content fingerprint of the sources the Chrome build depends on:
- * extension/src + extension/entrypoints + extension/package.json. sha1 over
- * each file's path and bytes (~hundreds of small files, single-digit ms) —
- * deterministic across checkouts, unlike mtime comparisons.
+ * extension/src + extension/entrypoints + extension/package.json +
+ * extension/wxt.config.ts + pnpm-lock.yaml. sha1 over each file's path and
+ * bytes (~hundreds of small files, single-digit ms) — deterministic across
+ * checkouts, unlike mtime comparisons.
  */
 export function computeBuildFingerprint(): string {
   const hash = createHash("sha1");
@@ -59,7 +73,12 @@ export function computeBuildFingerprint(): string {
       else if (entry.isFile()) addFile(abs, rel);
     }
   };
-  addFile(path.join(EXTENSION_DIR, "package.json"), "package.json");
+  for (const file of FINGERPRINT_EXTENSION_FILES) {
+    addFile(path.join(EXTENSION_DIR, file), `extension/${file}`);
+  }
+  for (const file of FINGERPRINT_ROOT_FILES) {
+    addFile(path.join(REPO_ROOT, file), file);
+  }
   for (const dir of FINGERPRINT_DIRS) {
     walk(path.join(EXTENSION_DIR, dir), dir);
   }
