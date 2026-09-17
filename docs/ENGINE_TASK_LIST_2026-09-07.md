@@ -2,8 +2,9 @@
 
 Consolidated, actionable task list for the extension engines and surrounding
 program. **Status columns refreshed 2026-09-13** against the beads epic
-(`Classroom-Quick-Downloader-1yf`): S1–S10, S6 closed (G2 2026-09-13, G3
-2026-09-17); S11 is the next takeable sprint (gate G5). Sections C/F are historical snapshots. Produced from a full
+(`Classroom-Quick-Downloader-1yf`): S1–S11, S6 closed (G2 2026-09-13, G3
+2026-09-17, G5 2026-09-17 — Firefox signed leg owner-blocked); S12 is the
+next takeable sprint (gates G4/G6). Sections C/F are historical snapshots. Produced from a full
 scan of: the Engine V4 epic
 (`Classroom-Quick-Downloader-1yf`), `docs/ENGINE_V4_MASTER_PLAN.md`,
 `extension/docs/ENGINE_V4_SYSTEM_DESIGN.md`, `extension/docs/PRD_ENGINE_REFACTOR.md`,
@@ -42,7 +43,7 @@ fitness suite** (gate G1). Nothing above can start cleanly without it.
 | S8 acquisition core | pure state machine; one correlation id replaces 4 pending maps; deadline → forced settle | — | `1yf.8` | **Done** |
 | S9 acquisition adapters | Direct/Drive-auth/BypassTab strategies; Chrome/Firefox BrowserPort adapters; #537/#546/#547 repro tests | — | `1yf.9` | **Done** (2026-09-13: authuser cycling fix + flow harness, commit af09ac05/fef5dfc0) |
 | S10 strip V1 detector | 1 observer, 0 heartbeats; V1 render-only | G3 | `1yf.10` | **Done** (2026-09-17: DomPort multiplexer, heartbeats deleted, v2 default at interactive parity; V1 kept as rollback — see session log) |
-| S11 cross-browser & perf | browser smoke matrix in CI; `handleMutations` p95 < 6 ms | G5 | `1yf.11` | Blocked on S10 |
+| S11 cross-browser & perf | browser smoke matrix in CI; `handleMutations` p95 < 6 ms | G5 | `1yf.11` | **Done** (2026-09-17: p95 1.9ms asserted; Chrome+Edge CI legs; Firefox signed leg env-gated/owner-blocked; _locales + selector audit) |
 | S12 ratchet & closeout | floors up, mutation ≥ 80%, decision trace, docs | G4, G6 | `1yf.12` | Blocked on S11 |
 | S13+ API assist | OAuth client id + `identity`; `ApiDetector` strategy; consent + fallback | — | *to file* | Post-G4 by plan (R7); seam may be laid early |
 
