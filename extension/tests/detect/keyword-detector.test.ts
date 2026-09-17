@@ -171,4 +171,16 @@ describe('KeywordDetector', () => {
     expect(obs.comment.strength).toBeGreaterThanOrEqual(40);
     expect(obs.comment.present).toBe(true);
   });
+
+  it('detects the Hungarian edited marker through a real hu keyword table (S12)', () => {
+    // Before S12 there was no `hu` entry, so getEditedKeywords('hu') silently
+    // fell back to English and '(szerkesztve: ...)' never matched anything.
+    const post = createPost(
+      '<div class="JZk9qf Vu2fZd">Közzétéve: márc. 1. (szerkesztve: márc. 10.)</div>',
+    );
+    const obs = detector.observe(post, { postId: 'p15', viewKind: ViewKind.STREAM, lang: 'hu' });
+
+    expect(obs.edited.present).toBe(true);
+    expect(obs.edited.strength).toBeGreaterThanOrEqual(35);
+  });
 });

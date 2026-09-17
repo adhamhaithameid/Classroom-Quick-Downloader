@@ -10,8 +10,5 @@
     "countExactRate": 1,
     "coverage": 1
   },
-  "knownFailures": [
-    "syn-hu-both-flags",
-    "syn-hu-edited-only"
-  ]
+  "knownFailures": []
 }

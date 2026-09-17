@@ -451,6 +451,10 @@ const EDITED_KEYWORDS_LATIN: Record<string, string[]> = {
   nl: ['bewerkt', 'gewijzigd', 'wijziging', 'bewerking'],
   pl: ['edytowano', 'zmieniono', 'modyfikacja', 'zmiana', 'edycja'],
   cs: ['upraveno', 'změněno', 'úprava', 'změna'],
+  // Hungarian (S12): Classroom renders the edit marker as
+  // "(szerkesztve: <date>)". Before S12 there was no hu entry and the loader
+  // silently fell back to English, so Hungarian edited posts went unseen.
+  hu: ['szerkesztve', 'szerkesztett', 'módosítva', 'utolsó szerkesztés'],
   ro: ['editat', 'modificat', 'modificare', 'ultima modificare'],
   tr: ['düzenlendi', 'değiştirildi', 'düzenleme', 'değişiklik'],
   vi: ['đã chỉnh sửa', 'sửa đổi', 'chỉnh sửa'],
