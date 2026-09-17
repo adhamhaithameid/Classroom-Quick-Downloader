@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Commit Planner - Classroom-Quick-Downloader</title>
+<link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+<header class="topbar">
+  <h1>Commit Planner</h1>
+  <div class="stats">
+    <span><b id="statFiles">-</b> files</span>
+    <span><b id="statCommits">-</b> unpushed commits</span>
+    <span><b id="statBranches">-</b> branches</span>
+  </div>
+  <span class="spacer"></span>
+  <span id="saveState" aria-live="polite"></span>
+  <span id="generated" class="hint"></span>
+</header>
+
+<nav class="tabs" aria-label="sections">
+  <button data-tab="files">1 &middot; Triage</button>
+  <button data-tab="workspace">2 &middot; Organize branches</button>
+  <button data-tab="calendar">3 &middot; Schedule</button>
+  <button data-tab="export">4 &middot; Review &amp; export <span class="tabnote" id="tabExportNote"></span></button>
+  <button data-tab="history" class="secondary">Unpushed commits</button>
+</nav>
+
+<div class="layout">
+  <main class="content">
+
+    <section class="panel" id="panel-files">
+      <div class="search-wrap">
+        <input id="search" type="search" placeholder="filter by path, task, tag, commit subject...  (press / to focus)" aria-label="filter files"/>
+        <label class="toggle"><input type="checkbox" id="hideNoise" checked/> hide noise</label>
+        <button class="btn small ghost" id="densityToggle" title="toggle row density">density</button>
+        <span class="auto-note">auto-group visible files by:</span>
+        <button class="btn small ghost" data-auto="cat">category</button>
+        <button class="btn small ghost" data-auto="task">task</button>
+        <button class="btn small ghost" data-auto="status">status</button>
+      </div>
+      <div class="filter-bar" id="filterBar" role="group" aria-label="filters"></div>
+      <details class="legend">
+        <summary>what the badges mean</summary>
+        <div class="legend-body">
+          <span><b class="st st-staged">S</b> staged, ready to commit</span>
+          <span><b class="st st-partially">S+U</b> some changes staged, some not - one commit takes both</span>
+          <span><b class="st st-unstaged">U</b> unstaged edits</span>
+          <span><b class="st st-untracked">??</b> new file git has never seen</span>
+          <span><b class="st st-unmerged">UU</b> merge conflict - resolve before planning</span>
+          <span><span class="cat-dot cat-website"></span>website <span class="cat-dot cat-cloudflare"></span>cloudflare <span class="cat-dot cat-oracle"></span>oracle <span class="cat-dot cat-extension"></span>extension <span class="cat-dot cat-docs"></span>docs <span class="cat-dot cat-tooling"></span>tooling</span>
+        </div>
+      </details>
+      <div id="fileList"></div>
+    </section>
+
+    <section class="panel" id="panel-workspace" hidden>
+      <div id="workspaceList"></div>
+    </section>
+
+    <section class="panel" id="panel-history" hidden>
+      <div class="search-wrap">
+        <input id="commitSearch" type="search" placeholder="filter commits by subject or hash..." aria-label="filter commits"/>
+      </div>
+      <div class="filter-bar" id="commitFilters" role="group" aria-label="commit type filters"></div>
+      <p class="hint">These commits exist on local <code>main</code> only. Schedule their <strong>push</strong> on the Schedule tab - do not commit them again.</p>
+      <div id="commitList"></div>
+    </section>
+
+    <section class="panel" id="panel-calendar" hidden>
+      <div id="calendarGrid"></div>
+    </section>
+
+    <section class="panel" id="panel-export" hidden>
+      <div id="warnPanel"></div>
+      <h3 class="sub-h">Commit script - one file per commit, grouped by date</h3>
+      <p class="hint">Review every line before running. The planner never touches git itself.</p>
+      <div class="row-wrap">
+        <button class="btn" id="copyScript">copy script</button>
+        <button class="btn ghost" id="dlScript">download .sh</button>
+      </div>
+      <pre id="exportScript"></pre>
+      <h3 class="sub-h">Plan string - paste this to your agent</h3>
+      <div class="row-wrap"><textarea id="planOut" rows="3" readonly></textarea></div>
+      <div class="row-wrap">
+        <button class="btn" id="copyPlan">copy plan string</button>
+        <button class="btn ghost" id="clearPlan">clear whole plan</button>
+      </div>
+      <details><summary>load a plan string</summary>
+        <div class="row-wrap"><textarea id="planIn" rows="3" placeholder="CQP1:..."></textarea></div>
+        <button class="btn small" id="loadPlan">parse + load</button>
+        <div id="planMsg" class="hint"></div>
+      </details>
+      <details><summary>self-check</summary>
+        <button class="btn small" id="runTests">run self-check</button>
+        <div id="testOut" class="hint"></div>
+      </details>
+      <details><summary>backup / restore plan</summary>
+        <button class="btn small" id="expJson">export plan JSON</button>
+        <input type="file" id="impJson" accept=".json" aria-label="import plan JSON"/>
+      </details>
+    </section>
+
+  </main>
+
+  <aside class="rail" id="rail" aria-label="plan builder"></aside>
+</div>
+
+<div id="actionBar" class="actionbar" hidden></div>
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<div id="modal" class="modal" hidden></div>
+
+<script src="core.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
