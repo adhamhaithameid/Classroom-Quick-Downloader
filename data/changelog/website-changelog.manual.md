@@ -2,6 +2,8 @@
 ### Changed
 - Background grid lines now bend gently around your cursor; static for reduced-motion / touch — falls back automatically.
 - The footer now shares the page's ambient background (orbs + interactive grid) instead of painting its own.
+### Fixed
+- Fixed a duplicated static grid showing on the FAQ, Privacy, and Changelog pages.
 
 ## v1.8.0
 ### Summary

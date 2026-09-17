@@ -42,7 +42,10 @@ const AMBIENT_COPIES_GONE: Array<{ file: string; marker: string; label: string }
     marker: 'class="ft-pattern"',
     label: 'footer'
   },
-  { file: '../lib/components/SiteFooter.svelte', marker: 'ft-orb', label: 'footer' }
+  { file: '../lib/components/SiteFooter.svelte', marker: 'ft-orb', label: 'footer' },
+  { file: './faq/+page.svelte', marker: 'fq-grid-bg', label: 'faq' },
+  { file: './privacy/+page.svelte', marker: 'prv-grid-bg', label: 'privacy' },
+  { file: './changelog/+page.svelte', marker: 'cl-grid-bg', label: 'changelog' }
 ];
 
 describe('style consistency: shared glass design system', () => {

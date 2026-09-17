@@ -1,7 +1,6 @@
 <script lang="ts">
   import { privacyContent as privacy } from '$lib/content/privacy';
   import SeoMeta from '$lib/components/SeoMeta.svelte';
-  import { glassSheen } from '$lib/actions/glassSheen';
 
   const sectionIcons = ['🔒', '🚫', '💡', '⚡', '🗓️', '🧩', '⚖️', '👶', '🔑', '📬'];
 
@@ -33,7 +32,6 @@
     <div class="orb orb-5"></div>
     <div class="orb orb-6"></div>
   </div>
-  <div class="prv-grid-bg" aria-hidden="true"></div>
 
   <!-- Hero -->
   <section class="prv-hero">
@@ -88,7 +86,7 @@
 
       <div class="prv-card-grid">
         {#each privacy.sections as section, i}
-          <article class="prv-card prv-reveal glass-panel glass-hover" style="animation-delay: {i * 0.06}s" use:glassSheen>
+          <article class="prv-card prv-reveal glass-panel glass-hover" style="animation-delay: {i * 0.06}s">
             <div class="prv-card-icon glass-icon">{sectionIcons[i % sectionIcons.length]}</div>
             <h3>{section.title}</h3>
             <p class="prv-card-summary">{section.summary}</p>
@@ -160,15 +158,6 @@
   .orb-4 { width: 420px; height: 420px; background: #bbf7d0; top: 55%; left: 5%; opacity: 0.22; }
   .orb-5 { width: 380px; height: 380px; background: #a5f3fc; top: 75%; right: -2%; opacity: 0.18; }
   .orb-6 { width: 340px; height: 340px; background: #e0e7ff; top: 90%; left: 20%; opacity: 0.15; }
-
-  .prv-grid-bg {
-    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none; z-index: 0;
-    opacity: 0.03;
-    background-image: linear-gradient(var(--text) 1px, transparent 1px),
-                       linear-gradient(90deg, var(--text) 1px, transparent 1px);
-    background-size: 60px 60px;
-  }
 
   /* ── Hero ───────────────────────── */
   .prv-hero {
@@ -284,10 +273,6 @@
   .prv-card {
     border-radius: var(--radius);
     padding: 28px 24px;
-  }
-
-  .prv-card:hover {
-    transform: translateY(-4px);
   }
 
   .prv-card-icon {

@@ -4,7 +4,6 @@
   import { fetchChangelog } from '$lib/api/changelog';
   import { WEBSITE_MANUAL_CHANGELOG } from '$lib/content/changelog.manual.generated';
   import SeoMeta from '$lib/components/SeoMeta.svelte';
-  import { glassSheen } from '$lib/actions/glassSheen';
 
   type ChangelogMdEntry = {
     version: string;
@@ -229,7 +228,6 @@
     <div class="orb orb-4"></div>
     <div class="orb orb-5"></div>
   </div>
-  <div class="cl-grid-bg" aria-hidden="true"></div>
 
   <!-- Hero -->
   <section class="cl-hero">
@@ -305,7 +303,7 @@
                     <div class="cl-line"></div>
                   {/if}
                 </div>
-                <div class="cl-entry-card glass-panel glass-hover" style="--card-i: {i}" use:glassSheen>
+                <div class="cl-entry-card glass-panel glass-hover" style="--card-i: {i}">
                   <div class="cl-entry-header">
                     <h2>v{entry.version}{#if i === 0}<span class="cl-latest-tag">Latest</span>{/if}</h2>
                   </div>
@@ -394,13 +392,6 @@
   .orb-3 { width: 340px; height: 340px; background: #e0e7ff; top: 40%; right: 10%; opacity: 0.18; }
   .orb-4 { width: 400px; height: 400px; background: #bbf7d0; top: 65%; left: 5%; opacity: 0.2; }
   .orb-5 { width: 360px; height: 360px; background: #a5f3fc; top: 85%; right: 3%; opacity: 0.16; }
-
-  .cl-grid-bg {
-    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none; z-index: 0; opacity: 0.03;
-    background-image: linear-gradient(var(--text) 1px, transparent 1px), linear-gradient(90deg, var(--text) 1px, transparent 1px);
-    background-size: 60px 60px;
-  }
 
   /* ── Hero ───────────────────────── */
   .cl-hero {
@@ -573,10 +564,6 @@
   .cl-entry-card {
     border-radius: var(--radius);
     padding: 24px;
-  }
-
-  .cl-entry-card:hover {
-    transform: translateY(-2px);
   }
 
   .cl-entry-header { margin-bottom: 10px; }

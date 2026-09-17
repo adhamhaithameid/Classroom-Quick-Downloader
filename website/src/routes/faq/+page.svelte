@@ -2,7 +2,7 @@
   import { base } from '$app/paths';
   import { STORE_LINKS } from '$lib/config';
   import SeoMeta from '$lib/components/SeoMeta.svelte';
-  import { glassSheen } from '$lib/actions/glassSheen';
+  import { trackFaqExpand } from '$lib/analytics/websiteEvents';
 
   type FaqItem = {
     id: string;
@@ -405,6 +405,13 @@
       openIds.delete(id);
     } else {
       openIds.add(id);
+      for (const section of sections) {
+        const item = section.items.find((candidate) => candidate.id === id);
+        if (item) {
+          trackFaqExpand(item.q, section.title);
+          break;
+        }
+      }
     }
     openIds = new Set(openIds);
   }
@@ -464,7 +471,6 @@
     <div class="orb orb-4"></div>
     <div class="orb orb-5"></div>
   </div>
-  <div class="fq-grid-bg" aria-hidden="true"></div>
 
   <!-- Hero -->
   <section class="fq-hero">
@@ -531,7 +537,6 @@
                   on:click={() => toggle(item.id)}
                   aria-expanded={openIds.has(item.id)}
                   aria-controls={`faq-answer-${item.id}`}
-                  use:glassSheen
                 >
                   <div class="fq-question">
                     <span class="fq-q-text">{item.q}</span>
@@ -609,13 +614,6 @@
   .orb-3 { width: 360px; height: 360px; background: #e0e7ff; top: 40%; right: 8%; opacity: 0.18; }
   .orb-4 { width: 420px; height: 420px; background: #bbf7d0; top: 65%; left: 3%; opacity: 0.22; }
   .orb-5 { width: 340px; height: 340px; background: #a5f3fc; top: 85%; right: 5%; opacity: 0.18; }
-
-  .fq-grid-bg {
-    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none; z-index: 0; opacity: 0.03;
-    background-image: linear-gradient(var(--text) 1px, transparent 1px), linear-gradient(90deg, var(--text) 1px, transparent 1px);
-    background-size: 60px 60px;
-  }
 
   /* ── Hero ───────────────────────── */
   .fq-hero {
