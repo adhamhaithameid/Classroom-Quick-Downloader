@@ -5,9 +5,55 @@ export const EXTENSION_MANUAL_CHANGELOG = {
   "source": "manual",
   "entries": [
     {
-      "id": "manual-1.5.5-1",
+      "id": "manual-1.6.19-1",
+      "version": "1.6.19",
+      "date": "2026-09-17T00:59:59.588Z",
+      "summary": "A major download-engine overhaul: zero-window downloads with multi-account fallback, honest failure reporting for every error class, and the new Engine Mode switch. Every download now either succeeds or tells you exactly what to do next.",
+      "changes": [
+        "Summary: A major download-engine overhaul: zero-window downloads with multi-account fallback, honest failure reporting for every error class, and the new Engine Mode switch. Every download now either succeeds or tells you exactly what to do next.",
+        "Added: Added invisible multi-account fallback: when the active Google account cannot access a file, the extension now quietly tries your other signed-in accounts instead of failing.",
+        "Added: Added the Engine Mode switch in popup settings (Legacy / New) with one-click rollback — switching applies live, no page reload.",
+        "Added: Added a 150-second download deadline: a stalled download now reports \"This download timed out. Try again.\" instead of hanging forever.",
+        "Added: Added automatic retry (with a short backoff) for temporary network and server failures.",
+        "Added: Added specific, actionable failure messages: disk full, file unavailable, browser blocked the download, sign-in required, and more.",
+        "Changed: Downloads now target Google's modern byte-serving endpoint directly — faster downloads with no interstitial hop.",
+        "Changed: Downloads are now completely window-free: no new tabs or windows are ever opened, on any browser.",
+        "Changed: Firefox downloads now report success only when the browser confirms the file finished — no more phantom successes.",
+        "Changed: Student Work pages and form links no longer receive download buttons that could never work.",
+        "Changed: Hardened download URL validation: the allowlist now covers all legitimate Google attachment shapes while external look-alike links stay blocked.",
+        "Fixed: Fixed the \"Download All always hangs\" family: a group with a broken file now settles correctly (success, partial, or error) instead of sticking on the running state.",
+        "Fixed: Fixed downloads silently disappearing after the browser already reported success (Firefox).",
+        "Fixed: Fixed Drive error and quota pages being saved as fake \".html\" downloads — these are now detected and handled as access errors.",
+        "Fixed: Fixed the visible \"403 Access Forbidden\" window that could appear and never close.",
+        "Fixed: Fixed Sheets attachment downloads being rejected as invalid URLs."
+      ],
+      "added": [
+        "Added invisible multi-account fallback: when the active Google account cannot access a file, the extension now quietly tries your other signed-in accounts instead of failing.",
+        "Added the Engine Mode switch in popup settings (Legacy / New) with one-click rollback — switching applies live, no page reload.",
+        "Added a 150-second download deadline: a stalled download now reports \"This download timed out. Try again.\" instead of hanging forever.",
+        "Added automatic retry (with a short backoff) for temporary network and server failures.",
+        "Added specific, actionable failure messages: disk full, file unavailable, browser blocked the download, sign-in required, and more."
+      ],
+      "changed": [
+        "Downloads now target Google's modern byte-serving endpoint directly — faster downloads with no interstitial hop.",
+        "Downloads are now completely window-free: no new tabs or windows are ever opened, on any browser.",
+        "Firefox downloads now report success only when the browser confirms the file finished — no more phantom successes.",
+        "Student Work pages and form links no longer receive download buttons that could never work.",
+        "Hardened download URL validation: the allowlist now covers all legitimate Google attachment shapes while external look-alike links stay blocked."
+      ],
+      "fixed": [
+        "Fixed the \"Download All always hangs\" family: a group with a broken file now settles correctly (success, partial, or error) instead of sticking on the running state.",
+        "Fixed downloads silently disappearing after the browser already reported success (Firefox).",
+        "Fixed Drive error and quota pages being saved as fake \".html\" downloads — these are now detected and handled as access errors.",
+        "Fixed the visible \"403 Access Forbidden\" window that could appear and never close.",
+        "Fixed Sheets attachment downloads being rejected as invalid URLs."
+      ],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.5.5-2",
       "version": "1.5.5",
-      "date": "2026-08-16T00:50:08.036Z",
+      "date": "2026-09-16T00:59:59.588Z",
       "summary": "A leaner packaging release focused on reducing extension size while preserving the same classroom behavior.",
       "changes": [
         "Summary: A leaner packaging release focused on reducing extension size while preserving the same classroom behavior.",
@@ -27,9 +73,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.5.4-2",
+      "id": "manual-1.5.4-3",
       "version": "1.5.4",
-      "date": "2026-08-15T00:50:08.036Z",
+      "date": "2026-09-15T00:59:59.588Z",
       "summary": "A performance-focused release with two measurable speed upgrades in scan and download orchestration paths.",
       "changes": [
         "Summary: A performance-focused release with two measurable speed upgrades in scan and download orchestration paths.",
@@ -51,9 +97,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.5.3-3",
+      "id": "manual-1.5.3-4",
       "version": "1.5.3",
-      "date": "2026-08-14T00:50:08.036Z",
+      "date": "2026-09-14T00:59:59.588Z",
       "summary": "Introduced a new detection layer for flags and files to keep ownership mapping stable across complex Classroom layouts.",
       "changes": [
         "Summary: Introduced a new detection layer for flags and files to keep ownership mapping stable across complex Classroom layouts.",
@@ -73,9 +119,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.5.2-4",
+      "id": "manual-1.5.2-5",
       "version": "1.5.2",
-      "date": "2026-08-13T00:50:08.036Z",
+      "date": "2026-09-13T00:59:59.588Z",
       "summary": "A focused stabilization release delivering bug fixes and stronger security hardening for production classrooms.",
       "changes": [
         "Summary: A focused stabilization release delivering bug fixes and stronger security hardening for production classrooms.",
@@ -95,9 +141,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.5.1-5",
+      "id": "manual-1.5.1-6",
       "version": "1.5.1",
-      "date": "2026-08-12T00:50:08.036Z",
+      "date": "2026-09-12T00:59:59.588Z",
       "summary": "Expanded real-world support for the Student Work tap so teachers can download attached files and media directly from submissions.",
       "changes": [
         "Summary: Expanded real-world support for the Student Work tap so teachers can download attached files and media directly from submissions.",
@@ -117,9 +163,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.5.0-6",
+      "id": "manual-1.5.0-7",
       "version": "1.5.0",
-      "date": "2026-08-11T00:50:08.036Z",
+      "date": "2026-09-11T00:59:59.588Z",
       "summary": "This is the best and most reliable state the extension has reached so far. Download buttons, flag placement, and post detection are now much more accurate in real Google Classroom usage.",
       "changes": [
         "Summary: This is the best and most reliable state the extension has reached so far. Download buttons, flag placement, and post detection are now much more accurate in real Google Classroom usage.",
@@ -149,9 +195,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.4.0-7",
+      "id": "manual-1.4.0-8",
       "version": "1.4.0",
-      "date": "2026-08-10T00:50:08.036Z",
+      "date": "2026-09-10T00:59:59.588Z",
       "summary": "A major under-the-hood release that introduced the V2 engine foundation. It made the extension safer to improve without breaking the stable experience you already rely on.",
       "changes": [
         "Summary: A major under-the-hood release that introduced the V2 engine foundation. It made the extension safer to improve without breaking the stable experience you already rely on.",
@@ -173,9 +219,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.3.9-8",
+      "id": "manual-1.3.9-9",
       "version": "1.3.9",
-      "date": "2026-08-09T00:50:08.036Z",
+      "date": "2026-09-09T00:59:59.588Z",
       "summary": "Improved release consistency and user-facing clarity across the website and extension experiences.",
       "changes": [
         "Summary: Improved release consistency and user-facing clarity across the website and extension experiences.",
@@ -201,9 +247,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.3.8-9",
+      "id": "manual-1.3.8-10",
       "version": "1.3.8",
-      "date": "2026-08-08T00:50:08.036Z",
+      "date": "2026-09-08T00:59:59.588Z",
       "summary": "Improved changelog reliability so users always receive updates, even when the version number stays the same.",
       "changes": [
         "Summary: Improved changelog reliability so users always receive updates, even when the version number stays the same.",
@@ -229,9 +275,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": true
     },
     {
-      "id": "manual-1.3.7-10",
+      "id": "manual-1.3.7-11",
       "version": "1.3.7",
-      "date": "2026-08-07T00:50:08.036Z",
+      "date": "2026-09-07T00:59:59.588Z",
       "summary": "Improved daily reliability and clearer release communication for normal users.",
       "changes": [
         "Summary: Improved daily reliability and clearer release communication for normal users.",
@@ -257,9 +303,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": true
     },
     {
-      "id": "manual-1.3.6-11",
+      "id": "manual-1.3.6-12",
       "version": "1.3.6",
-      "date": "2026-08-06T00:50:08.036Z",
+      "date": "2026-09-06T00:59:59.588Z",
       "summary": "Focused on stability and compatibility hardening for heavy classroom workloads.",
       "changes": [
         "Summary: Focused on stability and compatibility hardening for heavy classroom workloads.",
@@ -285,9 +331,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.3.0-12",
+      "id": "manual-1.3.0-13",
       "version": "1.3.0",
-      "date": "2026-08-05T00:50:08.036Z",
+      "date": "2026-09-05T00:59:59.588Z",
       "summary": "Delivered major reliability, remote-config, and analytics improvements.",
       "changes": [
         "Summary: Delivered major reliability, remote-config, and analytics improvements.",
@@ -313,9 +359,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.2.7-13",
+      "id": "manual-1.2.7-14",
       "version": "1.2.7",
-      "date": "2026-08-04T00:50:08.036Z",
+      "date": "2026-09-04T00:59:59.588Z",
       "summary": "Broad security and reliability hardening across extension behavior.",
       "changes": [
         "Summary: Broad security and reliability hardening across extension behavior.",
@@ -341,9 +387,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.2.3-14",
+      "id": "manual-1.2.3-15",
       "version": "1.2.3",
-      "date": "2026-08-03T00:50:08.036Z",
+      "date": "2026-09-03T00:59:59.588Z",
       "summary": "Usability and telemetry consistency release.",
       "changes": [
         "Summary: Usability and telemetry consistency release.",
@@ -363,9 +409,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.2.2-15",
+      "id": "manual-1.2.2-16",
       "version": "1.2.2",
-      "date": "2026-08-02T00:50:08.036Z",
+      "date": "2026-09-02T00:59:59.588Z",
       "summary": "Cancel-flow polish release.",
       "changes": [
         "Summary: Cancel-flow polish release.",
@@ -385,9 +431,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.2.1-16",
+      "id": "manual-1.2.1-17",
       "version": "1.2.1",
-      "date": "2026-08-01T00:50:08.036Z",
+      "date": "2026-09-01T00:59:59.588Z",
       "summary": "Unified cancel-system iteration release.",
       "changes": [
         "Summary: Unified cancel-system iteration release.",
@@ -407,9 +453,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.2.0-17",
+      "id": "manual-1.2.0-18",
       "version": "1.2.0",
-      "date": "2026-07-31T00:50:08.036Z",
+      "date": "2026-08-31T00:59:59.588Z",
       "summary": "Cancel feature baseline release.",
       "changes": [
         "Summary: Cancel feature baseline release.",
@@ -429,9 +475,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.1.10-18",
+      "id": "manual-1.1.10-19",
       "version": "1.1.10",
-      "date": "2026-07-30T00:50:08.036Z",
+      "date": "2026-08-30T00:59:59.588Z",
       "summary": "Late 1.1 line reliability release.",
       "changes": [
         "Summary: Late 1.1 line reliability release.",
@@ -451,9 +497,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.1.5-19",
+      "id": "manual-1.1.5-20",
       "version": "1.1.5",
-      "date": "2026-07-29T00:50:08.036Z",
+      "date": "2026-08-29T00:59:59.588Z",
       "summary": "Mid 1.1 quality and compatibility release.",
       "changes": [
         "Summary: Mid 1.1 quality and compatibility release.",
@@ -473,9 +519,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.1.1-20",
+      "id": "manual-1.1.1-21",
       "version": "1.1.1",
-      "date": "2026-07-28T00:50:08.036Z",
+      "date": "2026-08-28T00:59:59.588Z",
       "summary": "Post-1.1 stabilization release.",
       "changes": [
         "Summary: Post-1.1 stabilization release.",
@@ -495,9 +541,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.1.0-21",
+      "id": "manual-1.1.0-22",
       "version": "1.1.0",
-      "date": "2026-07-27T00:50:08.036Z",
+      "date": "2026-08-27T00:59:59.588Z",
       "summary": "Feature and packaging expansion release.",
       "changes": [
         "Summary: Feature and packaging expansion release.",
@@ -517,9 +563,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.0.1-22",
+      "id": "manual-1.0.1-23",
       "version": "1.0.1",
-      "date": "2026-07-26T00:50:08.036Z",
+      "date": "2026-08-26T00:59:59.588Z",
       "summary": "Post-launch stabilization release.",
       "changes": [
         "Summary: Post-launch stabilization release.",
@@ -539,9 +585,9 @@ export const EXTENSION_MANUAL_CHANGELOG = {
       "isImportant": false
     },
     {
-      "id": "manual-1.0.0-23",
+      "id": "manual-1.0.0-24",
       "version": "1.0.0",
-      "date": "2026-07-25T00:50:08.036Z",
+      "date": "2026-08-25T00:59:59.588Z",
       "summary": "First stable production release.",
       "changes": [
         "Summary: First stable production release.",
@@ -585,11 +631,11 @@ export const EXTENSION_MANUAL_CHANGELOG = {
         "color": "default"
       }
     ],
-    "lastUpdated": 1786841408036
+    "lastUpdated": 1789606799588
   },
   "meta": {
     "applyMode": "manual",
-    "liveUpdatedAt": 1786841408036,
-    "contentChecksum": "manual-1786841408036"
+    "liveUpdatedAt": 1789606799588,
+    "contentChecksum": "manual-1789606799588"
   }
 } as const;

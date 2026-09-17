@@ -4,10 +4,42 @@ This is the main engineering changelog for Classroom Quick Downloader.
 It focuses on meaningful product, reliability, security, and architecture changes instead of raw commit history.
 
 ## Versioning Notes
-- Current extension release line: `1.5.5`
-- Recommended next patch release: `1.5.6`
-- Planned next engine milestone: `1.6.0`
+- Current extension release line: `1.6.19`
+- Planned next engine milestone: post-1.6 acquisition strategy wiring (API download tier behind the consent gate)
 - Pre-`1.0.0` bootstrap work is intentionally omitted from the user-facing release ledger
+
+## [1.6.19] - 2026-09-15
+
+### Summary
+Major download-engine overhaul: zero-window downloads with invisible multi-account fallback, a complete failure taxonomy with actionable messages, stall deadlines, and the Engine Mode switch. Every download either succeeds or tells the user exactly what to do next.
+
+### Added
+- Added invisible multi-account fallback: forbidden Drive files now cycle the signed-in accounts (bounded sweep) instead of failing on the first account.
+- Added the Engine Mode popup control (`cqdV2Mode`, Legacy / New, live switch, one-click rollback) behind the G2 gate.
+- Added the 150-second stall deadline (`PENDING_DEADLINE_MS`): stalled downloads cancel and report a timeout instead of hanging until the silent TTL reap.
+- Added one bounded in-place retry with backoff for transient interrupts (`NETWORK_FAILED`, `SERVER_FAILED`, `NETWORK_TIMED_OUT`).
+- Added the classified failure-message taxonomy: USER_CANCELED surfaces as cancelled; FILE_FAILED / STORAGE_FULL / CRASH / SERVER_BAD_CONTENT / FILE_VIRUS_INFECTED / FILE_BLOCKED each get specific guidance.
+- Added the zero-tab acquisition contract across both browsers: `chrome.tabs.create` is gone from the background flow (verified in bundles and by qa journeys).
+- Added the acquisition strategy chain as data (`direct` → `drive-auth` → reserved `api` tier, flag-gated off per #398) with the BrowserPort chrome adapter.
+- Added an adversarial download-outcome corpus (11 cases, run differentially against the pure acquire state machine AND production), a fast-check property suite over the machine (terminal absorption, sweep boundedness, deadline closure), and the qa-08 resilience browser journey.
+
+### Changed
+- Drive downloads target `drive.usercontent.google.com` byte-serving endpoint directly (shared `drive-endpoint` module): no interstitial hop, faster transfers.
+- Firefox `onCreated` correlates downloads only; success reports on `onChanged` complete like Chromium (no phantom successes).
+- Content Drive-URL patterns are scoped to Google hosts; external `/file/d/` links no longer render doomed buttons.
+- `onChanged` completion verifies the finished `DownloadItem` mime before reporting success.
+
+### Fixed
+- Fixed the Download All hang family: sticky failure bookkeeping plus live (non-seeded) in-progress state so groups always settle (success / partial / error).
+- Fixed the visible "403 Access Forbidden" bypass-tab window that never closed (error pages cannot run the reporting script); the bypass-tab mechanism is fully removed.
+- Fixed Drive error/quota HTML pages saving as fake `.html` files — detected at the filename hook or at completion, erased, and handled as access errors.
+- Fixed non-Drive HTML responses saving as garbage — now refused with a sign-in message.
+- Fixed Sheets export URLs being rejected as invalid by the download validator.
+- Fixed background-tab rendering of Download All groups (requestAnimationFrame suspension) via a hidden-state timer flush.
+
+### Security
+- Hardened the download URL allowlist (all legitimate Google attachment shapes, external look-alikes still blocked) and kept scheme checks strict.
+- Kept the zero-window, zero-third-party-network download surface: the extension still talks only to Google hosts.
 
 ## [Unreleased]
 

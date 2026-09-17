@@ -1,3 +1,27 @@
+## v1.6.19
+### Summary
+A major download-engine overhaul: zero-window downloads with multi-account fallback, honest failure reporting for every error class, and the new Engine Mode switch. Every download now either succeeds or tells you exactly what to do next.
+### Added
+- Added invisible multi-account fallback: when the active Google account cannot access a file, the extension now quietly tries your other signed-in accounts instead of failing.
+- Added the Engine Mode switch in popup settings (Legacy / New) with one-click rollback — switching applies live, no page reload.
+- Added a 150-second download deadline: a stalled download now reports "This download timed out. Try again." instead of hanging forever.
+- Added automatic retry (with a short backoff) for temporary network and server failures.
+- Added specific, actionable failure messages: disk full, file unavailable, browser blocked the download, sign-in required, and more.
+### Changed
+- Downloads now target Google's modern byte-serving endpoint directly — faster downloads with no interstitial hop.
+- Downloads are now completely window-free: no new tabs or windows are ever opened, on any browser.
+- Firefox downloads now report success only when the browser confirms the file finished — no more phantom successes.
+- Student Work pages and form links no longer receive download buttons that could never work.
+### Fixed
+- Fixed the "Download All always hangs" family: a group with a broken file now settles correctly (success, partial, or error) instead of sticking on the running state.
+- Fixed downloads silently disappearing after the browser already reported success (Firefox).
+- Fixed Drive error and quota pages being saved as fake ".html" downloads — these are now detected and handled as access errors.
+- Fixed the visible "403 Access Forbidden" window that could appear and never close.
+- Fixed Sheets attachment downloads being rejected as invalid URLs.
+
+### Security
+- Hardened download URL validation: the allowlist now covers all legitimate Google attachment shapes while external look-alike links stay blocked.
+
 ## v1.5.5
 ### Summary
 A leaner packaging release focused on reducing extension size while preserving the same classroom behavior.
