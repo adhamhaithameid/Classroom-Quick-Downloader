@@ -95,10 +95,10 @@ jobs:
       - name: Verify _locales Drift (generated from i18n.ts)
         run: |
           pnpm -C extension run locales:generate
-          git diff --exit-code -- extension/_locales
-          if [ -n "$(git status --porcelain -- extension/_locales)" ]; then
+          git diff --exit-code -- extension/_locales extension/src/_locales
+          if [ -n "$(git status --porcelain -- extension/_locales extension/src/_locales)" ]; then
             echo "::error::extension/_locales is out of sync with extension/entrypoints/content/i18n.ts — run 'pnpm -C extension run locales:generate' and commit the result."
-            git status --porcelain -- extension/_locales
+            git status --porcelain -- extension/_locales extension/src/_locales
             exit 1
           fi
 

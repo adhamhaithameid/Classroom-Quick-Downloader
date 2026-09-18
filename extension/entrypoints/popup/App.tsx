@@ -19,6 +19,7 @@ import {
   type ChangelogData,
   type ChangelogFetchResult
 } from '../utils/changelog';
+import { popupMessage } from './i18n';
 import { CHANGELOG_SITE_URL } from '../utils/analytics/constants';
 
 // External Links
@@ -1225,7 +1226,7 @@ function App() {
                     title={settingsCollapsed ? 'Open extension settings section' : 'Close extension settings section'}
                   >
                     <div>
-                      <h2 className="cqd-card-title">Extension Settings</h2>
+                      <h2 className="cqd-card-title">{popupMessage('popupExtensionSettings')}</h2>
                       <p className="cqd-card-subtitle">
                         Downloads and flags.
                       </p>
@@ -1254,7 +1255,7 @@ function App() {
                   >
                     <div className="cqd-settings-list">
                       <div className="cqd-settings-section">
-                        <div className="cqd-settings-section-label">General</div>
+                        <div className="cqd-settings-section-label">{popupMessage('popupSettingsSectionGeneral')}</div>
                         <div className="cqd-toggle-group">
                           <ToggleRow
                             label="Enable Extension"
@@ -1269,7 +1270,7 @@ function App() {
                       </div>
 
                       <div className="cqd-settings-section">
-                        <div className="cqd-settings-section-label">Engine</div>
+                        <div className="cqd-settings-section-label">{popupMessage('popupSettingsSectionEngine')}</div>
                         <div className="cqd-toggle-group">
                           <EngineModeRow
                             mode={engineMode}
@@ -1284,7 +1285,7 @@ function App() {
                       </div>
 
                       <div className="cqd-settings-section">
-                        <div className="cqd-settings-section-label">Flags</div>
+                        <div className="cqd-settings-section-label">{popupMessage('popupSettingsSectionFlags')}</div>
                         <div className="cqd-toggle-group">
                           <div className="cqd-flag-toggle-row cqd-flag-toggle-comment">
                             <ToggleRow
@@ -1566,14 +1567,15 @@ interface EngineModeRowProps {
 
 /** Separate Engine Mode control (#684 decision: not folded into flag
  *  toggles — engine selection changes the whole page pipeline, flags tune
- *  one feature). Segmented control, aria-pressed marks the active mode. */
+ *  one feature). Segmented control, aria-pressed marks the active mode.
+ *  Labels resolve via chrome.i18n with en fallback (bead 770). */
 export function EngineModeRow({ mode, loading, onSelect }: EngineModeRowProps) {
   const options: Array<{ value: PopupEngineMode; label: string }> = [
-    { value: 'legacy', label: 'Legacy' },
-    { value: 'v2', label: 'New' },
+    { value: 'legacy', label: popupMessage('popupEngineModeLegacy') },
+    { value: 'v2', label: popupMessage('popupEngineModeNew') },
   ];
   return (
-    <div className="cqd-engine-mode" role="group" aria-label="Engine Mode">
+    <div className="cqd-engine-mode" role="group" aria-label={popupMessage('popupEngineMode')}>
       {options.map((option) => (
         <button
           key={option.value}

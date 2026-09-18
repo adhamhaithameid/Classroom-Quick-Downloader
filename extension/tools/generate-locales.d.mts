@@ -42,6 +42,19 @@ export function loadTranslationsFromSource(
   sourcePath?: string,
 ): Record<string, Record<string, string>>;
 
+/** Compare generated output against one locale root on disk; returns drift descriptions. */
+export function diffLocalesRoot(rootDir: string, files: Record<string, string>): string[];
+
+/**
+ * Whether the web-ext manifest (wxt.config.ts) declares `default_locale`.
+ * Gates whether the generator emits the bundle copy of _locales (see the
+ * module docstring — Chrome rejects _locales without default_locale).
+ */
+export function manifestDeclaresDefaultLocale(configPath?: string): boolean;
+
+/** Write generated files into one locale root and prune removed locales. */
+export function writeLocalesRoot(rootDir: string, files: Record<string, string>): number;
+
 /** Compare generated output against the tree on disk; returns drift descriptions. */
 export function diffAgainstDisk(files: Record<string, string>): string[];
 

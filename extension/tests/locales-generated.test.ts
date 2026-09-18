@@ -21,6 +21,7 @@ import {
   diffAgainstDisk,
   fromDirName,
   loadTranslationsFromSource,
+  manifestDeclaresDefaultLocale,
   toDirName,
   toMessageKey,
 } from '../tools/generate-locales.mjs';
@@ -178,5 +179,20 @@ describe('t() behavior unchanged (TRANSLATIONS remains the runtime source)', () 
     const mod = await import('../entrypoints/content/i18n');
     expect(mod.getCurrentCachedLanguage()).toBe('sr-latn');
     expect(mod.t('cancel')).toBe(TRANSLATIONS.en.cancel);
+  });
+});
+
+describe('bundle copy gate (bead 770: chrome requires default_locale with _locales)', () => {
+  it('detects default_locale declarations in wxt config files', () => {
+    expect(manifestDeclaresDefaultLocale('/nonexistent/wxt.config.ts')).toBe(false);
+  });
+
+  it('bundle copy is inactive while the manifest lacks default_locale', () => {
+    // Tripwire: when default_locale lands in wxt.config.ts, this assertion
+    // fails until `locales:generate` regenerates the bundle root — exactly
+    // the coupling that must not be forgotten (Chrome rejects an extension
+    // that ships _locales without default_locale).
+    expect(manifestDeclaresDefaultLocale()).toBe(false);
+    expect(existsSync(path.join(EXTENSION_ROOT, 'src', '_locales'))).toBe(false);
   });
 });

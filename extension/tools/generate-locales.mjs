@@ -33,11 +33,18 @@
  *     is version-gated (default only from 22.18/23.6+), so we transpile with
  *     the `typescript` package (a direct devDependency) and import the result
  *     from a temp file. No regex parsing of the source — a real module load.
- *   - `extension/_locales/` is intentionally NOT in the build output yet:
- *     Chrome rejects an extension that has `_locales` without
- *     `default_locale` in the manifest, and the manifest bit lands with the
- *     parallel homepage_url edit (S12 wires default_locale + build copy).
- *     Today `_locales` is the CI drift-check contract for manifest-driven
+ *   - `extension/_locales/` is the repo contract location; the bundle copy is
+ *     `extension/src/_locales/` — wxt.config.ts sets `publicDir: 'src'`, and
+ *     WXT copies publicDir contents to the bundle root, so `src/_locales`
+ *     lands as `<output>/_locales` (chrome-mv3/firefox/edge). The generator
+ *     regenerates BOTH trees so they can never drift apart.
+ *   - The bundle copy is gated on the manifest declaring `default_locale`
+ *     (read from wxt.config.ts): Chrome rejects an extension that ships
+ *     `_locales` without `default_locale`. If the declaration is present the
+ *     generator writes/prunes `src/_locales` too; if it is absent the
+ *     generator REMOVES any stale `src/_locales` so the built extension can
+ *     never end up unloadable. `locales:check` mirrors the same condition.
+ *     Today `_locales` is also the CI drift-check contract for manifest-driven
  *     surfaces (popup/options/store metadata); content-script `t()` keeps
  *     resolving via TRANSLATIONS because chrome.i18n.getMessage follows the
  *     browser UI locale, not the page locale t() must follow.
@@ -57,6 +64,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION_ROOT = path.resolve(__dirname, '..');
 const I18N_SOURCE = path.join(EXTENSION_ROOT, 'entrypoints', 'content', 'i18n.ts');
 const LOCALES_DIR = path.join(EXTENSION_ROOT, '_locales');
+// Bundle copy: wxt.config.ts sets `publicDir: 'src'`, and WXT copies publicDir
+// contents to the output root, so src/_locales becomes <output>/_locales.
+const BUNDLE_LOCALES_DIR = path.join(EXTENSION_ROOT, 'src', '_locales');
+const WXT_CONFIG_PATH = path.join(EXTENSION_ROOT, 'wxt.config.ts');
+
+/**
+ * Whether the web-ext manifest declares `default_locale`. Chrome rejects an
+ * extension that ships `_locales` without it, so this gates whether the
+ * generator emits the bundle copy (see module docstring).
+ */
+export function manifestDeclaresDefaultLocale(configPath = WXT_CONFIG_PATH) {
+  if (!existsSync(configPath)) return false;
+  return /default_locale\s*:/.test(readFileSync(configPath, 'utf8'));
+}
 
 /** camelCase/`after_posting` t() key -> chrome.i18n message name ([a-zA-Z0-9_]). */
 export function toMessageKey(key) {
@@ -187,45 +208,77 @@ export function loadTranslationsFromSource(sourcePath = I18N_SOURCE) {
   }
 }
 
-/** Compare generated output against the tree on disk. Returns list of drift descriptions. */
-export function diffAgainstDisk(files) {
+/** Compare generated output against one locale root on disk. Returns drift descriptions. */
+export function diffLocalesRoot(rootDir, files) {
   const drift = [];
-  const existingDirs = existsSync(LOCALES_DIR)
-    ? readdirSync(LOCALES_DIR).filter((name) => statSync(path.join(LOCALES_DIR, name)).isDirectory())
+  const existingDirs = existsSync(rootDir)
+    ? readdirSync(rootDir).filter((name) => statSync(path.join(rootDir, name)).isDirectory())
     : [];
   for (const dir of existingDirs) {
-    if (!files[dir]) drift.push(`stale locale directory: _locales/${dir} (no longer in TRANSLATIONS)`);
+    if (!files[dir]) drift.push(`stale locale directory: ${path.relative(EXTENSION_ROOT, path.join(rootDir, dir))} (no longer in TRANSLATIONS)`);
   }
   for (const [dir, content] of Object.entries(files)) {
-    const filePath = path.join(LOCALES_DIR, dir, 'messages.json');
+    const filePath = path.join(rootDir, dir, 'messages.json');
     if (!existsSync(filePath)) {
-      drift.push(`missing locale file: _locales/${dir}/messages.json`);
+      drift.push(`missing locale file: ${path.relative(EXTENSION_ROOT, filePath)}`);
       continue;
     }
     const current = readFileSync(filePath, 'utf8');
-    if (current !== content) drift.push(`drifted: _locales/${dir}/messages.json`);
+    if (current !== content) drift.push(`drifted: ${path.relative(EXTENSION_ROOT, filePath)}`);
   }
   return drift;
 }
 
-/** Write all generated files and prune locale directories removed from TRANSLATIONS. */
-export function writeToDisk(files) {
-  mkdirSync(LOCALES_DIR, { recursive: true });
+/**
+ * Compare generated output against every root the generator manages:
+ * the repo contract root always, the bundle root whenever the manifest
+ * declares default_locale (or whenever a stale bundle copy exists).
+ */
+export function diffAgainstDisk(files) {
+  const drift = diffLocalesRoot(LOCALES_DIR, files);
+  const declares = manifestDeclaresDefaultLocale();
+  if (declares || existsSync(BUNDLE_LOCALES_DIR)) {
+    drift.push(...diffLocalesRoot(BUNDLE_LOCALES_DIR, files).map((line) => `${line} (bundle copy)`));
+  }
+  return drift;
+}
+
+/** Write generated files into one locale root and prune removed locales. */
+export function writeLocalesRoot(rootDir, files) {
+  mkdirSync(rootDir, { recursive: true });
   const expectedDirs = new Set(Object.keys(files));
-  for (const name of readdirSync(LOCALES_DIR)) {
-    const entryPath = path.join(LOCALES_DIR, name);
+  for (const name of readdirSync(rootDir)) {
+    const entryPath = path.join(rootDir, name);
     if (!statSync(entryPath).isDirectory()) continue;
     if (!expectedDirs.has(name)) {
       rmSync(entryPath, { recursive: true, force: true });
-      console.log(`pruned stale locale directory: _locales/${name}`);
+      console.log(`pruned stale locale directory: ${path.relative(EXTENSION_ROOT, entryPath)}`);
     }
   }
   let written = 0;
   for (const [dir, content] of Object.entries(files)) {
-    const dirPath = path.join(LOCALES_DIR, dir);
+    const dirPath = path.join(rootDir, dir);
     mkdirSync(dirPath, { recursive: true });
     writeFileSync(path.join(dirPath, 'messages.json'), content, 'utf8');
     written += 1;
+  }
+  return written;
+}
+
+/**
+ * Write all generated files and prune locale directories removed from
+ * TRANSLATIONS. The repo contract root (`extension/_locales`) is always
+ * written; the bundle root (`extension/src/_locales`) is written only while
+ * the manifest declares `default_locale` (Chrome requirement), and removed
+ * otherwise so the build never ships `_locales` without it.
+ */
+export function writeToDisk(files) {
+  const written = writeLocalesRoot(LOCALES_DIR, files);
+  if (manifestDeclaresDefaultLocale()) {
+    written += writeLocalesRoot(BUNDLE_LOCALES_DIR, files);
+  } else if (existsSync(BUNDLE_LOCALES_DIR)) {
+    rmSync(BUNDLE_LOCALES_DIR, { recursive: true, force: true });
+    console.log('removed bundle locale copy: src/_locales (manifest does not declare default_locale)');
   }
   return written;
 }
@@ -251,7 +304,10 @@ async function main() {
   }
 
   const written = writeToDisk(files);
-  console.log(`Generated ${written} locales (${messageCount} messages) from entrypoints/content/i18n.ts -> extension/_locales/`);
+  const bundleNote = manifestDeclaresDefaultLocale()
+    ? ' + src/_locales (bundle copy)'
+    : ' (bundle copy inactive: manifest lacks default_locale)';
+  console.log(`Generated ${written} locale files (${locales} locales, ${messageCount} messages) from entrypoints/content/i18n.ts -> extension/_locales/${bundleNote}`);
 }
 
 const isDirectRun = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
