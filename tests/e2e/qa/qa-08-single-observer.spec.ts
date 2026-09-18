@@ -82,7 +82,9 @@ test.describe("qa-08 single-observer", () => {
   let context: BrowserContext;
   let page: Page;
   let capture: ReturnType<typeof captureConsole>;
-  let closeQa: () => Promise<void>;
+  let closeQa: (() => Promise<void>) | undefined;
+  /** Firefox: extension-world probes need CDP (Chromium-only) — classified skip. */
+  let chromiumOnlyProbes = false;
 
   /** CDP handle + every execution context seen since Runtime.enable. */
   let cdp: CDPSession;
@@ -140,13 +142,10 @@ test.describe("qa-08 single-observer", () => {
 
   test.beforeAll(async ({}, testInfo) => {
     const browser = projectBrowser(testInfo.project.name);
-    if (browser !== "chromium") {
-      // The probe reads the extension's isolated world over CDP
-      // Runtime.evaluate — a Chromium-only mechanism. On Firefox the check
-      // cannot run without faking it; classify honestly and skip.
-      test.skip(true, "HARNESS: extension-world probe uses CDP — Chromium-only; Firefox has no CDP");
-      return;
-    }
+    // Firefox: the probe reads the extension's isolated world over CDP —
+    // Chromium-only; the checks classify-skip via check.skip below.
+    chromiumOnlyProbes = browser !== "chromium";
+    if (chromiumOnlyProbes) return;
     const session = await launchQaContext(browser, scenario());
     context = session.context;
     closeQa = session.close;
@@ -183,11 +182,15 @@ test.describe("qa-08 single-observer", () => {
   });
 
   test.afterAll(async () => {
-    await closeQa();
+    await closeQa?.();
   });
 
   test("one page, one platform MutationObserver, live port subscriptions", async () => {
     await runCheck(test.info(), page, capture, "qa-08-single-observer", RUNBOOK_REF, async (check) => {
+    if (chromiumOnlyProbes) {
+      check.skip("HARNESS: extension-world probe uses CDP — Chromium-only; Firefox has no CDP");
+      return;
+    }
       const probe = await readDomPortProbe();
       if (!probe) {
         throw new HarnessFailure(

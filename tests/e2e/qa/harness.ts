@@ -439,7 +439,9 @@ export class QaCheck {
       failureClass: this.status === "failed" ? this.failureClass ?? "PRODUCT" : undefined,
       durationMs: Date.now() - this.startedAt,
       screenshots: this.screenshots,
-      consoleErrors: [...this.consoleCapture.severe, ...this.consoleCapture.recorded],
+      consoleErrors: this.consoleCapture
+        ? [...this.consoleCapture.severe, ...this.consoleCapture.recorded]
+        : [],
       downloads: this.downloads,
       assertions: this.assertions,
       error: this.error,

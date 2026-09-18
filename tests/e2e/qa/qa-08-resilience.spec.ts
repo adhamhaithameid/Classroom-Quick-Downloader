@@ -63,6 +63,8 @@ test.describe("qa-08 resilience", () => {
   let capture: ReturnType<typeof captureConsole>;
   let browser: "chromium" | "firefox";
   let closeQa: () => Promise<void>;
+  /** Firefox MV2: the service-worker resilience probe is Chromium-only. */
+  let chromiumOnlySeam = false;
   let readProbe: (() => Promise<SwProbe>) | null = null;
 
   test.beforeAll(async ({}, testInfo) => {
@@ -75,7 +77,10 @@ test.describe("qa-08 resilience", () => {
     capture = captureConsole(page);
     await page.goto(`https://classroom.google.com${STREAM}`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector(SELECTORS.downloadButton, { timeout: 20_000 });
-    readProbe = await instrumentSw(context, "chrome-extension");
+    // Firefox MV2: the service-worker probe is a Chromium-only seam —
+    // classify-skip in the check body below.
+    chromiumOnlySeam = browser !== "chromium";
+    if (!chromiumOnlySeam) readProbe = await instrumentSw(context, "chrome-extension");
   });
 
   test.afterAll(async () => {
@@ -85,6 +90,10 @@ test.describe("qa-08 resilience", () => {
   test("every failure shape reaches a classified terminal — no dead ends", async () => {
     test.setTimeout(240_000);
     await runCheck(test.info(), page, capture, "qa-08", RUNBOOK_REF, async (check) => {
+      if (chromiumOnlySeam) {
+        check.skip("HARNESS: download probe instruments the extension service worker — Chromium-only; Firefox MV2 has no SW and Playwright hides its background");
+        return;
+      }
       const pagesBefore = context.pages().length;
       const cases = [
         { id: "srvfail-res-1", terminalClass: /cqd-error|cqd-success/, name: "transient 5xx" },
