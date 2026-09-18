@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
+import DOMPurify from 'isomorphic-dompurify';
 import SeoContentPage from './SeoContentPage.svelte';
 import type { SeoPageConfig } from '$lib/content/seoPages';
 
@@ -21,12 +22,10 @@ const baseConfig: SeoPageConfig = {
 
 function renderBody(config: SeoPageConfig): string {
   const { body } = render(SeoContentPage, { props: { config } });
-  // Normalize SSR noise: Svelte wraps each-block items in HTML comments and
-  // adds scoping classes to every element. Strip both so assertions match
-  // the visible markup, then collapse whitespace.
-  return body
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<!--/g, '')
+  // Normalize SSR noise: DOMPurify drops Svelte's each-block HTML comments
+  // (a real parser, so no comment marker can survive), then scoping classes
+  // are stripped and whitespace collapsed so assertions match visible markup.
+  return DOMPurify.sanitize(body, { ADD_ATTR: ['target'] })
     .replace(/ class="svelte-[a-z0-9]+"/g, '')
     .replace(/\s+/g, ' ');
 }
