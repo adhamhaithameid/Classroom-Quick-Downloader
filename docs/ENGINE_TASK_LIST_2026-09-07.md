@@ -2,9 +2,9 @@
 
 Consolidated, actionable task list for the extension engines and surrounding
 program. **Status columns refreshed 2026-09-13** against the beads epic
-(`Classroom-Quick-Downloader-1yf`): S1–S12, S6 closed (G2–G5 met; G4
-2026-09-18). S13 is the last open child (owner-blocked: Google OAuth client
-id), then epic close (G6). Sections C/F are historical snapshots. Produced from a full
+(`Classroom-Quick-Downloader-1yf`): ALL SPRINTS CLOSED (G2–G5 met; G4
+2026-09-18; S13 shipped behind OAuth 2026-09-18 — activation is the owner's
+config step, docs/engine/api-assist-setup.md). Epic 1yf closed at G6. Sections C/F are historical snapshots. Produced from a full
 scan of: the Engine V4 epic
 (`Classroom-Quick-Downloader-1yf`), `docs/ENGINE_V4_MASTER_PLAN.md`,
 `extension/docs/ENGINE_V4_SYSTEM_DESIGN.md`, `extension/docs/PRD_ENGINE_REFACTOR.md`,
@@ -45,7 +45,7 @@ fitness suite** (gate G1). Nothing above can start cleanly without it.
 | S10 strip V1 detector | 1 observer, 0 heartbeats; V1 render-only | G3 | `1yf.10` | **Done** (2026-09-17: DomPort multiplexer, heartbeats deleted, v2 default at interactive parity; V1 kept as rollback — see session log) |
 | S11 cross-browser & perf | browser smoke matrix in CI; `handleMutations` p95 < 6 ms | G5 | `1yf.11` | **Done** (2026-09-17: p95 1.9ms asserted; Chrome+Edge CI legs; Firefox signed leg env-gated/owner-blocked; _locales + selector audit) |
 | S12 ratchet & closeout | floors up, mutation ≥ 80%, decision trace, docs | G4, G6 | `1yf.12` | **Done** (2026-09-18: knownFailures [], floors 1.0, mutation 95.64%, trace viewer, checksums, ADR Accepted) |
-| S13+ API assist | OAuth client id + `identity`; `ApiDetector` strategy; consent + fallback | — | *to file* | Post-G4 by plan (R7); seam may be laid early |
+| S13+ API assist | OAuth client id + `identity`; `ApiDetector` strategy; consent + fallback | — | `1yf.13` | **Done** (2026-09-18: strategy+consent+activation shipped, inert until owner OAuth config) |
 
 ## C. P0/P1 operations items (not engine code, but blocking trust)
 
