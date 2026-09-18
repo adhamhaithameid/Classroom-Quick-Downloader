@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "බාගන්න",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "බාගත වෙමින්…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "උත්සාහ කරමින්…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "අවසන්",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "දෝෂයකි",
+    "description": "error"
+  },
+  "failed": {
+    "message": "අසාර්ථකයි",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "බාගන්න",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "ඉක්මන් බාගත කිරීම",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "අදහස්",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "සංස්කරණය",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "සියල්ල බාගන්න",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "ගොනුව",
+    "description": "file"
+  },
+  "files": {
+    "message": "ගොනු",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Number of comments on this post",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Download interrupted.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime not available",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Could not start.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Communication error.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "අදහස්",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "අවලංගු කරන්න",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "අවලංගු කරන ලදී",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

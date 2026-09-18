@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Aflaai",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Laai af…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Probeer…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Klaar",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Fout",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Misluk.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Aflaai",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Vinnige aflaai",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "kommentare",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Geredigeer",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Laai alles af",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "lêer",
+    "description": "file"
+  },
+  "files": {
+    "message": "lêers",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Aantal kommentaar op hierdie plasing",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Aflaai onderbreek.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Looptyd nie beskikbaar nie",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Kon nie begin nie.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Kommunikasiefout.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "kommentare",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Kanselleer",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Gekanselleer",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

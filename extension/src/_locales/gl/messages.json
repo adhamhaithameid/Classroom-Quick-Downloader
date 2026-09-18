@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Descargar",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Descargando…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Tentando…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Descargado",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Erro",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Fallou.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Descargar",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Descarga rápida",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "comentarios",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Editado",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Descargar todo",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "ficheiro",
+    "description": "file"
+  },
+  "files": {
+    "message": "ficheiros",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Número de comentarios nesta publicación",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Descarga interrompida.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Tempo de execución non dispoñible",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Non se puido iniciar.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Erro de comunicación.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "comentarios",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Cancelar",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Cancelado",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancelar todo",
+    "description": "cancelAll"
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Pellgargañ",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "O bellgargañ…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "O klask…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Pellgarget",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Fazi",
+    "description": "error"
+  },
+  "failed": {
+    "message": "C'hwitet.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Pellgargañ",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Pellgargañ prim",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "evezhiadennoù",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "evezhiadenn",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Kemmet",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Pellgargañ pep tra",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "restr",
+    "description": "file"
+  },
+  "files": {
+    "message": "restroù",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Niver a evezhiadennoù war ar post-mañ",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Pellgargañ paouezet.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime dihegerz",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "N'haller ket kregiñ.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Fazi kevreadenn.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "Nullañ",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Nullet",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

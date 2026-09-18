@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Tak niður",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Tekur niður…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Roynir…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Tikin niður",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Villa",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Misheppnaðist.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Tak niður",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Skjót niðurtaking",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "viðmerkingar",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "viðmerking",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Broytt",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Tak alt niður",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "fíla",
+    "description": "file"
+  },
+  "files": {
+    "message": "fílur",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Tal á viðmerkingum á hesum poste",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Niðurtaking brotin av.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime tøk ikki",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Kann ikki byrja.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Samskiftisfeilur.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "Angra",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Angrað",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

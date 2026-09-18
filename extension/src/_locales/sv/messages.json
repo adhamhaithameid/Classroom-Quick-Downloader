@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Ladda ner",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Laddar ner…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Försöker…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Klart",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Fel",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Misslyckades.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Ladda ner",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Snabb nedladdning",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "kommentarer",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Redigerad",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Ladda ner alla",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "fil",
+    "description": "file"
+  },
+  "files": {
+    "message": "filer",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Antal kommentarer på detta inlägg",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Nedladdning avbruten.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime inte tillgänglig",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Kunde inte starta.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Kommunikationsfel.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Dagar mellan inlägg och senaste redigering",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "kommentarer",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Avbryt",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Avbruten",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Avbryt alla",
+    "description": "cancelAll"
+  }
+}

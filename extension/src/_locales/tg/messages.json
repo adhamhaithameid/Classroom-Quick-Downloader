@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Боргирӣ",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Боргирӣ…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Кӯшиш…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Анҷом ёфт",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Хатогӣ",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Нашуд.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Боргирӣ",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Боргирии тез",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "шарҳҳо",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Таҳрир шуд",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Ҳамаро боргирӣ кунед",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "файл",
+    "description": "file"
+  },
+  "files": {
+    "message": "файлҳо",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Шумораи шарҳҳо дар ин мақола",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Боргирӣ қатъ гардид.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Вақти иҷро дастрас нест",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Оғоз карда натавонист.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Хатои алоқа.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "шарҳҳо",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Бекор кардан",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Бекор карда шуд",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

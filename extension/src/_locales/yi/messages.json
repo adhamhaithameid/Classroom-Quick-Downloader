@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "אראפקאפיע",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "דאַונלאָודינג…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "פּרובירן…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "געענדיקט",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "טעות",
+    "description": "error"
+  },
+  "failed": {
+    "message": "דורכפאַל.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "אראפקאפיע",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "שנעל אראפקאפיע",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "באַמערקונגען",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "עדיטיד",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "אראפקאפיע אַלע",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "טעקע",
+    "description": "file"
+  },
+  "files": {
+    "message": "טעקעס",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "נומער פון באַמערקונגען אויף דעם פּאָסטן",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "אראפקאפיע ינטעראַפּטיד.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "רונטימע ניט בנימצא",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "קען נישט אָנהייבן.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "קאָמוניקאַציע טעות.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "באַמערקונגען",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "באָטל מאַכן",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "קאַנסאַלד",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

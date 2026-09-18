@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "La'u mai",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "O lo'o la'u mai…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Taumafai…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Mae'a",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Mea sese",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Le manuia.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "La'u mai",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "La'u mai vave",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "fa'amatalaga",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Fa'asa'oina",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "La'u mai uma",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "faila",
+    "description": "file"
+  },
+  "files": {
+    "message": "faila",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Numera o fa'amatalaga i lenei pou",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Ua motusia le la'uina mai.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "E le maua le taimi e tamo'e ai",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Le mafai ona amata.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Fesootaiga sese.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "fa'amatalaga",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Fa'aleaogaina",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Ua fa'aleaogaina",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

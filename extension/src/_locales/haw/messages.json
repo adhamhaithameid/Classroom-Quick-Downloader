@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Hoʻoiho",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Ke hoʻoiho nei…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Ke hoʻāʻo nei…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Ua hoʻoiho ʻia",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Hewa",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Ua hāʻule.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Hoʻoiho",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Hoʻoiho wikiwiki",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "manaʻo",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "manaʻo",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Ua hoʻololi ʻia",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Hoʻoiho a pau",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "faila",
+    "description": "file"
+  },
+  "files": {
+    "message": "nā faila",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Ka helu o nā manaʻo ma kēia pou",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Ua hoʻōki ʻia ka hoʻoiho.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "ʻAʻole loaʻa ka runtime",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "ʻAʻole hiki ke hoʻomaka.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Hewa kamaʻilio.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "Hoʻopau",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Ua hoʻopau ʻia",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

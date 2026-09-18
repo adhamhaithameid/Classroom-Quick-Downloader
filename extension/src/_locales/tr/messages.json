@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "İndir",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "İndiriliyor…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Deneniyor…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "İndirildi",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Hata",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Başarısız.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "İndir",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Hızlı indir",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "yorum",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Düzenlendi",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Tümünü indir",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "dosya",
+    "description": "file"
+  },
+  "files": {
+    "message": "dosya",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Bu gönderideki yorum sayısı",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "İndirme kesintiye uğradı.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Çalışma zamanı kullanılamıyor",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Başlatılamadı.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "İletişim hatası.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Gönderi ile son düzenleme arasındaki gün sayısı",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "yorum",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "İptal",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "İptal edildi",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Tümünü iptal et",
+    "description": "cancelAll"
+  }
+}

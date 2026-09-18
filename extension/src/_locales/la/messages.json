@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Download",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Downloading…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Conatus…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Perfectus",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Error",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Defecit.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Download",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Download celer",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "commentaria",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Editum",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Download omnia",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "file",
+    "description": "file"
+  },
+  "files": {
+    "message": "files",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Numerus commentariorum in hac statione",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Download interpellata.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime non available",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Non incipere.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Communicatio error.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "commentaria",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Cancel",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Cancellatus",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "download": {
+    "message": "Pag-download",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Nag-download…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Nagsulay…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Nahuman na",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Sayop",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Napakyas.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Pag-download",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Dali nga pag-download",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "mga komento",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Na-edit",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "I-download ang tanan",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "file",
+    "description": "file"
+  },
+  "files": {
+    "message": "mga file",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Gidaghanon sa mga komento niini nga post",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Nabalda ang pag-download.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Dili magamit ang runtime",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Dili makasugod.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Sayop sa komunikasyon.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "Kanselahon",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Nakansela",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

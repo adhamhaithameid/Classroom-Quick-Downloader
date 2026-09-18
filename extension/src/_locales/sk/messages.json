@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Stiahnuť",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Sťahovanie…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Skúšam…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Hotovo",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Chyba",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Zlyhalo.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Stiahnuť",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Rýchle stiahnutie",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "komentárov",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Upravené",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Stiahnuť všetko",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "súbor",
+    "description": "file"
+  },
+  "files": {
+    "message": "súbory",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Počet komentárov k tomuto príspevku",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Sťahovanie prerušené.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime nie je k dispozícii",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Nemožno spustiť.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Chyba komunikácie.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Dni medzi zverejnením a poslednou úpravou",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "komentárov",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Zrušiť",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Zrušené",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Zrušiť všetko",
+    "description": "cancelAll"
+  }
+}

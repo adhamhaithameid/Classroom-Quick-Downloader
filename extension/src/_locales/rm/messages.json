@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Telechargiar",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Telechargiar…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Empruvar…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Telechargià",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Errur",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Betg reussì.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Telechargiar",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Telechargiar svelt",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "commentaris",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "commentari",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Modifitgà",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Telechargiar tut",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "datoteca",
+    "description": "file"
+  },
+  "files": {
+    "message": "datotecas",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Dumber da commentaris sin quest post",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Telechargiar interrut.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime na disponibel",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Na pudì cumenzar.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Errur da communicaziun.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "Halar",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Halà",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Pakua",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Inapakua…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Inajaribu…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Imekamilika",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Hitilafu",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Imeshindwa.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Pakua",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Pakua haraka",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "maoni",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Imehaririwa",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Pakua zote",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "faili",
+    "description": "file"
+  },
+  "files": {
+    "message": "faili",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Idadi ya maoni kwenye chapisho hili",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Upakuaji umekatizwa.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Wakati wa kuendesha haupatikani",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Inaweza kuanza.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Hitilafu ya mawasiliano.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Siku kati ya kuchapisha na uhariri wa mwisho",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "maoni",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Ghairi",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Imeghairiwa",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

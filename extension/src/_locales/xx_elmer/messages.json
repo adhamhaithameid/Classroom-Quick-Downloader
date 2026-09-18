@@ -1,0 +1,94 @@
+{
+  "cancel": {
+    "message": "Cancew",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Cancewwed",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancew Aww",
+    "description": "cancelAll"
+  },
+  "download": {
+    "message": "Download",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Downloading…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Twying…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Downloaded",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Ewwow",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Download faiwed.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Download",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Quick download",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "comments",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "comment",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Edited",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Download aww",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "fiwe",
+    "description": "file"
+  },
+  "files": {
+    "message": "fiwes",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Number of comments on this post",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Download intewwupted.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Wuntime not avaiwabwe",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Couwd not stawt.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Communication ewwow.",
+    "description": "commError"
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Preuzmi",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Preuzimanje…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Pokušavam…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Gotovo",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Greška",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Neuspjelo.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Preuzmi",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Brzo preuzimanje",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "komentara",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Uređeno",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Preuzmi sve",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "datoteka",
+    "description": "file"
+  },
+  "files": {
+    "message": "datoteke",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Broj komentara na ovu objavu",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Preuzimanje prekinuto.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Vrijeme izvođenja nije dostupno",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Nije moguće pokrenuti.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Pogreška u komunikaciji.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Dani između objave i zadnjeg uređivanja",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "komentara",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Odustani",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Otkazano",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Otkaži sve",
+    "description": "cancelAll"
+  }
+}

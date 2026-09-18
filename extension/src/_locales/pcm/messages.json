@@ -1,0 +1,102 @@
+{
+  "download": {
+    "message": "Download",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "E dey download…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "E dey try…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "E don finish",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Error",
+    "description": "error"
+  },
+  "failed": {
+    "message": "E no work.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Download",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Sharp download",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "komments",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "komment",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Dem don edit am",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Download evritin",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "file",
+    "description": "file"
+  },
+  "files": {
+    "message": "files",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "How many comments dey for dis post",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days wey pass between postin and last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Download cut.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime no dey",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "E no fit start.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Wahala for connection.",
+    "description": "commError"
+  },
+  "modified": {
+    "message": "Wetin dem change",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "after posting",
+    "description": "after_posting"
+  },
+  "cancel": {
+    "message": "Kansul",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Don kansul",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Kansul Evritin",
+    "description": "cancelAll"
+  }
+}

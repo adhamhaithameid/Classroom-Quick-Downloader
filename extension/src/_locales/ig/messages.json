@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Budata",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Na-ebudata…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Na-anwa…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Emechara",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Mperi",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Kụrụ afọ n'ala.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Budata",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Nbudata ngwa ngwa",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "okwu",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Ediziri",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Budata ihe niile",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "faịlụ",
+    "description": "file"
+  },
+  "files": {
+    "message": "faịlụ",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Ọnụọgụ nke nkọwa na post a",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Budata kwụsịrị.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Oge ojiri gaa adịghị",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Enweghị ike ịmalite.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Mperi nzikọrịta ozi.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "okwu",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Kagbuo",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Akagbuola",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

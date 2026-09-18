@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "다운로드",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "다운로드 중…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "시도 중…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "완료",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "오류",
+    "description": "error"
+  },
+  "failed": {
+    "message": "실패함",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "다운로드",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "빠른 다운로드",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "개 댓글",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "수정됨",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "모두 다운로드",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "파일",
+    "description": "file"
+  },
+  "files": {
+    "message": "파일",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "이 게시물의 댓글 수",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "다운로드가 중단되었습니다.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "런타임을 사용할 수 없습니다",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "시작할 수 없습니다.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "통신 오류.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "게시와 마지막 수정 사이의 일수",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "댓글",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "취소",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "취소됨",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "모두 취소",
+    "description": "cancelAll"
+  }
+}

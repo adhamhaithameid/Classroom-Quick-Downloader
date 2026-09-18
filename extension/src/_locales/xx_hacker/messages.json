@@ -1,0 +1,94 @@
+{
+  "cancel": {
+    "message": "C4NC3L",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "C4NC3LL3D",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "C4NC3L 4LL",
+    "description": "cancelAll"
+  },
+  "download": {
+    "message": "D0WNL04D",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "D0WNL04D1NG…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "7RY1NG…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "D0WNL04D3D",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "3RR0R",
+    "description": "error"
+  },
+  "failed": {
+    "message": "F41L3D.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "D0WNL04D",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "QU1CK D0WNL04D",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "comments",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "comment",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "3D173D",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "D0WNL04D 4LL",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "f1l3",
+    "description": "file"
+  },
+  "files": {
+    "message": "f1l3s",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Number of comments on this post",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "D0WNL04D 1N73RRUP73D.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "RUN71M3 N07 4V41L4BL3",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "C0ULD N07 574R7.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "C0MMUN1C4710N 3RR0R.",
+    "description": "commError"
+  }
+}

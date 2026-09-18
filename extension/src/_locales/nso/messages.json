@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Downlouda",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Go downlouda…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Go leka…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "E downloaditšwe",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Phošo",
+    "description": "error"
+  },
+  "failed": {
+    "message": "E padile.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Downlouda",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Downlouda ka pela",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "ditshwaelo",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "tshwaelo",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "E fetotšwe",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Downlouda tšohle",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "faele",
+    "description": "file"
+  },
+  "files": {
+    "message": "difaele",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Palo ya ditshwaelo mo posting ye",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Go downlouda go kgaogile.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime ga e gona",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "E ka se thome.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Phošo ya kgokagano.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "Phumola",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "E phumotswe",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

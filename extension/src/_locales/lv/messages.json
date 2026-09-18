@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Lejupielādēt",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Lejupielādē…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Mēģina…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Pabeigts",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Kļūda",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Neizdevās.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Lejupielādēt",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Ātrā lejupielāde",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "komentāri",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Rediģēts",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Lejupielādēt visu",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "failu",
+    "description": "file"
+  },
+  "files": {
+    "message": "faili",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Komentāru skaits par šo ziņu",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Lejupielāde pārtraukta.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Izpildlaiks nav pieejams",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Nevarēja sākt.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Saziņas kļūda.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Dienas starp publicēšanu un pēdējo rediģēšanu",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "komentāri",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Atcelt",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Atcelts",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Atcelt visu",
+    "description": "cancelAll"
+  }
+}

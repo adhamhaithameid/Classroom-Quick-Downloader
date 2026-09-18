@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Telecargar",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Telecargament…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Ensag…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Telecargat",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Error",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Fracassat.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Telecargar",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Telecargament rapid",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "comentaris",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "comentari",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Modificat",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Telecargar tot",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "fichièr",
+    "description": "file"
+  },
+  "files": {
+    "message": "fichièrs",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Nombre de comentaris sus aqueste post",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Telecargament interromput.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime pas disponible",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Pòt pas començar.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Error de comunicacion.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "Anullar",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Anullat",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

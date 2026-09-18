@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "ダウンロード",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "DL中…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "試行中…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "完了",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "エラー",
+    "description": "error"
+  },
+  "failed": {
+    "message": "失敗しました。",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "ダウンロード",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "クイックダウンロード",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "件のコメント",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "編集済み",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "すべてDL",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "ファイル",
+    "description": "file"
+  },
+  "files": {
+    "message": "ファイル",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "この投稿へのコメント数",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "投稿から最終編集までの日数",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "ダウンロードが中断されました。",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "ランタイムが利用できません",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "開始できませんでした。",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "通信エラー。",
+    "description": "commError"
+  },
+  "comment_singular": {
+    "message": "コメント",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "キャンセル",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "キャンセル済み",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "全てキャンセル",
+    "description": "cancelAll"
+  }
+}

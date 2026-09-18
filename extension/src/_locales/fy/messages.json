@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Downloade",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Downloade…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Besykje…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Ynladen",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Flater",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Mislearre.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Downloade",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Fluch downloade",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "reaksjes",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "reaksje",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Bewurke",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Download alles",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "bestân",
+    "description": "file"
+  },
+  "files": {
+    "message": "bestannen",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Tal fan reaksjes op dizze post",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Download ûnderbrutsen.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime net beskikber",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Koe net begjinne.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Kommunikaasjeflater.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "Annulearje",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Annulearre",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}
