@@ -226,6 +226,46 @@ describe('weekly flush slot math', () => {
     expect(state.meta.lastWeeklyFlushSlotKey).toBe(localDateKey(new Date(2026, 8, 17, 13, 47, 0)));
   });
 
+  it('d) getFlushDecision in weekly mode survives a broken clock without touching meta', () => {
+    const epochSlotKey = localDateKey(new Date(0));
+    const meta = makeMeta({
+      weeklyOffsetMinutes: 30,
+      weeklyOffsetSlotKey: epochSlotKey,
+      lastWeeklyFlushSlotKey: epochSlotKey,
+    });
+    const dateSpy = vi.spyOn(Date, 'now').mockReturnValue(Number.NaN);
+    const perfSpy = vi.spyOn(performance, 'now').mockReturnValue(Number.NaN);
+    try {
+      const decision = __flushTestInternals.getFlushDecision(makeWeeklyCfg(), meta, 0, null);
+      // The safe-clock fallback (changed=false) must not flush or dirty meta.
+      expect(decision.shouldFlush).toBe(false);
+      expect(decision.metaChanged).toBe(false);
+    } finally {
+      dateSpy.mockRestore();
+      perfSpy.mockRestore();
+    }
+  });
+
+  it('d) internalFlush with an empty weekly queue and a broken clock performs no request and no meta writes', async () => {
+    const epochSlotKey = localDateKey(new Date(0));
+    const state = makeState([], makeWeeklyCfg(), makeMeta({
+      weeklyOffsetMinutes: 30,
+      weeklyOffsetSlotKey: epochSlotKey,
+      lastWeeklyFlushSlotKey: epochSlotKey,
+    }));
+    const { mod, saveMeta } = await loadFlushModule(state);
+    const dateSpy = vi.spyOn(Date, 'now').mockReturnValue(Number.NaN);
+    const perfSpy = vi.spyOn(performance, 'now').mockReturnValue(Number.NaN);
+    try {
+      await mod.internalFlush();
+    } finally {
+      dateSpy.mockRestore();
+      perfSpy.mockRestore();
+    }
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    expect(saveMeta).not.toHaveBeenCalled();
+  });
+
   it('e) weekly mode ignores count/age/daily triggers while the slot is not due', async () => {
     const now = new Date(2026, 8, 17, 0, 20, 0);
     vi.setSystemTime(now);

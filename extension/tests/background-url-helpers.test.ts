@@ -41,6 +41,12 @@ describe('background url helpers', () => {
     expect(result.baseUrl).toBe(input);
   });
 
+  it('flags drive hosts without a resolvable file id as drive and keeps the raw url', () => {
+    const input = 'https://drive.google.com/drive/my-drive';
+    const result = normalizeUrl(input);
+    expect(result).toEqual({ baseUrl: input, isDrive: true });
+  });
+
   it('handles invalid URL values safely', () => {
     const input = 'not-a-url';
     const result = normalizeUrl(input);

@@ -501,6 +501,30 @@ describe('background download handler', () => {
     expect(sendResponse).toHaveBeenCalledTimes(1);
   });
 
+  it('handleDownloadRequest responds exactly once when the browser double-fires a success callback', async () => {
+    const ctx = await loadDownloadHandler({
+      isFirefox: false,
+      normalizeResult: { baseUrl: 'https://example.com/file.pdf', isDrive: false },
+    });
+    (chrome.downloads.download as any).mockImplementation((_: unknown, cb: (id?: number) => void) => {
+      (chrome.runtime as { lastError?: { message: string } }).lastError = undefined;
+      cb(77);
+      cb(77);
+    });
+    const sendResponse = vi.fn();
+    ctx.mod.handleDownloadRequest(
+      { url: 'https://example.com/file.pdf', requestId: 'req-double-success' },
+      { tab: { id: 25 } } as chrome.runtime.MessageSender,
+      sendResponse,
+    );
+    expect(sendResponse).toHaveBeenCalledTimes(1);
+    expect(sendResponse).toHaveBeenCalledWith({
+      started: true,
+      requestId: 'req-double-success',
+      downloadId: 77,
+    });
+  });
+
   it('handleDownloadRequest handles cancellation race after download ID assignment', async () => {
     const ctx = await loadDownloadHandler({
       isFirefox: false,
