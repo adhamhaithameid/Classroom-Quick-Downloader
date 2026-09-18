@@ -26,6 +26,7 @@ function renderBody(config: SeoPageConfig): string {
   // the visible markup, then collapse whitespace.
   return body
     .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<!--/g, '')
     .replace(/ class="svelte-[a-z0-9]+"/g, '')
     .replace(/\s+/g, ' ');
 }

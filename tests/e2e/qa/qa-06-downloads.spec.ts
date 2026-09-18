@@ -136,9 +136,10 @@ test.describe("qa-06 downloads", () => {
       const served = servedDownloads().find(
         (d) => d.url.includes("id=authlocked-dl-1") && d.filename === "secret.pdf",
       );
+      const servedUrl = served ? new URL(served.url) : null;
       check.assert(
         "served from the usercontent byte-serving endpoint under authuser=1",
-        !!served && served.url.includes("drive.usercontent.google.com") && served.url.includes("authuser=1") && served.filename === "secret.pdf",
+        !!servedUrl && servedUrl.hostname === "drive.usercontent.google.com" && servedUrl.searchParams.get("authuser") === "1" && served.filename === "secret.pdf",
         JSON.stringify(servedDownloads().filter((d) => d.url.includes("id=authlocked-dl-1"))),
       );
 
