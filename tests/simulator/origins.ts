@@ -204,11 +204,17 @@ function failureResponse(id: string): SimulatedResponse | null {
   }
   if (id.startsWith("quota")) {
     // Drive's quota/usage-limit page arrives as HTML — must be intercepted,
-    // never saved as a fake .html "download".
+    // never saved as a fake .html "download". The body is padded like the
+    // forbidden fixture: a tiny body can COMPLETE before the filename
+    // interception cancels it, flipping the file to a false success (the
+    // exact hole qa-08 exists to catch).
     return {
       status: 200,
       contentType: "text/html; charset=utf-8",
-      body: '<!doctype html><html><head><title>Quota exceeded</title></head><body>usageLimits — you have exceeded your download quota. Try again later.</body></html>',
+      body:
+        '<!doctype html><html><head><title>Quota exceeded</title></head><body>usageLimits — you have exceeded your download quota. Try again later.' +
+        'x'.repeat(5 * 1024 * 1024) +
+        '</body></html>',
     };
   }
   return null;

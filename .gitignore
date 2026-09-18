@@ -65,3 +65,14 @@ tests/e2e/.build-stamp
 # Stryker mutation testing (extension)
 extension/.stryker-tmp/
 extension/reports/
+
+# Scanner/QA tool state (collapsed to "noise" in the commit planner)
+.mimosa/
+qa-artifacts/
+gui-test-screenshots/
+.superpowers/tmp/
+.zcode/
+
+# Commit planner generated artifacts
+tools/commit-planner/data.js
+tools/commit-planner/data.json

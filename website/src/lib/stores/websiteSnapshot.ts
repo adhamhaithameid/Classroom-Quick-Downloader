@@ -21,7 +21,7 @@ const snapshotStateStore = writable<WebsiteSnapshotStoreState>(initialState);
 let initRefCount = 0;
 let refreshInFlight: Promise<WebsiteSnapshotStoreState> | null = null;
 let stalenessTimer: ReturnType<typeof setInterval> | null = null;
-const SNAPSHOT_FORCE_APPLY_MAX_AGE_MS = 3 * 60 * 60 * 1000;
+const SNAPSHOT_FORCE_APPLY_MAX_AGE_MS = 6 * 60 * 60 * 1000;
 // How often the store polls for snapshot expiry. The API layer no-ops while
 // the cached snapshot is inside its refresh window, so this is cheap and only
 // hits the network when the snapshot actually expired.

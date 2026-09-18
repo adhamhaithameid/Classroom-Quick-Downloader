@@ -35,7 +35,9 @@ import {
   startNextDriveAttempt,
   startSingleAttempt,
 } from './download-handler';
-import { refreshRemoteAnalyticsConfig, recordDownloadEvent } from '../utils/analytics';
+import { Analytics, refreshRemoteAnalyticsConfig, recordDownloadEvent } from '../utils/analytics';
+import { buildUninstallUrl } from '../utils/analytics/flush';
+import { loadStats } from '../utils/analytics/storage';
 import { createWorkerRuntimeBridge } from '../../src/adapters/bridge/runtime-bridge';
 import { startBridgeDownloadService } from './bridge-download-service';
 import { UNINSTALL_SITE_URL } from '../utils/analytics/constants';
@@ -57,18 +59,27 @@ function detectRuntimeBrowser(): 'chrome' | 'firefox' | 'edge' {
   return 'chrome';
 }
 
-function initializeUninstallUrl(): void {
+/**
+ * W3: the uninstall URL now carries compact download totals (d/a) alongside
+ * source/browser/version, so they survive uninstall via the website's
+ * uninstall page. URL assembly (including the 500-char cap that drops d/a
+ * first) lives in the pure buildUninstallUrl; this stays a thin chrome caller.
+ */
+async function initializeUninstallUrl(): Promise<void> {
   const setUninstallURL = chrome?.runtime?.setUninstallURL;
   if (typeof setUninstallURL !== 'function') return;
 
-  const extensionVersion = chrome.runtime?.getManifest?.().version || 'unknown';
-  const uninstallUrl = new URL(UNINSTALL_SITE_URL);
-  uninstallUrl.searchParams.set('source', 'extension');
-  uninstallUrl.searchParams.set('browser', detectRuntimeBrowser());
-  uninstallUrl.searchParams.set('version', extensionVersion);
-
   try {
-    setUninstallURL(uninstallUrl.toString(), () => {
+    const extensionVersion = chrome.runtime?.getManifest?.().version || 'unknown';
+    const stats = await loadStats();
+    const uninstallUrl = buildUninstallUrl(UNINSTALL_SITE_URL, {
+      source: 'extension',
+      browser: detectRuntimeBrowser(),
+      version: extensionVersion,
+      stats: { total: stats.total, attempts: stats.attempts },
+    });
+
+    setUninstallURL(uninstallUrl, () => {
       void chrome.runtime.lastError;
     });
   } catch {
@@ -112,9 +123,16 @@ export default defineBackground(() => {
   // Initialize analytics alarms
   ensureAnalyticsAlarm();
   refreshRemoteAnalyticsConfig().catch(() => {});
-  initializeUninstallUrl();
+  // Startup catch-up: the flush decision gates everything, so this is safe and
+  // idempotent (no-op unless a trigger is due, e.g. weekly slot catch-up).
+  // W3: once the flush resolves, rebuild the uninstall URL so it carries the
+  // post-flush local stats (last setUninstallURL call wins).
+  Analytics.flush()
+    .then(() => initializeUninstallUrl())
+    .catch(() => {});
+  void initializeUninstallUrl();
   chrome.runtime.onInstalled?.addListener(() => {
-    initializeUninstallUrl();
+    void initializeUninstallUrl();
   });
 
   // Memory leak prevention: periodic cleanup
