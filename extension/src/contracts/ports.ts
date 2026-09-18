@@ -117,6 +117,19 @@ export interface DeterminingFilenameItem {
   suggestedFilename?: string;
 }
 
+/**
+ * S13: request for an OAuth identity token (Classroom API assist).
+ *
+ * The result carries the answer, not the failure mode: denial, absent
+ * identity API, and errors all resolve to null. A port that can throw for
+ * denial would push callers into try/catch consent probing — the seam is
+ * honest instead.
+ */
+export interface IdentityTokenRequest {
+  /** OAuth scopes to request. Empty means the manifest-declared scopes. */
+  scopes: string[];
+}
+
 export interface BrowserPort {
   /** Human-readable family, e.g. 'chrome' | 'firefox'. Adapters decide. */
   readonly browserName: 'chrome' | 'firefox';
@@ -134,6 +147,16 @@ export interface BrowserPort {
   createTab(options: { url: string; active: boolean }): Promise<{ id?: number }>;
   /** Close a tab. Safe on unknown ids. */
   removeTab(tabId: number): Promise<void>;
+  /**
+   * S13: non-interactive OAuth token for the API-assist strategy.
+   *
+   * Optional because hosts without an identity API simply omit it — callers
+   * must treat the method's absence exactly like a resolved null. Never
+   * rejects: denial, missing API, and errors all resolve null. Never
+   * prompts: interactive acquisition is a consent-flow decision, not this
+   * port's business.
+   */
+  getIdentityToken?(request: IdentityTokenRequest): Promise<string | null>;
 }
 
 // ============================================================================

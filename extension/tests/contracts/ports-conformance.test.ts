@@ -5,7 +5,7 @@
  * contract the real adapters satisfy, and the fakes' behavior must be
  * predictable enough for roles to be unit-tested against them.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import type {
   BrowserPort,
   ClockPort,
@@ -15,12 +15,14 @@ import type {
 } from '../../src/contracts/ports';
 import { createFakeClock } from '../fakes/fake-clock';
 import { createFakeBrowserPort } from '../fakes/fake-browser-port';
+import { createFakeIdentityBrowserPort } from '../fakes/fake-identity-browser-port';
 import { createFakeDomPort } from '../fakes/fake-dom-port';
 import { createFakeNetworkPort } from '../fakes/fake-network-port';
 import { createFakeSchedulerPort } from '../fakes/fake-scheduler-port';
 import { createSystemClock } from '../../src/adapters/clock/system-clock';
 import { createIdleScheduler } from '../../src/adapters/scheduler/idle-scheduler';
 import { createMutationObserverDomPort } from '../../src/adapters/dom/mutation-observer-dom-port';
+import { withIdentityToken } from '../../src/adapters/identity/chrome-identity-token-port';
 
 describe('ClockPort', () => {
   it('is satisfied by the fake and the system adapter', () => {
@@ -170,5 +172,121 @@ describe('BrowserPort', () => {
     const tab = await port.createTab({ url: 'https://drive.google.com/x', active: false });
     expect(tab.id).toBe(1);
     expect(port.createdTabs).toEqual([{ url: 'https://drive.google.com/x', active: false }]);
+  });
+});
+
+// ===========================================================================
+// S13 — the optional identity seam on BrowserPort.
+//
+// Conformance rule: BOTH the fake and the chrome.identity adapter answer the
+// same three questions identically — a granted token resolves as a string;
+// denial, absent API, and errors resolve as null (never a rejection); and
+// implementations without identity support simply omit the method.
+// ===========================================================================
+
+type GetAuthTokenStub = (
+  details: { interactive: boolean; scopes?: string[] },
+  callback: (result?: string | { token?: string }) => void,
+) => void;
+
+/** Install a chrome.identity stub over the setup.ts chrome mock. */
+function stubChromeIdentity(getAuthToken: GetAuthTokenStub): void {
+  const host = globalThis as { chrome?: { identity?: unknown } };
+  if (!host.chrome) host.chrome = {} as never;
+  host.chrome.identity = { getAuthToken };
+}
+
+describe('BrowserPort.getIdentityToken (S13 optional seam)', () => {
+  afterEach(() => {
+    const host = globalThis as { chrome?: { identity?: unknown } };
+    delete host.chrome?.identity;
+  });
+
+  it('the fake without the method and the fake with it are both BrowserPorts', () => {
+    // The seam is optional: every pre-existing fake/adapter must still
+    // conform with zero edits — that is why it is `getIdentityToken?`.
+    const without: BrowserPort = createFakeBrowserPort();
+    const withFake: BrowserPort = createFakeIdentityBrowserPort();
+    expect(without).toBeDefined();
+    expect(withFake).toBeDefined();
+  });
+
+  it('fake scripts tokens in queue order and denies once the queue is empty', async () => {
+    const port = createFakeIdentityBrowserPort();
+    port.identityTokenQueue.push('tok-1', null, 'tok-2');
+
+    await expect(port.getIdentityToken!({ scopes: ['s'] })).resolves.toBe('tok-1');
+    await expect(port.getIdentityToken!({ scopes: ['s'] })).resolves.toBeNull();
+    await expect(port.getIdentityToken!({ scopes: ['s'] })).resolves.toBe('tok-2');
+    // Empty queue = deny, never throw.
+    await expect(port.getIdentityToken!({ scopes: ['s'] })).resolves.toBeNull();
+  });
+
+  it('fake records every requested scope set', async () => {
+    const port = createFakeIdentityBrowserPort();
+    port.identityTokenQueue.push('tok');
+    await port.getIdentityToken!({ scopes: ['a', 'b'] });
+    expect(port.identityTokenCalls).toEqual([{ scopes: ['a', 'b'] }]);
+  });
+
+  it('adapter is satisfied as a BrowserPort', () => {
+    const port: BrowserPort = withIdentityToken(createFakeBrowserPort());
+    expect(port).toBeDefined();
+  });
+
+  it('adapter resolves the token chrome grants', async () => {
+    stubChromeIdentity((details, callback) => {
+      expect(details.interactive).toBe(false);
+      callback('tok-from-chrome');
+    });
+    const port = withIdentityToken(createFakeBrowserPort());
+    await expect(port.getIdentityToken!({ scopes: [] })).resolves.toBe('tok-from-chrome');
+  });
+
+  it('adapter forwards non-empty scopes and omits empty ones', async () => {
+    let seen: { interactive: boolean; scopes?: string[] } | null = null;
+    stubChromeIdentity((details, callback) => {
+      seen = details;
+      callback('tok');
+    });
+    const port = withIdentityToken(createFakeBrowserPort());
+    await port.getIdentityToken!({ scopes: ['scope.a'] });
+    expect(seen).toEqual({ interactive: false, scopes: ['scope.a'] });
+
+    seen = null;
+    await port.getIdentityToken!({ scopes: [] });
+    expect(seen).toEqual({ interactive: false });
+  });
+
+  it('adapter resolves null on chrome.runtime.lastError (denial)', async () => {
+    stubChromeIdentity((_details, callback) => {
+      const runtime = (globalThis as { chrome: { runtime: { lastError: unknown } } }).chrome.runtime;
+      runtime.lastError = { message: 'OAuth2 not granted' };
+      callback('');
+      runtime.lastError = null;
+    });
+    const port = withIdentityToken(createFakeBrowserPort());
+    await expect(port.getIdentityToken!({ scopes: [] })).resolves.toBeNull();
+  });
+
+  it('adapter resolves null when chrome.identity is absent', async () => {
+    const port = withIdentityToken(createFakeBrowserPort());
+    await expect(port.getIdentityToken!({ scopes: [] })).resolves.toBeNull();
+  });
+
+  it('adapter resolves null when getAuthToken throws', async () => {
+    stubChromeIdentity(() => {
+      throw new Error('sync host failure');
+    });
+    const port = withIdentityToken(createFakeBrowserPort());
+    await expect(port.getIdentityToken!({ scopes: [] })).resolves.toBeNull();
+  });
+
+  it('adapter accepts the object-token shape older chrome builds emit', async () => {
+    stubChromeIdentity((_details, callback) => {
+      callback({ token: 'obj-token' });
+    });
+    const port = withIdentityToken(createFakeBrowserPort());
+    await expect(port.getIdentityToken!({ scopes: [] })).resolves.toBe('obj-token');
   });
 });
