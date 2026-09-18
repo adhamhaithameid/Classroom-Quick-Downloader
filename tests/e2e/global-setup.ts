@@ -22,7 +22,7 @@
  * @since v4.0.0
  */
 
-import { spawnSync, execSync } from "node:child_process";
+import { spawnSync, execFileSync } from "node:child_process";
 import path from "node:path";
 import fs from "node:fs";
 import { createHash } from "node:crypto";
