@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Stáhnout",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Stahování…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Zkouším…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Staženo",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Chyba",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Selhalo.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Stáhnout",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Rychlé stažení",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "komentářů",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Upraveno",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Stáhnout vše",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "soubor",
+    "description": "file"
+  },
+  "files": {
+    "message": "soubory",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Počet komentářů u tohoto příspěvku",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Stahování přerušeno.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime není k dispozici",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Nelze spustit.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Chyba komunikace.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Dny mezi zveřejněním a poslední úpravou",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "komentářů",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Zrušit",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Zrušeno",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Zrušit vše",
+    "description": "cancelAll"
+  }
+}

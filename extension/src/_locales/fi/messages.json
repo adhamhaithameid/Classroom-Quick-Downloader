@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Lataa",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Ladataan…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Yritetään…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Ladattu",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Virhe",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Epäonnistui.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Lataa",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Pikalataus",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "kommenttia",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Muokattu",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Lataa kaikki",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "tiedosto",
+    "description": "file"
+  },
+  "files": {
+    "message": "tiedostot",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Kommenttien määrä tässä julkaisussa",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Lataus keskeytyi.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Suoritusympäristö ei saatavilla",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Ei voitu käynnistää.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Yhteysvirhe.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Päivät julkaisun ja viimeisen muokkauksen välillä",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "kommenttia",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Peruuta",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Peruutettu",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Peruuta kaikki",
+    "description": "cancelAll"
+  }
+}

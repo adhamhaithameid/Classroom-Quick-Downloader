@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Laadi alla",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Laadimine…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Proovin…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Valmis",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Viga",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Ebaõnnestus.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Laadi alla",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Kiire allalaadimine",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "kommentaari",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Muudetud",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Laadi kõik alla",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "fail",
+    "description": "file"
+  },
+  "files": {
+    "message": "failid",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Kommentaaride arv selles postituses",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Allalaadimine katkestati.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Käitusaeg pole saadaval",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Ei saanud käivitada.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Sideviga.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Päevad postitamise ja viimase muutmise vahel",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "kommentaari",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Loobu",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Tühistatud",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Tühista kõik",
+    "description": "cancelAll"
+  }
+}

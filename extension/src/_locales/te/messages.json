@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "డౌన్‌లోడ్",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "డౌన్‌లోడ్ అవుతోంది…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "ప్రయత్నిస్తోంది…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "పూర్తయింది",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "లోపం",
+    "description": "error"
+  },
+  "failed": {
+    "message": "విఫలమైంది",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "డౌన్‌లోడ్",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "త్వరిత డౌన్‌లోడ్",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "వ్యాఖ్యలు",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "సవరించబడింది",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "అన్నీ డౌన్‌లోడ్ చేయండి",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "ఫైల్",
+    "description": "file"
+  },
+  "files": {
+    "message": "ఫైళ్లు",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "ఈ పోస్ట్‌పై వ్యాఖ్యల సంఖ్య",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "డౌన్‌లోడ్ అంతరాయం కలిగింది.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "రన్‌టైమ్ అందుబాటులో లేదు",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "ప్రారంభించడం సాధ్యం కాలేదు.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "కమ్యూనికేషన్ లోపం.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "పోస్ట్ చేయడానికి మరియు చివరి సవరణకు మధ్య రోజులు",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "వ్యాఖ్యలు",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "రద్దు",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "రద్దు చేయబడింది",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "అన్నీ రద్దు చేయి",
+    "description": "cancelAll"
+  }
+}

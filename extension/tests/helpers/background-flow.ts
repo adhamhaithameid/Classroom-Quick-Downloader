@@ -146,7 +146,13 @@ export async function loadFlowHarness(options: FlowHarnessOptions = {}) {
   vi.doMock('../../entrypoints/background/url-helpers', () => ({
     getFilenameExt: (f: string) => f?.split('.').pop()?.toLowerCase() ?? '',
     normalizeUrl: vi.fn((url: string) => {
-      if (url.includes('drive.usercontent.google.com') || url.includes('drive.google.com')) {
+      let host = '';
+      try {
+        host = new URL(url).hostname;
+      } catch {
+        host = '';
+      }
+      if (host === 'drive.usercontent.google.com' || host === 'drive.google.com') {
         return { baseUrl: DRIVE_BASE, isDrive: true };
       }
       return { baseUrl: url, isDrive: false };

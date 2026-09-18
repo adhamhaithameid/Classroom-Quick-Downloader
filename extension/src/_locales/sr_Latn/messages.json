@@ -1,0 +1,82 @@
+{
+  "download": {
+    "message": "Preuzmi",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Preuzimanje…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Pokušavam…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Preuzeto",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Greška",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Neuspelo.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Preuzmi",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Brzo preuzimanje",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "komentara",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "komentar",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Izmenjeno",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Preuzmi sve",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "datoteka",
+    "description": "file"
+  },
+  "files": {
+    "message": "datoteke",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Broj komentara na ovoj objavi",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Dani između objavljivanja i poslednjeg uređivanja",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Preuzimanje prekinuto.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime nije dostupan",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Nije moguće pokrenuti.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Greška u komunikaciji.",
+    "description": "commError"
+  }
+}

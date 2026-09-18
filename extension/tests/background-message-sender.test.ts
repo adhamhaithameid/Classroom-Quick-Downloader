@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { sendStatusToTab } from '../entrypoints/background/message-sender';
+import {
+  sendStatusToTab,
+  setDownloadStatusListener,
+} from '../entrypoints/background/message-sender';
 import type { PendingDownload } from '../entrypoints/background/types';
 
 function makePending(overrides: Partial<PendingDownload> = {}): PendingDownload {
@@ -58,5 +61,48 @@ describe('background message sender', () => {
     }) as never;
     const pending = makePending();
     expect(() => sendStatusToTab(pending, 'error')).not.toThrow();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // S6/G2 bridge listener: the single status observer registered by the
+  // bridge download service so tab-less downloads still settle.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  describe('download status listener', () => {
+    it('notifies the registered listener even when the download has no tab', () => {
+      const listener = vi.fn();
+      setDownloadStatusListener(listener);
+      const pending = makePending({ tabId: undefined });
+      sendStatusToTab(pending, 'success', undefined, undefined);
+      expect(listener).toHaveBeenCalledWith(pending, 'success', undefined, undefined);
+      setDownloadStatusListener(null);
+    });
+
+    it('forwards user messages and error codes to the listener', () => {
+      const listener = vi.fn();
+      setDownloadStatusListener(listener);
+      const pending = makePending();
+      sendStatusToTab(pending, 'error', 'failed', 'ERR');
+      expect(listener).toHaveBeenCalledWith(pending, 'error', 'failed', 'ERR');
+      setDownloadStatusListener(null);
+    });
+
+    it('ignores statuses after the listener is cleared', () => {
+      const listener = vi.fn();
+      setDownloadStatusListener(listener);
+      setDownloadStatusListener(null);
+      sendStatusToTab(makePending(), 'error');
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('never lets a broken listener break the status funnel', () => {
+      setDownloadStatusListener(() => {
+        throw new Error('observer exploded');
+      });
+      const pending = makePending();
+      expect(() => sendStatusToTab(pending, 'error')).not.toThrow();
+      expect(chrome.tabs.sendMessage).toHaveBeenCalled();
+      setDownloadStatusListener(null);
+    });
   });
 });

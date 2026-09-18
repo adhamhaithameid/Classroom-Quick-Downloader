@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Herunterladen",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Laden…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Versuchen…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Fertig",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Fehler",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Fehlgeschlagen.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Herunterladen",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Schneller Download",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "Kurskommentare",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "Kurskommentar",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Bearbeitet",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Alle herunterladen",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "Datei",
+    "description": "file"
+  },
+  "files": {
+    "message": "Dateien",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Anzahl der Kommentare zu diesem Beitrag",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Download unterbrochen.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Laufzeitumgebung nicht verfügbar",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Konnte nicht starten.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Kommunikationsfehler.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Tage zwischen Veröffentlichung und letzter Bearbeitung",
+    "description": "editedTooltip"
+  },
+  "cancel": {
+    "message": "Abbrechen",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Abgebrochen",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Alle abbrechen",
+    "description": "cancelAll"
+  }
+}

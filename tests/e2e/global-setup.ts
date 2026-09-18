@@ -176,20 +176,23 @@ function ensureFirefoxProfile(): void {
     return;
   }
 
+  const outputDir = path.join(EXTENSION_DIR, ".output");
   const manifestPath = path.join(FIREFOX_OUTPUT_DIR, "manifest.json");
-  const firefoxZips = fs.existsSync(path.join(EXTENSION_DIR, ".output"))
-    ? fs
-        .readdirSync(path.join(EXTENSION_DIR, ".output"))
-        .filter((f) => f.endsWith("-firefox.zip"))
-    : [];
+  const listFirefoxZips = () =>
+    fs.existsSync(outputDir)
+      ? fs.readdirSync(outputDir).filter((f) => f.endsWith("-firefox.zip"))
+      : [];
+  let firefoxZips = listFirefoxZips();
   if (!fs.existsSync(manifestPath) || firefoxZips.length === 0) {
     console.log("\n🔨 Building extension for Firefox (MV2)...");
     runExtensionScript("firefox"); // wxt build -b firefox && wxt zip -b firefox
+    // Re-scan after the build: the pre-build scan is empty on fresh runners.
+    firefoxZips = listFirefoxZips();
   }
 
   // wxt zip names the artifact <name>-<version>-firefox.zip — glob for it.
   const sourceZip = firefoxZips
-    .map((f) => path.join(EXTENSION_DIR, ".output", f))
+    .map((f) => path.join(outputDir, f))
     .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0];
   if (!sourceZip) {
     throw new Error("Firefox zip not found in extension/.output — run pnpm -C extension run firefox first.");

@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Ներբեռնել",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Ներբեռնում…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Փորձում է…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Ավարտված",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Սխալ",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Ձախողվեց:",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Ներբեռնել",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Արագ ներբեռնում",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "մեկնաբանություն",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Խմբագրվել է",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Ներբեռնել բոլորը",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "ֆայլ",
+    "description": "file"
+  },
+  "files": {
+    "message": "ֆայլեր",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Մեկնաբանությունների քանակը այս գրառման մեջ",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Ներբեռնումը ընդհատվեց:",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Գործարկման ժամանակը անհասանելի է",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Չհաջողվեց սկսել:",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Հաղորդակցման սխալ:",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "մեկնաբանություն",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Չեղարկել",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Չեղարկված է",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

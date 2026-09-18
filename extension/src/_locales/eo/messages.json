@@ -1,0 +1,102 @@
+{
+  "download": {
+    "message": "Elŝuti",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Elŝutante…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Provante…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Elŝutita",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Eraro",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Malsukcesis.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Elŝuti",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Rapida elŝuto",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "komentoj",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "komento",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Redaktita",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Elŝuti ĉiujn",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "dosiero",
+    "description": "file"
+  },
+  "files": {
+    "message": "dosieroj",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Nombro da komentoj pri ĉi tiu afiŝo",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Tagoj inter afiŝado kaj la lasta redakto",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Elŝuto interrompita.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Rultempo ne disponebla",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Ne eblis komenci.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Komunika eraro.",
+    "description": "commError"
+  },
+  "modified": {
+    "message": "Modifita",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "post afiŝado",
+    "description": "after_posting"
+  },
+  "cancel": {
+    "message": "Nuligi",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Nuligita",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Nuligi Ĉiujn",
+    "description": "cancelAll"
+  }
+}

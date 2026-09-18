@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Luchdaich sìos",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "A' luchdachadh sìos…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "A' feuchainn…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Deiseil",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Mearachd",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Dh'fhàillig.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Luchdaich sìos",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Luchdachadh sìos luath",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "beachdan",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Deasaichte",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Luchdaich sìos na h-uile",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "faidhle",
+    "description": "file"
+  },
+  "files": {
+    "message": "faidhlichean",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Àireamh de bheachdan air a’ phost seo",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Chaidh stad a chur air an luchdachadh sìos.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Chan eil ùine ruith ri fhaighinn",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Cha b’ urrainn dhuinn tòiseachadh.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Mearachd conaltraidh.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "beachdan",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Sguir",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Air a sgur",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

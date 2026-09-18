@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "ดาวน์โหลด",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "กำลังโหลด…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "พยายาม…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "เสร็จสิ้น",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "ข้อผิดพลาด",
+    "description": "error"
+  },
+  "failed": {
+    "message": "ล้มเหลว",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "ดาวน์โหลด",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "ดาวน์โหลดด่วน",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "ความคิดเห็น",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "แก้ไขแล้ว",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "ดาวน์โหลดทั้งหมด",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "ไฟล์",
+    "description": "file"
+  },
+  "files": {
+    "message": "ไฟล์",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "จำนวนความคิดเห็นในโพสต์นี้",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "การดาวน์โหลดหยุดชะงัก",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "รันไทม์ไม่พร้อมใช้งาน",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "ไม่สามารถเริ่มต้นได้",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "ข้อผิดพลาดในการสื่อสาร",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "วันระหว่างการโพสต์และการแก้ไขครั้งล่าสุด",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "ความคิดเห็น",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "ยกเลิก",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "ยกเลิกแล้ว",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "ยกเลิกทั้งหมด",
+    "description": "cancelAll"
+  }
+}

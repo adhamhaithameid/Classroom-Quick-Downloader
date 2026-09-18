@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "تنزيل",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "جاري التنزيل…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "محاولة…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "تم التنزيل",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "خطأ",
+    "description": "error"
+  },
+  "failed": {
+    "message": "فشل التنزيل.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "تنزيل",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "تنزيل سريع",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "تعليقات",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "تعليق",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "تم التعديل",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "تنزيل الكل",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "ملف",
+    "description": "file"
+  },
+  "files": {
+    "message": "ملفات",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "عدد التعليقات على هذا المنشور",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "الأيام بين النشر وآخر تعديل",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "تم قطع التنزيل.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "وقت التشغيل غير متاح",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "تعذر البدء.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "خطأ في الاتصال.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "إلغاء",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "ملغى",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "إلغاء الكل",
+    "description": "cancelAll"
+  }
+}

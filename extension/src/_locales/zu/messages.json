@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Landa",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Iyalandwa…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Iyazama…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Ilandīwe",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Iphutha",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Ihlulekile.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Landa",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Ukulanda okusheshayo",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "amazwana",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Kuhleliwe",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Landa konke",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "ifayela",
+    "description": "file"
+  },
+  "files": {
+    "message": "amafayela",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Inani lamazwana kulokhu okuthunyelwe",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Ukulanda kuphazamisekile.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Isikhathi sokusebenza asitholakali",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Ayikwazanga ukuqala.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Iphutha lokuxhumana.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "amazwana",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Khansela",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Kukhanseliwe",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

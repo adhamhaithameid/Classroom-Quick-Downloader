@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Преузми",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Преузимање…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Покушавам…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Завршено",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Грешка",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Неуспешно.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Преузми",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Брзо преузимање",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "коментара",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Измењено",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Преузми све",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "датотека",
+    "description": "file"
+  },
+  "files": {
+    "message": "датотеке",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Број коментара на овај пост",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Преузимање је прекинуто.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Извршно окружење није доступно",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Није могуће покренути.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Грешка у комуникацији.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Дани између објављивања и последње измене",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "коментара",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Откажи",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Отказано",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Откажи све",
+    "description": "cancelAll"
+  }
+}

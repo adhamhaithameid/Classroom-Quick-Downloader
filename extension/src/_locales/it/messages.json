@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Scarica",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Scaricamento…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Provando…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Scaricato",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Errore",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Fallito.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Scarica",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Download rapido",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "commenti",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Modificato",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Scarica tutto",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "file",
+    "description": "file"
+  },
+  "files": {
+    "message": "file",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Numero di commenti su questo post",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Download interrotto.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime non disponibile",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Impossibile avviare.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Errore di comunicazione.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Giorni tra la pubblicazione e l'ultima modifica",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "commento",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Annulla",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Annullato",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Annulla tutto",
+    "description": "cancelAll"
+  }
+}

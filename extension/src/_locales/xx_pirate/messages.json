@@ -1,0 +1,94 @@
+{
+  "cancel": {
+    "message": "Abandon",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Abandoned",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Abandon Ship",
+    "description": "cancelAll"
+  },
+  "download": {
+    "message": "Plunder",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Plunderin'…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Tryin'…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Plundered",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Blimey",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Plunder failed, arr!",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Plunder",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Quick plunder",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "comments",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "comment",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Edited",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Plunder all",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "scroll",
+    "description": "file"
+  },
+  "files": {
+    "message": "scrolls",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Number of comments on this post",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Plunder interrupted, arr!",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime not available, matey",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Could not set sail.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Message in a bottle lost.",
+    "description": "commError"
+  }
+}

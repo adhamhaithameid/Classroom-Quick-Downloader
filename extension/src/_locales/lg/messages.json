@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Dawuniloda",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Kidawunirodwa…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Kugezaako…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Kikisibwa",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Ensobi",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Kigaanye.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Dawuniloda",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Dawuniloda enyanguyirira",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "ebirowoozo",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "ekirowoozo",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Kyakyusibwa",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Dawuniloda byonna",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "fayiro",
+    "description": "file"
+  },
+  "files": {
+    "message": "fayiro",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Omuwendo gwebirowoozo ku post eno",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Okudownlooda kwayimiriza.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime tekyaliwo",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Tekyasobola kutandika.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Ensobi yokukwatagana.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "Sazaamu",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Kisaziddwamu",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

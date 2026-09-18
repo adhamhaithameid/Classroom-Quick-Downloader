@@ -207,6 +207,21 @@ describe('analytics storage internals', () => {
     expect(migratedFromInvalid).toEqual(DEFAULT_CONFIG);
   });
 
+  it('normalizeConfig keeps the weekly flush mode and falls back for invalid values', () => {
+    expect(__storageTestInternals.normalizeConfig({
+      ...DEFAULT_CONFIG,
+      flushMode: 'weekly',
+    }).flushMode).toBe('weekly');
+    expect(__storageTestInternals.normalizeConfig({
+      ...DEFAULT_CONFIG,
+      flushMode: 'hourly' as any,
+    }).flushMode).toBe('next_day');
+    expect(__storageTestInternals.normalizeConfig({
+      ...DEFAULT_CONFIG,
+      flushMode: undefined as any,
+    }).flushMode).toBe('next_day');
+  });
+
   it('clampInt returns fallback for non-numeric values and clamps boundaries', () => {
     expect(__storageTestInternals.clampInt('bad', 1, 10, 7)).toBe(7);
     expect(__storageTestInternals.clampInt(-100, 1, 10, 7)).toBe(1);

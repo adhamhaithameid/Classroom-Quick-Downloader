@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Lawrlwytho",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Yn lawrlwytho…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Yn ceisio…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Wedi gorffen",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Gwall",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Methodd.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Lawrlwytho",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Lawrlwytho cyflym",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "sylwadau",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Golygwyd",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Lawrlwytho popeth",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "ffeil",
+    "description": "file"
+  },
+  "files": {
+    "message": "ffeiliau",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Nifer y sylwadau ar y post hwn",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Lawrlwytho wedi'i dorri ar draws.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Amser rhedeg ddim ar gael",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Methu cychwyn.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Gwall cyfathrebu.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "sylwadau",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Canslo",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Wedi'i ganslo",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

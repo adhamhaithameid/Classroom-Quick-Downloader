@@ -1,0 +1,102 @@
+{
+  "download": {
+    "message": "Download",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Downloading…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Trying…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Downloaded",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Error",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Download failed.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Download",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Quick download",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "ndemanga",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "ndemanga",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Edited",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Download all",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "file",
+    "description": "file"
+  },
+  "files": {
+    "message": "files",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Number of comments on this post",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Mazuŵa pakati pa kuika na kusintha kwaumaliro",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Download yadukizgika.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime palije",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Yatondeka kwamba.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Communication error.",
+    "description": "commError"
+  },
+  "modified": {
+    "message": "Kusinthidwa",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "pamanyuma pakuika",
+    "description": "after_posting"
+  },
+  "cancel": {
+    "message": "Kanizga",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Yakanizgika",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Kanizga Yose",
+    "description": "cancelAll"
+  }
+}

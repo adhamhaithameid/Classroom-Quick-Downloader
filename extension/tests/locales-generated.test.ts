@@ -187,12 +187,16 @@ describe('bundle copy gate (bead 770: chrome requires default_locale with _local
     expect(manifestDeclaresDefaultLocale('/nonexistent/wxt.config.ts')).toBe(false);
   });
 
-  it('bundle copy is inactive while the manifest lacks default_locale', () => {
-    // Tripwire: when default_locale lands in wxt.config.ts, this assertion
-    // fails until `locales:generate` regenerates the bundle root — exactly
-    // the coupling that must not be forgotten (Chrome rejects an extension
-    // that ships _locales without default_locale).
-    expect(manifestDeclaresDefaultLocale()).toBe(false);
-    expect(existsSync(path.join(EXTENSION_ROOT, 'src', '_locales'))).toBe(false);
+  it('bundle copy is active now that the manifest declares default_locale', () => {
+    // Bead 770 landed (2026-09-18): wxt.config.ts declares
+    // default_locale: 'en' and the generator ships _locales into the bundle
+    // root (src/, the publicDir). The coupling stays enforced from both
+    // directions: the detector below must agree with the real manifest, and
+    // the bundle copy must exist so Chrome never sees one without the other.
+    expect(manifestDeclaresDefaultLocale()).toBe(true);
+    expect(existsSync(path.join(EXTENSION_ROOT, 'src', '_locales'))).toBe(true);
+    expect(
+      existsSync(path.join(EXTENSION_ROOT, 'src', '_locales', 'en', 'messages.json')),
+    ).toBe(true);
   });
 });

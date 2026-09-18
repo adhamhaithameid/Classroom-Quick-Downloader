@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "دانلود",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "درحال دانلود…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "تلاش مجدد…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "انجام شد",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "خطا",
+    "description": "error"
+  },
+  "failed": {
+    "message": "ناموفق",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "دانلود",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "دانلود سریع",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "نظر",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "ویرایش شده",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "دانلود همه",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "فایل",
+    "description": "file"
+  },
+  "files": {
+    "message": "فایل‌ها",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "تعداد نظرات در این پست",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "دانلود قطع شد.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "زمان اجرا در دسترس نیست",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "شروع نشد.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "خطای ارتباطی.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "روزهای بین ارسال و آخرین ویرایش",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "نظر",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "لغو",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "لغو شد",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "لغو همه",
+    "description": "cancelAll"
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "ಡೌನ್‌ಲೋಡ್",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "ಡೌನ್‌ಲೋಡ್ ಆಗುತ್ತಿದೆ…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "ಪ್ರಯತ್ನಿಸುತ್ತಿದೆ…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "ಪೂರ್ಣಗೊಂಡಿದೆ",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "ದೋಷ",
+    "description": "error"
+  },
+  "failed": {
+    "message": "ವಿಫಲವಾಗಿದೆ",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "ಡೌನ್‌ಲೋಡ್",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "ತ್ವರಿತ ಡೌನ್‌ಲೋಡ್",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "ಕಾಮೆಂಟ್‌ಗಳು",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "ಸಂಪಾದಿಸಲಾಗಿದೆ",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "ಎಲ್ಲವನ್ನೂ ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "ಫೈಲ್",
+    "description": "file"
+  },
+  "files": {
+    "message": "ಫೈಲ್‌ಗಳು",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "ಈ ಪೋಸ್ಟ್‌ನಲ್ಲಿನ ಕಾಮೆಂಟ್‌ಗಳ ಸಂಖ್ಯೆ",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "ಡೌನ್‌ಲೋಡ್ ತಡೆಹಿಡಿಯಲಾಗಿದೆ.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "ರನ್‌ಟೈಮ್ ಲಭ್ಯವಿಲ್ಲ",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "ಪ್ರಾರಂಭಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "ಸಂವಹನ ದೋಷ.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "ಪೋಸ್ಟ್ ಮತ್ತು ಇತ್ತೀಚಿನ ಸಂಪಾದನೆಯ ನಡುವಿನ ದಿನಗಳು",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "ಕಾಮೆಂಟ್‌ಗಳು",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "ರದ್ದು",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "ಎಲ್ಲಾ ರದ್ದುಗೊಳಿಸಿ",
+    "description": "cancelAll"
+  }
+}

@@ -285,4 +285,139 @@ describe('D11 pending registry', () => {
     bindDownloadId(p2, 12);
     expect(getUnclaimedPendingByUrl(p1.baseUrl)).toBeUndefined();
   });
+
+  it('answers registry membership and lookup queries from the authoritative map', async () => {
+    const { registerPending, unregisterPending, isRegistered, getPendingByRequestId } =
+      await loadStateModuleWithNavigator('Chrome/120');
+    const p = makePending({ requestId: 'lookup-1' });
+    expect(isRegistered('lookup-1')).toBe(false);
+    expect(getPendingByRequestId('lookup-1')).toBeUndefined();
+    registerPending(p);
+    expect(isRegistered('lookup-1')).toBe(true);
+    expect(getPendingByRequestId('lookup-1')).toBe(p);
+    unregisterPending(p);
+    expect(isRegistered('lookup-1')).toBe(false);
+    expect(getPendingByRequestId('lookup-1')).toBeUndefined();
+  });
+
+  it('unregistering a pending that already lost authority leaves the registry alone', async () => {
+    const { registerPending, unregisterPending, pendingByRequestId } =
+      await loadStateModuleWithNavigator('Chrome/120');
+    const keeper = makePending({ requestId: 'ghost-guard' });
+    registerPending(keeper);
+    const stale = makePending({ requestId: 'ghost-stale' });
+    expect(() => unregisterPending(stale)).not.toThrow();
+    expect(pendingByRequestId.get('ghost-guard')).toBe(keeper);
+    expect(pendingByRequestId.has('ghost-stale')).toBe(false);
+  });
+
+  it('sweeps stale same-request download-id bindings when unregistering the authoritative pending', async () => {
+    const { registerPending, bindDownloadId, unregisterPending, getPendingByDownloadId } =
+      await loadStateModuleWithNavigator('Chrome/120');
+    const first = makePending({ requestId: 'zombie-1' });
+    registerPending(first);
+    expect(bindDownloadId(first, 301)).toBe(true);
+    const replacement = makePending({ requestId: 'zombie-1' });
+    registerPending(replacement);
+    expect(bindDownloadId(replacement, 302)).toBe(true);
+    // An unrelated pending's binding must survive the same sweep untouched.
+    const unrelated = makePending({ requestId: 'zombie-other' });
+    registerPending(unrelated);
+    expect(bindDownloadId(unrelated, 303)).toBe(true);
+
+    unregisterPending(replacement);
+
+    // The id bound to the replaced object shares the correlation id, so it
+    // must be swept together with the authoritative one — no zombie bindings.
+    expect(getPendingByDownloadId(301)).toBeUndefined();
+    expect(getPendingByDownloadId(302)).toBeUndefined();
+    expect(getPendingByDownloadId(303)).toBe(unrelated);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// Stall deadline (no-dead-ends): every registered pending gets a hard
+// deadline; the injected hook must fire only for pendings the authoritative
+// registry still tracks.
+// ─────────────────────────────────────────────────────────────────────────
+
+describe('pending expiry deadline hook', () => {
+  it('fires the injected hook when a pending is still registered at its deadline', async () => {
+    vi.useFakeTimers();
+    try {
+      const state = await loadStateModuleWithNavigator('Chrome/120');
+      const expired: string[] = [];
+      state.setPendingExpiredHook((p) => expired.push(p.requestId));
+      const p = makePending({ requestId: 'deadline-hit' });
+      state.registerPending(p);
+      vi.advanceTimersByTime(state.PENDING_DEADLINE_MS);
+      expect(expired).toEqual(['deadline-hit']);
+      // The hook decides the outcome; the registry itself is untouched.
+      expect(state.isRegistered('deadline-hit')).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not fire the hook for a pending the TTL sweep already reaped', async () => {
+    vi.useFakeTimers();
+    try {
+      const state = await loadStateModuleWithNavigator('Chrome/120');
+      const expired: string[] = [];
+      state.setPendingExpiredHook((p) => expired.push(p.requestId));
+      const p = makePending({ requestId: 'deadline-reaped' });
+      state.registerPending(p);
+      state.unregisterPending(p);
+      vi.advanceTimersByTime(state.PENDING_DEADLINE_MS);
+      expect(expired).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not fire the hook when the registry moved on to a different pending object', async () => {
+    vi.useFakeTimers();
+    try {
+      const state = await loadStateModuleWithNavigator('Chrome/120');
+      const expired: string[] = [];
+      state.setPendingExpiredHook((p) => expired.push(p.requestId));
+      const stale = makePending({ requestId: 'deadline-replaced' });
+      state.registerPending(stale);
+      // The authoritative entry was replaced (retry re-registered a fresh
+      // object under the same correlation id); the stale deadline must no-op.
+      const fresh = makePending({ requestId: 'deadline-replaced' });
+      state.pendingByRequestId.set('deadline-replaced', fresh);
+      vi.advanceTimersByTime(state.PENDING_DEADLINE_MS);
+      expect(expired).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('clears the hook when it is reset to null', async () => {
+    vi.useFakeTimers();
+    try {
+      const state = await loadStateModuleWithNavigator('Chrome/120');
+      const expired: string[] = [];
+      state.setPendingExpiredHook((p) => expired.push(p.requestId));
+      state.setPendingExpiredHook(null);
+      const p = makePending({ requestId: 'deadline-cleared' });
+      state.registerPending(p);
+      vi.advanceTimersByTime(state.PENDING_DEADLINE_MS);
+      expect(expired).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('skips deadline scheduling entirely when timers are unavailable', async () => {
+    const state = await loadStateModuleWithNavigator('Chrome/120');
+    vi.stubGlobal('setTimeout', undefined as unknown as typeof setTimeout);
+    try {
+      expect(() => state.registerPending(makePending({ requestId: 'deadline-no-timer' }))).not.toThrow();
+      expect(state.isRegistered('deadline-no-timer')).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });

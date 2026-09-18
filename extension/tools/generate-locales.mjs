@@ -273,7 +273,7 @@ export function writeLocalesRoot(rootDir, files) {
  * otherwise so the build never ships `_locales` without it.
  */
 export function writeToDisk(files) {
-  const written = writeLocalesRoot(LOCALES_DIR, files);
+  let written = writeLocalesRoot(LOCALES_DIR, files);
   if (manifestDeclaresDefaultLocale()) {
     written += writeLocalesRoot(BUNDLE_LOCALES_DIR, files);
   } else if (existsSync(BUNDLE_LOCALES_DIR)) {

@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Sækja",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Sækir…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Reyni…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Sótt",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Villa",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Mistókst.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Sækja",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Flýtiniðurhal",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "ummæli",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Breytt",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Sækja allt",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "skrá",
+    "description": "file"
+  },
+  "files": {
+    "message": "skrár",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Fjöldi athugasemda við þessa færslu",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Niðurhal rofið.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Keyrslutími ekki tiltækur",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Gat ekki byrjað.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Samskiptavilla.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "ummæli",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Hætta við",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Hætt við",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

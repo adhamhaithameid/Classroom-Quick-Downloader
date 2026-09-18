@@ -22,7 +22,7 @@ vi.mock('../src/engines/engine-registry', () => ({
 }));
 vi.mock('../src/v2/context/route-classifier', () => ({
   RouteWatcher: class { start() {} stop() {} },
-  isClassroomUrl: vi.fn((url: string) => url.includes('classroom.google.com')),
+  isClassroomUrl: vi.fn((url: string) => url.startsWith('https://classroom.google.com/')),
 }));
 vi.mock('../src/v2/compat/shadow-compare', () => ({ ShadowComparator: class {} }));
 

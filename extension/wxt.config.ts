@@ -31,10 +31,19 @@ export default defineConfig({
     name: "Classroom Quick Downloader",
     short_name: "Classroom Quick Downloader",
     homepage_url: "https://classroom-quick-downloader.adhamhaithameid.is-a.dev/",
+    // chrome.i18n: _locales is generated from the TRANSLATIONS monolith
+    // (extension/tools/generate-locales.mjs) and copied into the bundle —
+    // bead 770. The manifest must declare the default or Chrome rejects
+    // the _locales directory.
+    default_locale: "en",
     permissions: [
       'downloads',
       'storage',
-      'alarms'
+      'alarms',
+      // S13 API assist (docs/engine/api-assist-setup.md): exposes
+      // chrome.identity. Inert until manifest oauth2.client_id is set —
+      // isApiConfigured() requires BOTH, so the v3 engine stays dormant.
+      'identity'
     ],
     host_permissions: [
       'https://drive.google.com/*',
