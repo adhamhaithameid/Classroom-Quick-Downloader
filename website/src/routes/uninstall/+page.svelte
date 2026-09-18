@@ -261,7 +261,7 @@
             class="un-submit"
             type="button"
             disabled={submitState === 'sending'}
-            use:magnetic
+            use:magnetic={submitState !== 'sending'}
             on:click={submitFeedback}
           >
             {#if submitState === 'sending'}
