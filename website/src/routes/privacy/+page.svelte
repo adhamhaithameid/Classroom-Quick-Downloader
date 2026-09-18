@@ -1,6 +1,7 @@
 <script lang="ts">
   import { privacyContent as privacy } from '$lib/content/privacy';
   import SeoMeta from '$lib/components/SeoMeta.svelte';
+  import { magnetic } from '$lib/actions/magnetic';
 
   const sectionIcons = ['🔒', '🚫', '💡', '⚡', '🗓️', '🧩', '⚖️', '👶', '🔑', '📬'];
 
@@ -109,7 +110,7 @@
       <div class="prv-cta-card prv-reveal glass-panel">
         <h2>Want the complete details?</h2>
         <p>Read the full, unabridged privacy policy document on GitHub for complete legal language and technical specifics.</p>
-        <a class="prv-cta-btn" href={privacy.fullPrivacyUrl} target="_blank" rel="noopener noreferrer">
+        <a class="prv-cta-btn" href={privacy.fullPrivacyUrl} target="_blank" rel="noopener noreferrer" use:magnetic>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
           Read full privacy policy
         </a>

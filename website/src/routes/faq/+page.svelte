@@ -3,6 +3,7 @@
   import { STORE_LINKS } from '$lib/config';
   import SeoMeta from '$lib/components/SeoMeta.svelte';
   import { trackFaqExpand } from '$lib/analytics/websiteEvents';
+  import { magnetic } from '$lib/actions/magnetic';
 
   type FaqItem = {
     id: string;
@@ -570,7 +571,7 @@
         <h2>Still have questions?</h2>
         <p>Reach out by email and we'll get back to you.</p>
         <div class="fq-cta-actions">
-          <a class="fq-cta-btn fq-cta-primary" href="mailto:adhamhaithameid@gmail.com">
+          <a class="fq-cta-btn fq-cta-primary" href="mailto:adhamhaithameid@gmail.com" use:magnetic>
             ✉️ Email us
           </a>
         </div>

@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Magnetic CTAs — prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  /* ── Tokens lifted from website/src/app.css so this feels like the real site ── */
+  :root {
+    --gc-green: #1a8b55;
+    --gc-green-light: #57bb8a;
+    --gc-green-dark: #137a47;
+    --bg: #fafcfb;
+    --text: #1a1a2e;
+    --text-secondary: #64748b;
+    --border: rgba(226, 232, 240, 0.6);
+    --radius-sm: 12px;
+    --font-ui: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--font-ui), sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  /* 60px engineering grid at 0.05 + soft green washes, same as the site shell */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background:
+      radial-gradient(600px 400px at 15% 10%, rgba(26,139,85,0.05), transparent 70%),
+      radial-gradient(700px 500px at 85% 85%, rgba(26,139,85,0.04), transparent 70%),
+      repeating-linear-gradient(0deg, rgba(26,26,46,0.05) 0 1px, transparent 1px 60px),
+      repeating-linear-gradient(90deg, rgba(26,26,46,0.05) 0 1px, transparent 1px 60px);
+  }
+
+  .proto-bar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,0.75);
+    backdrop-filter: blur(8px);
+    font-size: 13px;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .proto-bar strong { font-size: 13px; }
+  .proto-tag {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--gc-green); background: rgba(26,139,85,0.08);
+    padding: 3px 8px; border-radius: 999px;
+  }
+  .proto-hint { color: var(--text-secondary); }
+  .proto-rm {
+    display: none;
+    color: #b45309; background: rgba(251,191,36,0.12);
+    padding: 3px 8px; border-radius: 999px; font-size: 12px;
+  }
+  body.reduced-motion .proto-rm { display: inline-block; }
+
+  main { max-width: 1080px; margin: 0 auto; padding: 0 24px 140px; }
+
+  /* ── Hero replica (mirrors the overview page hero) ── */
+  .hero { padding: 96px 0 72px; text-align: center; }
+  .l2-label {
+    display: inline-block; font-size: 12px; font-weight: 800; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--gc-green);
+    background: rgba(26,139,85,0.08); border: 1px solid rgba(26,139,85,0.18);
+    padding: 6px 14px; border-radius: 999px; margin-bottom: 22px;
+  }
+  h1 { font-size: clamp(34px, 5vw, 54px); line-height: 1.12; margin: 0 0 18px; font-weight: 800; letter-spacing: -0.02em; }
+  h1 .grad {
+    background: linear-gradient(135deg, var(--gc-green-dark), var(--gc-green-light));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .l2-sub { font-size: 18px; color: var(--text-secondary); margin: 0 0 8px; }
+  .l2-disclaimer { font-size: 12px; color: #94a3b8; margin: 0 0 34px; }
+
+  .l2-hero-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .l2-compat { font-size: 12.5px; color: #94a3b8; margin-top: 18px; }
+
+  /* ── Hero CTA styles: copied from overview/+page.svelte .l2-cta family ── */
+  .l2-cta {
+    display: inline-flex; align-items: center; gap: 9px;
+    padding: 14px 28px; font-size: 15px; font-weight: 700;
+    font-family: var(--font-ui), sans-serif;
+    border-radius: 14px; text-decoration: none; cursor: pointer;
+    transition: all 0.25s ease;
+  }
+  .l2-cta-icon { width: 18px; height: 18px; flex: 0 0 auto; }
+  .l2-cta-current {
+    color: #fff;
+    background: linear-gradient(135deg, var(--gc-green), var(--gc-green-light));
+    box-shadow: 0 4px 20px rgba(26,139,85,.35), 0 0 40px rgba(26,139,85,.15);
+  }
+  .l2-cta-current:hover {
+    box-shadow: 0 6px 28px rgba(26,139,85,.45), 0 0 60px rgba(26,139,85,.2);
+  }
+  .l2-cta-other {
+    color: var(--gc-green-dark);
+    background: rgba(255,255,255,0.6);
+    border: 1px solid var(--border);
+  }
+  .l2-cta-other:hover { border-color: rgba(26,139,85,0.25); color: var(--gc-green); }
+
+  /* ── Content-page CTA family (mirrors SeoContentPage seo-btn + glass panel) ── */
+  .content-section { padding: 30px 0 10px; }
+  .glass-panel {
+    background: linear-gradient(120deg, #ffffff, #f8fcf9);
+    border: 1px solid rgba(255,255,255,0.72);
+    box-shadow: 0 4px 20px rgba(15,20,25,0.06);
+  }
+  .cta-card { border-radius: 24px; padding: 44px 36px; text-align: center; }
+  .cta-card h2 { margin: 0 0 8px; font-size: 26px; font-weight: 800; letter-spacing: -0.01em; }
+  .cta-card p { margin: 0 0 26px; color: var(--text-secondary); font-size: 15px; }
+  .seo-btn-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .seo-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 13px 26px; font-size: 15px; font-weight: 700;
+    font-family: var(--font-ui), sans-serif;
+    border-radius: var(--radius-sm); text-decoration: none; cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  }
+  .seo-btn-primary {
+    color: #fff; background: var(--gc-green-dark);
+    box-shadow: 0 4px 24px rgba(26,139,85,0.12);
+  }
+  .seo-btn-primary:hover { box-shadow: 0 6px 28px rgba(26,139,85,0.3); }
+  .seo-btn-secondary { color: var(--gc-green-dark); background: #fff; border: 1px solid var(--border); }
+  .seo-btn-secondary:hover { border-color: rgba(26,139,85,0.25); }
+
+  .proto-note {
+    text-align: center; font-size: 12px; color: #94a3b8; margin-top: 56px;
+  }
+  .proto-note code { font-size: 11.5px; background: rgba(26,26,46,0.05); padding: 1px 5px; border-radius: 4px; }
+
+  @media (max-width: 640px) {
+    .hero { padding: 64px 0 48px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="proto-bar">
+  <span class="proto-tag">Prototype</span>
+  <strong>Magnetic CTA effect</strong>
+  <span class="proto-hint">Feel locked to Subtle, green primary buttons only — move your cursor near them. Ghost buttons keep the plain hover for comparison.</span>
+  <span class="proto-rm">Reduced motion is on — effect disabled, as it will be in production</span>
+</div>
+
+<main>
+  <!-- Hero replica: the l2-cta family from the overview page -->
+  <section class="hero">
+    <span class="l2-label">Google Classroom, minus the busywork</span>
+    <h1>Download everything from<br /><span class="grad">Google Classroom.</span></h1>
+    <p class="l2-sub">Download all Google Classroom files in one click for every assignment.</p>
+    <p class="l2-disclaimer">Not affiliated with Google or Google Classroom.</p>
+    <div class="l2-hero-actions">
+      <a href="#" class="l2-cta l2-cta-current" data-magnetic>
+        <img class="l2-cta-icon" alt="" src="https://cdn.simpleicons.org/googlechrome/ffffff" />
+        Install for Chrome
+      </a>
+      <a href="#" class="l2-cta l2-cta-other">
+        <img class="l2-cta-icon" alt="" src="https://cdn.simpleicons.org/microsoftedge/0078D7" />
+        Edge
+      </a>
+      <a href="#" class="l2-cta l2-cta-other">
+        <img class="l2-cta-icon" alt="" src="https://cdn.simpleicons.org/firefoxbrowser/FF7139" />
+        Firefox
+      </a>
+    </div>
+    <p class="l2-compat">Also works on Brave, Opera, Vivaldi, Arc &amp; all Chromium browsers</p>
+  </section>
+
+  <!-- Content-page CTA replica: the seo-btn family from SeoContentPage -->
+  <section class="content-section">
+    <div class="cta-card glass-panel">
+      <h2>Ready to save hours?</h2>
+      <p>The same effect applied to the content-page CTA family (primary + secondary glass).</p>
+      <div class="seo-btn-row">
+        <a href="#" class="seo-btn seo-btn-primary" data-magnetic>
+          <img class="l2-cta-icon" alt="" src="https://cdn.simpleicons.org/googlechrome/ffffff" />
+          Install for Chrome
+        </a>
+        <a href="#" class="seo-btn seo-btn-secondary">View FAQ</a>
+      </div>
+    </div>
+    <p class="proto-note">
+      Approved feel: <code>Subtle</code> — 70px attraction radius, max 6px pull, near-critical spring.
+      Production plan: one shared Svelte action (<code>use:magnetic</code>), single window pointer listener,
+      self-stopping rAF loop, gated on <code>(pointer: fine)</code> +
+      <code>prefers-reduced-motion</code> — same conventions as <code>gridBend.ts</code>.
+      Green primary CTAs only; navbar and footer excluded.
+    </p>
+  </section>
+</main>
+
+<script>
+(() => {
+  'use strict';
+
+  /* Locked-in "Subtle" feel. radius = attraction distance beyond the button
+     edge (px); strength = fraction of cursor-to-center offset the button
+     chases; the spring is near-critically damped for a calm glide;
+     maxShift = hard clamp on the translation so the button never travels far. */
+  const CONFIG = { radius: 70, strength: 0.22, stiffness: 170, damping: 30, maxShift: 6 };
+  const HOVER_LIFT = -2;      // matches the existing CSS :hover translateY(-2px)
+  const HOVER_SCALE = 1.02;
+  const SETTLE_PX = 0.05;
+
+  const finePointer = window.matchMedia('(pointer: fine)');
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const gatesPass = () => finePointer.matches && !reducedMotion.matches;
+
+  const reduceNote = () => document.body.classList.toggle('reduced-motion', reducedMotion.matches);
+  reduceNote();
+
+  let running = false;
+  let rectsDirty = true;
+  let lastTime = 0;
+  let pointerX = -1e4;
+  let pointerY = -1e4;
+
+  const buttons = [];
+
+  function register(el) {
+    buttons.push({
+      el,
+      rect: null,
+      x: 0, y: 0, vx: 0, vy: 0,   // spring state
+      tx: 0, ty: 0,               // spring target
+      engaged: false
+    });
+  }
+  document.querySelectorAll('[data-magnetic]').forEach(register);
+
+  function refreshRects() {
+    for (const b of buttons) b.rect = b.el.getBoundingClientRect();
+    rectsDirty = false;
+  }
+
+  // Distance from the cursor to the rect (0 when inside), so `radius` reads
+  // as "beyond the button edge".
+  function edgeDistance(b, px, py) {
+    const r = b.rect;
+    const dx = Math.max(r.left - px, 0, px - r.right);
+    const dy = Math.max(r.top - py, 0, py - r.bottom);
+    return Math.hypot(dx, dy);
+  }
+
+  function retarget() {
+    for (const b of buttons) {
+      if (!b.rect) continue;
+      const cx = b.rect.left + b.rect.width / 2;
+      const cy = b.rect.top + b.rect.height / 2;
+      const dist = edgeDistance(b, pointerX, pointerY);
+      if (dist < CONFIG.radius) {
+        // Smoothstep the influence so the pull eases in at the radius edge.
+        const t = 1 - dist / CONFIG.radius;
+        const eased = t * t * (3 - 2 * t);
+        let ox = (pointerX - cx) * CONFIG.strength * eased;
+        let oy = (pointerY - cy) * CONFIG.strength * eased;
+        const mag = Math.hypot(ox, oy);
+        if (mag > CONFIG.maxShift) {
+          ox = (ox / mag) * CONFIG.maxShift;
+          oy = (oy / mag) * CONFIG.maxShift;
+        }
+        b.tx = ox;
+        b.ty = oy;
+        b.engaged = true;
+      } else {
+        b.tx = 0;
+        b.ty = 0;
+        b.engaged = false;
+      }
+    }
+  }
+
+  function frame(now) {
+    if (rectsDirty) refreshRects();
+    retarget();
+    const dt = Math.min((now - lastTime) / 1000 || 1 / 60, 1 / 30);
+    lastTime = now;
+    let live = false;
+
+    for (const b of buttons) {
+      // Semi-implicit Euler spring toward the target on each axis.
+      const axX = -CONFIG.stiffness * (b.x - b.tx) - CONFIG.damping * b.vx;
+      const axY = -CONFIG.stiffness * (b.y - b.ty) - CONFIG.damping * b.vy;
+      b.vx += axX * dt;
+      b.vy += axY * dt;
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+
+      const settled = !b.engaged && Math.abs(b.x - b.tx) < SETTLE_PX && Math.abs(b.y - b.ty) < SETTLE_PX &&
+        Math.abs(b.vx) < SETTLE_PX && Math.abs(b.vy) < SETTLE_PX;
+      if (settled) {
+        b.x = b.y = b.vx = b.vy = 0;
+        b.el.style.transform = '';
+        continue;
+      }
+      live = true;
+      const lift = b.engaged ? HOVER_LIFT : 0;
+      const scale = b.engaged ? HOVER_SCALE : 1;
+      b.el.style.transform = `translate3d(${b.x.toFixed(2)}px, ${(b.y + lift).toFixed(2)}px, 0) scale(${scale})`;
+    }
+
+    if (live || buttons.some((b) => b.engaged)) {
+      requestAnimationFrame(frame);
+    } else {
+      running = false;
+    }
+  }
+
+  function wake() {
+    if (!gatesPass() || running) return;
+    running = true;
+    lastTime = performance.now();
+    requestAnimationFrame(frame);
+  }
+
+  function onPointerMove(e) {
+    pointerX = e.clientX;
+    pointerY = e.clientY;
+    wake();
+  }
+
+  function release() {
+    pointerX = -1e4;
+    pointerY = -1e4;
+    wake(); // let springs glide home, then the loop stops itself
+  }
+
+  let scrollRaf = 0;
+  function onScrollOrResize() {
+    rectsDirty = true;
+    if (!scrollRaf) {
+      scrollRaf = requestAnimationFrame(() => {
+        scrollRaf = 0;
+        wake();
+      });
+    }
+  }
+
+  function bind() {
+    window.addEventListener('pointermove', onPointerMove, { passive: true });
+    window.addEventListener('scroll', onScrollOrResize, { passive: true });
+    window.addEventListener('resize', onScrollOrResize, { passive: true });
+    document.documentElement.addEventListener('pointerleave', release);
+    window.addEventListener('blur', release);
+  }
+  function unbind() {
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('scroll', onScrollOrResize);
+    window.removeEventListener('resize', onScrollOrResize);
+    document.documentElement.removeEventListener('pointerleave', release);
+    window.removeEventListener('blur', release);
+    release();
+  }
+
+  function applyGates() {
+    reduceNote();
+    if (gatesPass()) bind();
+    else unbind();
+  }
+  finePointer.addEventListener?.('change', applyGates);
+  reducedMotion.addEventListener?.('change', applyGates);
+  applyGates();
+})();
+</script>
+</body>
+</html>

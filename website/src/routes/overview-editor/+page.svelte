@@ -2,6 +2,7 @@
   import { onMount, type ComponentType } from 'svelte';
   import { fade, fly, scale } from 'svelte/transition';
   import { quintOut } from 'svelte/easing';
+  import { magnetic } from '$lib/actions/magnetic';
   import { base } from '$app/paths';
   import { APP_VERSION, SITE_URL, STORE_LINKS } from '$lib/config';
   import SeoMeta from '$lib/components/SeoMeta.svelte';
@@ -1483,6 +1484,7 @@
             href={browserLink(b)}
             target="_blank"
             rel="noopener noreferrer"
+            use:magnetic={b === detectedBrowser}
             on:click={() => trackInstallClick('hero_install')}
           >
             <img src="{base}/images/{b}.svg" alt="" class="l2-cta-icon" />
@@ -1897,6 +1899,7 @@
                         href={browserLink(detectedBrowser)}
                         target="_blank"
                         rel="noopener noreferrer"
+                        use:magnetic
                         on:click={() => trackInstallClick('map_prompt_install')}
                       >
                         <img src="{base}/images/{detectedBrowser}.svg" alt="" class="l2-cta-icon" />
@@ -1996,6 +1999,7 @@
             href={browserLink(b)}
             target="_blank"
             rel="noopener noreferrer"
+            use:magnetic={b === detectedBrowser}
             on:click={() => trackInstallClick('final_install')}
           >
             <img src="{base}/images/{b}.svg" alt="" class="l2-cta-icon" />

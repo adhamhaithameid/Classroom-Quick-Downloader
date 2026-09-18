@@ -5,6 +5,7 @@
   import { relatedPagesFor, type SeoPageConfig } from '$lib/content/seoPages';
   import { SITE_NAME, SOCIAL_IMAGE, lastModForPath } from '$lib/seo/site';
   import { trackGuideCtaClick, trackGuideEngaged, GUIDE_ENGAGEMENT_PERCENT } from '$lib/analytics/websiteEvents';
+  import { magnetic } from '$lib/actions/magnetic';
 
   export let config: SeoPageConfig;
 
@@ -222,6 +223,7 @@
           href={resolveHref(config.primaryCta.href)}
           target={config.primaryCta.external ? '_blank' : undefined}
           rel={config.primaryCta.external ? 'noopener noreferrer' : undefined}
+          use:magnetic
           on:click={() => trackGuideCtaClick('guide_primary', config.path)}
         >
           {config.primaryCta.label}
