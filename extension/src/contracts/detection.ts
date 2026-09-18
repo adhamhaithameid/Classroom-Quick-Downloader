@@ -14,8 +14,14 @@
  */
 import type { ViewKind, LayerTrace } from '../engines/types';
 
-/** Which detector produced an observation. */
-export type DetectorName = 'keyword' | 'structural';
+/**
+ * Which detector produced an observation.
+ *
+ * 'api' (S13) is the Classroom-API assist: it never produces a first-party
+ * finding — it wraps a base detector and corroborates. See
+ * src/strategies/detect/api-detector.ts.
+ */
+export type DetectorName = 'keyword' | 'structural' | 'api';
 
 /** Everything a detector is told about the post it is looking at. */
 export interface DetectContext {
