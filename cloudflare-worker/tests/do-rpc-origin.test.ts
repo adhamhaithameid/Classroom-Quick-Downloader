@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import worker from "../src/index";
 import type { Env as WorkerEnv } from "../src/types";
 import { TEST_DO_SHARED_SECRET } from "./helpers/dummy-secrets";
