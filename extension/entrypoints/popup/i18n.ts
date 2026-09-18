@@ -25,6 +25,7 @@ export const POPUP_MESSAGES = {
   popupEngineMode: { name: 'popup_engine_mode', fallback: 'Engine Mode' },
   popupEngineModeLegacy: { name: 'popup_engine_mode_legacy', fallback: 'Legacy' },
   popupEngineModeNew: { name: 'popup_engine_mode_new', fallback: 'New' },
+  popupEngineModeApi: { name: 'popup_engine_mode_api', fallback: 'API (beta)' },
 } as const;
 
 export type PopupMessageKey = keyof typeof POPUP_MESSAGES;

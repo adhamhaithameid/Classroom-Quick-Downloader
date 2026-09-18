@@ -39,6 +39,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     popupEngineMode: 'Engine Mode',
     popupEngineModeLegacy: 'Legacy',
     popupEngineModeNew: 'New',
+    popupEngineModeApi: 'API (beta)',
   },
   ar: {
     download: 'تنزيل',

@@ -21,6 +21,7 @@ import {
 } from '../utils/changelog';
 import { popupMessage } from './i18n';
 import { CHANGELOG_SITE_URL } from '../utils/analytics/constants';
+import { isApiConfigured } from '../../src/engines/v3/api/config';
 
 // External Links
 const SURVEY_URL = 'https://forms.gle/wPU2b1Qxa7svHqJa6';
@@ -355,6 +356,9 @@ function App() {
   // ENGINE MODE STATE
   const [engineMode, setEngineMode] = useState<string>('legacy');
   const [engineModeLoading, setEngineModeLoading] = useState(true);
+  // S13: read once — the manifest's identity/oauth2 setup does not change
+  // while the popup is open (a reload picks up a redelivered manifest).
+  const [apiConfigured] = useState(isApiConfigured);
 
   // COLLAPSIBLE SETTINGS STATE (persisted)
   const [settingsCollapsed, setSettingsCollapsed] = useState(true);
@@ -748,7 +752,7 @@ function App() {
     }
   }, []);
 
-  function handleEngineModeSelect(nextMode: 'legacy' | 'v2') {
+  function handleEngineModeSelect(nextMode: 'legacy' | 'v2' | 'v3') {
     if (nextMode === engineMode) return;
     setEngineMode(nextMode);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1275,6 +1279,7 @@ function App() {
                           <EngineModeRow
                             mode={engineMode}
                             loading={engineModeLoading}
+                            apiConfigured={apiConfigured}
                             onSelect={handleEngineModeSelect}
                           />
                           <div className="cqd-settings-section-note">
@@ -1555,24 +1560,50 @@ function App() {
 
 // --- Subcomponents ---
 
-/** The engine modes the popup exposes (#684). API (v3) stays hidden until
- *  S13 lands OAuth — a hidden option is not a shipped option. */
-export type PopupEngineMode = 'legacy' | 'v2';
+/** The engine modes the popup exposes (#684). S13: the API (beta) option is
+ *  the CONSENT surface (#398) — it renders only as a disabled, tooltip'd
+ *  hint until the install is OAuth-configured (isApiConfigured(): identity
+ *  permission + oauth2 client_id, docs/engine/api-assist-setup.md), and
+ *  selecting it while enabled is the user's explicit consent that sets
+ *  cqdV2Mode 'v3'. */
+export type PopupEngineMode = 'legacy' | 'v2' | 'v3';
+
+/** Tooltip shown while the API option is disabled — the owner setup path. */
+const API_SETUP_TOOLTIP = 'Requires OAuth setup (see docs)';
+
+/** Tooltip on the enabled API option — the privacy model in one line (#398):
+ *  no background token acquisition; the Classroom API is only queried on
+ *  student-work views while v3 is active. Full model: docs/engine/
+ *  api-assist-setup.md. */
+const API_PRIVACY_TOOLTIP =
+  'Queries the Classroom API only on student-work views while active — no background token requests. Requires OAuth setup (see docs).';
 
 interface EngineModeRowProps {
   mode: string;
   loading?: boolean;
+  /** S13: whether this install can run the API engine at all (manifest
+   *  identity permission + oauth2 client_id). Gates the API option. */
+  apiConfigured?: boolean;
   onSelect: (mode: PopupEngineMode) => void;
 }
 
 /** Separate Engine Mode control (#684 decision: not folded into flag
  *  toggles — engine selection changes the whole page pipeline, flags tune
  *  one feature). Segmented control, aria-pressed marks the active mode.
- *  Labels resolve via chrome.i18n with en fallback (bead 770). */
-export function EngineModeRow({ mode, loading, onSelect }: EngineModeRowProps) {
-  const options: Array<{ value: PopupEngineMode; label: string }> = [
-    { value: 'legacy', label: popupMessage('popupEngineModeLegacy') },
-    { value: 'v2', label: popupMessage('popupEngineModeNew') },
+ *  Labels resolve via chrome.i18n with en fallback (bead 770).
+ *  The API (beta) option is disabled-with-tooltip until OAuth is configured
+ *  (S13) — a hidden option is not a shipped option, and neither is an
+ *  option that silently does nothing. */
+export function EngineModeRow({ mode, loading, apiConfigured, onSelect }: EngineModeRowProps) {
+  const options: Array<{ value: PopupEngineMode; label: string; disabled: boolean; title: string }> = [
+    { value: 'legacy', label: popupMessage('popupEngineModeLegacy'), disabled: false, title: '' },
+    { value: 'v2', label: popupMessage('popupEngineModeNew'), disabled: false, title: '' },
+    {
+      value: 'v3',
+      label: popupMessage('popupEngineModeApi'),
+      disabled: !apiConfigured,
+      title: apiConfigured ? API_PRIVACY_TOOLTIP : API_SETUP_TOOLTIP,
+    },
   ];
   return (
     <div className="cqd-engine-mode" role="group" aria-label={popupMessage('popupEngineMode')}>
@@ -1583,8 +1614,9 @@ export function EngineModeRow({ mode, loading, onSelect }: EngineModeRowProps) {
           className="cqd-engine-mode-option"
           data-mode={option.value}
           aria-pressed={mode === option.value}
-          disabled={!!loading}
-          onClick={() => onSelect(option.value)}
+          disabled={!!loading || option.disabled}
+          title={option.title || undefined}
+          onClick={() => { if (!option.disabled) onSelect(option.value); }}
         >
           {option.label}
         </button>

@@ -97,13 +97,14 @@ describe('EngineModeRow renders through chrome.i18n', () => {
     container.remove();
   });
 
-  function renderRow(props: { mode?: string; loading?: boolean; onSelect?: (mode: 'legacy' | 'v2') => void } = {}) {
+  function renderRow(props: { mode?: string; loading?: boolean; apiConfigured?: boolean; onSelect?: (mode: 'legacy' | 'v2' | 'v3') => void } = {}) {
     const onSelect = props.onSelect ?? vi.fn();
     flushSync(() => {
       root.render(
         createElement(EngineModeRow, {
           mode: props.mode ?? 'legacy',
           loading: props.loading ?? false,
+          apiConfigured: props.apiConfigured ?? false,
           onSelect,
         }),
       );
@@ -117,7 +118,8 @@ describe('EngineModeRow renders through chrome.i18n', () => {
     );
     renderRow();
     const buttons = [...container.querySelectorAll<HTMLButtonElement>('.cqd-engine-mode-option')];
-    expect(buttons.map((b) => b.textContent)).toEqual(['Klassisch', 'Neu']);
+    // The API label has no catalog entry in this stub — the en fallback shows.
+    expect(buttons.map((b) => b.textContent)).toEqual(['Klassisch', 'Neu', 'API (beta)']);
   });
 
   it('marks the group with the translated aria-label', () => {
@@ -131,7 +133,14 @@ describe('EngineModeRow renders through chrome.i18n', () => {
     stubGetMessage(() => '');
     renderRow();
     const buttons = [...container.querySelectorAll<HTMLButtonElement>('.cqd-engine-mode-option')];
-    expect(buttons.map((b) => b.textContent)).toEqual(['Legacy', 'New']);
+    expect(buttons.map((b) => b.textContent)).toEqual(['Legacy', 'New', 'API (beta)']);
     expect(container.querySelector('.cqd-engine-mode')?.getAttribute('aria-label')).toBe('Engine Mode');
+  });
+
+  it('resolves the API option label through the catalog when present', () => {
+    stubGetMessage((name) => (name === 'popup_engine_mode_api' ? 'API (Beta)' : ''));
+    renderRow();
+    const buttons = [...container.querySelectorAll<HTMLButtonElement>('.cqd-engine-mode-option')];
+    expect(buttons.map((b) => b.textContent)).toEqual(['Legacy', 'New', 'API (Beta)']);
   });
 });

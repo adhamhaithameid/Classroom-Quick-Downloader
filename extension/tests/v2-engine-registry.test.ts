@@ -202,12 +202,48 @@ describe('EngineRegistry: Active Engines', () => {
     expect(active[0].name).toBe('engine-v2');
   });
 
-  it('v3 mode → falls back to V1+V2 (identity permission not granted)', () => {
+  it('v3 mode → falls back to V1+V2 when the API is NOT configured', () => {
     registry.setMode('v3');
     const active = registry.getActiveEngines();
     expect(active).toHaveLength(2);
     expect(active[0].name).toBe('engine-v1');
     expect(active[1].name).toBe('engine-v2');
+  });
+
+  it('v3 mode → [V3] when the API IS configured (identity + oauth2 client id)', () => {
+    // S13: the configured world — manifest grants identity and an oauth2
+    // client_id. The probe reads chrome at call time, so a global stub is
+    // the whole arrangement.
+    vi.stubGlobal('chrome', {
+      identity: { getAuthToken: () => {} },
+      runtime: {
+        getManifest: () => ({
+          oauth2: { client_id: 'cqd-test.apps.googleusercontent.com' },
+        }),
+      },
+    });
+    try {
+      registry.setMode('v3');
+      const active = registry.getActiveEngines();
+      expect(active).toHaveLength(1);
+      expect(active[0].name).toBe('engine-v3');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('v3 configured path keeps V3 out when the client id is missing (identity alone is not enough)', () => {
+    vi.stubGlobal('chrome', {
+      identity: { getAuthToken: () => {} },
+      runtime: { getManifest: () => ({}) },
+    });
+    try {
+      registry.setMode('v3');
+      const active = registry.getActiveEngines();
+      expect(active.map((e) => e.name)).toEqual(['engine-v1', 'engine-v2']);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('returns empty if required engine is not registered', () => {

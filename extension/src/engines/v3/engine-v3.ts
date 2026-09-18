@@ -15,18 +15,33 @@
  * This solves the #1 frustration with the current system: files that
  * are "there" but not visible until you scroll down or click "Show more."
  *
- * CURRENT STATUS: This is a STUB. The full implementation requires:
- * 1. OAuth2 authentication (NOT yet granted: the manifest lacks `identity`
- *    and no oauth2 client_id is configured — token-provider returns null and
- *    the registry refuses to activate this engine until both land)
- * 2. Classroom API client (courses.courseWork.list, etc.)
- * 3. Rate limiting (Google API quotas are strict)
- * 4. Caching (don't re-query on every scan)
+ * CURRENT STATUS: activation-gated assist (S13). The registry activates this
+ * engine ONLY when isApiConfigured() (see api/config.ts) AND the user
+ * explicitly selected the 'API (beta)' Engine Mode (consent, #398). Once
+ * active, EngineV3 is the COMPOSITION ROOT for the ApiDetector
+ * (src/strategies/detect/api-detector.ts): it wires the real token provider
+ * and its own discovery service into the detector's deps, pre-resolves the
+ * token+snapshot cache during init on student-work views (the refresh
+ * contract — observe never fetches), and runs the detector's observe pass
+ * over V2's tracked posts to publish the 'api-corroboration' LayerTraces on
+ * the debug/explanation surface (getApiCorroborationTrace).
  *
- * The plan is:
- * - Phase 7: Build the API client and authentication
- * - Phase 8: Integrate API discovery with V2's DOM discovery
- * - Phase 9: Ship as V3 mode
+ * SCOPING (honest): the corroboration floor does NOT yet alter V2's rendered
+ * flags — V2's per-post pipeline (ingestPost → detectFlags →
+ * scoreFlagsForPost) is a private, decision-shaped stack that a
+ * PostObservation-shaped detector cannot be injected into without rewriting
+ * its semantics. So the detector runs REAL end-to-end here (token, snapshot,
+ * per-post observe, traces) and its output is surfaced for debugging, while
+ * wiring the floor into the rendered decisions is the documented follow-up
+ * once the owner OAuth credential step ships (docs/engine/api-assist-setup.md).
+ *
+ * PRIVACY (#398): token acquisition is non-interactive and happens ONLY on
+ * student-work views while v3 is active — never on other views, never in the
+ * background. The full privacy model lives in docs/engine/api-assist-setup.md.
+ *
+ * Still required for full API-enhanced discovery (Phase 8-9):
+ * 1. Owner OAuth setup (identity permission + oauth2 client_id — setup doc)
+ * 2. Rate limiting (Google API quotas are strict)
  *
  * @author Adham — planning for the future while building the present
  * @since v4.2.1 (planned)
@@ -39,9 +54,14 @@ import {
   type FlagDecision,
   type PlacementDecision,
   type DecisionTrace,
+  type LayerTrace,
 } from '../types';
+import type { DetectContext, PostObservation } from '../../contracts/detection';
+import { ApiDetector } from '../../strategies/detect/api-detector';
+import { keywordDetector } from '../../detect/keyword/keyword-detector';
 import { EngineV2 } from '../v2/engine-v2';
-import type { ClassroomApiSnapshot } from './api';
+import type { ClassroomApiSnapshot, ClassroomApiTokenProvider } from './api';
+import { ChromeIdentityTokenProvider } from './api/token-provider';
 import {
   createDefaultApiDiscoveryService,
   publishStudentWorkApiSnapshot,
@@ -58,10 +78,6 @@ import {
  *
  * This EXTENDS V2 rather than replacing it. All DOM-based functionality
  * comes from V2. V3 adds an API correlation layer on top.
- *
- * Current status: STUB — delegates everything to V2's implementation.
- * The API integration methods are defined but throw "not yet implemented"
- * to make it clear they need work.
  */
 export class EngineV3 implements CQDEngine {
   readonly name = 'engine-v3';
@@ -76,9 +92,28 @@ export class EngineV3 implements CQDEngine {
   private latestApiSnapshot: ClassroomApiSnapshot | null = null;
   private currentView: ViewKind | null = null;
 
+  /**
+   * The S13 API-assist detector, composed here (composition root — see the
+   * header). Base detector: the shared keywordDetector (stateless, the same
+   * instance V2 resets on teardown). deps feed off this engine's own token
+   * provider and discovery result, so refresh() adds NO extra network
+   * round-trip for the snapshot — only the (Chrome-cached, non-interactive)
+   * token check.
+   */
+  private apiDetector: ApiDetector;
+  private tokenProvider: ClassroomApiTokenProvider;
+
+  /** Per-post ApiDetector observations from the latest corroboration pass. */
+  private apiCorroboration: Map<string, PostObservation> = new Map();
+
   constructor() {
     this.v2 = new EngineV2();
     this.apiDiscovery = createDefaultApiDiscoveryService();
+    this.tokenProvider = new ChromeIdentityTokenProvider();
+    this.apiDetector = new ApiDetector(keywordDetector, {
+      getToken: () => this.tokenProvider.getAccessToken(false),
+      getSnapshot: async () => this.latestApiSnapshot,
+    });
   }
 
   // ========================================================================
@@ -89,24 +124,23 @@ export class EngineV3 implements CQDEngine {
     await this.v2.init(viewKind, signal);
     this.currentView = viewKind;
     await this.refreshApiSnapshot(signal);
-
-    // TODO (Phase 8): After V2 init, also query the Classroom API
-    // for the course's assignments and materials. Compare the API's
-    // file list with V2's DOM-discovered files. Any API files not
-    // found in the DOM are "hidden" files we need to handle.
-    //
-    // await this.correlateWithApi(viewKind, signal);
+    // Corroborate whatever posts V2's init scan already tracked. On a live
+    // signal this is the real init scan; on an aborted one (tests, teardown
+    // races) it is a no-op and fullScan picks the posts up instead.
+    this.runApiCorroborationPass();
 
     console.log(
-      `[Engine V3] Initialized for view: ${viewKind} (API integration: STUB)`,
+      `[Engine V3] Initialized for view: ${viewKind} (API assist: ${this.latestApiSnapshot ? 'snapshot ready' : 'fallback to DOM'})`,
     );
   }
 
   destroy(): void {
     this.v2.destroy();
     this.apiDiscovery.clear();
+    this.apiDetector.reset();
     this.latestApiSnapshot = null;
     this.currentView = null;
+    this.apiCorroboration.clear();
     publishStudentWorkApiSnapshot(null);
     console.log('[Engine V3] Destroyed');
   }
@@ -122,12 +156,10 @@ export class EngineV3 implements CQDEngine {
   fullScan(): void {
     this.v2.fullScan();
     if (this.currentView && isStudentWorkView(this.currentView)) {
-      void this.refreshApiSnapshot();
+      // Refresh the cache, THEN corroborate the posts V2 just tracked — the
+      // pass reads the detector's cache, so it must not race the refresh.
+      void this.refreshApiSnapshot().then(() => this.runApiCorroborationPass());
     }
-
-    // TODO (Phase 8): After V2's DOM scan, cross-reference with
-    // cached API data. If API shows files not in the DOM, create
-    // "phantom" PostNodes for them.
   }
 
   // ========================================================================
@@ -154,9 +186,22 @@ export class EngineV3 implements CQDEngine {
     return this.latestApiSnapshot;
   }
 
+  /**
+   * The 'api-corroboration' LayerTrace ApiDetector produced for this post on
+   * the last corroboration pass, or null when the API had nothing to add
+   * (denied token, no snapshot, post never observed). Debug/explanation
+   * surface only — see the scoping note in the header.
+   */
+  getApiCorroborationTrace(postId: string): LayerTrace | null {
+    const observation = this.apiCorroboration.get(postId);
+    if (!observation?.debug) return null;
+    return observation.debug.find((t) => t.layerName === 'api-corroboration') ?? null;
+  }
+
   private async refreshApiSnapshot(signal?: AbortSignal): Promise<void> {
     if (!this.currentView || !isStudentWorkView(this.currentView)) {
       this.latestApiSnapshot = null;
+      this.apiDetector.reset();
       publishStudentWorkApiSnapshot(null);
       return;
     }
@@ -164,6 +209,7 @@ export class EngineV3 implements CQDEngine {
     const context = resolveClassroomApiRouteContext(window.location.href);
     if (!context) {
       this.latestApiSnapshot = null;
+      this.apiDetector.reset();
       publishStudentWorkApiSnapshot(null);
       return;
     }
@@ -171,9 +217,29 @@ export class EngineV3 implements CQDEngine {
     try {
       this.latestApiSnapshot = await this.apiDiscovery.discover(context, { signal });
       publishStudentWorkApiSnapshot(this.latestApiSnapshot);
+      // The refresh contract: pre-resolve the detector cache AFTER the
+      // snapshot exists. deps.getSnapshot returns the already-fetched
+      // snapshot, so this adds no second discovery request.
+      await this.apiDetector.refresh();
     } catch (error) {
       if (signal?.aborted) return;
       console.warn('[Engine V3] API base discovery failed:', error);
+    }
+  }
+
+  /**
+   * Run ApiDetector.observe over every post V2 currently tracks. The
+   * detector falls back to the base keyword observation verbatim whenever
+   * the API has nothing usable (token denied, snapshot missing/stale, route
+   * mismatch) — the pass is silent by construction. Results feed
+   * getApiCorroborationTrace.
+   */
+  private runApiCorroborationPass(): void {
+    if (!this.currentView || !isStudentWorkView(this.currentView)) return;
+
+    for (const post of this.v2.getTrackedPosts()) {
+      const ctx: DetectContext = { postId: post.id, viewKind: this.currentView };
+      this.apiCorroboration.set(post.id, this.apiDetector.observe(post.element, ctx));
     }
   }
 

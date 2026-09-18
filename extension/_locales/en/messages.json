@@ -126,5 +126,9 @@
   "popup_engine_mode_new": {
     "message": "New",
     "description": "popupEngineModeNew"
+  },
+  "popup_engine_mode_api": {
+    "message": "API (beta)",
+    "description": "popupEngineModeApi"
   }
 }

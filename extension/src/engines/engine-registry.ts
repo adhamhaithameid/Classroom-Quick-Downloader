@@ -33,6 +33,7 @@
  */
 
 import type { CQDEngine, EngineMode, ViewKind } from './types';
+import { isApiConfigured } from './v3/api/config';
 
 // ============================================================================
 // REGISTRY CLASS
@@ -156,7 +157,8 @@ export class EngineRegistry {
    * - 'legacy' → [V1]         — business as usual
    * - 'shadow' → [V1, V2]     — V1 renders, V2 runs silently
    * - 'v2'     → [V2]         — V2 takes over
-   * - 'v3'     → [V3]         — V2 + API (future)
+   * - 'v3'     → [V3]         — V2 + API assist, ONLY when isApiConfigured();
+   *                               otherwise the [V1, V2] shadow fallback
    *
    * The first engine in the array is the "primary" — it handles rendering.
    * The rest are "secondary" — they run for comparison but don't render.
@@ -174,13 +176,18 @@ export class EngineRegistry {
         return this.getEnginesByNames(['engine-v2']);
 
       case 'v3':
+        if (isApiConfigured()) {
+          // S13: the install has both prerequisites (identity permission +
+          // oauth2 client_id — see engines/v3/api/config.ts), so the user's
+          // explicit 'v3' selection (consent, #398) activates the API engine.
+          return this.getEnginesByNames(['engine-v3']);
+        }
         // V3 requires the `identity` permission (chrome.identity.getAuthToken)
-        // which the manifest does NOT grant — the API engine cannot obtain a
-        // token and is inert. Until `identity` + a real oauth2 client_id land
-        // in wxt.config.ts, fall back to the V1+V2 shadow pair so 'v3' never
-        // silently renders nothing.
+        // AND an oauth2 client_id; without either the API engine cannot obtain
+        // a token and is inert. Fall back to the V1+V2 shadow pair so 'v3'
+        // never silently renders nothing.
         console.warn(
-          '[CQD Registry] Mode "v3" unavailable: manifest lacks identity permission. Falling back to shadow.'
+          '[CQD Registry] Mode "v3" unavailable: manifest lacks identity permission or oauth2 client_id. Falling back to shadow.'
         );
         return this.getEnginesByNames(['engine-v1', 'engine-v2']);
 
