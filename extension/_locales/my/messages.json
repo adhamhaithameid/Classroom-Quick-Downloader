@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "ဒေါင်းလုဒ်",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "ဒေါင်းလုဒ် လုပ်နေ…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "ကြိုးစားနေ…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "ပြီးပါပြီ",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "အမှား",
+    "description": "error"
+  },
+  "failed": {
+    "message": "မအောင်မြင်ပါ။",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "ဒေါင်းလုဒ်",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "အမြန် ဒေါင်းလုဒ်",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "မှတ်ချက်များ",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "ပြင်ဆင်ပြီး",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "အားလုံး ဒေါင်းလုဒ်လုပ်ပါ",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "ဖိုင်",
+    "description": "file"
+  },
+  "files": {
+    "message": "ဖိုင်များ",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "ဤပို့စ်ရှိ မှတ်ချက်အရေအတွက်",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "ဒေါင်းလုဒ် ပြတ်တောက်သွားသည်။",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime မရနိုင်ပါ",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "စတင်၍မရပါ။",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "ဆက်သွယ်ရေး အမှား။",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "မှတ်ချက်များ",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "ပယ်ဖျက်",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "ပယ်ဖျက်ပြီး",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

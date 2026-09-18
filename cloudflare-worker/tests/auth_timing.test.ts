@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import worker from "../src/index";
 import type { Env } from "../src/types";
+import { TEST_SECRET_123, TEST_PASSWORD_123, TEST_DANGER_123 } from "./helpers/dummy-secrets";
 
 function buildAuthEnv(overrides: Partial<Env> = {}) {
   const doFetch = vi.fn(async (input: RequestInfo) => {
@@ -28,9 +29,9 @@ function buildAuthEnv(overrides: Partial<Env> = {}) {
   };
 
   const env: Env = {
-    DO_SHARED_SECRET: "secret123",
-    DASHBOARD_PASSWORD: "password123",
-    DANGER_PASSWORD: "danger123",
+    DO_SHARED_SECRET: TEST_SECRET_123,
+    DASHBOARD_PASSWORD: TEST_PASSWORD_123,
+    DANGER_PASSWORD: TEST_DANGER_123,
     DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace,
     ORACLE_ENDPOINT: "https://oracle.local/ingest-batch",
     MAX_BATCH_EVENTS: "10000",
@@ -54,7 +55,7 @@ function makeDangerRequest(password: string): Request {
     body: JSON.stringify({ password }),
     headers: {
       "content-type": "application/json",
-      "x-admin-secret": "secret123",
+      "x-admin-secret": TEST_SECRET_123,
     },
   });
 }
@@ -63,7 +64,7 @@ describe("Authentication timing safety", () => {
   it("allows login with the correct dashboard password", async () => {
     const { env } = buildAuthEnv();
 
-    const res = await worker.fetch(makeLoginRequest("password123"), env, {} as ExecutionContext);
+    const res = await worker.fetch(makeLoginRequest(TEST_PASSWORD_123), env, {} as ExecutionContext);
 
     expect(res.status).toBe(302);
     expect(res.headers.get("Location")).toBe("/dashboard");
@@ -92,7 +93,7 @@ describe("Authentication timing safety", () => {
   it("allows danger verification with the correct password", async () => {
     const { env } = buildAuthEnv();
 
-    const res = await worker.fetch(makeDangerRequest("danger123"), env, {} as ExecutionContext);
+    const res = await worker.fetch(makeDangerRequest(TEST_DANGER_123), env, {} as ExecutionContext);
     const body = await res.json();
 
     expect(res.status).toBe(200);
@@ -113,7 +114,7 @@ describe("Authentication timing safety", () => {
   it("denies danger verification when DANGER_PASSWORD is not configured", async () => {
     const { env } = buildAuthEnv({ DANGER_PASSWORD: undefined });
 
-    const res = await worker.fetch(makeDangerRequest("danger123"), env, {} as ExecutionContext);
+    const res = await worker.fetch(makeDangerRequest(TEST_DANGER_123), env, {} as ExecutionContext);
     const body = await res.json() as { ok: boolean; error: string };
 
     expect(res.status).toBe(401);

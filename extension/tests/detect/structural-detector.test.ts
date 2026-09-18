@@ -142,4 +142,61 @@ describe('StructuralDetector', () => {
     const withoutDebug = JSON.stringify({ ...obs, debug: undefined });
     expect(withoutDebug).not.toContain('class comments');
   });
+
+  // --- D5: S0 must sanity-check the numeral it trusts -----------------------
+
+  it('accepts a plausible bare numeral chip just under the acceptance ceiling', () => {
+    const post = createPost('<div class="qCWAqb"><div class="huI6Cb">9999</div></div>');
+    const obs = detector.observe(post, { postId: 'p13', viewKind: ViewKind.STREAM });
+
+    expect(obs.comment.present).toBe(true);
+    expect(obs.comment.count).toBe(9999);
+    expect(obs.comment.strength).toBe(100);
+    expect(obs.comment.source).toBe('dom-truth');
+  });
+
+  it('rejects values at or above PLAUSIBLE_COMMENT_COUNT as ids, not counts', () => {
+    const atCeiling = createPost('<div class="qCWAqb"><div class="huI6Cb">10000</div></div>');
+    const obsCeiling = detector.observe(atCeiling, { postId: 'p14', viewKind: ViewKind.STREAM });
+    expect(obsCeiling.comment.present).toBe(false);
+    expect(obsCeiling.comment.count).toBeNull();
+
+    const idLike = createPost('<div class="qCWAqb"><div class="huI6Cb">99999</div></div>');
+    const obsId = detector.observe(idLike, { postId: 'p15', viewKind: ViewKind.STREAM });
+    expect(obsId.comment.present).toBe(false);
+    expect(obsId.comment.count).toBeNull();
+  });
+
+  it('rejects a long text node that merely contains a numeral', () => {
+    const post = createPost(
+      '<div class="qCWAqb"><div class="huI6Cb">Reference 4821 was resolved in the helpdesk queue yesterday</div></div>',
+    );
+    const obs = detector.observe(post, { postId: 'p16', viewKind: ViewKind.STREAM });
+
+    expect(obs.comment.present).toBe(false);
+    expect(obs.comment.count).toBeNull();
+  });
+
+  it('rejects a timestamp-shaped chip — a chip holds only numerals', () => {
+    const post = createPost('<div class="qCWAqb"><div class="huI6Cb">12:34</div></div>');
+    const obs = detector.observe(post, { postId: 'p17', viewKind: ViewKind.STREAM });
+
+    expect(obs.comment.present).toBe(false);
+    expect(obs.comment.count).toBeNull();
+  });
+
+  it('rejects a date in the count container — container text is chip-gated (D13)', () => {
+    // A day+month digit run inside the shell must not win on its first run.
+    const spanDate = createPost('<div class="qCWAqb seqYL"><span aria-hidden="true">12 mart</span></div>');
+    const obs = detector.observe(spanDate, { postId: 'p18', viewKind: ViewKind.STREAM });
+
+    expect(obs.comment.present).toBe(false);
+    expect(obs.comment.count).toBeNull();
+
+    const bareDate = createPost('<div class="qCWAqb seqYL">10 apr</div>');
+    const obsBare = detector.observe(bareDate, { postId: 'p19', viewKind: ViewKind.STREAM });
+
+    expect(obsBare.comment.present).toBe(false);
+    expect(obsBare.comment.count).toBeNull();
+  });
 });

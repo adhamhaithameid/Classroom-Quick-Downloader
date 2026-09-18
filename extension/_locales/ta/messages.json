@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "பதிவிறக்கு",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "பதிவிறக்கப்படுகிறது…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "முயற்சிக்கிறது…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "முடிந்தது",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "பிழை",
+    "description": "error"
+  },
+  "failed": {
+    "message": "தோல்வி",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "பதிவிறக்கு",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "விரைவு பதிவிறக்கம்",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "கருத்துகள்",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "திருத்தப்பட்டது",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "எல்லாவற்றையும் பதிவிறக்கவும்",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "கோப்பு",
+    "description": "file"
+  },
+  "files": {
+    "message": "கோப்புகள்",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "இந்தப் பதிவில் உள்ள கருத்துகளின் எண்ணிக்கை",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "பதிவிறக்கம் தடைபட்டது.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "இயக்க நேரம் கிடைக்கவில்லை",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "தொடங்க முடியவில்லை.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "தொடர்பு பிழை.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "பதிவிடுவதற்கும் கடைசித் திருத்தத்திற்கும் இடைப்பட்ட நாட்கள்",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "கருத்துகள்",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "ரத்து",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "ரத்து செய்யப்பட்டது",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "அனைத்தையும் ரத்து செய்",
+    "description": "cancelAll"
+  }
+}

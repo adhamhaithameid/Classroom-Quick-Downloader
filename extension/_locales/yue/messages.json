@@ -1,0 +1,102 @@
+{
+  "download": {
+    "message": "下載",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "下載緊…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "試緊…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "下載完成",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "錯誤",
+    "description": "error"
+  },
+  "failed": {
+    "message": "下載失敗",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "下載",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "快速下載",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "則留言",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "則留言",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "已編輯",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "全部下載",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "檔案",
+    "description": "file"
+  },
+  "files": {
+    "message": "檔案",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "呢個帖嘅留言數量",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "由發布至最後編輯嘅日數",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "下載中斷。",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime 唔可用",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "開始唔到。",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "通訊錯誤。",
+    "description": "commError"
+  },
+  "modified": {
+    "message": "已修改",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "發布後",
+    "description": "after_posting"
+  },
+  "cancel": {
+    "message": "取消",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "已取消",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "全部取消",
+    "description": "cancelAll"
+  }
+}

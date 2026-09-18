@@ -41,8 +41,10 @@
     "sync:manual-changelog": "node tools/sync-manual-changelog.mjs",
     "changelog:full": "node tools/generate-full-changelog.mjs",
     "indexing:submit": "node tools/submit-search-indexing.mjs",
+    "verify:contract": "node tools/verify-analytics-contract.mjs",
     "test:e2e": "playwright test --project=extension-chromium",
     "test:e2e:headed": "playwright test --project=extension-chromium --headed",
+    "test:e2e:edge": "playwright test --project=extension-edge",
     "prepare": "husky"
   },
   "_meta": {

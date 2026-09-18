@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Изтегли",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Изтегляне…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Опит…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Готово",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Грешка",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Неуспешно.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Изтегли",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Бързо изтегляне",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "коментара",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Редактирано",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Изтегли всички",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "файл",
+    "description": "file"
+  },
+  "files": {
+    "message": "файлове",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Брой коментари към тази публикация",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Изтеглянето е прекъснато.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Средата за изпълнение не е налична",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Не може да стартира.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Грешка в комуникацията.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Дни между публикуването и последната редакция",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "коментара",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Отказ",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Отказано",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Откажи све",
+    "description": "cancelAll"
+  }
+}

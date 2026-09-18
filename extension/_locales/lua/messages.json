@@ -1,0 +1,102 @@
+{
+  "download": {
+    "message": "Kupakula",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Kupakula…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Kukeba…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Kupakulwa",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Mupika",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Kupakula kubulwa.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Kupakula",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Kupakula lukasa",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "maluwi",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "diluwi",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Kulongolola",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Kupakula yonso",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "fayile",
+    "description": "file"
+  },
+  "files": {
+    "message": "mifayile",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Nomba ya maluwi pa post eyi",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Minsu ya katshi ka post ne edit wa ndekelu",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Kupakula kudi kupingana.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime kadiyi kudi",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Kadiyi kukonkonona.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Mupika wa kuakula.",
+    "description": "commError"
+  },
+  "modified": {
+    "message": "Kulongolola",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "pashishe pa post",
+    "description": "after_posting"
+  },
+  "cancel": {
+    "message": "Kulekela",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Kulekelwa",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Kulekela Yonso",
+    "description": "cancelAll"
+  }
+}

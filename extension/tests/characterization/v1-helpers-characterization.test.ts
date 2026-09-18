@@ -16,27 +16,31 @@ import { detectComments } from '../../entrypoints/content/smart-detector-comment
 import { isActualPostCard } from '../../entrypoints/content/post-card-utils';
 
 describe('characterization: V1 cleanAttachmentName', () => {
-  it('strips known English garbage type labels', () => {
-    expect(cleanAttachmentName('Worksheet PDF')).toBe('Worksheet');
-    expect(cleanAttachmentName('Spreadsheet Microsoft Excel')).toBe('Spreadsheet');
+  // D10 re-characterization: a label is stripped only when the stem still
+  // carries a real extension. 'Worksheet PDF' (no extension) is exactly the
+  // ambiguous shape the anchor rule exists to protect.
+  it('strips a type label only when the stem keeps its extension', () => {
+    expect(cleanAttachmentName('Worksheet.pdf PDF')).toBe('Worksheet.pdf');
+    expect(cleanAttachmentName('Spreadsheet.xlsx Microsoft Excel')).toBe('Spreadsheet.xlsx');
+    expect(cleanAttachmentName('Worksheet PDF')).toBe('Worksheet PDF');
+    expect(cleanAttachmentName('Spreadsheet Microsoft Excel')).toBe('Spreadsheet Microsoft Excel');
   });
 
   it('collapses a doubled filename', () => {
     expect(cleanAttachmentName('notes.txtnotes.txt')).toBe('notes.txt');
   });
 
-  // DOCUMENTED GAP (D10): localized type labels are NOT stripped — #541.
-  it('leaves localized type labels attached (known defect D10)', () => {
-    expect(cleanAttachmentName('example.zipTömörítettArchívum')).toBe(
-      'example.zipTömörítettArchívum',
-    );
+  // FIXED (D10): localized labels glue straight onto the extension and are
+  // stripped via the locale-driven TypeLabelRegistry.
+  it('strips a localized label glued to the extension (was known defect D10)', () => {
+    expect(cleanAttachmentName('example.zipTömörített archívum')).toBe('example.zip');
   });
 });
 
 describe('characterization: V1 toDownloadUrl', () => {
-  it('converts a Drive file URL to the uc export form', () => {
+  it('converts a Drive file URL to the usercontent download form', () => {
     expect(toDownloadUrl('https://drive.google.com/file/d/ABC123/view?usp=sharing')).toBe(
-      'https://drive.google.com/uc?export=download&id=ABC123',
+      'https://drive.usercontent.google.com/download?id=ABC123&export=download&confirm=t',
     );
   });
 

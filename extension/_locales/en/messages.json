@@ -1,0 +1,134 @@
+{
+  "download": {
+    "message": "Download",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Downloading…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Trying…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Downloaded",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Error",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Download failed.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Download",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Quick download",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "comments",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "comment",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Edited",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Download all",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "file",
+    "description": "file"
+  },
+  "files": {
+    "message": "files",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Number of comments on this post",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Download interrupted.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime not available",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Could not start.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Communication error.",
+    "description": "commError"
+  },
+  "modified": {
+    "message": "Modified",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "after posting",
+    "description": "after_posting"
+  },
+  "cancel": {
+    "message": "Cancel",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Cancelled",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  },
+  "popup_extension_settings": {
+    "message": "Extension Settings",
+    "description": "popupExtensionSettings"
+  },
+  "popup_settings_section_general": {
+    "message": "General",
+    "description": "popupSettingsSectionGeneral"
+  },
+  "popup_settings_section_engine": {
+    "message": "Engine",
+    "description": "popupSettingsSectionEngine"
+  },
+  "popup_settings_section_flags": {
+    "message": "Flags",
+    "description": "popupSettingsSectionFlags"
+  },
+  "popup_engine_mode": {
+    "message": "Engine Mode",
+    "description": "popupEngineMode"
+  },
+  "popup_engine_mode_legacy": {
+    "message": "Legacy",
+    "description": "popupEngineModeLegacy"
+  },
+  "popup_engine_mode_new": {
+    "message": "New",
+    "description": "popupEngineModeNew"
+  },
+  "popup_engine_mode_api": {
+    "message": "API (beta)",
+    "description": "popupEngineModeApi"
+  }
+}

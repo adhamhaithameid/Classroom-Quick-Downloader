@@ -1,6 +1,25 @@
+@import './lib/styles/glass.css';
+
 /* Visual identity guard: keep Plus Jakarta Sans as the primary UI font.
-   Covered by overview.visual-guard.test.ts and should not be swapped silently. */
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
+   The webfont stylesheet is linked from src/app.html (preconnect to
+   fonts.googleapis.com + fonts.gstatic.com, display=swap) so it is discovered
+   at HTML parse time on every route; covered by overview.visual-guard.test.ts
+   and should not be swapped silently.
+
+   Metric-adjusted fallback: while the webfont downloads, a locally installed
+   Arial sized to Plus Jakarta Sans metrics keeps line breaks and vertical
+   rhythm stable. Values measured from the real font files (UPM-normalized
+   average advance width vs Arial for size-adjust; hhea ascent/descent divided
+   by size-adjust for the overrides, so override x size-adjust reproduces
+   Plus Jakarta Sans's 103.8% ascent / 22.2% descent / 0% line gap). */
+@font-face {
+  font-family: 'Plus Jakarta Sans Fallback';
+  src: local('Arial');
+  size-adjust: 103.63%;
+  ascent-override: 100.17%;
+  descent-override: 21.42%;
+  line-gap-override: 0%;
+}
 
 :root {
   /* Google Classroom-inspired palette */
@@ -32,10 +51,18 @@
   --shadow-lg: 0 12px 40px rgba(15, 20, 25, 0.08);
   --shadow-green: 0 4px 24px rgba(26, 139, 85, 0.12);
 
+  /* Glass language — shared with the navbar surface so cards speak the
+     same material. The gradient is fully opaque: a translucent surface let
+     the ambient orbs bleed through and read as a site-wide opacity drop. */
+  --glass-ease: cubic-bezier(0.32, 1.35, 0.42, 1);
+  --glass-bg: linear-gradient(120deg, #ffffff, #f8fcf9);
+  --glass-border: rgba(255, 255, 255, 0.72);
+  --glass-highlight: rgba(255, 255, 255, 0.85);
+
   --radius: 18px;
   --radius-sm: 12px;
   --radius-lg: 24px;
-  --font-ui: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui;
+  --font-ui: 'Plus Jakarta Sans', 'Plus Jakarta Sans Fallback', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui;
   --emoji-font-stack: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', 'Twemoji Mozilla';
 }
 
@@ -49,23 +76,26 @@ body {
   padding: 0;
   font-family: var(--font-ui), sans-serif;
   color: var(--text);
-  background: var(--bg);
   min-height: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* The opaque canvas color lives on html ONLY. body must stay transparent:
+   an opaque body background paints as an in-flow box above the root's
+   negative-z children, which would bury the fixed ambient layers
+   (AmbientBackground) on some routes. */
 html {
-  scroll-behavior: smooth;
-  scroll-padding-top: 92px;
+  background: var(--bg);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
+body {
+  background: transparent;
 }
 
+/* ── Original ambient body orbs ──────────────────────────────────────
+   Restored verbatim from the deployed background (origin/main b7820fe7):
+   two soft fixed green washes drifting behind the shared orb field. */
 body::before,
 body::after {
   content: '';
@@ -94,8 +124,47 @@ body::after {
   animation-delay: -8s;
 }
 
+@keyframes floatOrb {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-20px) scale(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  body::after {
+    animation: none;
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 92px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
 a {
   color: inherit;
+}
+
+/* Balanced headings avoid orphaned last lines; pretty keeps paragraph
+   ragged edges even. Progressive enhancement, ignored where unsupported. */
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
 }
 
 button,
@@ -111,13 +180,26 @@ select {
 }
 
 .card {
+  position: relative;
+  overflow: hidden;
   border-radius: var(--radius);
-  border: 1px solid var(--border-subtle);
-  background: rgba(255, 255, 255, 0.65);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: var(--shadow);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  box-shadow:
+    0 1px 2px rgba(15, 20, 25, 0.05),
+    0 12px 30px rgba(15, 20, 25, 0.1),
+    0 8px 24px rgba(26, 139, 85, 0.08),
+    inset 0 1px 0 var(--glass-highlight);
+  transition: transform 0.45s var(--glass-ease), box-shadow 0.45s var(--glass-ease), border-color 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(26, 139, 85, 0.16);
+  box-shadow:
+    0 2px 4px rgba(15, 20, 25, 0.06),
+    0 16px 36px rgba(15, 20, 25, 0.12),
+    inset 0 1px 0 var(--glass-highlight);
 }
 
 .state-loading,
@@ -140,18 +222,24 @@ select {
 
 .metric {
   border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: var(--surface);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
   padding: 18px;
   animation: riseIn 0.6s ease both;
-  box-shadow: var(--shadow-sm);
-  transition: all 0.3s ease;
+  box-shadow:
+    0 1px 2px rgba(15, 20, 25, 0.05),
+    0 12px 30px rgba(15, 20, 25, 0.1),
+    inset 0 1px 0 var(--glass-highlight);
+  transition: transform 0.45s var(--glass-ease), box-shadow 0.45s var(--glass-ease), border-color 0.3s ease;
 }
 
 .metric:hover {
-  border-color: var(--border-hover);
   transform: translateY(-2px);
-  box-shadow: var(--shadow);
+  border-color: rgba(26, 139, 85, 0.16);
+  box-shadow:
+    0 2px 4px rgba(15, 20, 25, 0.06),
+    0 16px 36px rgba(15, 20, 25, 0.12),
+    inset 0 1px 0 var(--glass-highlight);
 }
 
 .metric-label {
@@ -168,6 +256,7 @@ select {
   font-weight: 800;
   letter-spacing: -0.03em;
   color: var(--gc-green);
+  font-variant-numeric: tabular-nums;
 }
 
 @keyframes riseIn {
@@ -178,15 +267,6 @@ select {
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-
-@keyframes floatOrb {
-  0%, 100% {
-    transform: translateY(0) scale(1);
-  }
-  50% {
-    transform: translateY(-20px) scale(1.04);
   }
 }
 
@@ -204,6 +284,27 @@ select {
 ::selection {
   background: rgba(26, 139, 85, 0.2);
   color: var(--text);
+}
+
+/* Skip link: hidden until keyboard-focused, then pinned under the navbar. */
+.skip-link {
+  position: fixed;
+  top: 12px;
+  left: 16px;
+  z-index: 2000;
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius-sm);
+  background: var(--gc-green-dark);
+  color: #ffffff;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: var(--shadow-green);
+  transform: translateY(-250%);
+  transition: transform 0.15s ease;
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
 }
 
 @media (max-width: 860px) {

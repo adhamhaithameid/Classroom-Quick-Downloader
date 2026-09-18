@@ -30,7 +30,7 @@
     genPlacementId, getBuiltinSvg,
     maxPlacementZIndex
   } from '$lib/svgCatalog/placements';
-  import { categories as svgCategories, doodleItems, threeDElements } from '$lib/svgCatalog/index';
+  import { categories as svgCategories, doodleItems, threeDElements, resolvePlacementSvg } from '$lib/svgCatalog/index';
   import type { SvgItem } from '$lib/svgCatalog/index';
 
   /* ━━━ Feature toggle: set to false to hide the silly question ━━━ */
@@ -141,6 +141,7 @@
     softwareVersion: latestReleaseVersion.replace(/^v/, ''),
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
     publisher: { '@id': `${SITE_URL}/#organization` },
+    author: { '@type': 'Person', name: 'Adham Haitham', url: STORE_LINKS.github },
     url: buildCanonicalUrl(seoPath),
     downloadUrl: [STORE_LINKS.chrome, STORE_LINKS.firefox, STORE_LINKS.edge]
   };
@@ -910,23 +911,80 @@
     }
   }
 
-  function setupReveal(): void {
+  /* Reveal must fail open: sections are visible by default and JS hides only
+     the below-fold ones right before observing. A fast scroll can jump an
+     element from below the viewport to above it without any observer
+     callback, so a passive scroll check and a failsafe timer reveal anything
+     left behind. Missing site data can never blank the page. Returns a
+     cleanup function. */
+  function setupReveal(): () => void {
+    const revealables = Array.from(document.querySelectorAll<HTMLElement>('.l2-reveal'));
+
+    if (shouldReduceMotion()) {
+      revealables.forEach((el) => el.classList.add('in-view'));
+      return () => {};
+    }
+
+    const pending = new Set<HTMLElement>();
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('in-view');
-            const revealSection = (entry.target as HTMLElement).dataset.placementSection;
-            if (revealSection) {
-              setPlacementSectionVisible(revealSection);
-            }
-            observer.unobserve(entry.target);
+          if (entry.isIntersecting || entry.boundingClientRect.top < window.innerHeight) {
+            reveal(entry.target as HTMLElement);
           }
         }
       },
-      { threshold: 0.08, rootMargin: '0px 0px -40px 0px' }
+      { threshold: 0, rootMargin: '0px 0px 120px 0px' }
     );
-    document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
+
+    function reveal(el: HTMLElement): void {
+      el.classList.add('in-view');
+      el.classList.remove('l2-reveal-pending');
+      const revealSection = el.dataset.placementSection;
+      if (revealSection) {
+        setPlacementSectionVisible(revealSection);
+      }
+      pending.delete(el);
+      observer.unobserve(el);
+      if (pending.size === 0) {
+        window.removeEventListener('scroll', onScroll);
+        clearTimeout(failsafe);
+      }
+    }
+
+    /* rAF-throttled so at most one measurement pass happens per frame. */
+    let ticking = false;
+    function onScroll(): void {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        ticking = false;
+        for (const el of pending) {
+          if (el.getBoundingClientRect().top <= window.innerHeight) reveal(el);
+        }
+      });
+    }
+
+    const failsafe = setTimeout(() => {
+      for (const el of pending) reveal(el);
+    }, 4000);
+
+    for (const el of revealables) {
+      if (el.getBoundingClientRect().top > window.innerHeight * 0.9) {
+        el.classList.add('l2-reveal-pending');
+        pending.add(el);
+        observer.observe(el);
+      }
+    }
+    if (pending.size > 0) {
+      window.addEventListener('scroll', onScroll, { passive: true });
+    }
+
+    return () => {
+      clearTimeout(failsafe);
+      window.removeEventListener('scroll', onScroll);
+      observer.disconnect();
+    };
   }
 
   function resetPlacementSectionVisibility(showAll = false): void {
@@ -974,31 +1032,7 @@
   /* ━━━ Edit-mode helpers ━━━ */
   /** Resolve SVG content for a placement — from catalog or builtins */
   function resolveSvg(p: ElementPlacement): { svg: string; viewBox: string } {
-    const builtin = getBuiltinSvg(p.sampleId);
-    if (builtin) return builtin;
-
-    if (p.customSvg) {
-      return { svg: p.customSvg, viewBox: p.viewBox || '0 0 64 64' };
-    }
-
-    for (const cat of svgCategories) {
-      const item = cat.items.find((i: SvgItem) => i.id === p.sampleId);
-      if (item) {
-        return { svg: item.svg, viewBox: '0 0 64 64' };
-      }
-    }
-    for (const d of doodleItems) {
-      if (d.id === p.sampleId) {
-        return { svg: d.svg, viewBox: '0 0 60 60' };
-      }
-    }
-    for (const t of threeDElements) {
-      if (t.id === p.sampleId) {
-        return { svg: t.svg, viewBox: '0 0 120 110' };
-      }
-    }
-
-    return { svg: '<text x="32" y="40" text-anchor="middle" font-size="24" fill="currentColor">?</text>', viewBox: '0 0 64 64' };
+    return resolvePlacementSvg(p);
   }
 
   function setEditorStatus(message: string, tone: 'ok' | 'warn' | 'error' = 'ok') {
@@ -1365,6 +1399,7 @@
     let stopHeavierScroll: (() => void) | undefined;
     let stopMapPromptDelay: (() => void) | undefined;
     let stopPlacementViewportWatcher: (() => void) | undefined;
+    let stopReveal: (() => void) | undefined;
     detectedBrowser = detectBrowserFromNavigator();
     reducedMotionPreferred = shouldReduceMotion();
     const searchParams = new URLSearchParams(window.location.search);
@@ -1392,6 +1427,17 @@
       : clonePlacements(publishedPlacements);
     initSillyState();
     const mapComponentsLoad = loadMapComponents().catch(() => undefined);
+
+    /* Reveal must be independent of data loading: if the snapshot API is
+       slow or unavailable, sections would otherwise stay hidden forever. */
+    if (isEmbed || editMode) {
+      resetPlacementSectionVisibility(true);
+      document.querySelectorAll('.l2-reveal').forEach((el) => el.classList.add('in-view'));
+    } else {
+      resetPlacementSectionVisibility(false);
+      stopReveal = setupReveal();
+    }
+
     void Promise.all([loadSiteData(), mapComponentsLoad]).then(() => {
       requestAnimationFrame(async () => {
         await waitForStableLayoutBeforePlacementLock();
@@ -1399,13 +1445,6 @@
         if (!editMode) {
           placementCanvasLocked = true;
           freezePlacementCoordinates();
-        }
-        if (isEmbed || editMode) {
-          resetPlacementSectionVisibility(true);
-          document.querySelectorAll('.l2-reveal').forEach((el) => el.classList.add('in-view'));
-        } else {
-          resetPlacementSectionVisibility(false);
-          setupReveal();
         }
         stopMarquee = initMarquee();
         stopHeavierScroll = initHeavierScroll();
@@ -1421,6 +1460,7 @@
       if (typeof stopHeavierScroll === 'function') stopHeavierScroll();
       if (typeof stopMapPromptDelay === 'function') stopMapPromptDelay();
       if (typeof stopPlacementViewportWatcher === 'function') stopPlacementViewportWatcher();
+      if (typeof stopReveal === 'function') stopReveal();
       if (statusTimer) clearTimeout(statusTimer);
       document.body.classList.remove('l2-map-modal-open');
     };
@@ -1481,7 +1521,7 @@
 
 <SeoMeta
   title="Classroom Quick Downloader — Google Classroom Bulk Download"
-  description="Bulk download all Google Classroom attachments in one click. Free, open-source extension for Chrome, Firefox, and Edge, built for students and teachers."
+  description="Bulk download all Google Classroom attachments in one click. Free browser extension for Chrome, Firefox, and Edge, built for students and teachers."
   path={seoPath}
   keywords="download all google classroom files, bulk download google classroom attachments, google classroom extension"
   structuredData={homeStructuredData}
@@ -1496,22 +1536,6 @@
 </svelte:head>
 
 <div class="l2" class:edit-mode={editMode} class:edit-isolation={editMode && editIsolation} bind:this={pageEl}>
-  <!-- ━━━━ Page-wide decorative layer ━━━━ -->
-  <div class="l2-page-orbs" aria-hidden="true">
-    <div class="orb orb-1"></div>
-    <div class="orb orb-2"></div>
-    <div class="orb orb-3"></div>
-    <div class="orb orb-4"></div>
-    <div class="orb orb-5"></div>
-    <div class="orb orb-6"></div>
-    <div class="orb orb-7"></div>
-    <div class="orb orb-8"></div>
-    <div class="orb orb-9"></div>
-    <div class="orb orb-10"></div>
-    <div class="orb orb-11"></div>
-    <div class="orb orb-12"></div>
-  </div>
-  <div class="l2-page-grid" aria-hidden="true"></div>
   <div class="l2-page-floats" aria-hidden="true">
     {#each visiblePlacements as p (p.id)}
       {@const resolved = resolveSvg(p)}
@@ -1640,8 +1664,8 @@
       </div>
 
       <div class="l2-student-grid" role="list">
-        <article class="l2-student-card" role="listitem">
-          <span class="l2-student-icon" aria-hidden="true">
+        <article class="l2-student-card glass-panel glass-hover" role="listitem" style="--card-i: 0">
+          <span class="l2-student-icon glass-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 8v5l3 3" />
               <circle cx="12" cy="12" r="9" />
@@ -1650,8 +1674,8 @@
           <h3>Less repetitive clicking</h3>
           <p>Download all materials from an assignment in one action instead of repeating the same file flow.</p>
         </article>
-        <article class="l2-student-card" role="listitem">
-          <span class="l2-student-icon" aria-hidden="true">
+        <article class="l2-student-card glass-panel glass-hover" role="listitem" style="--card-i: 1">
+          <span class="l2-student-icon glass-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
             </svg>
@@ -1659,8 +1683,8 @@
           <h3>Faster study prep</h3>
           <p>Get course files quickly so your time goes into understanding material, not managing downloads.</p>
         </article>
-        <article class="l2-student-card" role="listitem">
-          <span class="l2-student-icon" aria-hidden="true">
+        <article class="l2-student-card glass-panel glass-hover" role="listitem" style="--card-i: 2">
+          <span class="l2-student-icon glass-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M9 6h11M9 12h11M9 18h11" />
               <path d="m3 6 1.5 1.5L6.5 5.5" />
@@ -1861,18 +1885,18 @@
         <p>Everything you'd expect from a modern extension — and nothing you wouldn't.</p>
       </div>
       <div class="l2-feature-grid">
-        <div class="l2-fcard"><div class="l2-fcard-icon">⚡</div><h3>Instant</h3><p>Install → open Classroom → download. Zero configuration, zero learning curve.</p></div>
-        <div class="l2-fcard"><div class="l2-fcard-icon">🔒</div><h3>Private</h3><p>No third-party tracking, no cookies, and no user profiles. Only aggregate operational metrics.</p></div>
-        <div class="l2-fcard"><div class="l2-fcard-icon">🔓</div><h3>Transparent</h3><p>Clear docs, public roadmap, and predictable release notes for every update.</p></div>
-        <div class="l2-fcard"><div class="l2-fcard-icon">🌐</div><h3>Universal</h3><p>Chrome, Firefox, Edge, Brave, Opera, Vivaldi, Arc — it just works.</p></div>
-        <div class="l2-fcard"><div class="l2-fcard-icon">🎓</div><h3>For Students</h3><p>Built by a student who was tired of clicking. Designed for real classroom workflows.</p></div>
-        <div class="l2-fcard"><div class="l2-fcard-icon">🌍</div><h3><AnimatedNumber value={100} format={{ useGrouping: false }} suffix="+" animated /> Languages</h3><p>Available in English, Arabic, Spanish, French, German, and over <AnimatedNumber value={100} format={{ useGrouping: false }} animated /> more languages.</p></div>
+        <div class="l2-fcard glass-panel glass-hover" style="--card-i: 0"><div class="l2-fcard-icon glass-icon">⚡</div><h3>Instant</h3><p>Install → open Classroom → download. Zero configuration, zero learning curve.</p></div>
+        <div class="l2-fcard glass-panel glass-hover" style="--card-i: 1"><div class="l2-fcard-icon glass-icon">🔒</div><h3>Private</h3><p>No third-party tracking, no cookies, and no user profiles. Only aggregate operational metrics.</p></div>
+        <div class="l2-fcard glass-panel glass-hover" style="--card-i: 2"><div class="l2-fcard-icon glass-icon">🔓</div><h3>Transparent</h3><p>Clear docs, public roadmap, and predictable release notes for every update.</p></div>
+        <div class="l2-fcard glass-panel glass-hover" style="--card-i: 3"><div class="l2-fcard-icon glass-icon">🌐</div><h3>Universal</h3><p>Chrome, Firefox, Edge, Brave, Opera, Vivaldi, Arc — it just works.</p></div>
+        <div class="l2-fcard glass-panel glass-hover" style="--card-i: 4"><div class="l2-fcard-icon glass-icon">🎓</div><h3>For Students</h3><p>Built by a student who was tired of clicking. Designed for real classroom workflows.</p></div>
+        <div class="l2-fcard glass-panel glass-hover" style="--card-i: 5"><div class="l2-fcard-icon glass-icon">🌍</div><h3><AnimatedNumber value={100} format={{ useGrouping: false }} suffix="+" animated /> Languages</h3><p>Available in English, Arabic, Spanish, French, German, and over <AnimatedNumber value={100} format={{ useGrouping: false }} animated /> more languages.</p></div>
       </div>
     </div>
   </section>
 
   <!-- ━━━━ How It Works ━━━━ -->
-  <section class="l2-block l2-snap">
+  <section id="how-it-works" class="l2-block l2-snap">
     <div class="l2-wrap l2-reveal" data-placement-section="steps" style="position:relative">
       <div class="l2-section-head">
         <span class="l2-label">HOW IT WORKS</span>
@@ -1903,7 +1927,7 @@
         <p>Students, teachers, and universities around the world trust Classroom Quick Downloader.</p>
       </div>
       <div class="l2-proof-grid">
-        <div class="l2-proof-card">
+        <div class="l2-proof-card glass-panel glass-hover" style="--card-i: 0">
           <div class="l2-proof-num">
             {#if metricsReady}
               <AnimatedNumber value={downloadCount ?? 0} animated />
@@ -1913,7 +1937,7 @@
           </div>
           <div class="l2-proof-label">Total Downloads</div>
         </div>
-        <div class="l2-proof-card">
+        <div class="l2-proof-card glass-panel glass-hover" style="--card-i: 1">
           <div class="l2-proof-num">
             {#if metricsReady}
               <AnimatedNumber value={userCount ?? 0} animated />
@@ -1923,8 +1947,8 @@
           </div>
           <div class="l2-proof-label">Active Users</div>
         </div>
-        <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumber value={100} suffix="+" animated /></div><div class="l2-proof-label">Languages</div></div>
-        <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumericText text={latestReleaseVersion} animated stableInitial /></div><div class="l2-proof-label">Latest Release</div></div>
+        <div class="l2-proof-card glass-panel glass-hover" style="--card-i: 2"><div class="l2-proof-num"><AnimatedNumber value={100} suffix="+" animated /></div><div class="l2-proof-label">Languages</div></div>
+        <div class="l2-proof-card glass-panel glass-hover" style="--card-i: 3"><div class="l2-proof-num"><AnimatedNumericText text={latestReleaseVersion} animated stableInitial /></div><div class="l2-proof-label">Latest Release</div></div>
       </div>
     </div>
   </section>
@@ -1934,18 +1958,18 @@
     <div class="l2-wrap l2-reveal l2-map-wrap" data-placement-section="map">
       <div class="l2-map-layout">
         {#if mapState === 'loading'}
-          <div class="l2-map-state-card">
+          <div class="l2-map-state-card glass-panel">
             <div class="state-loading">Loading live global map…</div>
           </div>
         {:else if mapState === 'error'}
-          <div class="l2-map-state-card">
+          <div class="l2-map-state-card glass-panel">
             <div class="state-error">
               <strong>Could not load global map.</strong>
               <p>{mapError}</p>
             </div>
           </div>
         {:else if !RotatingGlobeComponent}
-          <div class="l2-map-state-card">
+          <div class="l2-map-state-card glass-panel">
             <div class="state-loading">Preparing globe renderer…</div>
           </div>
         {:else}
@@ -1981,7 +2005,7 @@
           <p>Country-level usage rendered as a rotating globe based on live service metrics.</p>
           <div class="l2-map-top-countries">
             {#each topCountries as country, i}
-              <div class="l2-top-country-card l2-rank-{i}" style="--rank-color:{i === 0 ? '#ca8a04' : i === 1 ? '#64748b' : '#92400e'};--rank-bg:{i === 0 ? 'rgba(234,179,8,0.08)' : i === 1 ? 'rgba(148,163,184,0.06)' : 'rgba(180,83,9,0.06)'};--rank-border:{i === 0 ? 'rgba(234,179,8,0.3)' : i === 1 ? 'rgba(148,163,184,0.25)' : 'rgba(180,83,9,0.25)'}">
+              <div class="l2-top-country-card l2-rank-{i} glass-panel" style="--card-i:{i};--rank-color:{i === 0 ? '#ca8a04' : i === 1 ? '#64748b' : '#92400e'};--rank-bg:{i === 0 ? 'rgba(234,179,8,0.08)' : i === 1 ? 'rgba(148,163,184,0.06)' : 'rgba(180,83,9,0.06)'};--rank-border:{i === 0 ? 'rgba(234,179,8,0.3)' : i === 1 ? 'rgba(148,163,184,0.25)' : 'rgba(180,83,9,0.25)'}">
                 <div class="l2-top-rank">
                   <span class="l2-rank-medal">{i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}</span>
                 </div>
@@ -2075,7 +2099,7 @@
             showLegend={false}
           />
         {:else}
-          <div class="l2-map-state-card">
+          <div class="l2-map-state-card glass-panel">
             <div class="state-loading">Preparing map renderer…</div>
           </div>
         {/if}
@@ -2084,52 +2108,8 @@
   {/if}
 
   <!-- ━━━━ Final CTA ━━━━ -->
-  <section class="l2-cta-section l2-snap">
-    <div class="l2-wrap l2-cta-content l2-reveal" data-placement-section="cta" style="position:relative;overflow:visible">
-      <h2>Ready to save hours?</h2>
-      <p>Install Classroom Quick Downloader in under 10 seconds. Free, forever. No account required.</p>
-      <!-- NEWSLETTER_CTA_DISABLED_ROLLBACK_START
-      <p>Install Classroom Quick Downloader in under 10 seconds, and add your email for future updates. Free, forever. No account required.</p>
-      <form class="l2-newsletter-form" on:submit|preventDefault={submitNewsletterEmail}>
-        <input
-          type="email"
-          class="l2-newsletter-input"
-          bind:value={newsletterEmail}
-          placeholder="Enter your email for future updates"
-          inputmode="email"
-          autocomplete="email"
-          required
-        />
-        <button
-          type="submit"
-          class="l2-newsletter-submit"
-          disabled={newsletterSubmitState === 'submitting'}
-        >
-          {#if newsletterSubmitState === 'submitting'}Submitting…{:else}Notify me{/if}
-        </button>
-      </form>
-      {#if newsletterStatusMessage}
-        <p class="l2-newsletter-status l2-newsletter-status-{newsletterSubmitState}">
-          {newsletterStatusMessage}
-        </p>
-      {/if}
-      NEWSLETTER_CTA_DISABLED_ROLLBACK_END -->
-      <div class="l2-hero-actions">
-        {#each orderedBrowserCtas as b}
-          <a
-            class="l2-cta {b === detectedBrowser ? 'l2-cta-current' : 'l2-cta-other'}"
-            href={browserLink(b)}
-            target="_blank"
-            rel="noopener noreferrer"
-            on:click={() => trackInstallClick('final_install')}
-          >
-            <img src="{base}/images/{b}.svg" alt="" class="l2-cta-icon" />
-            {#if b === detectedBrowser}Install for {browserDisplayName(b)}{:else}{browserDisplayName(b)}{/if}
-          </a>
-        {/each}
-      </div>
-    </div>
-  </section>
+  <!-- The final "Ready to save hours?" CTA now lives in the site footer
+       (SiteFooter.svelte) so it closes every page, not just the overview. -->
 
   <!-- ━━━━ Edit Mode Toolbar & Picker ━━━━ -->
   {#if editMode}
@@ -2396,7 +2376,8 @@
     --radius: 16px;
     --wrap: 1280px;
     font-family: var(--font-ui), sans-serif;
-    background: var(--bg);
+    /* transparent so the shared .bg-aurora layer behind the layout shell shows through */
+    background: transparent;
     color: var(--text);
     overflow-x: hidden;
     position: relative;
@@ -2429,44 +2410,10 @@
   }
 
   /* ── Page-wide decorative layers ──── */
-  .l2-page-orbs {
-    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none; z-index: 0;
-  }
-  .orb {
-    position: absolute; border-radius: 50%;
-    filter: blur(120px);
-  }
-  /* Hero-region orbs */
-  .orb-1 { width: 560px; height: 560px; background: #bbf7d0; top: 1%; right: -4%; opacity: 0.35; animation: orb-drift 18s ease-in-out infinite alternate; }
-  .orb-2 { width: 480px; height: 480px; background: #a5f3fc; top: 8%; left: -4%; opacity: 0.28; animation: orb-drift 22s ease-in-out infinite alternate-reverse; }
-  .orb-3 { width: 360px; height: 360px; background: #e0e7ff; top: 5%; left: 42%; opacity: 0.22; animation: orb-drift 15s ease-in-out infinite alternate; }
-  /* Mid-page orbs */
-  .orb-4 { width: 500px; height: 500px; background: #bbf7d0; top: 30%; left: -3%; opacity: 0.25; animation: orb-drift 20s ease-in-out infinite alternate; }
-  .orb-5 { width: 440px; height: 440px; background: #a5f3fc; top: 45%; right: -2%; opacity: 0.22; animation: orb-drift 24s ease-in-out infinite alternate-reverse; }
-  /* Lower-page orbs */
-  .orb-6 { width: 520px; height: 520px; background: #bbf7d0; top: 65%; right: 5%; opacity: 0.28; animation: orb-drift 19s ease-in-out infinite alternate; }
-  .orb-7 { width: 400px; height: 400px; background: #e0e7ff; top: 80%; left: 5%; opacity: 0.2; animation: orb-drift 26s ease-in-out infinite alternate-reverse; }
-  /* Extra density orbs */
-  .orb-8 { width: 380px; height: 380px; background: #bbf7d0; top: 20%; right: 15%; opacity: 0.2; animation: orb-drift 21s ease-in-out infinite alternate; }
-  .orb-9 { width: 420px; height: 420px; background: #a5f3fc; top: 38%; left: 20%; opacity: 0.18; animation: orb-drift 25s ease-in-out infinite alternate-reverse; }
-  .orb-10 { width: 460px; height: 460px; background: #e0e7ff; top: 55%; right: -2%; opacity: 0.2; animation: orb-drift 17s ease-in-out infinite alternate; }
-  .orb-11 { width: 340px; height: 340px; background: #bbf7d0; top: 72%; left: 30%; opacity: 0.22; animation: orb-drift 23s ease-in-out infinite alternate-reverse; }
-  .orb-12 { width: 480px; height: 480px; background: #a5f3fc; top: 90%; right: 8%; opacity: 0.18; animation: orb-drift 27s ease-in-out infinite alternate; }
-
-  .l2-page-grid {
-    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none; z-index: 0;
-    opacity: 0.03;
-    background-image: linear-gradient(var(--text) 1px, transparent 1px),
-                       linear-gradient(90deg, var(--text) 1px, transparent 1px);
-    background-size: 60px 60px;
-  }
-
   .l2-hero-content { position: relative; z-index: 2; }
 
   .l2-mega {
-    font-size: clamp(40px, 6vw, 72px); font-weight: 900;
+    font-size: clamp(40px, 6vw, 72px); font-weight: 800;
     line-height: 1.05; letter-spacing: -0.03em;
     margin: 0 0 24px;
   }
@@ -2590,21 +2537,12 @@
   }
 
   .l2-student-card {
-    position: relative;
-    background: rgba(255, 255, 255, 0.72);
-    border: 1px solid var(--border-subtle);
     border-radius: 18px;
     padding: 28px 24px;
-    box-shadow: 0 8px 28px rgba(15, 20, 25, 0.06);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
   }
 
   .l2-student-card:hover {
     transform: translateY(-4px);
-    border-color: var(--green-border);
-    box-shadow: 0 16px 38px rgba(15, 20, 25, 0.1);
   }
 
   .l2-student-icon {
@@ -3352,49 +3290,18 @@
     align-items: center;
     gap: 14px;
     padding: 14px 18px;
-    background: var(--rank-bg);
+    /* Rank identity rides on the border + a faint tint layer; the surface
+       itself is the shared opaque glass gradient like every other card. */
+    background-color: var(--rank-bg);
+    background-image: var(--glass-bg);
     border: 1.5px solid var(--rank-border);
     border-radius: 16px;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
     flex: 1;
     min-width: 160px;
-    transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
-    position: relative;
-    overflow: hidden;
   }
 
-  .l2-top-country-card::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background: linear-gradient(
-      118deg,
-      transparent 30%,
-      rgba(255, 255, 255, 0.38) 50%,
-      transparent 70%
-    );
-    transform: translateX(-130%);
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  .l2-top-country-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
-  }
-
-  .l2-top-country-card:hover::after,
-  .l2-top-country-card:focus-within::after {
-    opacity: 1;
-    animation: top-country-glint 1.2s ease-out 1;
-  }
-
-  @keyframes top-country-glint {
-    from { transform: translateX(-130%); }
-    to { transform: translateX(130%); }
-  }
+  /* Hover: the shared .glass-hover response only — the old per-card lift
+     and one-shot glint sweep stacked on top of it and read as extreme. */
 
   .l2-top-rank {
     flex-shrink: 0;
@@ -3475,7 +3382,7 @@
     font-weight: 700;
     border: 2px solid transparent;
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+    transition: all 0.3s var(--glass-ease);
     position: relative;
     overflow: hidden;
   }
@@ -3519,7 +3426,7 @@
 
   .l2-silly-yay-text {
     font-size: clamp(36px, 5vw, 56px);
-    font-weight: 900;
+    font-weight: 800;
     display: block;
     margin-bottom: 4px;
     background: linear-gradient(135deg, #22c55e, #eab308, #ef4444, #8b5cf6);
@@ -3625,13 +3532,8 @@
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
   }
   .l2-fcard {
-    background: rgba(255, 255, 255, 0.65); border: 1px solid var(--border-subtle);
     border-radius: var(--radius); padding: 28px 24px;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
   }
-  .l2-fcard:hover { border-color: var(--green-border); transform: translateY(-4px); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08); }
   .l2-fcard-icon { font-size: 36px; margin-bottom: 14px; }
   .l2-fcard h3 { font-size: 17px; font-weight: 700; margin: 0 0 8px; }
   .l2-fcard p { font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin: 0; }
@@ -3661,13 +3563,8 @@
   /* ── Social Proof ──────────────────── */
   .l2-proof-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
   .l2-proof-card {
-    background: rgba(255, 255, 255, 0.65); border: 1px solid var(--border-subtle);
     border-radius: var(--radius); padding: 28px; text-align: center;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
   }
-  .l2-proof-card:hover { border-color: var(--green-border); transform: translateY(-3px); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.05); }
   .l2-proof-num { font-size: 28px; font-weight: 800; color: var(--green); margin-bottom: 6px; }
   .l2-metric-pending { color: #64748b; font-size: 1em; font-weight: 700; letter-spacing: 0.02em; }
   .l2-proof-label { font-size: 13px; font-weight: 500; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
@@ -3737,9 +3634,6 @@
   .l2-map-state-card {
     width: min(100%, 760px);
     border-radius: 18px;
-    border: 1px solid rgba(15, 20, 25, 0.1);
-    background: rgba(255, 255, 255, 0.82);
-    box-shadow: 0 10px 26px rgba(15, 20, 25, 0.08);
     padding: 30px;
   }
 
@@ -3835,44 +3729,8 @@
   }
 
   /* ── Final CTA ─────────────────────── */
-  .l2-cta-section {
-    position: relative;
-    z-index: 2;
-    isolation: isolate;
-    padding: 80px 0;
-    text-align: center;
-    background: transparent;
-  }
-  .l2-cta-content {
-    position: relative;
-    z-index: 2;
-    width: 100%;
-    background: rgba(255, 255, 255, 0.55);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid var(--border-subtle);
-    border-radius: 24px;
-    padding: clamp(28px, 5vw, 64px) clamp(20px, 5vw, 48px);
-    overflow: visible;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.04);
-  }
-  .l2-cta-content::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(145deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.08));
-    pointer-events: none;
-    z-index: 0;
-  }
-  .l2-cta-content > * {
-    position: relative;
-    z-index: 1;
-  }
-  .l2-cta-content h2 {
-    font-size: clamp(32px, 4vw, 48px); font-weight: 900;
-    letter-spacing: -0.03em; margin: 0 0 16px;
-  }
-  .l2-cta-content p { font-size: 18px; color: var(--text-secondary); margin: 0 0 20px; }
+  /* Removed: the final CTA lives in SiteFooter.svelte now. */
+
 
   .l2-newsletter-form {
     width: min(580px, 100%);
@@ -3937,18 +3795,47 @@
     color: var(--text-muted);
   }
 
+  /* Staggered entrance on section reveal — the nav dropdown's "retyped"
+     cascade, paced per card with --card-i. `backwards` fill hides each
+     card during its delay and releases the transform once done, so hover
+     transitions stay live afterwards. Pending sections hold their cards
+     invisible, so the cascade plays on reveal instead of first paint. */
+  :global(.l2-reveal:not(.l2-reveal-pending)) .l2-student-card,
+  :global(.l2-reveal:not(.l2-reveal-pending)) .l2-fcard,
+  :global(.l2-reveal:not(.l2-reveal-pending)) .l2-proof-card,
+  :global(.l2-reveal:not(.l2-reveal-pending)) .l2-top-country-card {
+    animation: card-glass-in 0.6s var(--glass-ease) backwards;
+    animation-delay: calc(0.06s + var(--card-i, 0) * 0.07s);
+  }
+
+  :global(.l2-reveal.l2-reveal-pending) .l2-student-card,
+  :global(.l2-reveal.l2-reveal-pending) .l2-fcard,
+  :global(.l2-reveal.l2-reveal-pending) .l2-proof-card,
+  :global(.l2-reveal.l2-reveal-pending) .l2-top-country-card {
+    opacity: 0;
+  }
+
+  /* The shared glass guards don't know about this page's reveal-gated
+     cascade — switch the scoped entrance off for reduced motion here. */
+  @media (prefers-reduced-motion: reduce) {
+    :global(.l2-reveal) .l2-student-card,
+    :global(.l2-reveal) .l2-fcard,
+    :global(.l2-reveal) .l2-proof-card,
+    :global(.l2-reveal) .l2-top-country-card {
+      animation: none !important;
+    }
+  }
+
   /* ── Reveal Animations ─────────────── */
+  /* Fail open: sections are visible by default. JS adds l2-reveal-pending
+     only to below-fold elements right before observing them, so content can
+     never be stranded invisible (no data, fast scroll, no-JS). */
   .l2-reveal {
-    opacity: 0; transform: translateY(32px);
     transition: opacity 0.7s ease, transform 0.7s ease;
   }
-  :global(.l2-reveal.in-view) { opacity: 1; transform: translateY(0); }
+  :global(.l2-reveal.l2-reveal-pending) { opacity: 0; transform: translateY(32px); }
 
   /* ── Keyframes ──────────────────────── */
-  @keyframes orb-drift {
-    0% { transform: translate(0, 0); }
-    100% { transform: translate(30px, -40px); }
-  }
   @keyframes gradient-shift {
     0%, 100% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
@@ -3997,14 +3884,6 @@
       max-height: calc(100vh - 16px);
       border-radius: 14px;
       padding: 8px;
-    }
-    .l2-cta-content {
-      border-radius: 20px;
-      padding: 30px 20px;
-    }
-    .l2-cta-content p {
-      margin-bottom: 26px;
-      font-size: 16px;
     }
     .l2-newsletter-form {
       flex-direction: column;

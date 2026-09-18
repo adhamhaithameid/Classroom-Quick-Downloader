@@ -11,14 +11,6 @@
 />
 
 <div class="nf">
-  <!-- Decorative orbs -->
-  <div class="nf-orbs" aria-hidden="true">
-    <div class="orb orb-1"></div>
-    <div class="orb orb-2"></div>
-    <div class="orb orb-3"></div>
-  </div>
-  <div class="nf-grid-bg" aria-hidden="true"></div>
-
   <section class="nf-hero">
     <div class="nf-wrap">
       <div class="nf-glitch-code" aria-hidden="true">404</div>
@@ -41,22 +33,22 @@
   <section class="nf-links-section">
     <div class="nf-wrap">
       <div class="nf-links-grid">
-        <a class="nf-link-card" href="{base}/">
-          <span class="nf-link-icon">🏠</span>
+        <a class="nf-link-card glass-panel glass-hover" href="{base}/">
+          <span class="nf-link-icon glass-icon">🏠</span>
           <div>
             <strong>Overview</strong>
             <p>Learn what Classroom Quick Downloader does and how it works.</p>
           </div>
         </a>
-        <a class="nf-link-card" href="{base}/faq">
-          <span class="nf-link-icon">❓</span>
+        <a class="nf-link-card glass-panel glass-hover" href="{base}/faq">
+          <span class="nf-link-icon glass-icon">❓</span>
           <div>
             <strong>FAQ</strong>
             <p>Find answers to commonly asked questions about the extension.</p>
           </div>
         </a>
-        <a class="nf-link-card" href="{base}/changelog">
-          <span class="nf-link-icon">📋</span>
+        <a class="nf-link-card glass-panel glass-hover" href="{base}/changelog">
+          <span class="nf-link-icon glass-icon">📋</span>
           <div>
             <strong>Changelog</strong>
             <p>See what's new in the latest releases and version history.</p>
@@ -92,23 +84,6 @@
 
   .nf-wrap { max-width: 680px; margin: 0 auto; padding: 0 24px; width: 100%; }
 
-  /* ── Decorative ────────────────── */
-  .nf-orbs {
-    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none; z-index: 0;
-  }
-  .orb { position: absolute; border-radius: 50%; filter: blur(120px); }
-  .orb-1 { width: 480px; height: 480px; background: #bbf7d0; top: -10%; right: -8%; opacity: 0.25; }
-  .orb-2 { width: 400px; height: 400px; background: #fca5a5; top: 30%; left: -10%; opacity: 0.15; }
-  .orb-3 { width: 360px; height: 360px; background: #e0e7ff; top: 60%; right: 10%; opacity: 0.18; }
-
-  .nf-grid-bg {
-    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none; z-index: 0; opacity: 0.03;
-    background-image: linear-gradient(var(--text) 1px, transparent 1px), linear-gradient(90deg, var(--text) 1px, transparent 1px);
-    background-size: 60px 60px;
-  }
-
   /* ── Hero ───────────────────────── */
   .nf-hero {
     position: relative; z-index: 2;
@@ -118,7 +93,7 @@
 
   .nf-glitch-code {
     font-size: clamp(100px, 18vw, 200px);
-    font-weight: 900;
+    font-weight: 800;
     line-height: 1;
     letter-spacing: -0.04em;
     background: linear-gradient(135deg, rgba(26,139,85,0.12), rgba(34,197,94,0.08));
@@ -135,7 +110,7 @@
 
   .nf-mega {
     font-size: clamp(28px, 4vw, 48px);
-    font-weight: 900;
+    font-weight: 800;
     line-height: 1.15;
     letter-spacing: -0.03em;
     margin: 0 0 16px;
@@ -204,26 +179,16 @@
 
   .nf-link-card {
     display: flex; align-items: flex-start; gap: 14px;
-    background: rgba(255,255,255,0.6);
-    border: 1px solid var(--border-subtle);
     border-radius: 16px;
     padding: 22px 20px;
     text-decoration: none;
     color: var(--text);
-    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    animation: nf-rise 0.5s ease both;
+    animation: nf-rise 0.5s var(--glass-ease) backwards;
   }
 
   .nf-link-card:nth-child(1) { animation-delay: 0.05s; }
   .nf-link-card:nth-child(2) { animation-delay: 0.1s; }
   .nf-link-card:nth-child(3) { animation-delay: 0.15s; }
-
-  .nf-link-card:hover {
-    transform: translateY(-4px);
-    border-color: rgba(26,139,85,0.2);
-    box-shadow: 0 16px 40px rgba(0,0,0,0.08);
-  }
 
   .nf-link-icon {
     font-size: 28px;
@@ -247,6 +212,12 @@
   @keyframes nf-rise {
     from { opacity: 0; transform: translateY(14px); }
     to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .nf-link-card {
+      animation: none;
+    }
   }
 
   /* ── Responsive ────────────────── */

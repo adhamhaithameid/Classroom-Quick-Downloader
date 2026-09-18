@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Dhaunirodha",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Kudhaunirodha…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Kuedza…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Pedza",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Kukanganisa",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Zvakundikana.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Dhaunirodha",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Kudhaunirodha nekukurumidza",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "taura",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Yakagadziriswa",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Dhaunirodha zvese",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "faira",
+    "description": "file"
+  },
+  "files": {
+    "message": "mafaira",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Nhamba yemakomendi pane ino post",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Dhaunirodha yakanganiswa.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Nguva yekumhanya haiwanikwe",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Hazvina kukwanisa kutanga.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Kukanganisa kwekutaura.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "taura",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Kanzura",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Yakanzurwa",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

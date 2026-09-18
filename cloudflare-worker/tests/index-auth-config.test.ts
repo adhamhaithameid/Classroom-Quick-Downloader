@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import worker from "../src/index";
 import type { Env } from "../src/types";
+import { TEST_DO_SHARED_SECRET, TEST_DASHBOARD_PASSWORD, TEST_DANGER_PASSWORD } from "./helpers/dummy-secrets";
 
 function mockEnv(overrides: Partial<Env> = {}): Env {
   const stub = {
@@ -32,11 +33,11 @@ function mockEnv(overrides: Partial<Env> = {}): Env {
 
   return {
     DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace,
-    DO_SHARED_SECRET: "do-shared-secret",
-    DANGER_PASSWORD: "danger-secret",
+    DO_SHARED_SECRET: TEST_DO_SHARED_SECRET,
+    DANGER_PASSWORD: TEST_DANGER_PASSWORD,
     ORACLE_ENDPOINT: "https://oracle.local/ingest-batch",
     MAX_BATCH_EVENTS: "10000",
-    DASHBOARD_PASSWORD: "dashboard-secret",
+    DASHBOARD_PASSWORD: TEST_DASHBOARD_PASSWORD,
     CORS_ALLOWED_ORIGINS: "https://classroom-quick-downloader-website.pages.dev,https://stats.example.com",
     ...overrides,
   };
@@ -791,7 +792,7 @@ describe("Worker auth config hardening", () => {
       const req = input as Request;
       expect(new URL(req.url).pathname).toBe("/admin/website/replay-dlq");
       expect(req.method).toBe("POST");
-      expect(req.headers.get("x-admin-secret")).toBe("do-shared-secret");
+      expect(req.headers.get("x-admin-secret")).toBe(TEST_DO_SHARED_SECRET);
       expect(req.headers.get("content-type")).toContain("application/json");
       const payload = await req.json() as { limit?: number };
       expect(payload.limit).toBe(3);
@@ -811,7 +812,7 @@ describe("Worker auth config hardening", () => {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "X-Admin-Secret": "do-shared-secret",
+        "X-Admin-Secret": TEST_DO_SHARED_SECRET,
       },
       body: JSON.stringify({ limit: 3 }),
     });
@@ -869,7 +870,7 @@ describe("Worker auth config hardening", () => {
     const request = new Request("https://example.com/admin/website/snapshot/refresh", {
       method: "POST",
       headers: {
-        "X-Admin-Secret": "do-shared-secret",
+        "X-Admin-Secret": TEST_DO_SHARED_SECRET,
       },
     });
 
@@ -985,7 +986,7 @@ describe("Worker auth config hardening", () => {
       new Request("https://example.com/admin/website/console/summary", {
         method: "GET",
         headers: {
-          "X-Admin-Secret": "do-shared-secret",
+          "X-Admin-Secret": TEST_DO_SHARED_SECRET,
         },
       }),
       env,
@@ -1132,7 +1133,7 @@ describe("Worker auth config hardening", () => {
     const request = new Request("https://example.com/stats", {
       method: "GET",
       headers: {
-        "X-Admin-Secret": "do-shared-secret",
+        "X-Admin-Secret": TEST_DO_SHARED_SECRET,
       },
     });
 
@@ -1291,7 +1292,7 @@ describe("Worker auth config hardening", () => {
     const request = new Request("https://example.com/auth/verify-danger", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: "danger-secret" }),
+      body: JSON.stringify({ password: TEST_DANGER_PASSWORD }),
     });
 
     const res = await worker.fetch(request, env, {} as ExecutionContext);
@@ -1309,9 +1310,9 @@ describe("Worker auth config hardening", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Admin-Secret": "do-shared-secret",
+        "X-Admin-Secret": TEST_DO_SHARED_SECRET,
       },
-      body: JSON.stringify({ password: "danger-secret" }),
+      body: JSON.stringify({ password: TEST_DANGER_PASSWORD }),
     });
 
     const res = await worker.fetch(request, env, {} as ExecutionContext);
@@ -1348,7 +1349,7 @@ describe("Worker auth config hardening", () => {
         Cookie: setCookie,
         "CF-Connecting-IP": "203.0.113.10",
       },
-      body: JSON.stringify({ password: "danger-secret" }),
+      body: JSON.stringify({ password: TEST_DANGER_PASSWORD }),
     });
     const dangerRes = await worker.fetch(dangerReq, env, {} as ExecutionContext);
     const body = await dangerRes.json() as { ok: boolean };

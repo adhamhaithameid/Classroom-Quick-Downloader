@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Tải xuống",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Đang tải…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Đang thử…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Đã tải",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Lỗi",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Thất bại.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Tải xuống",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Tải xuống nhanh",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "nhận xét",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Đã chỉnh sửa",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Tải tất cả",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "tệp",
+    "description": "file"
+  },
+  "files": {
+    "message": "tệp",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Số bình luận về bài viết này",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Tải xuống bị gián đoạn.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Thời gian chạy không khả dụng",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Không thể bắt đầu.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Lỗi giao tiếp.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Số ngày giữa lần đăng và lần chỉnh sửa cuối cùng",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "bình luận",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Hủy",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Đã hủy",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Hủy tất cả",
+    "description": "cancelAll"
+  }
+}

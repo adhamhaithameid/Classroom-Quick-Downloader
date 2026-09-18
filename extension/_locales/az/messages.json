@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Yüklə",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Yüklənir…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Cəhd edilir…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Bitdi",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Xəta",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Alınmadı.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Yüklə",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Sürətli yükləmə",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "şərh",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Düzəliş edilib",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Hamısını yüklə",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "fayl",
+    "description": "file"
+  },
+  "files": {
+    "message": "fayllar",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Bu yazkıdakı şərhlərin sayı",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Yükləmə dayandırıldı.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "İcra mühiti mövcud deyil",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Başlamaq mümkün olmadı.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Rabitə xətası.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "şərh",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Ləğv et",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Ləğv edildi",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

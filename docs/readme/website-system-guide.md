@@ -58,6 +58,14 @@ Layout responsibilities:
 - optional feedback nav injection behind env flag
 - global website telemetry client lifecycle init/dispose
 
+Site footer (`website/src/lib/components/SiteFooter.svelte`):
+- Layer 1: final install CTA — detected browser gets the primary button; store links come from `STORE_LINKS` or the live snapshot
+- Layer 2: product identity + navigation grid (Product / Support / Install columns) with the app version
+- Layer 3: principles strip (Instant / Private / Transparent / Universal)
+- Layer 4: legal bar (copyright, non-affiliation note, builder credit)
+- Giant dot-matrix wordmark: a single dot population on one canvas. The rest state is one static frame (no idle animation); hovering shatters the dots — pointer entry and clicks fire ripple pulses whose wavefront travels through the glyphs while a local repulsion field holds a cavity under the pointer — and on leave every dot springs back home before the loop parks on the exact rest frame. Static rendering under `prefers-reduced-motion`
+- Reveal animations fail open: SSR markup never ships the hidden state, and a passive scroll check plus a failsafe timer reveal anything an IntersectionObserver callback misses
+
 ## 4. Data Access Layer
 
 Core API module:
@@ -147,7 +155,7 @@ Events ingest contract:
 
 Current instrumentation points:
 - nav install CTA (desktop/mobile)
-- footer download CTA
+- footer install CTAs (Layer 1 buttons + Install column, placement `footer_install_<browser>`)
 - hero/final install or download buttons on overview
 - map yes/no prompt actions
 - uninstall page reinstall links

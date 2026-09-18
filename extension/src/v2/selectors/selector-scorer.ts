@@ -387,6 +387,92 @@ export class SelectorScorer {
   }
 
   /**
+   * Union of EVERY candidate's matches — not just the best candidate's.
+   *
+   * z57 S2: file-anchor discovery needs this because one Classroom post
+   * routinely mixes attachment KINDS (a Drive pdf + a Docs sheet + a Slides
+   * deck), each matched by a DIFFERENT candidate at the same priority. The
+   * single-winner semantics of queryAll() would drop every kind but the best
+   * candidate's. Element-identity deduped; traces still record per-candidate
+   * match counts. Returns the same ScorerResult shape (winner = highest
+   * scoring candidate) so callers can keep their reporting.
+   */
+  queryAllCandidates(scope: HTMLElement | Document): ScorerResult {
+    const startTime = performance.now();
+    const trace: CandidateTrace[] = [];
+
+    let bestCandidate: SelectorCandidate | null = null;
+    let bestScore = 0;
+    const union = new Set<HTMLElement>();
+
+    for (const candidate of this.candidates) {
+      const candidateStart = performance.now();
+      const effectiveScore = this.getEffectiveScore(candidate);
+
+      if (!candidate.cssSelector) {
+        trace.push({
+          candidateId: candidate.id,
+          level: candidate.level,
+          cssSelector: null,
+          tried: false,
+          matched: false,
+          matchCount: 0,
+          effectiveScore,
+          reason: 'queryAllCandidates skips heuristic-only candidates',
+          duration_ms: performance.now() - candidateStart,
+        });
+        continue;
+      }
+
+      try {
+        const found = Array.from(
+          scope.querySelectorAll<HTMLElement>(candidate.cssSelector),
+        );
+        const matched = found.length > 0;
+
+        trace.push({
+          candidateId: candidate.id,
+          level: candidate.level,
+          cssSelector: candidate.cssSelector,
+          tried: true,
+          matched,
+          matchCount: found.length,
+          effectiveScore: matched ? effectiveScore : 0,
+          reason: matched
+            ? `Found ${found.length} element(s), score=${effectiveScore}`
+            : 'No match',
+          duration_ms: performance.now() - candidateStart,
+        });
+
+        if (matched) {
+          candidate.consecutiveFailures = 0;
+          candidate.lastConfirmedAt = new Date().toISOString();
+          for (const el of found) union.add(el);
+          if (effectiveScore > bestScore) {
+            bestScore = effectiveScore;
+            bestCandidate = candidate;
+          }
+        } else {
+          candidate.consecutiveFailures += 1;
+        }
+      } catch {
+        candidate.consecutiveFailures += 1;
+      }
+    }
+
+    return {
+      targetDescription: this.targetDescription,
+      winner: bestCandidate,
+      element: bestCandidate ? [...union][0] ?? null : null,
+      allElements: [...union],
+      confidence: bestScore,
+      winnerLevel: bestCandidate?.level ?? null,
+      trace,
+      duration_ms: performance.now() - startTime,
+    };
+  }
+
+  /**
    * Query the DOM for ALL matching elements (aggregates across candidates).
    *
    * Used when we want to find all posts, all files, etc.

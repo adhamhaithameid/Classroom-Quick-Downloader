@@ -4,6 +4,8 @@
   import { submitUninstallFeedback } from '$lib/api/publicSite';
   import { STORE_LINKS } from '$lib/config';
   import { trackWebsiteEvent } from '$lib/analytics/websiteEvents';
+  import { parseUninstallStatsParams } from '$lib/analytics/uninstallParams';
+  import { buildUninstallViewEvent } from '$lib/analytics/uninstallViewEvent';
   import { buildUninstallNotesPayload } from '$lib/uninstall/feedback';
   import { browserDisplayName, detectBrowserFromUserAgent, type BrowserKey } from '$lib/browser/detect';
   import SeoMeta from '$lib/components/SeoMeta.svelte';
@@ -41,6 +43,9 @@
   let queryBrowser: BrowserKey = 'chrome';
   let queryVersion = 'unknown';
   let querySource = 'website';
+  // W3: compact download totals the extension appended to the uninstall URL.
+  let queryDownloads = 0;
+  let queryAttempts = 0;
   let detectedBrowser: BrowserKey = 'chrome';
 
   let submitState: 'idle' | 'sending' | 'done' | 'error' = 'idle';
@@ -76,7 +81,10 @@
       eventType: 'cta',
       action: 'install_click',
       placement: `uninstall_reinstall_${browser}`,
-      pagePath: '/uninstall'
+      pagePath: '/uninstall',
+      // W3: usage totals carried through the uninstall URL (d/a params), so
+      // they survive uninstall.
+      meta: { downloads: queryDownloads, attempts: queryAttempts }
     });
   }
 
@@ -120,6 +128,22 @@
     queryBrowser = detectedBrowser;
     queryVersion = params.get('version') || 'unknown';
     querySource = params.get('source') || 'website';
+    // W3: extension-appended download totals (d/a), NaN/negative-safe.
+    const stats = parseUninstallStatsParams(params);
+    queryDownloads = stats.downloads;
+    queryAttempts = stats.attempts;
+
+    // W3: emit the uninstall lifecycle signal on page visit so the stats
+    // carried through the uninstall URL reach the warehouse even when the
+    // user never clicks reinstall. onMount runs once per page load.
+    trackWebsiteEvent(buildUninstallViewEvent({
+      stats,
+      context: {
+        source: querySource,
+        browser: queryBrowser,
+        version: queryVersion
+      }
+    }));
   });
 </script>
 
@@ -131,14 +155,6 @@
 />
 
 <div class="un">
-  <!-- Decorative background -->
-  <div class="un-orbs" aria-hidden="true">
-    <div class="orb orb-1"></div>
-    <div class="orb orb-2"></div>
-    <div class="orb orb-3"></div>
-  </div>
-  <div class="un-grid-bg" aria-hidden="true"></div>
-
   <!-- Hero -->
   <section class="un-hero un-appear" style="animation-delay: 0s">
     <div class="un-wrap">
@@ -157,14 +173,14 @@
       <!-- Step 1: Reason -->
       <div class="un-step un-appear" style="animation-delay: 0.1s">
         <div class="un-step-badge" aria-hidden="true">1</div>
-        <div class="un-card">
+        <div class="un-card glass-panel">
           <h2 class="un-card-title">What made you uninstall?</h2>
           <p class="un-card-hint">Pick the closest reason — it helps us prioritize fixes.</p>
           <div class="un-pills">
             {#each reasons as { label, icon }}
               <button
                 type="button"
-                class="un-pill"
+                class="un-pill glass-panel glass-hover"
                 class:active={selectedReason === label}
                 aria-pressed={selectedReason === label}
                 on:click={() => { selectedReason = label; }}
@@ -183,7 +199,7 @@
       <!-- Step 2: Details -->
       <div class="un-step un-appear" style="animation-delay: 0.2s">
         <div class="un-step-badge" aria-hidden="true">2</div>
-        <div class="un-card">
+        <div class="un-card glass-panel">
           <div class="un-card-title-row">
             <h2 class="un-card-title">Tell us more</h2>
             <span class="un-optional-tag">Optional</span>
@@ -196,7 +212,7 @@
               {#each confidenceOptions as { label, icon }}
                 <button
                   type="button"
-                  class="un-mini-pill"
+                  class="un-mini-pill glass-panel glass-hover"
                   class:active={confidenceToReinstall === label}
                   on:click={() => { confidenceToReinstall = label; }}
                 >
@@ -214,7 +230,7 @@
               {#each featureOptions as { label, icon }}
                 <button
                   type="button"
-                  class="un-mini-pill"
+                  class="un-mini-pill glass-panel glass-hover"
                   class:active={selectedFeatures.includes(label)}
                   on:click={() => toggleFeature(label)}
                 >
@@ -288,7 +304,7 @@
               href={STORE_LINKS[browser]}
               target="_blank"
               rel="noopener noreferrer"
-              class="un-reinstall-btn"
+              class="un-reinstall-btn glass-panel glass-hover"
               class:detected={isDetected}
               on:click={() => trackReinstallClick(browser)}
             >
@@ -346,26 +362,6 @@
     animation: un-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
-  /* ── Decorative ────────────────── */
-  .un-orbs {
-    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none; z-index: 0;
-  }
-
-  .orb { position: absolute; border-radius: 50%; filter: blur(130px); }
-  .orb-1 { width: 520px; height: 520px; background: #bbf7d0; top: -6%; right: -8%; opacity: 0.22; }
-  .orb-2 { width: 420px; height: 420px; background: #e0e7ff; top: 35%; left: -10%; opacity: 0.18; }
-  .orb-3 { width: 380px; height: 380px; background: #a5f3fc; top: 75%; right: -4%; opacity: 0.14; }
-
-  .un-grid-bg {
-    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none; z-index: 0; opacity: 0.025;
-    background-image:
-      linear-gradient(var(--text) 1px, transparent 1px),
-      linear-gradient(90deg, var(--text) 1px, transparent 1px);
-    background-size: 60px 60px;
-  }
-
   /* ── Hero ───────────────────────── */
   .un-hero {
     position: relative; z-index: 2;
@@ -381,7 +377,7 @@
 
   .un-mega {
     font-size: clamp(32px, 5.5vw, 52px);
-    font-weight: 900;
+    font-weight: 800;
     line-height: 1.12;
     letter-spacing: -0.035em;
     margin: 0 0 18px;
@@ -424,11 +420,8 @@
 
   /* ── Card ──────────────────────── */
   .un-card {
-    background: var(--surface);
-    border: 1px solid var(--border-subtle);
     border-radius: var(--radius);
     padding: 36px 32px;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
   }
 
   .un-card-title-row {
@@ -478,17 +471,13 @@
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    border: 1.5px solid var(--border-subtle);
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.8);
     padding: 11px 20px;
     color: var(--text-secondary);
     cursor: pointer;
-    transition: all 0.2s ease;
     font-size: 14px;
     font-weight: 600;
     font-family: var(--font-ui), sans-serif;
-    box-shadow: 0 1px 4px rgba(15, 20, 25, 0.03);
   }
 
   .un-pill-icon {
@@ -497,10 +486,8 @@
   }
 
   .un-pill:hover {
-    border-color: var(--green-border);
     color: var(--green);
     transform: translateY(-1px);
-    box-shadow: 0 4px 14px rgba(26, 139, 85, 0.08);
   }
 
   .un-pill.active {
@@ -545,13 +532,10 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    border: 1.5px solid var(--border-subtle);
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.8);
     padding: 8px 16px;
     color: var(--text-secondary);
     cursor: pointer;
-    transition: all 0.2s ease;
     font-size: 13px;
     font-weight: 600;
     font-family: var(--font-ui), sans-serif;
@@ -563,7 +547,6 @@
   }
 
   .un-mini-pill:hover {
-    border-color: var(--green-border);
     color: var(--green);
     transform: translateY(-1px);
   }
@@ -585,15 +568,18 @@
     width: 100%;
     min-height: 110px;
     resize: vertical;
-    border: 1.5px solid var(--border-subtle);
+    border: 1.5px solid var(--glass-border);
     border-radius: var(--radius-sm);
     padding: 14px 16px;
-    background: rgba(255, 255, 255, 0.7);
+    background: var(--glass-bg);
     color: var(--text);
     font-size: 14px;
     font-family: var(--font-ui), sans-serif;
     line-height: 1.65;
-    transition: all 0.25s ease;
+    transition:
+      transform 0.45s var(--glass-ease),
+      box-shadow 0.45s var(--glass-ease),
+      border-color 0.3s ease;
     box-sizing: border-box;
   }
 
@@ -689,7 +675,7 @@
 
   .un-cta-heading {
     font-size: clamp(22px, 3vw, 30px);
-    font-weight: 900;
+    font-weight: 800;
     letter-spacing: -0.03em;
     margin: 0 0 10px;
   }
@@ -719,11 +705,8 @@
     font-size: 14px;
     font-weight: 600;
     color: var(--text-secondary);
-    border: 1.5px solid var(--border-subtle);
     border-radius: var(--radius-sm);
     padding: 12px 22px;
-    transition: all 0.25s ease;
-    background: rgba(255, 255, 255, 0.65);
   }
 
   .un-browser-icon {
@@ -733,10 +716,8 @@
   }
 
   .un-reinstall-btn:hover {
-    border-color: var(--green-border);
     color: var(--green);
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
   }
 
   .un-reinstall-btn.detected {
@@ -813,6 +794,19 @@
     .un-reinstall-btn {
       width: 100%;
       justify-content: center;
+    }
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .un-field-group textarea {
+      background: #fcfefd;
+      border-color: rgba(226, 232, 240, 0.9);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .un-field-group textarea {
+      transition: none;
     }
   }
 </style>

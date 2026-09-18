@@ -21,7 +21,7 @@ export const STORAGE_KEYS = {
 
 export const CONFIG_VERSION = 2;
 const BATCH_SIZE = 50;
-const MAX_RETRY = 5;
+const MAX_RETRY = 20;
 const REMOTE_ENABLED = true;
 const MAX_EVENTS_PER_REQUEST = 5000;
 const DAILY_FLUSH_WINDOW_START_UTC = 1;
@@ -53,6 +53,9 @@ export const DEFAULT_META: AnalyticsMeta = {
   lastPerfMs: null,
   serverTimeOffsetMs: null,
   lastCommittedSeq: null,
+  lastWeeklyFlushSlotKey: null,
+  weeklyOffsetSlotKey: null,
+  weeklyOffsetMinutes: null,
 };
 
 // --- Backoff Steps (seconds) ---

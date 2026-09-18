@@ -1,5 +1,63 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// D11 — registry-faithful state mock shared by every loadBackground variant:
+// the authoritative map plus indexes maintained only through registry fns.
+// (The authority pre-check is exercised in background-state.test.ts; these
+// suites preset unregistered pendings to drive listener logic.)
+function makeStateModule(options: {
+  isFirefox?: boolean;
+  cleanupInterval?: number;
+  urlBuckets?: Array<[string, any[]]>;
+  pendingByRequestId?: Map<string, any>;
+  pendingByDownloadId?: Map<number, any>;
+  pendingByBypassTabId?: Map<number, any>;
+  cancelledByUs?: Set<number>;
+} = {}) {
+  const pendingByRequestId = options.pendingByRequestId ?? new Map<string, any>();
+  const pendingByDownloadId = options.pendingByDownloadId ?? new Map<number, any>();
+  const pendingByUrl = new Map<string, Set<any>>();
+  for (const [url, pendings] of options.urlBuckets ?? []) {
+    pendingByUrl.set(url, new Set(pendings));
+  }
+  const pendingByBypassTabId = options.pendingByBypassTabId ?? new Map<number, any>();
+  const indexUrl = (url: string, p: any) => {
+    let bucket = pendingByUrl.get(url);
+    if (!bucket) { bucket = new Set(); pendingByUrl.set(url, bucket); }
+    bucket.add(p);
+  };
+  return {
+    setPendingExpiredHook: vi.fn(),
+    pendingByRequestId,
+    pendingByDownloadId,
+    pendingByUrl,
+    pendingByBypassTabId,
+    registerPending: (p: any) => {
+      pendingByRequestId.set(p.requestId, p);
+      indexUrl(p.baseUrl, p);
+    },
+    registerPendingUrl: (p: any, url: string) => indexUrl(url, p),
+    bindDownloadId: (p: any, downloadId: number) => {
+      p.currentDownloadId = downloadId;
+      pendingByDownloadId.set(downloadId, p);
+      return true;
+    },
+    unbindDownloadId: (downloadId: number) => { pendingByDownloadId.delete(downloadId); },
+    getPendingByRequestId: (id: string) => pendingByRequestId.get(id),
+    getPendingByDownloadId: (id: number) => pendingByDownloadId.get(id),
+    getPendingByBypassTabId: (id: number) => pendingByBypassTabId.get(id),
+    getUnclaimedPendingByUrl: (url: string) => {
+      const bucket = pendingByUrl.get(url);
+      if (!bucket || bucket.size === 0) return undefined;
+      for (const p of bucket) { if (p.currentDownloadId == null) return p; }
+      return undefined;
+    },
+    cancelledByUs: options.cancelledByUs ?? new Set<number>(),
+    recentDownloads: new Map(),
+    CLEANUP_INTERVAL_MS: options.cleanupInterval ?? 1000,
+    IS_FIREFOX: options.isFirefox ?? false,
+  };
+}
+
 describe('background/index', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -18,19 +76,7 @@ describe('background/index', () => {
     });
     const onInstalledAddListener = vi.fn();
 
-    vi.doMock('../entrypoints/background/state', () => ({
-      pendingByRequestId: new Map(),
-      pendingByDownloadId: new Map(),
-      pendingByUrl: new Map(),
-      pendingByUrlAdd: vi.fn(),
-      pendingByUrlRemove: vi.fn(),
-      pendingByUrlGet: vi.fn(),
-      pendingByBypassTabId: new Map(),
-      cancelledByUs: new Set(),
-      recentDownloads: new Map(),
-      CLEANUP_INTERVAL_MS: 1000,
-      IS_FIREFOX: false,
-    }));
+    vi.doMock('../entrypoints/background/state', () => makeStateModule({ isFirefox: false }));
     vi.doMock('../entrypoints/background/icon-manager', () => ({
       createIconUpdaters: () => ({ updateTabIcon, updateGlobalIcon }),
       isClassroomUrl: () => true,
@@ -54,11 +100,11 @@ describe('background/index', () => {
     }));
     vi.doMock('../entrypoints/background/message-sender', () => ({
       sendStatusToTab: vi.fn(),
+      setDownloadStatusListener: vi.fn(),
     }));
     vi.doMock('../entrypoints/background/download-handler', () => ({
       handleDownloadRequest: vi.fn(() => true),
       startNextDriveAttempt: vi.fn(),
-      openDriveBypassTab: vi.fn(),
     }));
     vi.doMock('../entrypoints/utils/analytics', () => ({
       refreshRemoteAnalyticsConfig,
@@ -115,19 +161,7 @@ describe('background/index', () => {
     const sendStatusToTab = vi.fn();
     const recordDownloadEvent = vi.fn();
 
-    vi.doMock('../entrypoints/background/state', () => ({
-      pendingByRequestId: new Map(),
-      pendingByDownloadId,
-      pendingByUrl: new Map(),
-      pendingByUrlAdd: vi.fn(),
-      pendingByUrlRemove: vi.fn(),
-      pendingByUrlGet: vi.fn(),
-      pendingByBypassTabId: new Map(),
-      cancelledByUs: new Set(),
-      recentDownloads: new Map(),
-      CLEANUP_INTERVAL_MS: 1000,
-      IS_FIREFOX: false,
-    }));
+    vi.doMock('../entrypoints/background/state', () => makeStateModule({ pendingByDownloadId }));
     vi.doMock('../entrypoints/background/icon-manager', () => ({
       createIconUpdaters: () => ({ updateTabIcon: vi.fn(), updateGlobalIcon: vi.fn() }),
       isClassroomUrl: () => true,
@@ -151,11 +185,11 @@ describe('background/index', () => {
     }));
     vi.doMock('../entrypoints/background/message-sender', () => ({
       sendStatusToTab,
+      setDownloadStatusListener: vi.fn(),
     }));
     vi.doMock('../entrypoints/background/download-handler', () => ({
       handleDownloadRequest: vi.fn(() => true),
       startNextDriveAttempt: vi.fn(),
-      openDriveBypassTab: vi.fn(),
     }));
     vi.doMock('../entrypoints/utils/analytics', () => ({
       refreshRemoteAnalyticsConfig: vi.fn(async () => {}),
@@ -194,19 +228,7 @@ describe('background/index', () => {
 
   it('returns false for unknown message types and unexpected senders', async () => {
     vi.resetModules();
-    vi.doMock('../entrypoints/background/state', () => ({
-      pendingByRequestId: new Map(),
-      pendingByDownloadId: new Map(),
-      pendingByUrl: new Map(),
-      pendingByUrlAdd: vi.fn(),
-      pendingByUrlRemove: vi.fn(),
-      pendingByUrlGet: vi.fn(),
-      pendingByBypassTabId: new Map(),
-      cancelledByUs: new Set(),
-      recentDownloads: new Map(),
-      CLEANUP_INTERVAL_MS: 1000,
-      IS_FIREFOX: false,
-    }));
+    vi.doMock('../entrypoints/background/state', () => makeStateModule({ isFirefox: false }));
     vi.doMock('../entrypoints/background/icon-manager', () => ({
       createIconUpdaters: () => ({ updateTabIcon: vi.fn(), updateGlobalIcon: vi.fn() }),
       isClassroomUrl: () => true,
@@ -230,11 +252,11 @@ describe('background/index', () => {
     }));
     vi.doMock('../entrypoints/background/message-sender', () => ({
       sendStatusToTab: vi.fn(),
+      setDownloadStatusListener: vi.fn(),
     }));
     vi.doMock('../entrypoints/background/download-handler', () => ({
       handleDownloadRequest: vi.fn(() => true),
       startNextDriveAttempt: vi.fn(),
-      openDriveBypassTab: vi.fn(),
     }));
     vi.doMock('../entrypoints/utils/analytics', () => ({
       refreshRemoteAnalyticsConfig: vi.fn(async () => {}),
@@ -265,19 +287,7 @@ describe('background/index', () => {
   it('relays student-work resolver publish messages back to the originating tab', async () => {
     vi.resetModules();
 
-    vi.doMock('../entrypoints/background/state', () => ({
-      pendingByRequestId: new Map(),
-      pendingByDownloadId: new Map(),
-      pendingByUrl: new Map(),
-      pendingByUrlAdd: vi.fn(),
-      pendingByUrlRemove: vi.fn(),
-      pendingByUrlGet: vi.fn(),
-      pendingByBypassTabId: new Map(),
-      cancelledByUs: new Set(),
-      recentDownloads: new Map(),
-      CLEANUP_INTERVAL_MS: 1000,
-      IS_FIREFOX: false,
-    }));
+    vi.doMock('../entrypoints/background/state', () => makeStateModule({ isFirefox: false }));
     vi.doMock('../entrypoints/background/icon-manager', () => ({
       createIconUpdaters: () => ({ updateTabIcon: vi.fn(), updateGlobalIcon: vi.fn() }),
       isClassroomUrl: () => true,
@@ -301,11 +311,11 @@ describe('background/index', () => {
     }));
     vi.doMock('../entrypoints/background/message-sender', () => ({
       sendStatusToTab: vi.fn(),
+      setDownloadStatusListener: vi.fn(),
     }));
     vi.doMock('../entrypoints/background/download-handler', () => ({
       handleDownloadRequest: vi.fn(() => true),
       startNextDriveAttempt: vi.fn(),
-      openDriveBypassTab: vi.fn(),
     }));
     vi.doMock('../entrypoints/utils/analytics', () => ({
       refreshRemoteAnalyticsConfig: vi.fn(async () => {}),
@@ -414,39 +424,20 @@ describe('background/index', () => {
   } = {}) {
     vi.resetModules();
 
-    const pendingByUrl = new Map<string, Set<AnyPending>>();
-    for (const [url, pendings] of options.urlBuckets ?? []) {
-      pendingByUrl.set(url, new Set(pendings));
-    }
-
-    const stateModule = {
-      pendingByRequestId: options.pendingByRequestId ?? new Map(),
-      pendingByDownloadId: options.pendingByDownloadId ?? new Map(),
-      pendingByUrl,
-      pendingByUrlAdd: (url: string, p: AnyPending) => {
-        let bucket = pendingByUrl.get(url);
-        if (!bucket) { bucket = new Set(); pendingByUrl.set(url, bucket); }
-        bucket.add(p);
-      },
-      pendingByUrlRemove: vi.fn(),
-      pendingByUrlGet: (url: string) => {
-        const bucket = pendingByUrl.get(url);
-        if (!bucket || bucket.size === 0) return undefined;
-        for (const p of bucket) { if (p.currentDownloadId == null) return p; }
-        return undefined;
-      },
-      pendingByBypassTabId: options.pendingByBypassTabId ?? new Map(),
-      cancelledByUs: options.cancelledByUs ?? new Set<number>(),
-      recentDownloads: new Map(),
-      CLEANUP_INTERVAL_MS: 60_000,
-      IS_FIREFOX: options.isFirefox ?? false,
-    };
+    const stateModule = makeStateModule({
+      isFirefox: options.isFirefox,
+      cleanupInterval: 60_000,
+      urlBuckets: options.urlBuckets,
+      pendingByRequestId: options.pendingByRequestId,
+      pendingByDownloadId: options.pendingByDownloadId,
+      pendingByBypassTabId: options.pendingByBypassTabId,
+      cancelledByUs: options.cancelledByUs,
+    });
 
     const cleanup = vi.fn();
     const sendStatusToTab = vi.fn();
     const recordDownloadEvent = vi.fn();
     const startNextDriveAttempt = vi.fn();
-    const openDriveBypassTab = vi.fn();
     const extractDriveFileId = options.extractDriveFileId
       ? vi.fn(options.extractDriveFileId)
       : vi.fn(() => null);
@@ -471,11 +462,10 @@ describe('background/index', () => {
       ensureAnalyticsAlarm: vi.fn(),
       checkAndCloseFileTab: vi.fn(),
     }));
-    vi.doMock('../entrypoints/background/message-sender', () => ({ sendStatusToTab }));
+    vi.doMock('../entrypoints/background/message-sender', () => ({ sendStatusToTab, setDownloadStatusListener: vi.fn() }));
     vi.doMock('../entrypoints/background/download-handler', () => ({
       handleDownloadRequest: vi.fn(() => true),
       startNextDriveAttempt,
-      openDriveBypassTab,
     }));
     vi.doMock('../entrypoints/utils/analytics', () => ({
       refreshRemoteAnalyticsConfig: vi.fn(async () => {}),
@@ -507,7 +497,6 @@ describe('background/index', () => {
       sendStatusToTab,
       recordDownloadEvent,
       startNextDriveAttempt,
-      openDriveBypassTab,
       onDeterminingFilenameListeners,
       onCreatedListeners,
       downloadChangedListeners,
@@ -594,14 +583,13 @@ describe('background/index', () => {
       expect(suggest).toHaveBeenCalledWith({ filename: 'doc.pdf', conflictAction: 'uniquify' });
     });
 
-    it('cancels Drive download and opens bypass tab when response MIME is HTML', async () => {
+    it('cancels HTML responses and retries the next account without any tab (zero-tab contract)', async () => {
       const pending = makeBgPending({
         isDrive: true,
-        baseUrl: 'https://drive.google.com/uc?id=abc',
+        baseUrl: 'https://drive.usercontent.google.com/download?id=abc&export=download&confirm=t',
         fileMeta: { ext: 'pdf' },
-        fallbackStarted: false,
       });
-      const { onDeterminingFilenameListeners, openDriveBypassTab: openBypass } = await loadBackground({
+      const { onDeterminingFilenameListeners, startNextDriveAttempt: nextAttempt, sendStatusToTab } = await loadBackground({
         isFirefox: false,
         pendingByDownloadId: new Map([[42, pending]]),
       });
@@ -609,12 +597,13 @@ describe('background/index', () => {
       chrome.downloads.cancel = vi.fn((_id: number, cb?: () => void) => cb?.()) as never;
       const suggest = vi.fn();
       onDeterminingFilenameListeners[0](
-        { id: 42, url: 'https://drive.google.com/uc?id=abc', mime: 'text/html', filename: 'viewer.html', finalUrl: 'https://drive.google.com/uc?id=abc' },
+        { id: 42, url: 'https://drive.usercontent.google.com/download?id=abc', mime: 'text/html', filename: 'viewer.html', finalUrl: 'https://drive.usercontent.google.com/download?id=abc' },
         suggest,
       );
 
       expect(chrome.downloads.cancel).toHaveBeenCalledWith(42, expect.any(Function));
-      expect(openBypass).toHaveBeenCalled();
+      expect(nextAttempt).toHaveBeenCalledWith(pending);
+      expect(sendStatusToTab).toHaveBeenCalledWith(pending, 'trying', expect.any(String), 'AUTH_LOOP');
       expect(suggest).not.toHaveBeenCalled();
     });
 
@@ -705,8 +694,9 @@ describe('background/index', () => {
 
       onCreatedListeners[0]({ id: 77, url: 'https://example.com/file.pdf', filename: 'file.pdf' });
 
-      expect(sendStatusToTab).toHaveBeenCalledWith(pending, 'success');
-      expect(pending.finalized).toBe(true);
+      // Correlate-only (Firefox honesty): success waits for onChanged complete.
+      expect(sendStatusToTab).not.toHaveBeenCalled();
+      expect(pending.finalized).toBeFalsy();
       expect(pending.currentDownloadId).toBe(77);
     });
 
@@ -722,22 +712,23 @@ describe('background/index', () => {
       expect(sendStatusToTab).not.toHaveBeenCalled();
     });
 
-    it('finds pending via Drive file ID match in pendingByBypassTabId', async () => {
+    it('finds pending via Drive file ID match in the URL bucket (bypass-tab map removed)', async () => {
       const pending = makeBgPending({
         isDrive: true,
-        baseUrl: 'https://drive.google.com/uc?id=FILE1',
-        originalUrl: 'https://drive.google.com/uc?id=FILE1',
+        baseUrl: 'https://drive.usercontent.google.com/download?id=FILE1&export=download&confirm=t',
+        originalUrl: 'https://drive.usercontent.google.com/download?id=FILE1&export=download&confirm=t',
       });
       const { onCreatedListeners, sendStatusToTab } = await loadBackground({
         isFirefox: true,
-        pendingByBypassTabId: new Map([[88, pending]]),
+        urlBuckets: [['https://drive.usercontent.google.com/download?id=FILE1&export=download&confirm=t', [pending]]],
         extractDriveFileId: (url: string) => (url.includes('FILE1') ? 'FILE1' : null),
       });
 
-      onCreatedListeners[0]({ id: 55, url: 'https://drive.google.com/uc?id=FILE1', filename: 'file.pdf' });
+      onCreatedListeners[0]({ id: 55, url: 'https://drive.usercontent.google.com/download?id=FILE1&export=download&confirm=t', filename: 'file.pdf' });
 
       expect(pending.currentDownloadId).toBe(55);
-      expect(sendStatusToTab).toHaveBeenCalledWith(pending, 'success');
+      // Correlate-only: success waits for onChanged complete (Firefox honesty).
+      expect(sendStatusToTab).not.toHaveBeenCalled();
     });
 
     it('finds pending via Drive file ID match in pendingByUrl bucket (Set iteration)', async () => {
@@ -755,7 +746,8 @@ describe('background/index', () => {
       onCreatedListeners[0]({ id: 66, url: 'https://drive.google.com/uc?id=FILE2', filename: 'file.pdf' });
 
       expect(pending.currentDownloadId).toBe(66);
-      expect(sendStatusToTab).toHaveBeenCalledWith(pending, 'success');
+      // Correlate-only (Firefox honesty): success waits for onChanged complete.
+      expect(sendStatusToTab).not.toHaveBeenCalled();
     });
 
     it('falls back to exact URL match via pendingByUrlGet when Drive file ID is null', async () => {
@@ -769,7 +761,8 @@ describe('background/index', () => {
       onCreatedListeners[0]({ id: 44, url: 'https://example.com/direct.pdf', filename: 'direct.pdf' });
 
       expect(pending.currentDownloadId).toBe(44);
-      expect(sendStatusToTab).toHaveBeenCalledWith(pending, 'success');
+      // Correlate-only (Firefox honesty): success waits for onChanged complete.
+      expect(sendStatusToTab).not.toHaveBeenCalled();
     });
 
     it('finds pending via request ID map when URL and bypass tab maps have no match', async () => {
@@ -787,7 +780,8 @@ describe('background/index', () => {
       onCreatedListeners[0]({ id: 33, url: 'https://drive.google.com/uc?id=FILE3', filename: 'file.pdf' });
 
       expect(pending.currentDownloadId).toBe(33);
-      expect(sendStatusToTab).toHaveBeenCalledWith(pending, 'success');
+      // Correlate-only (Firefox honesty): success waits for onChanged complete.
+      expect(sendStatusToTab).not.toHaveBeenCalled();
     });
 
     it('correctly picks unassigned pending from a shared-URL bucket', async () => {
@@ -877,119 +871,8 @@ describe('background/index', () => {
     });
   });
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Bypass tab message handlers (CQD_BYPASS_SUCCESS, CQD_403_SEEN, CQD_REGISTER_BYPASS_URL)
-  // ─────────────────────────────────────────────────────────────────────────
-
-  describe('bypass tab message handlers', () => {
-    it('CQD_BYPASS_SUCCESS marks pending as finalized and schedules tab close', async () => {
-      const pending = makeBgPending({ isDrive: true });
-      const { onMessageListeners, sendStatusToTab } = await loadBackground({
-        pendingByBypassTabId: new Map([[300, pending]]),
-      });
-
-      chrome.tabs.remove = vi.fn() as never;
-      const sender = { id: chrome.runtime.id, tab: { id: 300 } };
-      for (const listener of onMessageListeners) {
-        listener({ type: 'CQD_BYPASS_SUCCESS' }, sender, undefined);
-      }
-
-      expect(sendStatusToTab).toHaveBeenCalledWith(pending, 'success');
-      expect(pending.finalized).toBe(true);
-      vi.advanceTimersByTime(6000);
-      expect(chrome.tabs.remove).toHaveBeenCalledWith(300);
-    });
-
-    it('CQD_BYPASS_SUCCESS ignores messages from tabs not in pendingByBypassTabId', async () => {
-      const { onMessageListeners, sendStatusToTab } = await loadBackground();
-
-      chrome.tabs.remove = vi.fn() as never;
-      const sender = { id: chrome.runtime.id, tab: { id: 999 } };
-      for (const listener of onMessageListeners) {
-        listener({ type: 'CQD_BYPASS_SUCCESS' }, sender, undefined);
-      }
-
-      expect(sendStatusToTab).not.toHaveBeenCalled();
-    });
-
-    it('CQD_403_SEEN on Firefox sends access-denied error and calls cleanup', async () => {
-      const pending = makeBgPending({ isDrive: true, htmlSeen: false });
-      const { onMessageListeners, sendStatusToTab, cleanup: cleanupSpy, recordDownloadEvent } = await loadBackground({
-        isFirefox: true,
-        pendingByBypassTabId: new Map([[400, pending]]),
-      });
-
-      chrome.tabs.remove = vi.fn() as never;
-      const sender = { id: chrome.runtime.id, tab: { id: 400 } };
-      for (const listener of onMessageListeners) {
-        listener({ type: 'CQD_403_SEEN' }, sender, undefined);
-      }
-
-      expect(sendStatusToTab).toHaveBeenCalledWith(pending, 'error', expect.any(String), 'ACCESS_DENIED');
-      expect(recordDownloadEvent).toHaveBeenCalledWith(expect.objectContaining({ status: 'fail', error_type: 'ACCESS_DENIED_FIREFOX' }));
-      expect(cleanupSpy).toHaveBeenCalledWith(pending);
-    });
-
-    it('CQD_403_SEEN on Chrome calls startNextDriveAttempt and sends trying status', async () => {
-      const pending = makeBgPending({ isDrive: true, htmlSeen: false, confirmed403: false });
-      const { onMessageListeners, startNextDriveAttempt: nextAttempt, sendStatusToTab } = await loadBackground({
-        isFirefox: false,
-        pendingByBypassTabId: new Map([[500, pending]]),
-      });
-
-      chrome.tabs.remove = vi.fn() as never;
-      const sender = { id: chrome.runtime.id, tab: { id: 500 } };
-      for (const listener of onMessageListeners) {
-        listener({ type: 'CQD_403_SEEN' }, sender, undefined);
-      }
-
-      expect(nextAttempt).toHaveBeenCalledWith(pending);
-      expect(sendStatusToTab).toHaveBeenCalledWith(pending, 'trying', expect.any(String), 'AUTH_LOOP');
-    });
-
-    it('CQD_403_SEEN on Chrome does not send trying status again if htmlSeen already true', async () => {
-      const pending = makeBgPending({ isDrive: true, htmlSeen: true, confirmed403: false });
-      const { onMessageListeners, sendStatusToTab } = await loadBackground({
-        isFirefox: false,
-        pendingByBypassTabId: new Map([[501, pending]]),
-      });
-
-      chrome.tabs.remove = vi.fn() as never;
-      const sender = { id: chrome.runtime.id, tab: { id: 501 } };
-      for (const listener of onMessageListeners) {
-        listener({ type: 'CQD_403_SEEN' }, sender, undefined);
-      }
-
-      expect(sendStatusToTab).not.toHaveBeenCalled();
-    });
-
-    it('CQD_REGISTER_BYPASS_URL adds the URL to the pending download URL bucket', async () => {
-      const pending = makeBgPending({ isDrive: true });
-      const { onMessageListeners, stateModule } = await loadBackground({
-        pendingByBypassTabId: new Map([[600, pending]]),
-      });
-
-      const sender = { id: chrome.runtime.id, tab: { id: 600 } };
-      for (const listener of onMessageListeners) {
-        listener({ type: 'CQD_REGISTER_BYPASS_URL', url: 'https://bypass.example.com/file.pdf' }, sender, undefined);
-      }
-
-      const bucket = stateModule.pendingByUrl.get('https://bypass.example.com/file.pdf');
-      expect(bucket?.has(pending)).toBe(true);
-    });
-
-    it('CQD_REGISTER_BYPASS_URL ignores messages with non-string url', async () => {
-      const pending = makeBgPending({ isDrive: true });
-      const { onMessageListeners, stateModule } = await loadBackground({
-        pendingByBypassTabId: new Map([[700, pending]]),
-      });
-
-      const sender = { id: chrome.runtime.id, tab: { id: 700 } };
-      for (const listener of onMessageListeners) {
-        listener({ type: 'CQD_REGISTER_BYPASS_URL', url: null }, sender, undefined);
-      }
-
-      expect(stateModule.pendingByUrl.size).toBe(0);
-    });
-  });
+  // Bypass tab message handlers were removed with the zero-tab flow:
+  // CQD_BYPASS_SUCCESS / CQD_403_SEEN / CQD_QUERY_BYPASS_CONSENT /
+  // CQD_REGISTER_BYPASS_URL no longer exist. The forbidden-failure behavior
+  // they used to carry lives in tests/background-bypass-flow.test.ts.
 });

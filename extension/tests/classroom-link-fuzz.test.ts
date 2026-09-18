@@ -30,8 +30,6 @@ describe('classroom link fuzz matrix', () => {
   it.each([
     'https://docs.google.com/forms/d/e/FORM123/viewform?usp=dialog',
     'https://docs.google.com/forms/d/FORM456/viewform',
-    'https://docs.google.com/spreadsheets/d/SHEET123/edit?usp=sharing',
-    'https://docs.google.com/spreadsheets/d/SHEET456/edit?gid=0#gid=0',
     'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
     'https://example.com/resource.pdf',
     'javascript:alert(1)',
@@ -40,26 +38,37 @@ describe('classroom link fuzz matrix', () => {
     expect(extractDriveUrlFromAnchor(makeAnchor(href))).toBeNull();
   });
 
+  // #546: Sheets attachments are downloadable through their Drive file ID;
+  // they were previously pinned to the reject list above and left assignment
+  // detail pages without buttons or Download All.
+  it.each([
+    'https://docs.google.com/spreadsheets/d/SHEET123/edit?usp=sharing',
+    'https://docs.google.com/spreadsheets/d/SHEET456/edit?gid=0#gid=0'
+  ])('accepts Google Sheets attachment links (#546): %s', (href) => {
+    expect(extractDriveUrlFromAnchor(makeAnchor(href))).toContain('docs.google.com');
+    expect(validateDownloadUrl(toDownloadUrl(href)).valid).toBe(true);
+  });
+
   it('normalizes viewer variants to direct download URLs', () => {
     expect(
       toDownloadUrl('https://drive.google.com/file/d/FILE123/view?usp=sharing')
-    ).toBe('https://drive.google.com/uc?export=download&id=FILE123');
+    ).toBe('https://drive.usercontent.google.com/download?id=FILE123&export=download&confirm=t');
 
     expect(
       toDownloadUrl('https://drive.google.com/u/1/file/d/FILE456/view?usp=sharing')
-    ).toBe('https://drive.google.com/uc?export=download&id=FILE456');
+    ).toBe('https://drive.usercontent.google.com/download?id=FILE456&export=download&confirm=t');
 
     expect(
       toDownloadUrl('https://docs.google.com/document/d/DOC123/edit?usp=sharing')
-    ).toBe('https://drive.google.com/uc?export=download&id=DOC123');
+    ).toBe('https://drive.usercontent.google.com/download?id=DOC123&export=download&confirm=t');
 
     expect(
       toDownloadUrl('https://docs.google.com/u/1/presentation/d/SLIDE123/edit?usp=sharing')
-    ).toBe('https://drive.google.com/uc?export=download&id=SLIDE123');
+    ).toBe('https://drive.usercontent.google.com/download?id=SLIDE123&export=download&confirm=t');
 
     expect(
       toDownloadUrl('https://classroom.google.com/u/1/drive?resourceId=FILE999')
-    ).toBe('https://drive.google.com/uc?export=download&id=FILE999');
+    ).toBe('https://drive.usercontent.google.com/download?id=FILE999&export=download&confirm=t');
   });
 
   it.each([

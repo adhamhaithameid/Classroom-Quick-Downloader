@@ -21,6 +21,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EngineV1 } from '../src/engines/v1/engine-v1';
 import { EngineV2 } from '../src/engines/v2/engine-v2';
 import { EngineV3 } from '../src/engines/v3/engine-v3';
+import { engineRegistry } from '../src/engines/engine-registry';
 import type { CQDEngine, ViewKind } from '../src/engines/types';
 
 // ============================================================================
@@ -121,6 +122,39 @@ describe('EngineV2', () => {
     engine = new EngineV2();
   });
 
+  // D8 helper: seed the engine's private state with one detected comment
+  // flag so the render strategy has something to (or not to) render.
+  function injectDetectedFlag(target: EngineV2, postId: string, element: HTMLElement): void {
+    const decision = {
+      postId,
+      commentScore: 100,
+      editedScore: 0,
+      commentCount: 3,
+      editedDiff: null,
+      exclusionPenalties: [],
+      finalVerdict: 'comment' as const,
+      confidence: 'high' as const,
+      trace: {
+        postId,
+        timestamp: Date.now(),
+        viewKind: 'stream' as ViewKind,
+        layers: [],
+        exclusions: [],
+        finalScore: 100,
+        duration_ms: 0,
+      },
+    };
+    (target as unknown as { flagDecisions: Map<string, unknown> }).flagDecisions.set(postId, decision);
+    (target as unknown as { postMap: Map<string, unknown> }).postMap.set(postId, {
+      id: postId,
+      element,
+      viewKind: 'stream',
+      files: [],
+      flags: decision,
+      lastScannedAt: Date.now(),
+    });
+  }
+
   it('has correct name and version', () => {
     expect(engine.name).toBe('engine-v2');
     expect(engine.version).toBe('4.0.0-alpha');
@@ -220,6 +254,60 @@ describe('EngineV2', () => {
 
   it('does not crash when fullScan called before init', () => {
     expect(() => engine.fullScan()).not.toThrow();
+  });
+
+  // D8 — 'v2' mode makes V2 the PRIMARY engine, and a primary that renders
+  // nothing is a Liskov failure the popup used to offer as a black hole.
+  // The scan pipeline must route through the render strategy, which
+  // self-gates: renders only in v2/v3 modes, stays silent in shadow.
+  it('routes the scan pipeline through the render strategy in v2 mode (D8)', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    await engine.init('stream' as ViewKind, controller.signal);
+
+    const renderFlags = vi.spyOn(engine as unknown as { renderDetectedFlags: () => void }, 'renderDetectedFlags');
+    const renderButtons = vi.spyOn(engine as unknown as { renderPlacedButtons: () => void }, 'renderPlacedButtons');
+
+    engineRegistry.setMode('v2');
+    engine.fullScan();
+
+    expect(renderFlags).toHaveBeenCalled();
+    expect(renderButtons).toHaveBeenCalled();
+
+    engineRegistry.setMode('shadow');
+  });
+
+  it('render strategy writes badge DOM in v2 mode (D8)', async () => {
+    const post = document.createElement('article');
+    post.setAttribute('data-stream-item-id', 'd8-post');
+    document.body.appendChild(post);
+    const controller = new AbortController();
+    controller.abort();
+    await engine.init('stream' as ViewKind, controller.signal);
+
+    injectDetectedFlag(engine, 'd8-post', post);
+
+    engineRegistry.setMode('v2');
+    (engine as unknown as { renderDetectedFlags: () => void }).renderDetectedFlags();
+
+    expect(post.querySelector('[data-cqd-v2-flag="badge"]')).not.toBeNull();
+    engineRegistry.setMode('shadow');
+  });
+
+  it('render strategy stays silent in shadow mode even with a detected flag (D8)', async () => {
+    const post = document.createElement('article');
+    post.setAttribute('data-stream-item-id', 'd8-post-shadow');
+    document.body.appendChild(post);
+    const controller = new AbortController();
+    controller.abort();
+    await engine.init('stream' as ViewKind, controller.signal);
+
+    injectDetectedFlag(engine, 'd8-post-shadow', post);
+
+    engineRegistry.setMode('shadow');
+    (engine as unknown as { renderDetectedFlags: () => void }).renderDetectedFlags();
+
+    expect(post.querySelector('[data-cqd-v2-flag="badge"]')).toBeNull();
   });
 
   it('filters irrelevant mutations', async () => {

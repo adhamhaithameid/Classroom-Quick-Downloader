@@ -56,13 +56,25 @@ export const SITEMAP_VIDEO_ENTRIES = [
 export const DEFAULT_SITE_LASTMOD = '2026-08-22' as const;
 
 export const SITE_PATH_LASTMOD: Record<string, string> = {
-  '/': '2026-08-22',
-  '/privacy': '2026-03-04',
+  '/': '2026-09-12',
+  '/privacy': '2026-09-12',
   '/faq': '2026-06-07',
   '/changelog': '2026-08-22',
   '/site-map': '2026-03-22',
   '/watch/cqd-demo': '2026-03-22',
-  '/watch/manual-vs-cqd': '2026-03-22'
+  '/watch/manual-vs-cqd': '2026-03-22',
+  // Pages whose copy was corrected in the September 2026 accuracy pass.
+  '/download-all-attachments-google-classroom': '2026-09-12',
+  '/google-workspace-school-accounts-support': '2026-09-12',
+  '/download-google-classroom-materials-fast': '2026-09-12',
+  '/install/chrome': '2026-09-12',
+  '/install/firefox': '2026-09-12',
+  '/install/edge': '2026-09-12',
+  '/bulk-download-google-classroom-assignments': '2026-09-12',
+  '/security': '2026-09-12',
+  '/compare/classroom-quick-downloader-vs-classroom-one-click-downloader': '2026-09-12',
+  '/compare/classroom-quick-downloader-vs-classmate': '2026-09-12',
+  '/compare/classroom-quick-downloader-vs-classfetch': '2026-09-12'
 };
 
 export function lastModForPath(path: string): string {

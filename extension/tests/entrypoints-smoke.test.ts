@@ -60,20 +60,17 @@ describe('entrypoint smoke imports', () => {
     const commentScript = await import('../entrypoints/comment_frame.content');
     const editedScript = await import('../entrypoints/edited_frame.content');
     const downloadAllScript = await import('../entrypoints/download_all.content');
-    const driveBypassScript = await import('../entrypoints/drive_bypass.content');
 
     expect(contentScript.default.matches).toContain('https://classroom.google.com/*');
     expect(commentScript.default.matches).toContain('https://classroom.google.com/*');
     expect(editedScript.default.matches).toContain('https://classroom.google.com/*');
     expect(downloadAllScript.default.matches).toContain('https://classroom.google.com/*');
-    expect(driveBypassScript.default.matches).toContain('https://drive.google.com/*');
 
     const fakeCtx = {} as any;
     contentScript.default.main(fakeCtx);
     commentScript.default.main(fakeCtx);
     editedScript.default.main(fakeCtx);
     downloadAllScript.default.main(fakeCtx);
-    driveBypassScript.default.main(fakeCtx);
 
     expect(subscribeToGlobalState).toHaveBeenCalled();
     expect(initContentScript).toHaveBeenCalledTimes(1);

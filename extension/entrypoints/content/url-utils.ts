@@ -4,8 +4,9 @@
  */
 
 import { DRIVE_URL_PATTERNS, DRIVE_ANCHOR_SELECTOR } from './state';
+import { buildDriveDownloadUrl } from '../../src/shared/drive-endpoint';
 
-const DOWNLOADABLE_DOCS_PATH = /^\/(document|presentation|drawings)\/d\/[^/]+/;
+const DOWNLOADABLE_DOCS_PATH = /^\/(document|presentation|drawings|spreadsheets)\/d\/[^/]+/;
 
 function isSupportedDocsUrl(parsed: URL, normalizedPath: string): boolean {
   if (parsed.hostname !== 'docs.google.com') return false;
@@ -80,7 +81,7 @@ export function toDownloadUrl(originalUrl: string, depth = 0): string {
   try {
     const parsed = new URL(originalUrl, location.href);
     const normalizedPath = parsed.pathname.replace(/^\/u\/\d+(?=\/)/, '');
-    
+
     const appendAuth = (u: string): string => {
       if (!authUser) return u;
       const newU = new URL(u);
@@ -95,40 +96,38 @@ export function toDownloadUrl(originalUrl: string, depth = 0): string {
         const cont = parsed.searchParams.get('continue');
         if (cont) return toDownloadUrl(cont, depth + 1);
         const id = parsed.searchParams.get('id');
-        if (id) return appendAuth(`https://drive.google.com/uc?export=download&id=${id}`);
+        if (id) return appendAuth(buildDriveDownloadUrl(id));
         return appendAuth(originalUrl);
       }
-      
+
       const fileMatch = normalizedPath.match(/^\/file\/d\/([^/]+)/);
       if (fileMatch) {
-        return appendAuth(`https://drive.google.com/uc?export=download&id=${fileMatch[1]}`);
+        return appendAuth(buildDriveDownloadUrl(fileMatch[1]));
       }
-      
+
       if (normalizedPath === '/open' || normalizedPath === '/uc') {
-        const normalizedUrl = new URL(parsed.toString());
-        normalizedUrl.pathname = normalizedPath;
-        normalizedUrl.searchParams.set('export', 'download');
-        if (authUser) normalizedUrl.searchParams.set('authuser', authUser);
-        return normalizedUrl.toString();
+        const id = parsed.searchParams.get('id');
+        if (id) return appendAuth(buildDriveDownloadUrl(id));
+        return appendAuth(originalUrl);
       }
     }
-    
+
     if (parsed.hostname === 'classroom.google.com' && normalizedPath.startsWith('/drive')) {
       const id = parsed.searchParams.get('id') ||
         parsed.searchParams.get('resourceId') ||
         parsed.searchParams.get('fileId');
-      if (id) return appendAuth(`https://drive.google.com/uc?export=download&id=${id}`);
+      if (id) return appendAuth(buildDriveDownloadUrl(id));
     }
 
     // Google Docs/Sheets/Slides/Drawings viewer URLs
     // Pattern: docs.google.com/{type}/d/{fileId}/...
     if (parsed.hostname === 'docs.google.com') {
-      const docsMatch = normalizedPath.match(/^\/(document|presentation|drawings)\/d\/([^/]+)/);
+      const docsMatch = normalizedPath.match(/^\/(document|presentation|drawings|spreadsheets)\/d\/([^/]+)/);
       if (docsMatch) {
-        return appendAuth(`https://drive.google.com/uc?export=download&id=${docsMatch[2]}`);
+        return appendAuth(buildDriveDownloadUrl(docsMatch[2]));
       }
     }
-    
+
     return appendAuth(originalUrl);
   } catch {
     return originalUrl;

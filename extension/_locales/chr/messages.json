@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "ᎠᏨᏍᏔᏅ",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "ᎤᎾᏄᎪᏫᏒᎢ…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "ᎠᏓᏰᎵᏍᎬᎢ…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "ᎤᎾᏄᎪᏨ",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "ᎤᏲᏨᎯ",
+    "description": "error"
+  },
+  "failed": {
+    "message": "ᏀᎾ ᎤᏙᎥᎾ.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "ᎠᏨᏍᏔᏅ",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "ᎤᏯᏅᎲ ᎠᏨᏍᏔᏅ",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "ᏗᎧᏁᎲᏍᎩ",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "ᎪᎱᏍᏗ",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "ᎠᏃᎯᏳᎲ",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "ᏂᎦᎥ ᎠᏨᏍᏔᏅ",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "ᎤᎦᏅᏛ",
+    "description": "file"
+  },
+  "files": {
+    "message": "ᏗᎦᏅᏛ",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Number of comments on this post",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "ᎠᏨᏍᏔᏅ ᎠᏤᏥᎩ.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime ᏀᎾ ᎣᏏᏳ",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "ᏀᎾ ᎪᏪᎳᏅ.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "ᎠᎵᏏᏂᏴᎢ ᎤᏲᏨᎯ.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "ᎡᎷᏪ",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "ᎡᎷᏪᎢ",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

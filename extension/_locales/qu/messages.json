@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Uraykachiy",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Uraykachisqa…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Ñuqaykuchkani…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Uraykachisqa",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Pantay",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Mana atiychu.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Uraykachiy",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Usqhay uraykachiy",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "rimaykuna",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "rimay",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Tikrasqa",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Llapanta uraykachiy",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "willañiqi",
+    "description": "file"
+  },
+  "files": {
+    "message": "willañiqikuna",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Hayka rimaykuna kay qillqaypi",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Uraykachiy puchukasqa.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime mana kanchu",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Mana qallariyta atiychu.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Willanakuy pantay.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "Tatichiy",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Tatichisqa",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

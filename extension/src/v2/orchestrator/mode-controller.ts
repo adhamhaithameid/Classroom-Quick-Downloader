@@ -55,21 +55,35 @@ const STORAGE_KEY = 'cqdV2Mode';
 /**
  * The default mode when no setting is found in storage.
  *
- * CHANGED back from 'shadow' to 'legacy' (2026-08): shadow shipped V1+V2
- * double scanning plus a 10s ShadowComparator interval and full-DOM
- * snapshots to EVERY user as a permanent CPU/battery tax, with no
- * readiness-gate promotion path actually flipping it off.
+ * z57 (S10 tail, 2026-09-17): the flip to 'v2' is RESTORED. The S10
+ * rollback (back to 'legacy', after eb93be36) existed because v2 mode had
+ * no interactive download path. That parity gap is closed:
+ * - delegated button clicks publish 'download:requested' on the page bus
+ *   and the S6 bridge relay → background machine settles them (S1)
+ * - v2 discovers docs/sheets/slides/drawings anchors like V1 (S2)
+ * - the Download All group machine runs staggered bus requests with
+ *   cancel over CQD_CANCEL_DOWNLOAD (S3)
+ * - v2 badges carry the exact V1 markup contract the QA journeys pin (S4)
+ * Legacy stays available as the explicit rollback mode via the popup's
+ * engine-mode control (cqdV2Mode='legacy').
  *
- * Rollout plan (unchanged in intent):
- * 1. 'shadow' becomes an explicit opt-in (storage `cqdV2Mode='shadow'`
- *    or remote config) while V2 validation runs on limited cohorts
- * 2. Default flips to 'v2' only after the readiness gate passes
- * 3. 'v3' stays behind a flag until the identity permission lands
+ * Rollout history:
+ * 1. 'shadow' was reverted to an explicit opt-in (2026-08) after it
+ *    shipped double scanning as a permanent CPU/battery tax (D9)
+ * 2. Default flipped to 'v2' (S10 T4, eb93be36) — REVERTED to 'legacy'
+ *    after fresh-build QA acceptance failed (interactive parity gap)
+ * 3. Re-flipped to 'v2' (z57) once V2 reached interactive parity and the
+ *    qa-chromium journeys passed on a fresh v2-default build
+ * 4. 'v3' stays behind a flag until the identity permission lands
  *
- * To opt into validation manually: set cqdV2Mode='shadow' in
- * chrome.storage.local
+ * To roll back: set cqdV2Mode='legacy' in chrome.storage.local
+ * (or use the popup's engine-mode control).
  */
-const DEFAULT_MODE: EngineMode = 'legacy';
+/**
+ * The shipped default mode, exported so tests (and docs) can assert it:
+ * docs and code must never disagree about this again (D9).
+ */
+export const DEFAULT_MODE: EngineMode = 'v2';
 
 // ============================================================================
 // READ / WRITE

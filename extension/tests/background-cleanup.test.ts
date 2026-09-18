@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, cleanupOrphanedPendingDownloads } from '../entrypoints/background/cleanup';
 import {
   cancelledByUs,
-  pendingByBypassTabId,
   pendingByDownloadId,
   pendingByRequestId,
   pendingByUrl,
@@ -21,7 +20,6 @@ function makePending(overrides: Partial<PendingDownload> = {}): PendingDownload 
     isDrive: false,
     fileMeta: { ext: 'pdf', name: 'file.pdf' },
     attemptedAuthUsers: [],
-    fallbackStarted: false,
     isCancelled: false,
     ...overrides,
   };
@@ -33,20 +31,15 @@ describe('background cleanup', () => {
     pendingByRequestId.clear();
     pendingByDownloadId.clear();
     pendingByUrl.clear();
-    pendingByBypassTabId.clear();
     cancelledByUs.clear();
     recentDownloads.clear();
-    chrome.tabs = {
-      remove: vi.fn(),
-    } as never;
   });
 
-  it('cleans all maps and closes bypass tabs for a pending download', () => {
+  it('cleans all maps for a pending download (zero-tab: nothing to close)', () => {
     const pending = makePending();
     pendingByRequestId.set(pending.requestId, pending);
     pendingByDownloadId.set(9, pending);
     pendingByUrlAdd('https://example.com/file.pdf', pending);
-    pendingByBypassTabId.set(21, pending);
     cancelledByUs.add(9);
 
     cleanup(pending, 9);
@@ -55,17 +48,6 @@ describe('background cleanup', () => {
     expect(pendingByDownloadId.has(9)).toBe(false);
     expect(cancelledByUs.has(9)).toBe(false);
     expect(pendingByUrl.size).toBe(0);
-    expect(pendingByBypassTabId.size).toBe(0);
-    expect(chrome.tabs.remove).toHaveBeenCalledWith(21);
-  });
-
-  it('does not throw when bypass tab close fails', () => {
-    const pending = makePending();
-    pendingByBypassTabId.set(7, pending);
-    chrome.tabs.remove = vi.fn(() => {
-      throw new Error('already closed');
-    }) as never;
-    expect(() => cleanup(pending)).not.toThrow();
   });
 
   it('removes stale pending downloads and old recent-download records', () => {
@@ -101,7 +83,6 @@ describe('orphaned pending downloads with an assigned browser download id', () =
     pendingByRequestId.clear();
     pendingByDownloadId.clear();
     pendingByUrl.clear();
-    pendingByBypassTabId.clear();
     cancelledByUs.clear();
     recentDownloads.clear();
   });

@@ -4,6 +4,7 @@
    * Keeps numeric glyph spacing natural (no per-digit layout engine).
    */
   import { onMount } from 'svelte';
+  import { observeFirstInView } from './animated-number/in-view';
 
   export let value: number = 0;
   export let initialValue: number | null = null;
@@ -98,29 +99,29 @@
       return;
     }
 
-    if (!hostEl || typeof IntersectionObserver === 'undefined') {
+    if (!hostEl) {
       hasAnimatedInView = true;
       animateTo(target);
       return () => stopAnimation();
     }
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (!entry.isIntersecting) continue;
-          if (!hasAnimatedInView) {
-            hasAnimatedInView = true;
-            animateTo(value);
-            observer.disconnect();
-          }
+    // Fires exactly once: real-viewport fast path, IntersectionObserver, or
+    // fallback delay — whichever notices the host first. The default
+    // rootMargin band ('0px 0px -8% 0px') must not be able to hold a
+    // partially visible counter at 0.
+    const inViewHandle = observeFirstInView(hostEl, {
+      threshold,
+      rootMargin,
+      onEnter: () => {
+        if (!hasAnimatedInView) {
+          hasAnimatedInView = true;
+          animateTo(value);
         }
-      },
-      { threshold, rootMargin }
-    );
+      }
+    });
 
-    observer.observe(hostEl);
     return () => {
-      observer.disconnect();
+      inViewHandle.disconnect();
       stopAnimation();
     };
   });
@@ -149,5 +150,6 @@
     letter-spacing: normal;
     word-spacing: normal;
     font-kerning: normal;
+    font-variant-numeric: tabular-nums;
   }
 </style>

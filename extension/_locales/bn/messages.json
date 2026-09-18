@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "ডাউনলোড",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "ডাউনলোড হচ্ছে…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "চেষ্টা করছে…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "সম্পন্ন",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "ত্রুটি",
+    "description": "error"
+  },
+  "failed": {
+    "message": "ব্যর্থ হয়েছে",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "ডাউনলোড",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "দ্রুত ডাউনলোড",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "টি মন্তব্য",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "সম্পাদিত",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "সব ডাউনলোড",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "ফাইল",
+    "description": "file"
+  },
+  "files": {
+    "message": "ফাইল",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "এই পোস্টে মন্তব্যের সংখ্যা",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "ডাউনলোড ব্যাহত হয়েছে।",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "রানটাইম উপলব্ধ নয়",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "শুরু করা যায়নি।",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "যোগাযোগ ত্রুটি।",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "পোস্ট করা এবং শেষ সম্পাদনার মধ্যে দিন",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "টি মন্তব্য",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "বাতিল",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "বাতিল",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "সব বাতিল",
+    "description": "cancelAll"
+  }
+}

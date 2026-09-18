@@ -32,7 +32,6 @@
     <div class="orb orb-5"></div>
     <div class="orb orb-6"></div>
   </div>
-  <div class="prv-grid-bg" aria-hidden="true"></div>
 
   <!-- Hero -->
   <section class="prv-hero">
@@ -87,8 +86,8 @@
 
       <div class="prv-card-grid">
         {#each privacy.sections as section, i}
-          <article class="prv-card prv-reveal" style="animation-delay: {i * 0.06}s">
-            <div class="prv-card-icon">{sectionIcons[i % sectionIcons.length]}</div>
+          <article class="prv-card prv-reveal glass-panel glass-hover" style="animation-delay: {i * 0.06}s">
+            <div class="prv-card-icon glass-icon">{sectionIcons[i % sectionIcons.length]}</div>
             <h3>{section.title}</h3>
             <p class="prv-card-summary">{section.summary}</p>
             {#if section.bullets.length > 0}
@@ -107,7 +106,7 @@
   <!-- Full Policy CTA -->
   <section class="prv-cta-section">
     <div class="prv-wrap">
-      <div class="prv-cta-card prv-reveal">
+      <div class="prv-cta-card prv-reveal glass-panel">
         <h2>Want the complete details?</h2>
         <p>Read the full, unabridged privacy policy document on GitHub for complete legal language and technical specifics.</p>
         <a class="prv-cta-btn" href={privacy.fullPrivacyUrl} target="_blank" rel="noopener noreferrer">
@@ -160,15 +159,6 @@
   .orb-5 { width: 380px; height: 380px; background: #a5f3fc; top: 75%; right: -2%; opacity: 0.18; }
   .orb-6 { width: 340px; height: 340px; background: #e0e7ff; top: 90%; left: 20%; opacity: 0.15; }
 
-  .prv-grid-bg {
-    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none; z-index: 0;
-    opacity: 0.03;
-    background-image: linear-gradient(var(--text) 1px, transparent 1px),
-                       linear-gradient(90deg, var(--text) 1px, transparent 1px);
-    background-size: 60px 60px;
-  }
-
   /* ── Hero ───────────────────────── */
   .prv-hero {
     position: relative; z-index: 2;
@@ -178,7 +168,7 @@
 
   .prv-mega {
     font-size: clamp(36px, 5vw, 60px);
-    font-weight: 900;
+    font-weight: 800;
     line-height: 1.15;
     letter-spacing: -0.03em;
     margin: 0 0 20px;
@@ -281,19 +271,8 @@
   }
 
   .prv-card {
-    background: rgba(255, 255, 255, 0.65);
-    border: 1px solid var(--border-subtle);
     border-radius: var(--radius);
     padding: 28px 24px;
-    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .prv-card:hover {
-    transform: translateY(-4px);
-    border-color: var(--green-border);
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08);
   }
 
   .prv-card-icon {
@@ -339,16 +318,12 @@
 
   .prv-cta-card {
     text-align: center;
-    background: rgba(255, 255, 255, 0.55);
-    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-    border: 1px solid var(--border-subtle);
     border-radius: 24px;
     padding: 56px 48px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.04);
   }
 
   .prv-cta-card h2 {
-    font-size: clamp(28px, 3.5vw, 40px); font-weight: 900;
+    font-size: clamp(28px, 3.5vw, 40px); font-weight: 800;
     letter-spacing: -0.03em; margin: 0 0 12px;
   }
 

@@ -1,5 +1,5 @@
 import { subscribeToGlobalState } from './content/flags';
-import { injectStyles } from './content/styles';
+import { injectStudentWorkStyles } from './content/styles';
 import { extractFileMeta } from './content/file-meta';
 import { createStudentWorkButton } from '../src/student_work/button';
 import {
@@ -10,12 +10,12 @@ import {
 } from '../src/student_work/url-classifier';
 import { registerButtonsInSubtree } from '../src/download-all/group-manager';
 import { scheduleRefresh } from '../src/download-all/refresh';
+import { getPageDomPort } from '../src/adapters/dom/mutation-observer-dom-port';
 
 const BY_STATUS_ROUTE_RE =
   /^\/(?:u\/\d+\/)?c\/[^/]+\/a\/[^/]+\/submissions\/by-status\/and-sort-name\/[^/]+\/[^/]+/;
 
 const SCAN_DEBOUNCE_MS = 120;
-const RESCAN_INTERVAL_MS = 2_000;
 const SIDE_CAR_ATTR = 'data-cqd-sw-bs-processed';
 const DOWNLOAD_ALL_HOST_ATTR = 'data-cqd-sw-bs-host';
 const DOWNLOAD_ALL_HEADER_ATTR = 'data-cqd-sw-bs-header';
@@ -53,8 +53,10 @@ const FLAG_ARTIFACT_ATTRS = [
 ];
 
 let running = false;
-let observer: MutationObserver | null = null;
-let rescanIntervalId: number | null = null;
+// S10 3b: rides the shared page DomPort (one platform observer per page).
+// The 2000ms rescan interval is deleted — mutation, scroll, and the debounced
+// scan cover rescan duty.
+let portUnsubscribe: (() => void) | null = null;
 let pendingScanTimer: number | null = null;
 
 function isByStatusRoute(pathname: string): boolean {
@@ -639,13 +641,9 @@ export function setStudentWorkByStatusRunningForTest(value: boolean): void {
 export function resetStudentWorkByStatusForTest(): void {
   running = false;
   clearPendingScan();
-  if (observer) {
-    observer.disconnect();
-    observer = null;
-  }
-  if (rescanIntervalId != null) {
-    window.clearInterval(rescanIntervalId);
-    rescanIntervalId = null;
+  if (portUnsubscribe) {
+    portUnsubscribe();
+    portUnsubscribe = null;
   }
 
   const sidecarButtons = document.querySelectorAll<HTMLButtonElement>(
@@ -676,39 +674,40 @@ function startSidecar(): void {
   if (running) return;
   running = true;
 
-  injectStyles();
+  // z57 tail: scoped sheet — the full V1 sheet would restyle V2's own
+  // .cqd-download-btn buttons (shared markup contract) and make neighbors
+  // intercept each other's clicks.
+  injectStudentWorkStyles();
   scanStudentWorkByStatus(document);
 
-  observer = new MutationObserver((mutations) => {
-    let shouldScan = false;
+  portUnsubscribe = getPageDomPort().observe(
+    {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['href', 'class', SIDE_CAR_ATTR],
+    },
+    (mutations) => {
+      if (!running) return;
+      let shouldScan = false;
 
-    for (const mutation of mutations) {
-      if (mutation.type === 'childList') {
-        shouldScan = true;
-        for (const node of mutation.addedNodes) {
-          if (!(node instanceof HTMLElement)) continue;
-          scanStudentWorkByStatus(node);
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList') {
+          shouldScan = true;
+          for (const node of mutation.addedNodes) {
+            if (!(node instanceof HTMLElement)) continue;
+            scanStudentWorkByStatus(node);
+          }
+        } else if (mutation.type === 'attributes') {
+          shouldScan = true;
         }
-      } else if (mutation.type === 'attributes') {
-        shouldScan = true;
       }
-    }
 
-    if (shouldScan) {
-      scheduleScan();
-    }
-  });
-
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['href', 'class', SIDE_CAR_ATTR],
-  });
-
-  rescanIntervalId = window.setInterval(() => {
-    scanStudentWorkByStatus(document);
-  }, RESCAN_INTERVAL_MS);
+      if (shouldScan) {
+        scheduleScan();
+      }
+    },
+  );
 
   window.addEventListener('scroll', scheduleScan, { passive: true });
 }
@@ -719,14 +718,9 @@ function stopSidecar(): void {
 
   clearPendingScan();
 
-  if (observer) {
-    observer.disconnect();
-    observer = null;
-  }
-
-  if (rescanIntervalId != null) {
-    window.clearInterval(rescanIntervalId);
-    rescanIntervalId = null;
+  if (portUnsubscribe) {
+    portUnsubscribe();
+    portUnsubscribe = null;
   }
 
   window.removeEventListener('scroll', scheduleScan);
@@ -744,9 +738,12 @@ export default defineContentScript({
   matches: ['https://classroom.google.com/*'],
   runAt: 'document_idle',
   main() {
-    subscribeToGlobalState(
-      () => startSidecar(),
-      () => stopSidecar(),
-    );
+    // z57 tail: this is a DOWNLOAD-FEATURE stack (it injects the row
+    // download buttons into Student Work submissions), not V1 detection —
+    // it must run in EVERY engine mode; v2 renders no row buttons of its
+    // own on submissions routes. The S10 mode gate wrongly silenced it in
+    // v2, so it is NOT gated. The global enabled flag behaves exactly as
+    // before, and a live cqdV2Mode flip is a no-op for this stack.
+    subscribeToGlobalState(startSidecar, stopSidecar);
   },
 });

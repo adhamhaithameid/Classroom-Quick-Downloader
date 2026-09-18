@@ -33,9 +33,15 @@ const EXTENSION_PATH = path.resolve(__dirname, '../../extension/.output/chrome-m
  *
  * We can't use the default context from Playwright's config because
  * persistent contexts (needed for extensions) require special setup.
+ *
+ * The browser flavor follows the Playwright project: `channel` is undefined
+ * for extension-chromium (vanilla Chromium) and 'msedge' for extension-edge —
+ * without passing it through, the Edge project would silently launch vanilla
+ * Chromium and the Edge leg would be a fake pass.
  */
-async function launchWithExtension(): Promise<BrowserContext> {
+async function launchWithExtension(channel?: string): Promise<BrowserContext> {
   return chromium.launchPersistentContext('', {
+    channel,
     headless: false,
     args: [
       `--disable-extensions-except=${EXTENSION_PATH}`,
@@ -50,8 +56,8 @@ async function launchWithExtension(): Promise<BrowserContext> {
 test.describe('Extension Smoke Tests', () => {
   let context: BrowserContext;
 
-  test.beforeAll(async () => {
-    context = await launchWithExtension();
+  test.beforeAll(async ({}, testInfo) => {
+    context = await launchWithExtension(testInfo.project.use.channel);
   });
 
   test.afterAll(async () => {

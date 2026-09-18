@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Unduh",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Ngunduh…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Nyoba…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Sampun kaunduh",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Iwang",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Nenten nyidayang.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Unduh",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Unduh gelis",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "komentar",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "komentar",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Sampun kaubah",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Unduh makasami",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "berkas",
+    "description": "file"
+  },
+  "files": {
+    "message": "berkas",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Akeh komentar ring postingan puniki",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Unduh kapegat.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime nenten wenten",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Nenten nyidayang ngawit.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Iwang komunikasi.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "Batal",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Kabatalang",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

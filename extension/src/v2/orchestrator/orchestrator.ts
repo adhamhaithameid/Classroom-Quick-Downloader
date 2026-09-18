@@ -52,6 +52,33 @@ import { ViewKind, type CQDEngine } from '../../engines/types';
 import { engineRegistry } from '../../engines/engine-registry';
 import { RouteWatcher, isClassroomUrl } from '../context/route-classifier';
 import { ShadowComparator, type ShadowCompareResult } from '../compat/shadow-compare';
+import { createEventBus, type EventBus } from '../../bus/event-bus';
+import type { CorrectionItem, PageTopicMap } from '../../contracts/topics';
+import { getPageDomPort } from '../../adapters/dom/mutation-observer-dom-port';
+import { DetectEngine } from '../../roles/detect-engine';
+import { ComputeEngine } from '../../roles/compute-engine';
+import { RenderEngine } from '../../roles/render-engine';
+import { HardenEngine, type BudgetSnapshot, type QueueStats } from '../../roles/harden-engine';
+
+/**
+ * CQDEngine plus the S5 additive members that only some engines expose.
+ * EngineV2 implements all of them; EngineV1 implements none — every use is
+ * guarded (`typeof` for the getters, `in` for the hook — see
+ * publishCycleTopics) so legacy mode can never break.
+ */
+type S5CapableEngine = CQDEngine & {
+  getLastRenderApplied?: () => Array<{ postId: string; kind: 'button' | 'flag' | 'all' }>;
+  getBudgetSnapshot?: () => BudgetSnapshot;
+  getCorrectionStats?: () => QueueStats;
+  /**
+   * S5 final-review fix: optional per-correction publish hook. EngineV2
+   * DECLARES this field (an own property, undefined until wired — define
+   * semantics under the ESNext target); EngineV1 has no such field. The
+   * orchestrator assigns it once per scan cycle in publishCycleTopics,
+   * pointing it at HardenEngine.reportCorrection.
+   */
+  onCorrectionSeen?: (item: CorrectionItem) => void;
+};
 
 // ============================================================================
 // ORCHESTRATOR CLASS
@@ -64,8 +91,13 @@ export class Orchestrator {
   /** Watches for URL changes in the Classroom SPA */
   private routeWatcher: RouteWatcher | null = null;
 
-  /** The single MutationObserver that feeds all active engines */
-  private domObserver: MutationObserver | null = null;
+  /**
+   * The orchestrator's subscription on the shared page DomPort (S10).
+   * The ONE platform MutationObserver lives on the port (window singleton);
+   * the orchestrator only holds the Unsubscribe handle. Page aborts
+   * unsubscribe; only stop() disposes the port itself.
+   */
+  private domUnsubscribe: (() => void) | null = null;
 
   /**
    * AbortController for the current page's lifecycle.
@@ -87,6 +119,22 @@ export class Orchestrator {
   /** Latest shadow comparison report (for debug panel) */
   private latestShadowReport: ShadowCompareResult | null = null;
 
+  /** The page-scoped event bus (S5). Roles subscribe/publish here only. */
+  private pageBus: EventBus<PageTopicMap> = createEventBus<PageTopicMap>();
+
+  /**
+   * The four S5 roles (design §4, "roles behind the bus"). Built once in
+   * start() against the page bus; their sources resolve the PRIMARY engine
+   * lazily per read (engineRegistry.getPrimaryEngine()), so mode changes are
+   * honored without rebuilding them. Null before start() / after stop().
+   */
+  private roles: {
+    detect: DetectEngine;
+    compute: ComputeEngine;
+    render: RenderEngine;
+    harden: HardenEngine;
+  } | null = null;
+
   // ========================================================================
   // LIFECYCLE
   // ========================================================================
@@ -105,6 +153,10 @@ export class Orchestrator {
     this.running = true;
 
     console.log('[CQD Orchestrator] Starting...');
+
+    // Construct the S5 roles against the page bus. Their sources read the
+    // primary engine lazily per cycle, so a later mode change needs no rebuild.
+    this.constructRoles();
 
     // Listen for mode changes (from popup, debug panel, storage sync)
     // When the mode changes, we need to tear down current engines
@@ -148,14 +200,14 @@ export class Orchestrator {
       this.routeWatcher = null;
     }
 
-    // 2. Abort current page lifecycle
+    // 2. Abort current page lifecycle (unsubscribes the dom subscription)
     this.abortCurrentPage();
 
-    // 3. Disconnect DOM observer
-    if (this.domObserver) {
-      this.domObserver.disconnect();
-      this.domObserver = null;
-    }
+    // 3. Tear down the shared page port itself. Every v2 subscription
+    // (orchestrator dom, title fallback, engine transients) has been
+    // removed above; dispose() drops the platform observer. The window
+    // singleton revives cleanly if the orchestrator starts again.
+    getPageDomPort().dispose();
 
     // 4. Destroy all active engines
     for (const engine of this.activeEngines) {
@@ -166,6 +218,10 @@ export class Orchestrator {
       }
     }
     this.activeEngines = [];
+
+    // 5. Drop the S5 roles — rebuilt by the next start(). They are stateless
+    // over the bus, so page navigations (abortCurrentPage) leave them alive.
+    this.roles = null;
 
     this.currentView = null;
     this.running = false;
@@ -204,6 +260,11 @@ export class Orchestrator {
       this.abortCurrentPage();
       return;
     }
+
+    // Publish the accepted view change on the page bus (S5). This sits after
+    // the guard and before the engines-empty early return so every accepted
+    // view is announced, even when no engines are active to handle it.
+    this.pageBus.publish('route:changed', { view: newView, url });
 
     console.log(`[CQD Orchestrator] View change: ${this.currentView || 'none'} → ${newView}`);
 
@@ -303,13 +364,14 @@ export class Orchestrator {
   // ========================================================================
 
   /**
-   * Set up the single shared MutationObserver.
+   * Subscribe to the shared page DomPort (S10).
    *
-   * ONE observer for ALL engines. This is the key performance improvement
-   * over V1's three independent observers.
+   * ONE platform MutationObserver for the whole page — the orchestrator's
+   * subscription is multiplexed on it alongside the RouteWatcher title
+   * fallback and any engine transient (waitForContentReady).
    *
-   * We observe childList and attributes on document.body with subtree.
-   * The attribute filter is tuned to only catch changes we care about:
+   * The subscription asks for childList and attributes on the document with
+   * subtree, with the same attribute filter the dedicated observer used:
    * - data-stream-item-id: post added/changed
    * - data-drive-id: file reference changed
    * - aria-expanded: accordion state changed
@@ -317,35 +379,20 @@ export class Orchestrator {
    * - class: class names changed (state changes)
    * - style: visibility changes
    *
-   * We DON'T observe characterData because text changes within existing
-   * elements rarely affect our decisions. If we need to catch text changes
-   * in the future, we can add it, but for now it saves a lot of noise.
+   * The port delivers every batch that contains at least one matching
+   * record; the callback body already handles arbitrary batches, so the
+   * multiplexed behavior is identical to the old dedicated observer.
+   * characterData is NOT requested — text-only batches never reach engines.
    */
   private setupDomObserver(): void {
-    // Disconnect any existing observer
-    if (this.domObserver) {
-      this.domObserver.disconnect();
+    // Drop any previous page's subscription first (idempotent).
+    if (this.domUnsubscribe) {
+      this.domUnsubscribe();
+      this.domUnsubscribe = null;
     }
 
-    // Create the shared observer
-    this.domObserver = new MutationObserver((mutations) => {
-      if (!this.running) return;
-
-      // Feed mutations to ALL active engines
-      for (const engine of this.activeEngines) {
-        try {
-          engine.handleMutations(mutations);
-        } catch (e) {
-          console.error(
-            `[CQD Orchestrator] Error in ${engine.name}.handleMutations:`, e,
-          );
-        }
-      }
-    });
-
-    // Start observing
-    if (document.body) {
-      this.domObserver.observe(document.body, {
+    this.domUnsubscribe = getPageDomPort().observe(
+      {
         childList: true,
         subtree: true,
         attributes: true,
@@ -357,7 +404,115 @@ export class Orchestrator {
           'class',
           'style',
         ],
-      });
+      },
+      (mutations) => {
+        if (!this.running) return;
+
+        // Feed mutations to ALL active engines
+        for (const engine of this.activeEngines) {
+          try {
+            engine.handleMutations(mutations);
+          } catch (e) {
+            console.error(
+              `[CQD Orchestrator] Error in ${engine.name}.handleMutations:`, e,
+            );
+          }
+        }
+
+        // Publish this cycle's topics through the S5 roles (page bus).
+        this.publishCycleTopics();
+      },
+    );
+  }
+
+  // ========================================================================
+  // CYCLE TOPIC PUBLISHING (S5 — roles behind the bus)
+  // ========================================================================
+
+  /**
+   * Build the four S5 roles against the page bus (once per start()).
+   *
+   * Role sources are thin adapters over the registry: they resolve the
+   * PRIMARY engine at read time, so switching modes (legacy → shadow → v2)
+   * is honored without rebuilding. EngineV1 lacks the render/harden getters;
+   * the adapters surface that as an isolated no-op inside the role (design
+   * §9 fault model) rather than letting a TypeError escape.
+   */
+  private constructRoles(): void {
+    this.roles = {
+      detect: new DetectEngine(this.pageBus, {
+        getTrackedPosts: () =>
+          engineRegistry.getPrimaryEngine()?.getTrackedPosts() ?? [],
+      }),
+      compute: new ComputeEngine(this.pageBus, {
+        getFlagDecisions: () =>
+          engineRegistry.getPrimaryEngine()?.getFlagDecisions() ?? [],
+        getPlacementDecisions: () =>
+          engineRegistry.getPrimaryEngine()?.getPlacementDecisions() ?? [],
+      }),
+      render: new RenderEngine(this.pageBus, {
+        getLastRenderApplied: () =>
+          (engineRegistry.getPrimaryEngine() as S5CapableEngine | null)
+            ?.getLastRenderApplied?.() ?? [],
+      }),
+      harden: new HardenEngine(this.pageBus, {
+        getBudgetSnapshot: () => {
+          const primary: S5CapableEngine | null = engineRegistry.getPrimaryEngine();
+          if (!primary || typeof primary.getBudgetSnapshot !== 'function') {
+            // EngineV1 has no budget snapshot. Throwing here is safe: the
+            // role isolates source throws and keeps its baseline.
+            throw new Error('[CQD Orchestrator] primary engine exposes no budget snapshot');
+          }
+          return primary.getBudgetSnapshot();
+        },
+        getCorrectionStats: () => {
+          const primary: S5CapableEngine | null = engineRegistry.getPrimaryEngine();
+          if (!primary || typeof primary.getCorrectionStats !== 'function') {
+            throw new Error('[CQD Orchestrator] primary engine exposes no correction stats');
+          }
+          return primary.getCorrectionStats();
+        },
+      }),
+    };
+  }
+
+  /**
+   * Publish one scan cycle's worth of topics through the S5 roles.
+   *
+   * Called at the tail of the shared MutationObserver callback, after all
+   * engines have handled the mutations. Reads the PRIMARY engine only and
+   * bails when nothing is active or no view is current. Publish order is
+   * pinned by test: render → detect → compute → harden. EngineV1 lacks the
+   * render/harden getters, so those two role calls are skipped for it; its
+   * live-DOM getTrackedPosts and empty decision arrays still publish
+   * real-but-empty detect/compute topics — correct verbatim behavior.
+   */
+  private publishCycleTopics(): void {
+    const primary: S5CapableEngine | null = engineRegistry.getPrimaryEngine();
+    if (!primary || !this.currentView) return;
+
+    // S5 final-review fix: point the primary's optional correction hook at the
+    // harden role, so EngineV2.handleCorrection's `onCorrectionSeen?.(item)`
+    // fires land on the bus as 'correction:needed' via reportCorrection().
+    // Re-assigned every cycle — idempotent, and a mode swap that installs a
+    // fresh primary is re-wired on its next scan cycle. The `in` guard (not a
+    // `typeof === 'function'` check) is deliberate: EngineV2 DECLARES the hook
+    // as an own field that is undefined until wired, while EngineV1 has no
+    // such field at all — `in` skips exactly the engines that lack the slot.
+    if ('onCorrectionSeen' in primary) {
+      primary.onCorrectionSeen = (item) => this.roles?.harden.reportCorrection(item);
+    }
+
+    if (typeof primary.getLastRenderApplied === 'function') {
+      this.roles?.render.onRenderApplied();
+    }
+    this.roles?.detect.onScanComplete();
+    this.roles?.compute.onDecisionsComputed();
+    if (
+      typeof primary.getBudgetSnapshot === 'function' &&
+      typeof primary.getCorrectionStats === 'function'
+    ) {
+      this.roles?.harden.onCycleChecks();
     }
   }
 
@@ -388,9 +543,12 @@ export class Orchestrator {
       this.pageAbortController = null;
     }
 
-    // 2. Disconnect DOM observer
-    if (this.domObserver) {
-      this.domObserver.disconnect();
+    // 2. Unsubscribe the orchestrator's dom subscription. The shared port
+    //    itself stays alive — the title fallback and engine transients are
+    //    multiplexed on it too. Only stop() disposes the port.
+    if (this.domUnsubscribe) {
+      this.domUnsubscribe();
+      this.domUnsubscribe = null;
     }
 
     // 3. Destroy active engines
@@ -418,7 +576,7 @@ export class Orchestrator {
       `  Running: ${this.running}`,
       `  Current View: ${this.currentView || 'none'}`,
       `  Active Engines: ${this.activeEngines.map(e => `${e.name} v${e.version}`).join(', ') || 'none'}`,
-      `  DOM Observer: ${this.domObserver ? 'connected' : 'disconnected'}`,
+      `  DOM Observer: ${this.domUnsubscribe ? 'connected' : 'disconnected'}`,
       `  Page Signal: ${this.pageAbortController ? (this.pageAbortController.signal.aborted ? 'aborted' : 'active') : 'none'}`,
       '',
       engineRegistry.getSummary(),
@@ -432,6 +590,13 @@ export class Orchestrator {
    */
   getCurrentView(): ViewKind | null {
     return this.currentView;
+  }
+
+  /**
+   * The page bus. Roles and debug tooling get it here — never a global.
+   */
+  getBus(): EventBus<PageTopicMap> {
+    return this.pageBus;
   }
 
   /**

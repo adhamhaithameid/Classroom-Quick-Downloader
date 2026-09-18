@@ -1,0 +1,26 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "packageManager": "pnpm",
+  "testRunner": "vitest",
+  "plugins": ["@stryker-mutator/vitest-runner"],
+  "vitest": {
+    "configFile": "vitest.mutation.config.ts"
+  },
+  "mutate": ["src/core/**/*.ts"],
+  "reporters": ["clear-text", "html", "json"],
+  "htmlReporter": {
+    "fileName": "reports/mutation/html/index.html"
+  },
+  "jsonReporter": {
+    "fileName": "reports/mutation/mutation.json"
+  },
+  "thresholds": {
+    "high": 80,
+    "low": 70,
+    "break": null
+  },
+  "timeoutMS": 30000,
+  "concurrency": 4,
+  "incremental": true,
+  "incrementalFile": ".stryker/incremental.json"
+}

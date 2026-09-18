@@ -85,13 +85,18 @@ describe('route render smoke coverage', () => {
     expect(html).toContain('supercharges');
     expect(html).toContain('Download all Google Classroom files in one click for every assignment.');
     expect(html).toContain('Not affiliated with Google or Google Classroom.');
-    expect(html).toContain('Ready to save hours?');
+    /* The final "Ready to save hours?" CTA moved to the site footer
+       (SiteFooter.svelte) — asserted in layout.shell.test.ts. */
     expect(html).toContain('See where Classroom Quick Downloader is used around the world.');
     expect(html).toContain('Latest Release');
     expect(text).toContain(expectedLatestRelease);
-    expect(html).toContain('l2-page-orbs');
-    expect(html).toContain('l2-page-grid');
     expect(html).toContain('l2-page-floats');
+    // The orbs + grid come from the layout-mounted AmbientBackground — the
+    // page itself must not re-implement them.
+    expect(html).not.toContain('class="l2-page-orbs"');
+    expect(html).not.toContain('class="l2-page-grid"');
+    // Reveal must fail open: server markup never ships the hidden state.
+    expect(html).not.toContain('l2-reveal-pending');
     expect(html).not.toContain('Element Editor');
     expect(head).toContain('Plus+Jakarta+Sans');
     expect(head).not.toContain('family=Inter');

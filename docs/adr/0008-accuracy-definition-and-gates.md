@@ -1,6 +1,6 @@
 # ADR-0008: What "100% accurate" means, and the gates that enforce it
 
-- **Status:** proposed
+- **Status:** Accepted (2026-09-18)
 - **Date:** 2026-08-22
 - **Deciders:** Adham (owner)
 - **Related:** ADR-0007, epic #685, issues #396, #673, #399
@@ -112,3 +112,28 @@ we chose to ship.
 credentials and real student data in CI, is rate-limited, non-deterministic, and
 a privacy hazard. Live checks stay a manual, human-run activity (compare mode,
 `extension/docs/COMPARE_MODE_RUNBOOK.md`).
+
+## Acceptance evidence (2026-09-18)
+
+S12 verified each gate mechanically before accepting this ADR:
+
+- **C1 (exact corpus match):** all corpus cases pass exactly, with
+  `knownFailures: []` — commits `105afe1a`, `5b235980`.
+- **C2 (statistical floors):** every floor in
+  `extension/tests/accuracy/accuracy-budget.json` raised to its measured
+  ceiling (all 1.0) in `0b943f05`.
+- **Mutation testing:** Stryker score **95.64%** on `src/core/**`, clearing
+  the ≥80% gate — `97d75370..ca6cdf07` (runner + gate, mutant kills, nightly
+  job).
+- **Property-based tests:** fast-check suites for the core parsers in
+  `5af4bb66`. Naming note: the examples in this document ("numeral parsing",
+  "filename cleaning", "URL normalization") describe behavior areas, not API
+  names — e.g. the word-number parser is now `extractDigitCount`, and the
+  sanitizer carries no clamp/illegal-character set. Do not read them as
+  symbols.
+- **Decision traces + corpus-case export:** shipped in `a3c1a4d8`, closing the
+  field-report → labelled-corpus-case loop (C3's mechanism).
+- **Corpus integrity:** sha256 checksum manifest over the corpus
+  (`extension/tests/accuracy/corpus/CHECKSUMS.json`, `corpus:check` in the CI
+  accuracy gate), per the "New obligations" clause — a silently edited label
+  is now a build failure.

@@ -1,0 +1,10 @@
+{
+  "caseId": "syn-en-count-shell-drift",
+  "viewKind": "stream",
+  "lang": "en",
+  "origin": "synthetic",
+  "note": "D12 regression, generic drift shape: the count chip uses a non-Google class (post-comment-count) in a plain footer, so no golden/L0/L1/L2 layer fires and only the L4 TreeWalker sees '4 class comments' at low confidence — below the decide threshold, silently dropping the verdict while the count survives. An independently detected edited marker (golden date container) corroborates the post chrome; a parsed positive count with keyword evidence must not die below the decide threshold.",
+  "posts": [
+    { "postId": "synth-en-drift-1", "commentPresent": true, "commentCount": 4, "editedPresent": true }
+  ]
+}

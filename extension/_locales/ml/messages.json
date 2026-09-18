@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "ഡൗൺലോഡ്",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "ഡൗൺലോഡ് ചെയ്യുന്നു…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "ശ്രമിക്കുന്നു…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "പൂർത്തിയായി",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "പിശക്",
+    "description": "error"
+  },
+  "failed": {
+    "message": "പരാജയപ്പെട്ടു",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "ഡൗൺലോഡ്",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "വേഗത്തിൽ ഡൗൺലോഡ്",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "അഭിപ്രായങ്ങൾ",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "എഡിറ്റുചെയ്തു",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "എല്ലാം ഡൗൺലോഡ് ചെയ്യുക",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "ഫയൽ",
+    "description": "file"
+  },
+  "files": {
+    "message": "ഫയലുകൾ",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "ഈ പോസ്റ്റിലെ കമന്റുകളുടെ എണ്ണം",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "ഡൗൺലോഡ് തടസ്സപ്പെട്ടു.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "റൺടൈം ലഭ്യമല്ല",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "ആരംഭിക്കാൻ കഴിഞ്ഞില്ല.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "ആശയവിനിമയ പിശക്.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "പോസ്റ്റിംഗും അവസാന എഡിറ്റും തമ്മിലുള്ള ദിവസങ്ങൾ",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "അഭിപ്രായങ്ങൾ",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "റദ്ദാക്കുക",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "റദ്ദാക്കി",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "എല്ലാം റദ്ദാക്കുക",
+    "description": "cancelAll"
+  }
+}

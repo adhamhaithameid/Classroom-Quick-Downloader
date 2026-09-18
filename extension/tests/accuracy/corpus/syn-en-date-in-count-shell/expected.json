@@ -1,0 +1,21 @@
+{
+  "viewKind": "stream",
+  "lang": "en",
+  "note": "D13: a date inside the .qCWAqb.seqYL shell must not become a comment count. Both container shapes — a span child and bare container text — carry a day+month digit run that the first-digit-run acceptance used to read as count 12/10 at strength 100.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-date-shell-a",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    },
+    {
+      "postId": "synth-date-shell-b",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    }
+  ],
+  "caseId": "syn-en-date-in-count-shell"
+}

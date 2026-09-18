@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Tsenya",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "E a tsena…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "E leka…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "E tsenywa",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Phoso",
+    "description": "error"
+  },
+  "failed": {
+    "message": "E padile.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Tsenya",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Tsenya ka bonako",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "dikakgelo",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "kakgelo",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "E fetotse",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Tsenya tsotlhe",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "faele",
+    "description": "file"
+  },
+  "files": {
+    "message": "difaele",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Palo ya dikakgelo mo potsong e",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Go tsenya go emisitswe.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime ga e teng",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Ga e ka ke ya simolola.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Phoso ya puisano.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "Kansela",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "E kasetse",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

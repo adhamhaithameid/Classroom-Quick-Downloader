@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cleanAttachmentName, extractFileMeta } from '../entrypoints/content/file-meta';
+import { getTypeLabels } from '../src/core/name/type-labels';
 
 describe('content file meta', () => {
   it('cleans garbage labels and duplicated names', () => {
@@ -7,6 +8,32 @@ describe('content file meta', () => {
     expect(cleanAttachmentName('file.txtfile.txt')).toBe('file.txt');
     expect(cleanAttachmentName('summary.pdfpdf')).toBe('summary.pdf');
     expect(cleanAttachmentName('')).toBe('');
+  });
+
+  it('strips a localized label glued to the extension (D10 Hungarian report)', () => {
+    // Classroom renders filename + localized type label with no separator.
+    expect(cleanAttachmentName('example.zipTömörített archívum', 'hu')).toBe('example.zip');
+    expect(cleanAttachmentName('example.zipTömörített archívum')).toBe('example.zip');
+    expect(cleanAttachmentName('dokumentum.pdfDokumentum', 'hu')).toBe('dokumentum.pdf');
+  });
+
+  it('never strips a label without a corroborating extension (D10 anchor rule)', () => {
+    // A real file named "Design Document" must not lose its name.
+    expect(cleanAttachmentName('Design Document')).toBe('Design Document');
+    // Same for localized label words: no extension before the label, no strip.
+    expect(cleanAttachmentName('Tömörített archívum', 'hu')).toBe('Tömörített archívum');
+    expect(cleanAttachmentName('Tervdokumentum', 'hu')).toBe('Tervdokumentum');
+  });
+
+  it('is case-insensitive on labels', () => {
+    expect(cleanAttachmentName('report.PDFPdf')).toBe('report.PDF');
+  });
+
+  it('exposes a locale-driven TypeLabelRegistry with an English fallback', () => {
+    expect(getTypeLabels('hu')).toContain('Tömörített archívum');
+    expect(getTypeLabels('hu')).toContain('PDF'); // English labels stay in play
+    expect(getTypeLabels('zz')).toContain('Compressed archive');
+    expect(getTypeLabels()).toContain('Microsoft Excel');
   });
 
   it('extracts file metadata from tooltip attributes first', () => {

@@ -47,10 +47,13 @@ var (
 	}
 
 	publicWebsiteEventActionToType = map[string]string{
-		"install_click":  "cta",
-		"download_click": "cta",
-		"map_yes":        "map",
-		"map_no":         "map",
+		"install_click":   "cta",
+		"download_click":  "cta",
+		"map_yes":         "map",
+		"map_no":          "map",
+		"guide_cta_click": "cta",
+		"faq_expand":      "content",
+		"guide_engaged":   "content",
 	}
 
 	publicWebsiteEventAllowedPlacements = map[string]struct{}{
@@ -69,6 +72,10 @@ var (
 		"uninstall_reinstall_edge":    {},
 		"website_link_header":         {},
 		"website_link_footer":         {},
+		"guide_primary":               {},
+		"guide_secondary":             {},
+		"faq_item":                    {},
+		"guide_scroll":                {},
 	}
 
 	publicWebsiteSnapshotBuildMu sync.Mutex

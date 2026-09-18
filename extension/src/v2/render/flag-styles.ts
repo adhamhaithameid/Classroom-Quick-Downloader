@@ -12,10 +12,10 @@
  * V2 uses a single <style> element with CSS-only hover effects.
  * Same pattern as button-styles.ts — inject once, remove on cleanup.
  *
- * Badge types:
- * - .cqd-v2-flag-comment (blue) — has comment count
- * - .cqd-v2-flag-edited (orange) — post was edited
- * - .cqd-v2-flag-both (red gradient) — both flags present
+ * Badge types (V1 markup contract — the QA journeys pin these classes):
+ * - .cqd-flag.cqd-comment-badge (purple) — comment count pill
+ * - .cqd-flag.cqd-edited-badge (teal) — edited pill + overlay frame
+ * - .cqd-overlay-container.cqd-both holding .cqd-flag.cqd-both-badge
  *
  * All badges use CSS-only hover expansion (max-width transition)
  * and CSS-only dark mode via .cqd-theme-dark class.
@@ -36,184 +36,190 @@ const V2_FLAG_STYLE_ID = 'cqd-v2-flag-styles';
 
 const V2_FLAG_CSS = `
 /* ====================================================================
-   CQD V2 — Flag Badge Styles
-   CSS-only hover expansion, dark mode, RTL support
+   CQD V2 — Flag Badge Styles (V1 .cqd-flag markup contract, z57 S4)
+   Edge-ribbon pills, overlay frames, hover expansion, dark + RTL.
    ==================================================================== */
 
-/* --- Overlay container (wraps the post) --- */
-.cqd-v2-overlay {
+:root {
+  --cqd-flag-transition: height 0.25s ease, border-radius 0.25s ease, box-shadow 0.25s ease;
+  --cqd-color-comment: #9B00FF;
+  --cqd-color-edited: #007F8D;
+}
+
+body.cqd-theme-dark {
+  --cqd-color-comment: #9B00FF;
+  --cqd-color-edited: #00D6EE;
+}
+
+/* --- Base edge-ribbon pill (V1 .cqd-flag) --- */
+.cqd-flag {
   position: absolute;
-  inset: 0;
+  top: 7px;
+  z-index: 9999;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  height: 30px;
+  width: 30px;
+  border-radius: 9999px;
+  border: none;
+  cursor: pointer;
+  overflow: hidden;
+  padding: 0;
+  transition: var(--cqd-flag-transition);
+  white-space: nowrap;
+}
+
+.cqd-flag:hover {
+  height: 60px;
+  border-radius: 15px;
+  z-index: 10000;
+}
+
+.cqd-flag-icon {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cqd-flag-text {
+  opacity: 0;
+  max-height: 0;
+  overflow: hidden;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  transition: opacity 0.25s ease, max-height 0.25s ease;
+}
+
+.cqd-flag:hover .cqd-flag-text {
+  opacity: 1;
+  max-height: 20px;
+}
+
+/* --- Comment badge (purple) --- */
+.cqd-comment-badge {
+  background-color: var(--cqd-color-comment);
+  color: #ffffff;
+}
+
+body[data-cqd-dir="ltr"] .cqd-comment-badge {
+  left: 0;
+  transform: translateX(-50%);
+}
+
+body[data-cqd-dir="rtl"] .cqd-comment-badge {
+  right: 0;
+  transform: translateX(50%);
+}
+
+/* --- Edited badge (teal) --- */
+.cqd-edited-badge {
+  background-color: var(--cqd-color-edited);
+  color: #ffffff;
+}
+
+body[data-cqd-dir="ltr"] .cqd-edited-badge {
+  left: 0;
+  transform: translateX(-50%);
+}
+
+body[data-cqd-dir="rtl"] .cqd-edited-badge {
+  right: 0;
+  transform: translateX(50%);
+}
+
+.cqd-edited-icon svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+}
+
+/* --- Overlay frame (inset ring around the post) --- */
+.cqd-overlay-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   pointer-events: none;
-  border-radius: inherit;
-  transition: border-color 0.3s ease;
-  z-index: 1;
+  z-index: 10;
+  box-sizing: border-box;
+  border-radius: var(--cqd-overlay-radius, 16px);
+  overflow: visible !important;
+  box-shadow:
+    inset 0 0 0 2px var(--cqd-color-comment),
+    0 0 12px rgba(99, 102, 241, 0.5);
 }
 
-/* Border highlights by flag type */
-.cqd-v2-overlay.cqd-v2-flag-border-comment {
-  border: 2px solid #4285f4;
+.cqd-overlay-container.cqd-edited {
+  box-shadow:
+    inset 0 0 0 2px var(--cqd-color-edited),
+    0 0 12px rgba(0, 214, 238, 0.50);
 }
 
-.cqd-v2-overlay.cqd-v2-flag-border-edited {
-  border: 2px solid #f9ab00;
+.cqd-overlay-container.cqd-both {
+  box-shadow:
+    inset 0 0 0 2px #FF4036,
+    0 0 12px rgba(255, 64, 54, 0.70);
 }
 
-.cqd-v2-overlay.cqd-v2-flag-border-both {
-  border: 2px solid #ea4335;
+/* --- Both badge (combined pill inside the overlay) --- */
+.cqd-both-badge {
+  background: #FF4036;
+  color: #ffffff;
+  flex-direction: row;
+  align-items: center;
+  width: auto;
+  min-width: 30px;
+  padding: 0 8px;
+  gap: 2px;
 }
 
-/* --- Base badge --- */
-.cqd-v2-flag {
-  position: absolute;
-  bottom: 8px;
+body[data-cqd-dir="ltr"] .cqd-both-badge {
+  left: 0;
+  transform: translateX(-50%);
+}
+
+body[data-cqd-dir="rtl"] .cqd-both-badge {
+  right: 0;
+  transform: translateX(50%);
+}
+
+.cqd-both-section {
   display: inline-flex;
   align-items: center;
-  gap: 0;
-  height: 28px;
-  padding: 0 6px;
-  border-radius: 14px;
-  font-family: 'Google Sans', Roboto, Arial, sans-serif;
-  font-size: 12px;
-  font-weight: 500;
-  color: #fff;
-  cursor: pointer;
-  user-select: none;
-  pointer-events: auto;
-  z-index: 2;
-  overflow: hidden;
-  white-space: nowrap;
-  transition: max-width 0.3s ease, padding 0.3s ease, gap 0.3s ease;
-  max-width: 28px; /* Collapsed: icon only */
 }
 
-/* RTL: position from inline-end */
-.cqd-v2-flag {
-  inset-inline-end: 8px;
-}
-
-.cqd-v2-flag:hover {
-  max-width: 200px; /* Expand to show text */
-  padding: 0 10px;
-  gap: 6px;
-}
-
-.cqd-v2-flag:active {
-  transform: scale(0.95);
-}
-
-/* --- Badge icon (always visible) --- */
-.cqd-v2-flag-icon {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  background-size: contain;
+.cqd-both-icon {
+  width: 18px;
+  height: 18px;
+  background-size: 18px 18px;
   background-repeat: no-repeat;
   background-position: center;
-  flex-shrink: 0;
 }
 
-/* --- Badge text (hidden until hover) --- */
-.cqd-v2-flag-text {
-  display: inline-block;
-  opacity: 0;
-  max-width: 0;
-  overflow: hidden;
-  transition: opacity 0.2s ease 0.1s, max-width 0.3s ease;
+.cqd-both-value {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  margin-inline-start: 2px;
 }
 
-.cqd-v2-flag:hover .cqd-v2-flag-text {
-  opacity: 1;
-  max-width: 150px;
+.cqd-both-plus {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
 }
 
-/* --- Comment badge (blue) --- */
-.cqd-v2-flag.cqd-v2-flag-comment {
-  background: #4285f4;
-}
-
-.cqd-v2-flag.cqd-v2-flag-comment .cqd-v2-flag-icon {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ffffff'%3E%3Cpath d='M21.99 4c0-1.1-.89-2-1.99-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4-.01-18z'/%3E%3C/svg%3E");
-}
-
-/* --- Edited badge (orange) --- */
-.cqd-v2-flag.cqd-v2-flag-edited {
-  background: #f9ab00;
-}
-
-.cqd-v2-flag.cqd-v2-flag-edited .cqd-v2-flag-icon {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ffffff'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E");
-}
-
-/* --- Both badge (red gradient) --- */
-.cqd-v2-flag.cqd-v2-flag-both {
-  background: linear-gradient(135deg, #ea4335, #d93025);
-  max-width: 56px; /* Two icons visible by default */
-  gap: 2px;
-  padding: 0 8px;
-}
-
-.cqd-v2-flag.cqd-v2-flag-both:hover {
-  max-width: 220px;
-  gap: 6px;
-  padding: 0 12px;
-}
-
-/* Separator between icons in both badge */
-.cqd-v2-flag-separator {
-  display: inline-block;
-  width: 1px;
-  height: 14px;
-  background: rgba(255, 255, 255, 0.4);
-  flex-shrink: 0;
-}
-
-/* --- Pulse animation on click --- */
-@keyframes cqd-v2-flag-pulse {
-  0% { box-shadow: 0 0 0 0 currentColor; }
-  50% { box-shadow: 0 0 0 6px transparent; }
-  100% { box-shadow: 0 0 0 0 transparent; }
-}
-
-.cqd-v2-flag.cqd-pulsing {
-  animation: cqd-v2-flag-pulse 0.6s ease-out;
-}
-
-/* ====================================================================
-   DARK MODE
-   ==================================================================== */
-
-.cqd-theme-dark .cqd-v2-flag.cqd-v2-flag-comment,
-.cqd-v2-flag.cqd-v2-flag-comment.cqd-theme-dark {
-  background: #5e97f6;
-}
-
-.cqd-theme-dark .cqd-v2-flag.cqd-v2-flag-edited,
-.cqd-v2-flag.cqd-v2-flag-edited.cqd-theme-dark {
-  background: #fdd663;
-  color: #3c4043;
-}
-
-.cqd-theme-dark .cqd-v2-flag.cqd-v2-flag-edited .cqd-v2-flag-icon,
-.cqd-v2-flag.cqd-v2-flag-edited.cqd-theme-dark .cqd-v2-flag-icon {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%233c4043'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E");
-}
-
-.cqd-theme-dark .cqd-v2-flag.cqd-v2-flag-both,
-.cqd-v2-flag.cqd-v2-flag-both.cqd-theme-dark {
-  background: linear-gradient(135deg, #f28b82, #ee675c);
-}
-
-.cqd-theme-dark .cqd-v2-overlay.cqd-v2-flag-border-comment {
-  border-color: #5e97f6;
-}
-
-.cqd-theme-dark .cqd-v2-overlay.cqd-v2-flag-border-edited {
-  border-color: #fdd663;
-}
-
-.cqd-theme-dark .cqd-v2-overlay.cqd-v2-flag-border-both {
-  border-color: #f28b82;
+/* --- Dark theme (badges carry .cqd-theme-dark) --- */
+.cqd-flag.cqd-theme-dark {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
 `;
 

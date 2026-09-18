@@ -1,0 +1,21 @@
+{
+  "viewKind": "stream",
+  "lang": "en",
+  "note": "Boundary of the shared plausibility ceiling (D4): a count of 9999 sits just below PLAUSIBLE_COMMENT_COUNT (10000) and must be believed identically by every acceptance path, while 99999 must be rejected everywhere — no path may keep its own ad-hoc bound.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-ceiling-a",
+      "commentPresent": true,
+      "commentCount": 9999,
+      "editedPresent": false
+    },
+    {
+      "postId": "synth-ceiling-b",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    }
+  ],
+  "caseId": "syn-en-count-ceiling-boundary"
+}

@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Descarrega",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Descarregant…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Intentant…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Descarregat",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Error",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Ha fallat.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Descarrega",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Descàrrega ràpida",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "comentaris",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Editat",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Descarregar-ho tot",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "fitxer",
+    "description": "file"
+  },
+  "files": {
+    "message": "fitxers",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Number of comments on this post",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Download interrupted.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime not available",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Could not start.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Communication error.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Dies entre la publicació i l’última edició",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "comentaris",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Cancel·la",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Cancel·lat",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

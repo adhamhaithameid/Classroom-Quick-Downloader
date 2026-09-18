@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "ჩამოტვირთვა",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "იწერება…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "მცდელობა…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "დასრულდა",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "შეცდომა",
+    "description": "error"
+  },
+  "failed": {
+    "message": "ვერ მოხერხდა.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "ჩამოტვირთვა",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "სწრაფი ჩამოტვირთვა",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "კომენტარი",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "რედაქტირებულია",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "ყველაფრის ჩამოტვირთვა",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "ფაილი",
+    "description": "file"
+  },
+  "files": {
+    "message": "ფაილები",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "კომენტარების რაოდენობა ამ პოსტზე",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "ჩამოტვირთვა შეწყდა.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime მიუწვდომელია",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "ვერ მოხერხდა დაწყება.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "კავშირის შეცდომა.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "კომენტარი",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "გაუქმება",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "გაუქმებულია",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

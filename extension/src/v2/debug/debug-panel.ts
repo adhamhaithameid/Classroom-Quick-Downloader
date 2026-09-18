@@ -22,8 +22,16 @@
  * @since v4.0.0
  */
 
+import type { CQDEngine } from '../../engines/types';
 import { engineRegistry } from '../../engines/engine-registry';
 import { orchestrator } from '../orchestrator/orchestrator';
+import {
+  buildCorpusCase,
+  downloadCorpusCase,
+  isV1SentinelTrace,
+  TRACE_NOT_RECORDED,
+  TRACE_UNAVAILABLE_V1,
+} from './decision-trace-view';
 
 // ============================================================================
 // CONSTANTS
@@ -123,6 +131,46 @@ const PANEL_STYLES = `
   .cqd-dbg-flag.edited { border-left-color: #FF9800; }
   .cqd-dbg-flag.both { border-left-color: #9C27B0; }
   .cqd-dbg-flag.none { border-left-color: #444; opacity: 0.5; }
+  /* --- Decision Trace section (S12 #399) — additive, appended --- */
+  .cqd-dbg-trace-post {
+    cursor: pointer;
+    padding: 3px 6px;
+    margin: 1px 0;
+    border-radius: 4px;
+    color: #8ab4ff;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cqd-dbg-trace-post:hover { background: rgba(100, 100, 255, 0.15); }
+  .cqd-dbg-trace-post.selected { background: rgba(100, 100, 255, 0.25); color: #fff; }
+  .cqd-dbg-trace-detail {
+    margin-top: 6px;
+    padding: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+  }
+  .cqd-dbg-trace-layer,
+  .cqd-dbg-trace-exclusion {
+    padding: 3px 6px;
+    margin: 2px 0;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 4px;
+    border-left: 3px solid #666;
+  }
+  .cqd-dbg-trace-layer.matched { border-left-color: #4caf50; }
+  .cqd-dbg-export-btn {
+    margin-top: 6px;
+    padding: 4px 10px;
+    background: rgba(100, 100, 255, 0.25);
+    color: #e0e0e0;
+    border: 1px solid rgba(100, 100, 255, 0.4);
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 10px;
+  }
+  .cqd-dbg-export-btn:hover { background: rgba(100, 100, 255, 0.4); }
 `;
 
 // ============================================================================
@@ -133,6 +181,8 @@ export class DebugPanel {
   private panelEl: HTMLElement | null = null;
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
   private visible = false;
+  /** Post whose DecisionTrace is expanded in the trace section (S12 #399). */
+  private selectedPostId: string | null = null;
 
   /**
    * Toggle panel visibility.
@@ -428,7 +478,125 @@ export class DebugPanel {
       fragment.appendChild(modelSection);
     }
 
+    // --- Decision Trace Section (S12 #399) ---
+    // Prefer the V2 engine (real traces); fall back to the first active
+    // engine so V1-only mode still lists posts (its traces are sentinels).
+    const traceEngine: CQDEngine | null = v2Engine ?? activeEngines[0] ?? null;
+    if (traceEngine) {
+      const tracePosts = traceEngine.getTrackedPosts();
+      const traceSection = createSection(`Decision Trace (${tracePosts.length} posts)`);
+
+      if (tracePosts.length === 0) {
+        const noPosts = document.createElement('div');
+        noPosts.style.color = '#666';
+        noPosts.style.fontStyle = 'italic';
+        noPosts.textContent = 'No tracked posts yet';
+        traceSection.appendChild(noPosts);
+      } else {
+        const shownPosts = tracePosts.slice(0, 10);
+        for (const post of shownPosts) {
+          const postEl = document.createElement('div');
+          postEl.className = `cqd-dbg-trace-post${post.id === this.selectedPostId ? ' selected' : ''}`;
+          postEl.dataset.postId = post.id;
+          postEl.textContent = post.id;
+          postEl.addEventListener('click', () => {
+            this.selectedPostId = post.id;
+            this.refresh();
+          });
+          traceSection.appendChild(postEl);
+        }
+        if (tracePosts.length > 10) {
+          const more = document.createElement('div');
+          more.style.color = '#666';
+          more.style.textAlign = 'center';
+          more.textContent = `+${tracePosts.length - 10} more`;
+          traceSection.appendChild(more);
+        }
+      }
+
+      if (this.selectedPostId) {
+        traceSection.appendChild(this.buildTraceDetail(traceEngine, createRow));
+      }
+
+      fragment.appendChild(traceSection);
+    }
+
     body.replaceChildren(fragment);
+  }
+
+  // ========================================================================
+  // DECISION TRACE DETAIL (S12 #399)
+  // ========================================================================
+
+  /**
+   * Build the detail block for the selected post's DecisionTrace: scalars,
+   * per-layer rows, exclusion rows, and the "export corpus case" action.
+   * DOM is built with textContent only — never innerHTML.
+   */
+  private buildTraceDetail(
+    engine: CQDEngine,
+    createRow: (key: string, value: string, valueClass?: string) => HTMLDivElement,
+  ): HTMLDivElement {
+    const detail = document.createElement('div');
+    detail.className = 'cqd-dbg-trace-detail';
+
+    const postId = this.selectedPostId ?? '';
+    const trace = engine.getDecisionTrace(postId);
+
+    if (!trace) {
+      const missing = document.createElement('div');
+      missing.style.color = '#f44336';
+      missing.textContent = TRACE_NOT_RECORDED;
+      detail.appendChild(missing);
+      return detail;
+    }
+
+    if (isV1SentinelTrace(trace)) {
+      const unavailable = document.createElement('div');
+      unavailable.style.color = '#ff9800';
+      unavailable.textContent = TRACE_UNAVAILABLE_V1;
+      detail.appendChild(unavailable);
+      return detail;
+    }
+
+    detail.appendChild(createRow('Post', trace.postId));
+    detail.appendChild(createRow('View', trace.viewKind));
+    detail.appendChild(createRow('Final Score', String(trace.finalScore)));
+    detail.appendChild(createRow('Duration', `${trace.duration_ms}ms`));
+
+    for (const layer of trace.layers) {
+      const layerEl = document.createElement('div');
+      layerEl.className = `cqd-dbg-trace-layer${layer.matched ? ' matched' : ''}`;
+      layerEl.appendChild(createRow('Layer', layer.layerName));
+      layerEl.appendChild(createRow('Score', String(layer.score)));
+      layerEl.appendChild(
+        createRow('Matched', layer.matched ? 'yes' : 'no', layer.matched ? 'good' : ''),
+      );
+      layerEl.appendChild(createRow('Matched Text', layer.matchedText || '—'));
+      layerEl.appendChild(createRow('Selector', layer.selectorUsed || '—'));
+      detail.appendChild(layerEl);
+    }
+
+    for (const exclusion of trace.exclusions) {
+      const exclusionEl = document.createElement('div');
+      exclusionEl.className = 'cqd-dbg-trace-exclusion';
+      exclusionEl.appendChild(createRow('Rule', exclusion.ruleId));
+      exclusionEl.appendChild(createRow('Penalty', String(exclusion.penalty), 'warn'));
+      exclusionEl.appendChild(createRow('Reason', exclusion.reason || '—'));
+      detail.appendChild(exclusionEl);
+    }
+
+    const exportBtn = document.createElement('button');
+    exportBtn.className = 'cqd-dbg-export-btn';
+    exportBtn.textContent = 'Export corpus case';
+    exportBtn.addEventListener('click', () => {
+      const decision =
+        engine.getFlagDecisions().find((d) => d.postId === trace.postId) ?? null;
+      downloadCorpusCase(buildCorpusCase(trace, decision));
+    });
+    detail.appendChild(exportBtn);
+
+    return detail;
   }
 }
 

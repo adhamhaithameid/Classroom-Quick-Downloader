@@ -67,8 +67,8 @@ const ALLOWED_URL_PATTERNS: RegExp[] = [
   /^https:\/\/drive\.google\.com\/(?:u\/\d+\/)?(?:file\/d\/|open\?|uc\?)/,
   // Drive usercontent (export endpoint)
   /^https:\/\/drive\.usercontent\.google\.com\//,
-  // Docs/Slides/Drawings export
-  /^https:\/\/docs\.google\.com\/(?:u\/\d+\/)?(?:document|presentation|drawings)\/d\//,
+  // Docs/Slides/Sheets/Drawings export
+  /^https:\/\/docs\.google\.com\/(?:u\/\d+\/)?(?:document|presentation|drawings|spreadsheets)\/d\//,
   // Classroom drive proxy
   /^https:\/\/classroom\.google\.com\/(?:u\/\d+\/)?drive\//,
   // Docs googleusercontent (direct download)

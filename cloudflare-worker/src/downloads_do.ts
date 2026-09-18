@@ -17,6 +17,7 @@ import type {
   ChangelogConfig,
   ChangelogApplyMode,
   ChangelogSyncStatus,
+  KVNamespaceBinding,
 } from "./types";
 import {
   isAllowInsecureOracleEndpointEnabled,
@@ -36,7 +37,17 @@ export interface Env {
   DO_SHARED_SECRET: string;
   MAX_BATCH_EVENTS: string;
   ALERT_WEBHOOK_URL?: string;
+  /**
+   * Optional KV binding used to publish the analytics config snapshot so the
+   * worker can serve GET /config from the edge without a DO request.
+   */
+  SITE_SNAPSHOT_KV?: KVNamespaceBinding;
 }
+
+// KV key + TTL for the edge /config snapshot. Shared with index.ts (the worker
+// reads the same key); do not import index.ts from here (circular import).
+export const ANALYTICS_CONFIG_KV_KEY = "analytics:config:v1";
+export const ANALYTICS_CONFIG_KV_TTL_SECONDS = 604800; // 7 days
 
 type DurableStateShape = {
   totalEvents: number;
@@ -52,6 +63,8 @@ type DurableStateShape = {
 
   // daily request counting for quota awareness
   reqCountToday: number;
+  // every DO request counted (broader than reqCountToday, which is /track only)
+  doRequestsToday: number;
   reqCountDate: string | null; // "YYYY-MM-DD" UTC
   reqDailyCounts: Record<string, number>;
 
@@ -164,10 +177,11 @@ type DurableStateShape = {
   // Worker buffer: max events in buffer (default: 50000)
   configMaxBufferSize: number;
   
-  // Flush mode: 'next_day' | 'time_based' (default: 'next_day')
+  // Flush mode: 'next_day' | 'time_based' | 'weekly' (default: 'weekly')
   // next_day: Flush in a daily UTC window
   // time_based: Flush based on timeFlushMinutes
-  configFlushMode: 'next_day' | 'time_based';
+  // weekly: Flush once per local-day slot
+  configFlushMode: 'next_day' | 'time_based' | 'weekly';
 
   // Daily flush window (UTC)
   configDailyFlushWindowStartUtc: number;
@@ -367,18 +381,26 @@ const WEBSITE_EVENTS_MAX_META_KEYS = 8;
 const WEBSITE_EVENTS_MAX_META_KEY_LEN = 40;
 const WEBSITE_EVENTS_MAX_META_VALUE_STRING_LEN = 120;
 const WEBSITE_EVENT_ID_PATTERN = /^[A-Za-z0-9._:-]{6,120}$/;
-const WEBSITE_EVENT_TYPE_VALUES = ["cta", "map"] as const;
+const WEBSITE_EVENT_TYPE_VALUES = ["cta", "map", "content"] as const;
 const WEBSITE_EVENT_ACTION_VALUES = [
   "install_click",
   "download_click",
   "map_yes",
   "map_no",
+  "guide_cta_click",
+  "faq_expand",
+  "guide_engaged",
+  "uninstall_view",
 ] as const;
 const WEBSITE_EVENT_ACTION_TO_TYPE: Record<(typeof WEBSITE_EVENT_ACTION_VALUES)[number], (typeof WEBSITE_EVENT_TYPE_VALUES)[number]> = {
   install_click: "cta",
   download_click: "cta",
   map_yes: "map",
   map_no: "map",
+  guide_cta_click: "cta",
+  faq_expand: "content",
+  guide_engaged: "content",
+  uninstall_view: "content",
 };
 const WEBSITE_EVENT_ROOT_KEYS = new Set(["schemaVersion", "sessionId", "pagePath", "events"]);
 const WEBSITE_EVENT_KEYS = new Set(["eventId", "eventType", "action", "placement", "tsUtc", "meta"]);
@@ -397,7 +419,7 @@ const QUOTA_VERY_NORMAL_LIMIT = 50_000;
 const QUOTA_NORMAL_LIMIT = 60_000;
 const QUOTA_HARD_NORMAL_LIMIT = 70_000;
 const QUOTA_HARD_LIMIT = 80_000;
-const QUOTA_VERY_HARD_LIMIT = 90_000;
+const QUOTA_VERY_HARD_LIMIT = 70_000;
 
 // Backpressure thresholds to prevent cascading failures
 const REMOTE_DISABLE_BUFFER_UTIL = 0.9;
@@ -441,6 +463,16 @@ const CHANGELOG_ALLOWED_CONTENT_TYPES = new Set([
   "text/x-markdown",
   "application/octet-stream",
 ]);
+
+/**
+ * SSRF guard (W1): the changelog sync fetches a URL derived from admin input.
+ * Restrict destinations to the GitHub hosts the feature actually syncs from;
+ * anything else — including https URLs to internal services — is rejected
+ * before any fetch happens. Only the default port is allowed and credentials
+ * in the URL are refused, so the fetch cannot be steered onto another
+ * origin or smuggled auth.
+ */
+const CHANGELOG_ALLOWED_MARKDOWN_HOSTS = new Set(["raw.githubusercontent.com", "github.com"]);
 
 function defaultExtensionChangelogEntries(): ChangelogEntry[] {
   return [
@@ -1209,7 +1241,7 @@ function parseWebsiteEventsRequest(raw: unknown): { ok: true; value: WebsiteEven
     if (!isWebsiteEventType(rawEventType)) {
       return {
         ok: false,
-        response: websiteEventsError("invalid_event_type", "eventType must be one of: cta, map.", 400, false),
+        response: websiteEventsError("invalid_event_type", "eventType must be one of: cta, map, content.", 400, false),
       };
     }
     const eventType: WebsiteEventType = rawEventType;
@@ -1220,7 +1252,7 @@ function parseWebsiteEventsRequest(raw: unknown): { ok: true; value: WebsiteEven
         ok: false,
         response: websiteEventsError(
           "invalid_event_action",
-          "action must be one of: install_click, download_click, map_yes, map_no.",
+          "action must be one of: install_click, download_click, map_yes, map_no, guide_cta_click, faq_expand, guide_engaged.",
           400,
           false,
         ),
@@ -1805,6 +1837,7 @@ export class DownloadsDurable {
       retryState: { ...DEFAULT_RETRY_STATE },
 
       reqCountToday: 0,
+      doRequestsToday: 0,
       reqCountDate: null,
       reqDailyCounts: {},
       hardRemoteOff: false,
@@ -1841,10 +1874,10 @@ export class DownloadsDurable {
       configVersion: CONFIG_VERSION,
       configBatchSize: 50,
       configMaxDailyRequests: 50,
-      configMaxRetry: 5,
+      configMaxRetry: 20,
       configMaxEventsPerRequest: 5000,
       configMaxBufferSize: 50000,
-      configFlushMode: 'next_day',
+      configFlushMode: 'weekly',
       configDailyFlushWindowStartUtc: DEFAULT_DAILY_FLUSH_WINDOW_START_UTC,
       configDailyFlushWindowMinutes: DEFAULT_DAILY_FLUSH_WINDOW_MINUTES,
       configTimeFlushMinutes: { low: 1440, mid: 1440, high: 1440 }, // 1440 = 24h = next day
@@ -1944,6 +1977,7 @@ export class DownloadsDurable {
       retryState: stored.retryState ?? { ...DEFAULT_RETRY_STATE },
 
       reqCountToday: stored.reqCountToday ?? 0,
+      doRequestsToday: stored.doRequestsToday ?? 0,
       reqCountDate: stored.reqCountDate ?? null,
       reqDailyCounts: normalizeReqDailyCounts(stored.reqDailyCounts),
       hardRemoteOff: stored.hardRemoteOff ?? false,
@@ -2081,10 +2115,21 @@ export class DownloadsDurable {
       configVersion: stored.configVersion ?? base.configVersion,
       configBatchSize: stored.configBatchSize ?? base.configBatchSize,
       configMaxDailyRequests: stored.configMaxDailyRequests ?? base.configMaxDailyRequests,
-      configMaxRetry: stored.configMaxRetry ?? base.configMaxRetry,
+      // One-time migration: production DOs persisted with the old shipped
+      // default (5) must pick up the resilience bump (20). An admin can still
+      // set 5 explicitly afterwards via /admin/update-config.
+      configMaxRetry:
+        stored.configMaxRetry === 5 ? base.configMaxRetry : stored.configMaxRetry ?? base.configMaxRetry,
       configMaxEventsPerRequest: stored.configMaxEventsPerRequest ?? base.configMaxEventsPerRequest,
       configMaxBufferSize: stored.configMaxBufferSize ?? base.configMaxBufferSize,
-      configFlushMode: stored.configFlushMode ?? base.configFlushMode,
+      // One-time migration: production DOs persisted with the old shipped
+      // default ('next_day') must pick up the new default ('weekly'). An
+      // admin can still set any mode explicitly afterwards via
+      // /admin/update-config.
+      configFlushMode:
+        stored.configFlushMode === 'next_day'
+          ? base.configFlushMode
+          : stored.configFlushMode ?? base.configFlushMode,
       configDailyFlushWindowStartUtc: stored.configDailyFlushWindowStartUtc ?? base.configDailyFlushWindowStartUtc,
       configDailyFlushWindowMinutes: stored.configDailyFlushWindowMinutes ?? base.configDailyFlushWindowMinutes,
       configTimeFlushMinutes: stored.configTimeFlushMinutes ?? base.configTimeFlushMinutes,
@@ -2543,7 +2588,11 @@ export class DownloadsDurable {
       }
     }
 
-    if (this.data.configFlushMode !== "next_day" && this.data.configFlushMode !== "time_based") {
+    if (
+      this.data.configFlushMode !== "next_day" &&
+      this.data.configFlushMode !== "time_based" &&
+      this.data.configFlushMode !== "weekly"
+    ) {
       this.data.configFlushMode = base.configFlushMode;
       configDirty = true;
     }
@@ -2665,6 +2714,7 @@ export class DownloadsDurable {
     if (this.d.reqCountDate !== today) {
       this.d.reqCountDate = today;
       this.d.reqCountToday = 0;
+      this.d.doRequestsToday = 0;
       
       // PRIVACY RESET: Clear legacy IP tracking fields every day
       this.d.ipCounts = {};
@@ -2811,6 +2861,11 @@ export class DownloadsDurable {
 
   async fetch(request: Request): Promise<Response> {
     await this.loaded;
+
+    // Quota guard counts EVERY request to this singleton (not just /track) so
+    // the emergency cutoff lands before Cloudflare's account-level wall.
+    this.ensureRequestDay();
+    this.d.doRequestsToday += 1;
 
     const url = new URL(request.url);
     const { pathname } = url;
@@ -4137,10 +4192,19 @@ export class DownloadsDurable {
     });
   }
 
+  /**
+   * Combined daily request count for quota decisions: the max of /track-ingest
+   * count and the all-requests DO counter. max() keeps the guard honest when
+   * either signal alone would understate real pressure.
+   */
+  private quotaRequestsToday(): number {
+    return Math.max(this.d.reqCountToday, this.d.doRequestsToday);
+  }
+
   private async handleStats(): Promise<Response> {
     this.ensureRequestDay();
     const quota = computeQuotaDescriptor(
-      this.d.reqCountToday,
+      this.quotaRequestsToday(),
       this.d.hardRemoteOff,
     );
 
@@ -4158,10 +4222,10 @@ export class DownloadsDurable {
       configVersion: this.d.configVersion ?? CONFIG_VERSION,
       batchSize: this.d.configBatchSize ?? 50,
       maxDailyRequests: this.d.configMaxDailyRequests ?? 50,
-      maxRetry: this.d.configMaxRetry ?? 5,
+      maxRetry: this.d.configMaxRetry ?? 20,
       maxEventsPerRequest: this.d.configMaxEventsPerRequest ?? 5000,
       maxBufferSize: this.d.configMaxBufferSize ?? 50000,
-      flushMode: this.d.configFlushMode ?? 'next_day',
+      flushMode: this.d.configFlushMode ?? 'weekly',
       timeFlushMinutes: this.d.configTimeFlushMinutes ?? { low: 1440, mid: 1440, high: 1440 },
       dailyFlushWindowStartUtc: this.d.configDailyFlushWindowStartUtc ?? DEFAULT_DAILY_FLUSH_WINDOW_START_UTC,
       dailyFlushWindowMinutes: this.d.configDailyFlushWindowMinutes ?? DEFAULT_DAILY_FLUSH_WINDOW_MINUTES,
@@ -4228,6 +4292,7 @@ export class DownloadsDurable {
       
       // Request tracking (for monitoring)
       requestsToday: this.d.reqCountToday ?? 0,
+      doRequestsToday: this.d.doRequestsToday ?? 0,
       requestDate: this.d.reqCountDate ?? null,
       uniqueRequestsToday: this.d.uniqueRequestsToday ?? 0,
       // BACKWARDS COMPATIBILITY: Legacy dashboard uses uniqueIpsToday
@@ -4282,8 +4347,16 @@ export class DownloadsDurable {
    */
   private async handleConfig(): Promise<Response> {
     this.ensureRequestDay();
+    return json(this.buildConfigPayload());
+  }
+
+  /**
+   * Build the full /config payload. Single source of truth for the extension
+   * config response and (minus per-request fields) the KV snapshot.
+   */
+  private buildConfigPayload(): Record<string, unknown> {
     const quota = computeQuotaDescriptor(
-      this.d.reqCountToday,
+      this.quotaRequestsToday(),
       this.d.hardRemoteOff,
     );
     const remoteGate = computeRemoteEnabled(
@@ -4297,27 +4370,27 @@ export class DownloadsDurable {
     const config = {
       ok: true,
       configVersion: this.d.configVersion ?? CONFIG_VERSION,
-      
+
       // Batching config
       batchSize: this.d.configBatchSize,
       maxDailyRequests: this.d.configMaxDailyRequests,
       maxRetry: this.d.configMaxRetry,
       maxEventsPerRequest: this.d.configMaxEventsPerRequest,
-      
+
       // Flush mode: 'next_day' (default) or 'time_based'
       flushMode: this.d.configFlushMode,
 
       // Daily flush window (UTC)
       dailyFlushWindowStartUtc: this.d.configDailyFlushWindowStartUtc,
       dailyFlushWindowMinutes: this.d.configDailyFlushWindowMinutes,
-      
+
       // Time-based flush intervals (only used if flushMode is 'time_based')
       timeFlushMinutes: this.d.configTimeFlushMinutes,
-      
+
       // Remote enabled (can be disabled for emergencies or backpressure)
       remoteEnabled: remoteGate.enabled,
       remoteEnabledReason: remoteGate.reason,
-      
+
       // Cancel hold delay: time before cancel becomes active (default 1000ms)
       cancelHoldDelayMs: this.d.configCancelHoldDelayMs,
 
@@ -4345,15 +4418,46 @@ export class DownloadsDurable {
 
       // Highest committed event sequence
       committedSeq: this.d.committedSeq ?? 0,
-      
+
       // Quota info for extension awareness
       quota,
-      
+
       // NEW: Changelog config for extension
       changelogConfig: this.d.changelogConfig,
     };
 
-    return json(config);
+    return config;
+  }
+
+  /**
+   * Build the KV snapshot payload for edge /config serving: the config payload
+   * minus per-request fields. serverTimeUtc is injected fresh by the worker at
+   * serve time; committedSeq/quota are DO-internal and must not be cached.
+   */
+  private buildConfigKvSnapshot(): Record<string, unknown> {
+    const snapshot: Record<string, unknown> = { ...this.buildConfigPayload() };
+    delete snapshot.serverTimeUtc;
+    delete snapshot.committedSeq;
+    delete snapshot.quota;
+    return snapshot;
+  }
+
+  /**
+   * Best-effort KV publish of the config snapshot so GET /config can be served
+   * from the edge. A KV failure must never fail the calling request.
+   */
+  private async writeConfigKvSnapshot(): Promise<void> {
+    try {
+      const kv = this.env.SITE_SNAPSHOT_KV;
+      if (!kv) return;
+      await kv.put(
+        ANALYTICS_CONFIG_KV_KEY,
+        JSON.stringify(this.buildConfigKvSnapshot()),
+        { expirationTtl: ANALYTICS_CONFIG_KV_TTL_SECONDS },
+      );
+    } catch (err) {
+      logEvent("warn", "analytics_config_kv_write_failed", { error: String(err) });
+    }
   }
 
   private async handleHealth(): Promise<Response> {
@@ -4547,10 +4651,10 @@ export class DownloadsDurable {
       configVersion: this.d.configVersion ?? CONFIG_VERSION,
       configBatchSize: this.d.configBatchSize ?? 50,
       configMaxDailyRequests: this.d.configMaxDailyRequests ?? 50,
-      configMaxRetry: this.d.configMaxRetry ?? 5,
+      configMaxRetry: this.d.configMaxRetry ?? 20,
       configMaxEventsPerRequest: this.d.configMaxEventsPerRequest ?? 5000,
       configMaxBufferSize: this.d.configMaxBufferSize ?? 50000,
-      configFlushMode: this.d.configFlushMode ?? 'next_day' as const,
+      configFlushMode: this.d.configFlushMode ?? 'weekly' as const,
       configDailyFlushWindowStartUtc: this.d.configDailyFlushWindowStartUtc ?? DEFAULT_DAILY_FLUSH_WINDOW_START_UTC,
       configDailyFlushWindowMinutes: this.d.configDailyFlushWindowMinutes ?? DEFAULT_DAILY_FLUSH_WINDOW_MINUTES,
       configTimeFlushMinutes: this.d.configTimeFlushMinutes ?? { low: 1440, mid: 1440, high: 1440 },
@@ -4618,6 +4722,7 @@ export class DownloadsDurable {
       counters: createEmptyCounters(),
       retryState: { ...DEFAULT_RETRY_STATE },
       reqCountToday: 0,
+      doRequestsToday: 0,
       reqCountDate: today,
       reqDailyCounts: { [today]: 0 },
       hardRemoteOff: false,
@@ -4774,7 +4879,7 @@ export class DownloadsDurable {
     });
 
     if ("flushMode" in body) {
-      if (body.flushMode === "next_day" || body.flushMode === "time_based") {
+      if (body.flushMode === "next_day" || body.flushMode === "time_based" || body.flushMode === "weekly") {
         this.d.configFlushMode = body.flushMode;
       } else {
         errors.push("flushMode");
@@ -4961,6 +5066,10 @@ export class DownloadsDurable {
 
     await this.persist();
 
+    // Best-effort: publish the updated config snapshot to KV so extensions
+    // pick up the change on the next edge /config poll (no DO request).
+    await this.writeConfigKvSnapshot();
+
     // Return current config state
     return json({
       ok: true,
@@ -5006,7 +5115,7 @@ export class DownloadsDurable {
     await this.persist();
 
     const quota = computeQuotaDescriptor(
-      this.d.reqCountToday,
+      this.quotaRequestsToday(),
       this.d.hardRemoteOff,
     );
 
@@ -5028,7 +5137,7 @@ export class DownloadsDurable {
     await this.persist();
 
     const quota = computeQuotaDescriptor(
-      this.d.reqCountToday,
+      this.quotaRequestsToday(),
       this.d.hardRemoteOff,
     );
 
@@ -5621,7 +5730,7 @@ export class DownloadsDurable {
     summary.topType = this.getTopKey(summary.types);
 
     // 3. Build DO state snapshot
-    const quota = computeQuotaDescriptor(this.d.reqCountToday, this.d.hardRemoteOff);
+    const quota = computeQuotaDescriptor(this.quotaRequestsToday(), this.d.hardRemoteOff);
     const doState: DOStateBatch = {
       ok: true,
       totalEvents: this.d.totalEvents,
@@ -6234,10 +6343,22 @@ stashFailedBatch();
     if (parsed.protocol !== "https:") {
       return { ok: false, error: "markdown_url_must_be_https" };
     }
+    if (!CHANGELOG_ALLOWED_MARKDOWN_HOSTS.has(parsed.hostname)) {
+      return { ok: false, error: "markdown_url_host_not_allowed" };
+    }
+    if (parsed.username || parsed.password || parsed.port) {
+      return { ok: false, error: "markdown_url_host_not_allowed" };
+    }
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8_000);
     try {
-      const res = await fetch(parsed.toString(), { method: "GET", signal: controller.signal });
+      // redirect: "error" — a redirect could bounce the allowlisted host onto
+      // an arbitrary origin; raw.githubusercontent.com serves 200s directly.
+      const res = await fetch(parsed.toString(), {
+        method: "GET",
+        signal: controller.signal,
+        redirect: "error",
+      });
       if (!res.ok) {
         return { ok: false, error: `markdown_fetch_failed_${res.status}` };
       }

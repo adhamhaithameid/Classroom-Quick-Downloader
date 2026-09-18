@@ -29,7 +29,9 @@
 import {
   normalizeForComparison,
   normalizeText,
-} from '../../../entrypoints/content/detection-keywords';
+} from '../../core/detect/normalize';
+import { matchesNormalizedKeyword } from '../../core/detect/matching';
+import { findActionButtonPattern } from '../../core/detect/action-buttons';
 
 // ============================================================================
 // TYPES
@@ -124,7 +126,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'ACTION_BTN_ADD_COMMENT',
     type: 'regex',
-    pattern: /add\s+(?:class\s+)?comment/i,
+    pattern: findActionButtonPattern('add\\s+(?:class\\s+)?comment'),
     applies_to: ['comment'],
     penalty: -30,
     reason: 'Action button text: "Add [class] comment"',
@@ -133,7 +135,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'ACTION_BTN_WRITE_COMMENT',
     type: 'regex',
-    pattern: /write.*comment/i,
+    pattern: findActionButtonPattern('write.*comment'),
     applies_to: ['comment'],
     penalty: -30,
     reason: 'Action button text: "Write comment"',
@@ -142,7 +144,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'ACTION_BTN_TYPE_COMMENT',
     type: 'regex',
-    pattern: /type.*comment/i,
+    pattern: findActionButtonPattern('type.*comment'),
     applies_to: ['comment'],
     penalty: -30,
     reason: 'Action button text: "Type comment"',
@@ -151,7 +153,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'ACTION_BTN_POST_COMMENT',
     type: 'regex',
-    pattern: /post.*comment/i,
+    pattern: findActionButtonPattern('post.*comment'),
     applies_to: ['comment'],
     penalty: -30,
     reason: 'Action button text: "Post comment"',
@@ -160,7 +162,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'ACTION_BTN_NEW_COMMENT',
     type: 'regex',
-    pattern: /new\s+comment/i,
+    pattern: findActionButtonPattern('new\\s+comment'),
     applies_to: ['comment'],
     penalty: -30,
     reason: 'Action button text: "New comment"',
@@ -169,7 +171,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'ACTION_BTN_LEAVE_COMMENT',
     type: 'regex',
-    pattern: /leave.*comment/i,
+    pattern: findActionButtonPattern('leave.*comment'),
     applies_to: ['comment'],
     penalty: -30,
     reason: 'Action button text: "Leave comment"',
@@ -179,7 +181,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'ACTION_BTN_ADD_COMMENT_AR',
     type: 'regex',
-    pattern: /(?:اضافة|إضافة|أضف)\s+تعليق/i,
+    pattern: findActionButtonPattern('(?:اضافة|إضافة|أضف)\\s+تعليق'),
     applies_to: ['comment'],
     penalty: -30,
     reason: 'Action button text: Arabic "Add comment"',
@@ -189,7 +191,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'ACTION_BTN_ADD_COMMENT_RU',
     type: 'regex',
-    pattern: /добавить\s+комментарий/i,
+    pattern: findActionButtonPattern('добавить\\s+комментарий'),
     applies_to: ['comment'],
     penalty: -30,
     reason: 'Action button text: Russian "Add comment"',
@@ -199,7 +201,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'ACTION_BTN_ADD_COMMENT_JA',
     type: 'regex',
-    pattern: /コメントを追加/i,
+    pattern: findActionButtonPattern('コメントを追加'),
     applies_to: ['comment'],
     penalty: -30,
     reason: 'Action button text: Japanese "Add comment"',
@@ -209,7 +211,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'ACTION_BTN_ADD_COMMENT_ZH',
     type: 'regex',
-    pattern: /添加评论/i,
+    pattern: findActionButtonPattern('添加评论'),
     applies_to: ['comment'],
     penalty: -30,
     reason: 'Action button text: Chinese "Add comment"',
@@ -219,7 +221,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'ACTION_BTN_ADD_COMMENT_FR',
     type: 'regex',
-    pattern: /ajouter.*commentaire/i,
+    pattern: findActionButtonPattern('ajouter.*commentaire'),
     applies_to: ['comment'],
     penalty: -30,
     reason: 'Action button text: French "Add comment"',
@@ -229,7 +231,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'ACTION_BTN_ADD_COMMENT_DE',
     type: 'regex',
-    pattern: /kommentar.*hinzufügen/i,
+    pattern: findActionButtonPattern('kommentar.*hinzufügen'),
     applies_to: ['comment'],
     penalty: -30,
     reason: 'Action button text: German "Add comment"',
@@ -239,7 +241,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'ACTION_BTN_ADD_COMMENT_ES',
     type: 'regex',
-    pattern: /añadir.*comentario/i,
+    pattern: findActionButtonPattern('añadir.*comentario'),
     applies_to: ['comment'],
     penalty: -30,
     reason: 'Action button text: Spanish "Add comment"',
@@ -447,28 +449,28 @@ const EXCLUSION_RULES: ExclusionRule[] = [
 // ============================================================================
 
 /**
- * Build a single compiled regex from all regex+text rules for a flag type.
+ * Build a single compiled regex from the regex-type rules for a flag type.
  *
- * V1 tested 14+ individual patterns in a loop. This compiles them into
- * a single alternation: /(pattern1|pattern2|…)/i
+ * Text-type rules are NOT compiled in here (D14): a substring alternation
+ * would fire 'editor' inside 'editors' and diverge from V1's whole-token
+ * exclusions. They go through the shared D6 matcher in isExcludedText.
  *
- * One regex.test() call replaces 14 .some() iterations.
+ * Returns null when a flag type has no regex rules — an empty alternation
+ * would match every text.
  */
-function buildCompiledRegex(flagType: 'comment' | 'edited'): RegExp {
+function buildCompiledRegex(flagType: 'comment' | 'edited'): RegExp | null {
   const parts: string[] = [];
 
   for (const rule of EXCLUSION_RULES) {
     if (!rule.applies_to.includes(flagType)) continue;
-    if (rule.type === 'selector') continue; // selectors aren't regex-testable
 
     if (rule.type === 'regex' && rule.pattern instanceof RegExp) {
       // Extract the source from the regex (strip flags, we'll add our own)
       parts.push(rule.pattern.source);
-    } else if (rule.type === 'text' && typeof rule.pattern === 'string') {
-      // Escape special regex chars in the text pattern
-      parts.push(rule.pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
     }
   }
+
+  if (parts.length === 0) return null;
 
   // Combine into single alternation — case-insensitive, unicode-aware
   return new RegExp(`(?:${parts.join('|')})`, 'iu');
@@ -480,6 +482,16 @@ const COMMENT_EXCLUSION_REGEX = buildCompiledRegex('comment');
 /** Pre-compiled regex for edited exclusions */
 const EDITED_EXCLUSION_REGEX = buildCompiledRegex('edited');
 
+/** Text-type rule patterns per flag type, matched through the D6 matcher. */
+const TEXT_RULE_PATTERNS: Record<'comment' | 'edited', string[]> = {
+  comment: EXCLUSION_RULES.filter(
+    (r) => r.type === 'text' && r.applies_to.includes('comment'),
+  ).map((r) => r.pattern as string),
+  edited: EXCLUSION_RULES.filter(
+    (r) => r.type === 'text' && r.applies_to.includes('edited'),
+  ).map((r) => r.pattern as string),
+};
+
 // ============================================================================
 // PUBLIC API
 // ============================================================================
@@ -487,8 +499,13 @@ const EDITED_EXCLUSION_REGEX = buildCompiledRegex('edited');
 /**
  * Check if text matches any exclusion pattern for a flag type.
  *
- * This is the fast path — one regex test instead of 14.
- * Use this in the hot path during detection scanning.
+ * This is the fast path — one regex test for the regex rules plus the shared
+ * D6 matcher for the text rules. Use this in the hot path during detection
+ * scanning.
+ *
+ * D14: text rules match through the same whole-token matcher as V1
+ * (core/detect/matching), so the two engines cannot diverge — 'editor' no
+ * longer fires inside 'editors', 'comment' not inside 'commentary'.
  *
  * @param text - The text to check
  * @param flagType - Which flag type to check exclusions for
@@ -497,7 +514,14 @@ const EDITED_EXCLUSION_REGEX = buildCompiledRegex('edited');
 export function isExcludedText(text: string, flagType: 'comment' | 'edited'): boolean {
   const normalized = normalizeForComparison(text);
   const regex = flagType === 'comment' ? COMMENT_EXCLUSION_REGEX : EDITED_EXCLUSION_REGEX;
-  return regex.test(normalized);
+  if (regex?.test(normalized)) return true;
+
+  for (const pattern of TEXT_RULE_PATTERNS[flagType]) {
+    if (matchesNormalizedKeyword(normalized, normalizeForComparison(pattern))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -535,8 +559,9 @@ export function applyExclusions(
         break;
       }
       case 'text': {
-        const normalizedPattern = normalizeForComparison(rule.pattern as string);
-        if (normalizedText.includes(normalizedPattern)) {
+        // D14: the shared D6 matcher, not substring includes — V1 and V2
+        // exclusions must answer identically ('editor' != 'editors').
+        if (matchesNormalizedKeyword(normalizedText, normalizeForComparison(rule.pattern as string))) {
           matched = true;
           matchedContent = text.slice(0, 80);
         }

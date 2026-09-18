@@ -1,0 +1,28 @@
+<!--
+  CQD synthetic regression case for D12 (count-shell class drift).
+
+  Generic drift shape, deliberately NOT a copy of the captured fixtures:
+  the comment-count chip carries a non-Google class (`post-comment-count`)
+  inside an unstyled footer — no `.qCWAqb`/`.seqYL` shell, no golden comment
+  container, no button/aria metadata. The only comment evidence anywhere is
+  the plain-text keyword phrase with a digit count, and an independent edited
+  marker in the header corroborates that this is real post chrome.
+
+  Guards the D12 ruling: a parsed positive count co-occurring with comment
+  keyword evidence must not lose its verdict just because every scoring layer
+  that saw it is a low-confidence one.
+-->
+<article data-stream-item-id="synth-en-drift-1">
+  <header class="IMvYId">
+    <div class="author-row">Test User</div>
+    <div class="meta-row">Edited Mar 10</div>
+  </header>
+
+  <div class="post-body">
+    <p>Reminder: review the material before the next session.</p>
+  </div>
+
+  <footer class="post-footer">
+    <div class="post-comment-count">4 class comments</div>
+  </footer>
+</article>

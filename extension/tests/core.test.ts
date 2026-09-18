@@ -122,6 +122,35 @@ describe('parseUnicodeInteger()', () => {
   it('should extract from Arabic comment text', () => {
     expect(parseUnicodeInteger('تعليق واحد من الصف')).toBe(1);
   });
+
+  it('should not substring-match word numbers (D2: no phantom 1s)', () => {
+    // 'un' inside 'unusual' is NOT the Spanish/French word-number 'un'.
+    expect(parseUnicodeInteger('unusual')).toBeNull();
+    expect(parseUnicodeInteger('an unusual number of comments')).toBeNull();
+    // Other prefix collisions against single-character word numbers.
+    expect(parseUnicodeInteger('uneventful class comment')).toBeNull();
+  });
+
+  it('should still parse exact word-number tokens (D2: token-exact)', () => {
+    expect(parseUnicodeInteger('un')).toBe(1);
+    expect(parseUnicodeInteger('comments: un')).toBe(1);
+    expect(parseUnicodeInteger('واحد')).toBe(1);
+  });
+
+  it('should not resolve tokens through the prototype chain (review round 1)', () => {
+    // 'constructor' and 'toString' are inherited Object.prototype members, not
+    // word numbers — the lookup must return null, never a function object.
+    expect(parseUnicodeInteger('constructor')).toBeNull();
+    expect(parseUnicodeInteger('toString')).toBeNull();
+    expect(parseUnicodeInteger('valueOf')).toBeNull();
+    expect(parseUnicodeInteger('hasOwnProperty')).toBeNull();
+  });
+
+  it('should parse further exact word-number tokens (review pins)', () => {
+    expect(parseUnicodeInteger('ein Kommentar')).toBe(1); // German "a comment"
+    expect(parseUnicodeInteger('eine')).toBe(1);          // German "a/one"
+    expect(parseUnicodeInteger('אחת')).toBe(1);           // Hebrew "one" (f.)
+  });
 });
 
 // ============================================================================
@@ -146,6 +175,16 @@ describe('getCommentKeywords()', () => {
     expect(keywords.singular).toContain('コメント');
   });
 
+  it('should return Armenian keywords (D1: no corrupted strings)', () => {
+    const keywords = getCommentKeywords('hy');
+    expect(keywords.singular).toContain('մեկնաբանություն');
+    expect(keywords.plural).toContain('մեկնաբանություններ');
+    expect(keywords.classComment).toContain('դասարանի մեկնաբանություն');
+    for (const kw of [...keywords.singular, ...keywords.plural, ...keywords.classComment]) {
+      expect(kw).not.toMatch(/delays/i);
+    }
+  });
+
   it('should fallback to English for unknown languages', () => {
     const keywords = getCommentKeywords('xx-unknown');
     expect(keywords.singular).toContain('comment');
@@ -166,6 +205,16 @@ describe('getEditedKeywords()', () => {
   it('should return Japanese edited keywords', () => {
     const keywords = getEditedKeywords('ja');
     expect(keywords).toContain('編集済み');
+  });
+
+  it('should return Armenian edited keywords (D1: no corrupted strings)', () => {
+    const keywords = getEditedKeywords('hy');
+    expect(keywords).toContain('խմբագրված');
+    expect(keywords).toContain('վերջին խմբագրումը');
+    expect(keywords).toContain('փոփոխված');
+    for (const kw of keywords) {
+      expect(kw).not.toMatch(/delays/i);
+    }
   });
 
   it('should return Hacker/1337 keywords', () => {
@@ -260,6 +309,27 @@ describe('parseUnicodeDate()', () => {
       expect(result.date.getUTCFullYear()).toBe(2026);
       expect(result.raw).toBe('Jan 20, 2026');
     }
+  });
+
+  it('should parse full English month names', () => {
+    const result = parseUnicodeDate('January 20, 2026');
+    expect(result).not.toBeNull();
+    if (result) {
+      expect(result.date.getUTCMonth()).toBe(0);
+      expect(result.date.getUTCDate()).toBe(20);
+      expect(result.date.getUTCFullYear()).toBe(2026);
+    }
+    const march = parseUnicodeDate('March 5, 2026');
+    expect(march).not.toBeNull();
+    if (march) expect(march.date.getUTCMonth()).toBe(2);
+  });
+
+  it('must not read a month key inside a larger word (D15)', () => {
+    // 'mar' inside 'market' used to parse as March 12, 2026.
+    expect(parseUnicodeDate('12 market 2026')).toBeNull();
+    // 'may' inside 'mayor', 'jun' inside 'junk'.
+    expect(parseUnicodeDate('3 mayor 2026')).toBeNull();
+    expect(parseUnicodeDate('7 junk 2026')).toBeNull();
   });
 
   it('should return null for invalid dates', () => {

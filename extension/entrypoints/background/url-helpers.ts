@@ -3,20 +3,38 @@
  * URL manipulation utilities for download handling.
  */
 
+import { buildDriveDownloadUrl } from '../../src/shared/drive-endpoint';
+
 /**
  * Normalize a download URL and detect if it's a Drive URL.
- * Strips authuser params and adds export=download for Drive.
+ *
+ * Every Drive URL resolves to the byte-serving endpoint
+ * drive.usercontent.google.com/download?...&confirm=t — the destination
+ * Drive's own interstitial "Download anyway" link points at. Downloading it
+ * directly serves the file bytes with the ambient session: no interstitial
+ * hop, no error-page hop, and therefore no reason for a bypass tab (the
+ * visible "403 Access Forbidden" window regression).
  */
 export function normalizeUrl(rawUrl: string): { baseUrl: string; isDrive: boolean } {
   try {
     const url = new URL(rawUrl);
     const isDrive = url.hostname.includes('drive');
     if (!isDrive) return { baseUrl: rawUrl, isDrive: false };
-    url.pathname = url.pathname.replace(/^\/u\/\d+(?=\/)/, '');
-    url.searchParams.delete('authuser');
-    if (url.pathname.includes('/open')) url.pathname = '/uc';
-    if (!url.searchParams.has('export')) url.searchParams.set('export', 'download');
-    return { baseUrl: url.toString(), isDrive: true };
+
+    if (url.hostname === 'drive.usercontent.google.com') {
+      url.searchParams.set('export', 'download');
+      url.searchParams.set('confirm', 't');
+      return { baseUrl: url.toString(), isDrive: true };
+    }
+
+    const id =
+      url.searchParams.get('id') ??
+      url.pathname.match(/\/file\/d\/([^/]+)/)?.[1] ??
+      url.pathname.match(/\/d\/([^/]+)/)?.[1];
+    if (id) {
+      return { baseUrl: buildDriveDownloadUrl(id), isDrive: true };
+    }
+    return { baseUrl: rawUrl, isDrive: true };
   } catch {
     return { baseUrl: rawUrl, isDrive: false };
   }

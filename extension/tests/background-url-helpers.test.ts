@@ -11,15 +11,16 @@ describe('background url helpers', () => {
     const result = normalizeUrl(input);
     expect(result.isDrive).toBe(true);
     expect(result.baseUrl.includes('authuser=')).toBe(false);
-    expect(result.baseUrl.includes('/uc')).toBe(true);
+    expect(result.baseUrl.includes('drive.usercontent.google.com/download')).toBe(true);
     expect(result.baseUrl.includes('export=download')).toBe(true);
+    expect(result.baseUrl.includes('confirm=t')).toBe(true);
   });
 
-  it('keeps existing drive path/export values when already normalized', () => {
-    const input = 'https://drive.google.com/uc?id=abc123&export=download';
+  it('keeps export values when already normalized to the usercontent endpoint', () => {
+    const input = 'https://drive.usercontent.google.com/download?id=abc123&export=download&confirm=t';
     const result = normalizeUrl(input);
     expect(result.isDrive).toBe(true);
-    expect(result.baseUrl.includes('/uc')).toBe(true);
+    expect(result.baseUrl.includes('drive.usercontent.google.com/download')).toBe(true);
     expect(result.baseUrl.includes('export=download')).toBe(true);
   });
 
@@ -27,7 +28,8 @@ describe('background url helpers', () => {
     const input = 'https://drive.google.com/u/1/file/d/abc123/view?authuser=1';
     const result = normalizeUrl(input);
     expect(result.isDrive).toBe(true);
-    expect(result.baseUrl).toContain('https://drive.google.com/file/d/abc123/view');
+    expect(result.baseUrl).toContain('drive.usercontent.google.com/download');
+    expect(result.baseUrl).toContain('id=abc123');
     expect(result.baseUrl).not.toContain('/u/1/');
     expect(result.baseUrl).not.toContain('authuser=');
   });
@@ -60,5 +62,30 @@ describe('background url helpers', () => {
     expect(getFilenameExt('archive.tar.gz')).toBe('gz');
     expect(getFilenameExt('filename-without-ext')).toBeUndefined();
     expect(getFilenameExt(undefined)).toBeUndefined();
+  });
+
+  it('normalizes drive urls to the usercontent byte-serving endpoint (#manual-403 regression)', () => {
+    const result = normalizeUrl('https://drive.google.com/file/d/abc123/view');
+    expect(result.isDrive).toBe(true);
+    expect(result.baseUrl).toContain('https://drive.usercontent.google.com/download');
+    expect(result.baseUrl).toContain('id=abc123');
+    expect(result.baseUrl).toContain('export=download');
+    expect(result.baseUrl).toContain('confirm=t');
+    expect(result.baseUrl).not.toContain('authuser=');
+  });
+
+  it('is idempotent for already-usercontent urls', () => {
+    const input = 'https://drive.usercontent.google.com/download?id=abc123&export=download&confirm=t';
+    const result = normalizeUrl(input);
+    expect(result.isDrive).toBe(true);
+    expect(result.baseUrl).toBe(input);
+  });
+
+  it('rewrites legacy uc download urls to the usercontent endpoint', () => {
+    const result = normalizeUrl('https://drive.google.com/uc?export=download&id=abc123&authuser=2');
+    expect(result.isDrive).toBe(true);
+    expect(result.baseUrl).toContain('drive.usercontent.google.com/download');
+    expect(result.baseUrl).toContain('id=abc123');
+    expect(result.baseUrl).not.toContain('authuser=');
   });
 });

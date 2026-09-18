@@ -137,7 +137,7 @@
 
   <section class="site-map-sections">
     {#each groupedLinks as section}
-      <article class="site-map-card">
+      <article class="site-map-card glass-panel glass-hover">
         <h2>{section.group}</h2>
         <ul>
           {#each section.links as link}
@@ -190,16 +190,14 @@
   }
 
   .site-map-card {
-    border: 1px solid #e2e8f0;
     border-radius: 0.9rem;
-    background: #ffffff;
     padding: 1rem 1.1rem 1.1rem;
   }
 
   .site-map-card h2 {
     margin: 0;
     font-size: 1rem;
-    color: #0f172a;
+    color: var(--text);
   }
 
   .site-map-card ul {
@@ -214,26 +212,33 @@
     display: flex;
     flex-direction: column;
     gap: 0.2rem;
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--border-subtle);
     border-radius: 0.68rem;
-    background: #f8fafc;
+    background: rgba(255, 255, 255, 0.55);
     padding: 0.55rem 0.65rem;
   }
 
   .site-map-card a {
-    color: #0f172a;
+    color: var(--text);
     text-decoration: none;
     font-weight: 600;
   }
 
   .site-map-card a:hover {
-    color: #047857;
+    color: var(--gc-green);
     text-decoration: underline;
   }
 
   .site-map-card code {
     font-size: 0.72rem;
-    color: #64748b;
+    color: var(--text-secondary);
     word-break: break-word;
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .site-map-card li {
+      background: #fcfefd;
+      border-color: rgba(226, 232, 240, 0.9);
+    }
   }
 </style>

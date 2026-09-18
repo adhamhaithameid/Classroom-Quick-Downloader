@@ -28,6 +28,18 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Cancel',
     cancelled: 'Cancelled',
     cancelAll: 'Cancel All',
+    // Popup settings surface (bead 770): consumed by the popup via
+    // chrome.i18n.getMessage with en fallback (entrypoints/popup/i18n.ts).
+    // en-only for now — other locales fall back to the default-locale table
+    // at runtime; TRANSLATIONS stays the single source of truth.
+    popupExtensionSettings: 'Extension Settings',
+    popupSettingsSectionGeneral: 'General',
+    popupSettingsSectionEngine: 'Engine',
+    popupSettingsSectionFlags: 'Flags',
+    popupEngineMode: 'Engine Mode',
+    popupEngineModeLegacy: 'Legacy',
+    popupEngineModeNew: 'New',
+    popupEngineModeApi: 'API (beta)',
   },
   ar: {
     download: 'تنزيل',

@@ -21,6 +21,7 @@ import {
   type CommentDetectionResult,
   type LayerDebugInfo,
 } from './smart-detector-comments';
+import { matchesNormalizedKeyword } from '../../src/core/detect/matching';
 
 // ============================================================================
 // TYPES & INTERFACES
@@ -82,9 +83,9 @@ function extractAriaLabels(element: HTMLElement): string[] {
 
 function findEditedKeyword(text: string, keywords: string[]): string | null {
   const normalizedText = normalizeForComparison(text);
-  
+
   for (const keyword of keywords) {
-    if (normalizedText.includes(normalizeForComparison(keyword))) {
+    if (matchesNormalizedKeyword(normalizedText, normalizeForComparison(keyword))) {
       return keyword;
     }
   }
@@ -360,7 +361,7 @@ function executeEditedLayer4(post: HTMLElement, matchedText: string | null): Lay
     const userContent = post.querySelector(selector);
     if (userContent) {
       const userText = normalizeForComparison(userContent.textContent || '');
-      if (userText.includes(normalizeForComparison(matchedText))) {
+      if (matchesNormalizedKeyword(userText, normalizeForComparison(matchedText))) {
         return {
           score: CONFIDENCE_WEIGHTS.LAYER_4_EXCLUSION,
           matchedText,

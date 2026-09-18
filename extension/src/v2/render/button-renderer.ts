@@ -34,6 +34,20 @@ import type { PlacementDecision } from '../../engines/types';
 import type { ScannedFile } from '../model/dom-scanner';
 import { getFileIdAttr, getInjectedAttr } from '../decision/file-placement';
 import { injectV2Styles } from './button-styles';
+import { resolveDownloadUrl } from '../decision/download-url';
+
+/**
+ * The user-facing markup contract (z57 S1): v2 buttons carry the SAME class
+ * names and inner structure V1's renderer produced — `button.cqd-download-btn`
+ * with .cqd-download-icon / .cqd-label / .cqd-error-detail, and
+ * `button.cqd-download-all-btn` with .cqd-download-all-main /
+ * .cqd-download-all-sub — because that surface is the product contract the QA
+ * journeys pin (qa-01/02/05/06 SELECTORS). V2 ownership of the pipeline does
+ * not change the user-visible button.
+ */
+
+/** Selector the delegated click dispatcher matches buttons by. */
+export const V2_BUTTON_SELECTOR = '.cqd-download-btn, .cqd-download-all-btn';
 
 // ============================================================================
 // HELPERS — CSS.escape polyfill for jsdom
@@ -60,32 +74,34 @@ let buttonTemplate: HTMLButtonElement | null = null;
 /**
  * Create the button template that will be cloned for each button instance.
  *
- * Structure:
- *   <button class="cqd-v2-btn" data-cqd-injected="true" data-cqd-file-id="...">
- *     <span class="cqd-v2-icon cqd-icon-download"></span>
- *     <span class="cqd-v2-label">Download</span>
+ * Structure (V1 markup contract — qa SELECTORS pin `button.cqd-download-btn`):
+ *   <button class="cqd-download-btn" data-cqd-injected="true" data-cqd-file-id="...">
+ *     <span class="cqd-download-icon"></span>
+ *     <span class="cqd-label">Download</span>
+ *     <span class="cqd-error-detail"></span>
  *   </button>
- *
- * Only 2 child elements (icon + label) vs V1's 3 (icon wrapper + icon + label + error detail).
- * Fewer DOM nodes = faster cloning and less memory.
  */
 function getButtonTemplate(): HTMLButtonElement {
   if (buttonTemplate) return buttonTemplate;
 
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.className = 'cqd-v2-btn';
+  btn.className = 'cqd-download-btn';
   btn.setAttribute(getInjectedAttr(), 'true');
 
   const icon = document.createElement('span');
-  icon.className = 'cqd-v2-icon cqd-icon-download';
+  icon.className = 'cqd-download-icon';
 
   const label = document.createElement('span');
-  label.className = 'cqd-v2-label';
+  label.className = 'cqd-label';
   label.textContent = 'Download';
+
+  const errorDetail = document.createElement('span');
+  errorDetail.className = 'cqd-error-detail';
 
   btn.appendChild(icon);
   btn.appendChild(label);
+  btn.appendChild(errorDetail);
 
   buttonTemplate = btn;
   return btn;
@@ -97,11 +113,13 @@ let downloadAllTemplate: HTMLButtonElement | null = null;
 /**
  * Create the Download All button template.
  *
- * Structure:
- *   <button class="cqd-v2-btn cqd-download-all" data-cqd-injected="true" data-cqd-file-id="download-all:...">
- *     <span class="cqd-v2-icon cqd-icon-download"></span>
- *     <span class="cqd-v2-label">Download All</span>
- *     <span class="cqd-v2-count">0</span>
+ * Structure (V1 markup contract — qa SELECTORS pin `button.cqd-download-all-btn`):
+ *   <button class="cqd-download-all-btn" data-cqd-injected="true" data-cqd-file-id="download-all:...">
+ *     <span class="cqd-icon-wrapper cqd-download-all-icon-wrapper">
+ *       <span class="cqd-download-all-icon"></span>
+ *     </span>
+ *     <span class="cqd-download-all-main">Download all</span>
+ *     <span class="cqd-download-all-sub">0 files</span>
  *   </button>
  */
 function getDownloadAllTemplate(): HTMLButtonElement {
@@ -109,23 +127,25 @@ function getDownloadAllTemplate(): HTMLButtonElement {
 
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.className = 'cqd-v2-btn cqd-download-all';
+  btn.className = 'cqd-download-all-btn';
   btn.setAttribute(getInjectedAttr(), 'true');
 
+  const iconWrapper = document.createElement('span');
+  iconWrapper.className = 'cqd-icon-wrapper cqd-download-all-icon-wrapper';
   const icon = document.createElement('span');
-  icon.className = 'cqd-v2-icon cqd-icon-download';
+  icon.className = 'cqd-download-all-icon';
+  iconWrapper.appendChild(icon);
 
-  const label = document.createElement('span');
-  label.className = 'cqd-v2-label';
-  label.textContent = 'Download All';
+  const main = document.createElement('span');
+  main.className = 'cqd-download-all-main';
+  main.textContent = 'Download all';
 
-  const count = document.createElement('span');
-  count.className = 'cqd-v2-count';
-  count.textContent = '0';
+  const sub = document.createElement('span');
+  sub.className = 'cqd-download-all-sub';
 
-  btn.appendChild(icon);
-  btn.appendChild(label);
-  btn.appendChild(count);
+  btn.appendChild(iconWrapper);
+  btn.appendChild(main);
+  btn.appendChild(sub);
 
   downloadAllTemplate = btn;
   return btn;
@@ -203,8 +223,11 @@ export function renderButton(
   // Ensure styles are injected
   injectV2Styles();
 
-  // Idempotent check — don't create duplicate buttons
-  const existingBtn = decision.targetElement.querySelector(
+  // Idempotent check — don't create duplicate buttons. The scope is the
+  // target's PARENT because buttons may land as siblings of the anchor
+  // (header 'before', anchor 'after'), where a query on the target misses them.
+  const dedupeScope = decision.targetElement.parentElement ?? decision.targetElement;
+  const existingBtn = dedupeScope.querySelector(
     `[${getFileIdAttr()}="${safeCssEscape(file.canonicalId)}"]`,
   );
   if (existingBtn) return null;
@@ -217,8 +240,11 @@ export function renderButton(
   btn.setAttribute('aria-label', `Download ${file.name || 'file'}`);
   btn.title = file.name || 'Download';
 
-  // Store file metadata on the button for the click handler
-  btn.dataset.cqdUrl = file.downloadUrl || '';
+  // Store file metadata on the button for the click handler. The URL is the
+  // CONVERTED direct-download URL (qa-01 pins data-cqd-url on docs buttons as
+  // drive.usercontent.google.com/download?id=…); resolveDownloadUrl is
+  // idempotent, so an already-converted discovery URL passes through.
+  btn.dataset.cqdUrl = file.downloadUrl ? resolveDownloadUrl(file.downloadUrl) : '';
   btn.dataset.cqdName = file.name || '';
   btn.dataset.cqdExt = file.ext || '';
 
@@ -227,8 +253,16 @@ export function renderButton(
     btn.classList.add('cqd-theme-dark');
   }
 
-  // Insert at the position specified by the decision
-  insertAtPosition(btn, decision.targetElement, decision.insertionPoint);
+  // Insert at the position specified by the decision. V1 outcome parity:
+  // a button never lands INSIDE an <a> (nested interactive content) — an
+  // append-onto an anchor degrades to insert-after, keeping the button inside
+  // the attachment container like V1's injectButtonIntoAttachment.
+  const point =
+    decision.insertionPoint === 'append' &&
+    decision.targetElement.tagName === 'A'
+      ? 'after'
+      : decision.insertionPoint;
+  insertAtPosition(btn, decision.targetElement, point);
 
   return btn;
 }
@@ -296,8 +330,10 @@ export function renderDownloadAllButton(
   // Ensure styles are injected
   injectV2Styles();
 
-  // Idempotent check
-  const existingBtn = decision.targetElement.querySelector(
+  // Idempotent check (parent scope — the button may be a header SIBLING when
+  // the recipe inserts 'before', so a query on the target alone misses it).
+  const dedupeScope = decision.targetElement.parentElement ?? decision.targetElement;
+  const existingBtn = dedupeScope.querySelector(
     `[${getFileIdAttr()}="${safeCssEscape(decision.fileId)}"]`,
   );
   if (existingBtn) return null;
@@ -316,11 +352,13 @@ export function renderDownloadAllButton(
     // Recipe-specific classes are added via the decision
   }
 
-  // Update file count
-  const countEl = btn.querySelector('.cqd-v2-count');
-  if (countEl) {
-    countEl.textContent = String(files.length);
+  // Seed the group sub-text with the file count (V1 parity: "N files")
+  const subEl = btn.querySelector('.cqd-download-all-sub');
+  if (subEl) {
+    subEl.textContent = `${files.length} ${files.length === 1 ? 'file' : 'files'}`;
   }
+  // The group machine's reset restores the idle sub-text from this count.
+  btn.dataset.cqdGroupCount = String(files.length);
 
   // Apply dark mode
   if (isDark) {
@@ -361,10 +399,15 @@ export function removeStaleButtons(
 /**
  * Remove ALL V2-injected buttons from the document or a subtree.
  *
- * Called on engine destroy or mode switch.
+ * Called on engine destroy or mode switch. Scoped to buttons carrying the
+ * v2 file-id attribute (plus the retired `.cqd-v2-btn` marker) — V1's own
+ * buttons share the `cqd-download-btn` class in shadow mode and must survive
+ * a v2 teardown.
  */
 export function removeAllV2Buttons(scope: HTMLElement | Document = document): void {
-  const allButtons = scope.querySelectorAll<HTMLElement>('.cqd-v2-btn');
+  const allButtons = scope.querySelectorAll<HTMLElement>(
+    `[${getInjectedAttr()}][${getFileIdAttr()}], .cqd-v2-btn`,
+  );
   for (const btn of allButtons) {
     btn.remove();
   }
@@ -381,8 +424,9 @@ const delegatedRoots = new WeakSet<HTMLElement>();
  * Set up a delegated click handler on a post root.
  *
  * Instead of attaching click handlers to every button, we attach ONE handler
- * to the post root and use event delegation. When a .cqd-v2-btn is clicked,
- * we extract the file data from the button's dataset and dispatch accordingly.
+ * to the post root and use event delegation. When a v2 download button
+ * (.cqd-download-btn / .cqd-download-all-btn) is clicked, we extract the file
+ * data from the button's dataset and dispatch accordingly.
  *
  * @param postEl - The post element to set up delegation on
  * @param onSingleClick - Callback for single file download clicks
@@ -398,7 +442,7 @@ export function setupDelegatedClickHandler(
 
   postEl.addEventListener('click', (e: Event) => {
     const target = e.target as HTMLElement;
-    const button = target.closest<HTMLButtonElement>('.cqd-v2-btn');
+    const button = target.closest<HTMLButtonElement>(V2_BUTTON_SELECTOR);
     if (!button) return;
 
     // Prevent the click from propagating to Google's UI

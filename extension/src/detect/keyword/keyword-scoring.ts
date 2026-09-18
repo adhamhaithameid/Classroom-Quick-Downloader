@@ -44,6 +44,10 @@ import {
   GOLDEN_SELECTORS,
   type CommentKeywords,
 } from '../../v2/decision/keyword-loader';
+import { ACTION_BUTTON_PATTERNS } from '../../core/detect/action-buttons';
+import { PLAUSIBLE_COMMENT_COUNT } from '../../core/detect/ceilings';
+import { parseCountChip } from '../../core/detect/numerals';
+import { matchesNormalizedKeyword } from '../../core/detect/matching';
 
 import {
   applyExclusions,
@@ -80,26 +84,10 @@ interface EditedLayerResult {
 // ============================================================================
 
 /**
- * Action button patterns — regex for "Add comment" style text.
- * These are UI buttons, not actual comment indicators.
- * Tested via the exclusion engine as well, but we double-check
- * at the layer level for early exit.
+ * Action button patterns live in src/core/detect/action-buttons.ts — the one
+ * canonical table (D3). This layer double-checks them for early exit; the
+ * exclusion engine scores the same table with metadata.
  */
-const ACTION_BUTTON_PATTERNS: RegExp[] = [
-  /add\s+(?:class\s+)?comment/i,
-  /(?:اضافة|إضافة|أضف)\s+تعليق/i,
-  /добавить\s+комментарий/i,
-  /コメントを追加/i,
-  /添加评论/i,
-  /ajouter.*commentaire/i,
-  /kommentar.*hinzufügen/i,
-  /añadir.*comentario/i,
-  /write.*comment/i,
-  /type.*comment/i,
-  /post.*comment/i,
-  /new\s+comment/i,
-  /leave.*comment/i,
-];
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -111,12 +99,32 @@ function isActionButton(text: string): boolean {
   return ACTION_BUTTON_PATTERNS.some(p => p.test(normalized));
 }
 
-/** Check if text contains any of the comment keywords */
-function containsCommentKeyword(text: string, keywords: CommentKeywords): string | null {
+/**
+ * Check if text contains any of the comment keywords (D6 semantics).
+ *
+ * Matching goes through the shared core matcher: phrases are consecutive
+ * whole-token runs, single words are whole-token equality in space-delimited
+ * scripts, and unspaced-script keywords keep substring containment.
+ *
+ * Evidence policy (D6): `classComment` entries — which include generic
+ * phrases like the Arabic 'من الصف' ("from the class") that carry no comment
+ * word of their own — only count as evidence in an authoritative attribute
+ * context (aria-label/title). In plain text they are indistinguishable from
+ * ordinary body copy, and a stray numeral or word-number in the same sentence
+ * then becomes a phantom count. Layer 0 chip evidence short-circuits before
+ * any keyword runs, so this restriction costs the layers nothing.
+ */
+function containsCommentKeyword(
+  text: string,
+  keywords: CommentKeywords,
+  options: { attributeContext?: boolean } = {},
+): string | null {
   const normalizedText = normalizeForComparison(text);
-  const allKeywords = [...keywords.singular, ...keywords.plural, ...keywords.classComment];
-  for (const keyword of allKeywords) {
-    if (normalizedText.includes(normalizeForComparison(keyword))) {
+  const pool = options.attributeContext
+    ? [...keywords.singular, ...keywords.plural, ...keywords.classComment]
+    : [...keywords.singular, ...keywords.plural];
+  for (const keyword of pool) {
+    if (matchesNormalizedKeyword(normalizedText, normalizeForComparison(keyword))) {
       return keyword;
     }
   }
@@ -128,11 +136,11 @@ function extractCount(text: string): number | null {
   return parseUnicodeInteger(text);
 }
 
-/** Find an edited keyword in text */
+/** Find an edited keyword in text (D6 shared-matcher semantics) */
 function findEditedKeyword(text: string, keywords: string[]): string | null {
   const normalizedText = normalizeForComparison(text);
   for (const keyword of keywords) {
-    if (normalizedText.includes(normalizeForComparison(keyword))) {
+    if (matchesNormalizedKeyword(normalizedText, normalizeForComparison(keyword))) {
       return keyword;
     }
   }
@@ -181,19 +189,27 @@ function expandParentContext(node: Node): { text: string; hasDate: boolean; leve
  * The most reliable source. Google renders comment counts in
  * .qCWAqb .huI6Cb elements. If we find this, it's authoritative.
  * Score: 100 (maximum).
+ *
+ * Authoritative does not mean unexamined (D5): the `.huI6Cb` paths accept only
+ * what `parseCountChip` believes (value plausibility + chip shape — an id-like
+ * or implausible numeral never gets this far), every container-level text path
+ * is chip-gated too (D13 — a date in the shell must not win on its first digit
+ * run), and the one exception is a dedicated count child span whose word-bearing
+ * text carries its own comment keyword ("2 comments"). Word evidence anywhere
+ * else belongs to the layers below. Identical rules to the structural chain's
+ * S0 via the same core helper.
  */
-function commentLayer0_DOMTruth(post: HTMLElement): CommentLayerResult {
+function commentLayer0_DOMTruth(post: HTMLElement, keywords: CommentKeywords): CommentLayerResult {
   // Primary: .qCWAqb .huI6Cb
   const huI6Cb = post.querySelector<HTMLElement>('.qCWAqb .huI6Cb');
   if (huI6Cb) {
-    const text = normalizeText(huI6Cb.textContent?.trim() || '');
-    const count = extractCount(text);
-    if (count !== null && count > 0) {
+    const chip = parseCountChip(huI6Cb.textContent ?? '');
+    if (chip) {
       return {
         score: 100,
-        count,
-        matchedText: text,
-        details: `L0-DOMTruth: "${text}" via .qCWAqb .huI6Cb (count: ${count})`,
+        count: chip.count,
+        matchedText: chip.text,
+        details: `L0-DOMTruth: "${chip.text}" via .qCWAqb .huI6Cb (count: ${chip.count})`,
       };
     }
   }
@@ -207,8 +223,15 @@ function commentLayer0_DOMTruth(post: HTMLElement): CommentLayerResult {
     );
     if (textSpan) {
       const text = normalizeText(textSpan.textContent?.trim() || '');
+      const chip = parseCountChip(text);
+      if (chip) {
+        return { score: 100, count: chip.count, matchedText: chip.text, details: `L0-DOMTruth: "${chip.text}" in .qCWAqb.seqYL span (count: ${chip.count})` };
+      }
+      // A dedicated count child may carry words ("2 comments"): a parsed count
+      // corroborated by a comment keyword in the same span is still DOM truth.
+      // Bare dates ("12 mart") carry no comment keyword and stay out (D13).
       const count = extractCount(text);
-      if (count !== null && count > 0) {
+      if (count !== null && count > 0 && count < PLAUSIBLE_COMMENT_COUNT && containsCommentKeyword(text, keywords)) {
         return { score: 100, count, matchedText: text, details: `L0-DOMTruth: "${text}" in .qCWAqb.seqYL span (count: ${count})` };
       }
     }
@@ -216,28 +239,26 @@ function commentLayer0_DOMTruth(post: HTMLElement): CommentLayerResult {
     // Try .huI6Cb inside the container
     const icon = container.querySelector<HTMLElement>('.huI6Cb');
     if (icon) {
-      const text = normalizeText(icon.textContent || '');
-      const count = extractCount(text);
-      if (count !== null && count > 0) {
-        return { score: 100, count, matchedText: text, details: `L0-DOMTruth: "${text}" via .huI6Cb (count: ${count})` };
+      const chip = parseCountChip(icon.textContent ?? '');
+      if (chip) {
+        return { score: 100, count: chip.count, matchedText: chip.text, details: `L0-DOMTruth: "${chip.text}" via .huI6Cb (count: ${chip.count})` };
       }
     }
 
-    // Direct text content
-    const directText = normalizeText(container.textContent || '');
-    const directCount = extractCount(directText);
-    if (directCount !== null && directCount > 0 && directCount < 1000) {
-      return { score: 100, count: directCount, matchedText: directText, details: `L0-DOMTruth: "${directText}" direct (count: ${directCount})` };
+    // Direct text content — chip-gated like every container path (D13): a
+    // date in the shell ("12 mart") must not win on its first digit run.
+    const directChip = parseCountChip(container.textContent || '');
+    if (directChip) {
+      return { score: 100, count: directChip.count, matchedText: directChip.text, details: `L0-DOMTruth: "${directChip.text}" direct (count: ${directChip.count})` };
     }
   }
 
   // Fallback 2: .seqYL alone
   const seqYL = post.querySelector<HTMLElement>('.seqYL');
   if (seqYL && seqYL !== container) {
-    const text = normalizeText(seqYL.textContent || '');
-    const count = extractCount(text);
-    if (count !== null && count > 0 && count < 1000) {
-      return { score: 95, count, matchedText: text, details: `L0-DOMTruth: "${text}" via .seqYL (count: ${count})` };
+    const chip = parseCountChip(seqYL.textContent || '');
+    if (chip) {
+      return { score: 95, count: chip.count, matchedText: chip.text, details: `L0-DOMTruth: "${chip.text}" via .seqYL (count: ${chip.count})` };
     }
   }
 
@@ -259,7 +280,7 @@ function commentLayer1_Accessibility(post: HTMLElement, keywords: CommentKeyword
     if (isExcludedText(label, 'comment')) continue;
     if (isActionButton(label)) continue;
 
-    const match = containsCommentKeyword(label, keywords);
+    const match = containsCommentKeyword(label, keywords, { attributeContext: true });
     if (match) {
       const count = extractCount(label);
       if (count !== null && count > 0) {
@@ -281,7 +302,7 @@ function commentLayer1_Accessibility(post: HTMLElement, keywords: CommentKeyword
     if (isExcludedText(title, 'comment')) continue;
     if (isActionButton(title)) continue;
 
-    const match = containsCommentKeyword(title, keywords);
+    const match = containsCommentKeyword(title, keywords, { attributeContext: true });
     if (match) {
       const count = extractCount(title);
       if (count !== null && count > 0) {
@@ -329,7 +350,7 @@ function commentLayer2_ButtonHeuristic(post: HTMLElement, keywords: CommentKeywo
     // Also check button's own aria-label
     const ariaLabel = normalizeText(el.getAttribute('aria-label') || '');
     if (ariaLabel && !isActionButton(ariaLabel) && !isExcludedText(ariaLabel, 'comment')) {
-      const match = containsCommentKeyword(ariaLabel, keywords);
+      const match = containsCommentKeyword(ariaLabel, keywords, { attributeContext: true });
       if (match) {
         const count = extractCount(ariaLabel);
         if (count !== null && count > 0) {
@@ -363,7 +384,7 @@ function commentLayer3_GoldenSelectors(post: HTMLElement, keywords: CommentKeywo
         if (ariaLabel) {
           const normalized = normalizeText(ariaLabel);
           if (!isExcludedText(normalized, 'comment') && !isActionButton(normalized)) {
-            const match = containsCommentKeyword(normalized, keywords);
+            const match = containsCommentKeyword(normalized, keywords, { attributeContext: true });
             if (match) {
               const count = extractCount(normalized);
               if (count !== null && count > 0) {
@@ -383,7 +404,7 @@ function commentLayer3_GoldenSelectors(post: HTMLElement, keywords: CommentKeywo
           const childText = normalizeText(child.textContent || '');
           if (/^\d+$/.test(childText.trim()) && child.children.length === 0) {
             const count = parseInt(childText.trim(), 10);
-            if (count > 0 && count < 10000) {
+            if (count > 0 && count < PLAUSIBLE_COMMENT_COUNT) {
               const parentText = normalizeText(element.textContent || '');
               const match = containsCommentKeyword(parentText, keywords);
               if (match) {
@@ -735,7 +756,7 @@ function editedLayer4_Exclusion(post: HTMLElement, matchedText: string | null): 
     const userContent = post.querySelector(selector);
     if (userContent) {
       const userText = normalizeForComparison(userContent.textContent || '');
-      if (userText.includes(normalizeForComparison(matchedText))) {
+      if (matchesNormalizedKeyword(userText, normalizeForComparison(matchedText))) {
         return {
           score: CONFIDENCE_WEIGHTS.LAYER_4_EXCLUSION,
           matchedText,
@@ -779,7 +800,7 @@ export function scoreComments(
   };
 
   // Layer 0: DOM Truth — if found, return immediately
-  const l0 = commentLayer0_DOMTruth(post);
+  const l0 = commentLayer0_DOMTruth(post, combined);
   if (l0.score > 0 && l0.count !== null && l0.count > 0) {
     return { score: l0.score, count: l0.count, matchedText: l0.matchedText, layers: [l0] };
   }

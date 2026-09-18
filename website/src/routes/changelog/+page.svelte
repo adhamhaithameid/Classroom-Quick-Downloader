@@ -228,7 +228,6 @@
     <div class="orb orb-4"></div>
     <div class="orb orb-5"></div>
   </div>
-  <div class="cl-grid-bg" aria-hidden="true"></div>
 
   <!-- Hero -->
   <section class="cl-hero">
@@ -238,7 +237,7 @@
       <p class="cl-sub">What's new in every release of Classroom Quick Downloader.</p>
 
       <div class="cl-hero-actions">
-        <a class="cl-action-pill" href={STORE_LINKS.github + '/blob/main/user-friendly-changelog.md'} target="_blank" rel="noopener noreferrer">
+        <a class="cl-action-pill glass-panel glass-hover" href={STORE_LINKS.github + '/blob/main/user-friendly-changelog.md'} target="_blank" rel="noopener noreferrer">
           Open changelog on GitHub →
         </a>
       </div>
@@ -249,24 +248,24 @@
   <section class="cl-body-section">
     <div class="cl-wrap">
       {#if state === 'loading'}
-        <div class="cl-state-card cl-reveal">
+        <div class="cl-state-card glass-panel cl-reveal">
           <div class="cl-state-inner">
             <span class="cl-state-icon">⏳</span>
             <p>Loading changelog from the servers…</p>
           </div>
         </div>
       {:else if state === 'error'}
-        <div class="cl-state-card cl-state-error cl-reveal">
+        <div class="cl-state-card cl-state-error glass-panel cl-reveal">
           <div class="cl-state-inner">
             <span class="cl-state-icon">⚠️</span>
             <strong>Could not load changelog.</strong>
             <p>{error}</p>
-            <button type="button" class="cl-action-pill" on:click={() => load(true)} disabled={refreshing}>Retry</button>
+            <button type="button" class="cl-action-pill glass-panel glass-hover" on:click={() => load(true)} disabled={refreshing}>Retry</button>
           </div>
         </div>
       {:else}
         {#if degraded}
-          <div class="cl-state-card cl-state-warn cl-reveal">
+          <div class="cl-state-card cl-state-warn glass-panel cl-reveal">
             <div class="cl-state-inner">
               <span class="cl-state-icon">⚠️</span>
               <strong>Showing cached changelog data.</strong>
@@ -277,7 +276,7 @@
         <div class="cl-layout">
           <!-- Sidebar -->
           <aside class="cl-sidebar">
-            <div class="cl-sidebar-card cl-reveal">
+            <div class="cl-sidebar-card glass-panel cl-reveal">
               <h2 class="cl-sidebar-label">Versions</h2>
               <nav class="cl-sidebar-links">
                 {#each changelogEntries as entry}
@@ -304,7 +303,7 @@
                     <div class="cl-line"></div>
                   {/if}
                 </div>
-                <div class="cl-entry-card">
+                <div class="cl-entry-card glass-panel glass-hover" style="--card-i: {i}">
                   <div class="cl-entry-header">
                     <h2>v{entry.version}{#if i === 0}<span class="cl-latest-tag">Latest</span>{/if}</h2>
                   </div>
@@ -394,13 +393,6 @@
   .orb-4 { width: 400px; height: 400px; background: #bbf7d0; top: 65%; left: 5%; opacity: 0.2; }
   .orb-5 { width: 360px; height: 360px; background: #a5f3fc; top: 85%; right: 3%; opacity: 0.16; }
 
-  .cl-grid-bg {
-    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none; z-index: 0; opacity: 0.03;
-    background-image: linear-gradient(var(--text) 1px, transparent 1px), linear-gradient(90deg, var(--text) 1px, transparent 1px);
-    background-size: 60px 60px;
-  }
-
   /* ── Hero ───────────────────────── */
   .cl-hero {
     position: relative; z-index: 2;
@@ -410,7 +402,7 @@
 
   .cl-mega {
     font-size: clamp(36px, 5vw, 60px);
-    font-weight: 900; line-height: 1.15;
+    font-weight: 800; line-height: 1.15;
     letter-spacing: -0.03em; margin: 0 0 16px;
     padding-bottom: 0.1em;
     background: linear-gradient(135deg, var(--green), var(--green-light), #10b981);
@@ -435,18 +427,13 @@
 
   .cl-action-pill {
     display: inline-flex; align-items: center; gap: 6px;
-    border: 1px solid var(--border-subtle);
     border-radius: 999px; padding: 9px 18px;
     text-decoration: none;
-    background: rgba(255,255,255,0.6);
-    backdrop-filter: blur(6px);
     color: var(--text-secondary);
     font-weight: 600; font-size: 13px;
-    cursor: pointer; transition: all 0.25s ease;
-    box-shadow: 0 1px 3px rgba(15,20,25,0.04);
+    cursor: pointer;
   }
   .cl-action-pill:hover {
-    border-color: rgba(26,139,85,0.25);
     color: var(--green);
   }
   .cl-action-pill:disabled { opacity: 0.6; cursor: wait; }
@@ -458,13 +445,9 @@
   }
 
   .cl-state-card {
-    background: rgba(255,255,255,0.6);
-    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-    border: 1px solid var(--border-subtle);
     border-radius: 20px;
     padding: 48px;
     text-align: center;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.04);
   }
 
   .cl-state-error {
@@ -498,12 +481,8 @@
   }
 
   .cl-sidebar-card {
-    border: 1px solid var(--border-subtle);
     border-radius: var(--radius);
-    background: rgba(255,255,255,0.6);
-    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
     padding: 18px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
   }
 
   .cl-sidebar-label {
@@ -555,7 +534,7 @@
     background: var(--green-bg);
     flex-shrink: 0;
     box-shadow: 0 0 0 4px rgba(26,139,85,0.06);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.3s var(--glass-ease);
   }
 
   .cl-dot.active {
@@ -583,19 +562,8 @@
   }
 
   .cl-entry-card {
-    background: rgba(255,255,255,0.65);
-    border: 1px solid var(--border-subtle);
     border-radius: var(--radius);
     padding: 24px;
-    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .cl-entry-card:hover {
-    transform: translateY(-2px);
-    border-color: var(--green-border);
-    box-shadow: 0 8px 28px rgba(0,0,0,0.06);
   }
 
   .cl-entry-header { margin-bottom: 10px; }
@@ -688,8 +656,8 @@
       white-space: nowrap;
       flex-shrink: 0;
       min-width: 114px;
-      border: 1px solid var(--border-subtle);
-      background: rgba(255, 255, 255, 0.76);
+      border: 1px solid var(--glass-border);
+      background: var(--glass-bg);
       border-radius: 12px;
       padding: 10px 12px;
     }
@@ -715,5 +683,11 @@
       padding: 9px 10px;
     }
     .cl-sv { font-size: 13px; }
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .cl-state-warn {
+      background: #fcfefd;
+    }
   }
 </style>

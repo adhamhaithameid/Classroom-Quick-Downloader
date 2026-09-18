@@ -40,10 +40,24 @@ describe('Mode Controller', () => {
   // ========================================================================
 
   describe('readMode', () => {
-    it('returns "legacy" as default mode', async () => {
+    // z57 (2026-09-17): the flip to 'v2' is restored — v2 has the full
+    // interactive download path now (delegated clicks → page bus → S6
+    // bridge → background machine, Download All group machine, docs
+    // anchors, V1-contract badges). Verified by the qa-chromium journeys
+    // on a fresh v2-default build.
+    it('returns "v2" as default mode (z57 parity flip)', async () => {
       const { modeController } = await loadModeControllerModule();
       const mode = await modeController.readMode();
-      expect(mode).toBe('legacy');
+      expect(mode).toBe('v2');
+    });
+
+    // Docs and code must assert the same constant — the shipped default is
+    // 'v2' (D9 rule stands).
+    it('ships DEFAULT_MODE = "v2", matching the docs (D9/z57)', async () => {
+      const { modeController } = await loadModeControllerModule();
+      expect(
+        (modeController as { DEFAULT_MODE?: string }).DEFAULT_MODE,
+      ).toBe('v2');
     });
 
     it('reads mode from chrome.storage.local', async () => {
@@ -57,22 +71,22 @@ describe('Mode Controller', () => {
       expect(mode).toBe('shadow');
     });
 
-    it('returns "legacy" for invalid stored value', async () => {
+    it('returns the default "v2" for invalid stored value', async () => {
       chrome.storage.local.get = vi.fn().mockResolvedValue({
         cqdV2Mode: 'invalid-mode',
       });
 
       const { modeController } = await loadModeControllerModule();
       const mode = await modeController.readMode();
-      expect(mode).toBe('legacy');
+      expect(mode).toBe('v2');
     });
 
-    it('returns "legacy" when storage read fails', async () => {
+    it('returns the default "v2" when storage read fails', async () => {
       chrome.storage.local.get = vi.fn().mockRejectedValue(new Error('quota exceeded'));
 
       const { modeController } = await loadModeControllerModule();
       const mode = await modeController.readMode();
-      expect(mode).toBe('legacy');
+      expect(mode).toBe('v2');
     });
 
     it('reads v2 and v3 modes correctly', async () => {
@@ -177,13 +191,13 @@ describe('Mode Controller', () => {
       expect(addListenerSpy).toHaveBeenCalled();
     });
 
-    it('defaults to legacy when storage is empty', async () => {
+    it('defaults to v2 when storage is empty (z57 parity flip)', async () => {
       chrome.storage.local.get = vi.fn().mockResolvedValue({});
 
       const { modeController, registry } = await loadModeControllerModule();
       await modeController.initModeController();
 
-      expect(registry.getMode()).toBe('legacy');
+      expect(registry.getMode()).toBe('v2');
     });
   });
 });

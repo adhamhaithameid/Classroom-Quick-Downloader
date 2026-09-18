@@ -214,8 +214,16 @@ export type UninstallStatsResponse = {
   };
 };
 
-export type WebsiteEventType = 'cta' | 'map';
-export type WebsiteEventAction = 'install_click' | 'download_click' | 'map_yes' | 'map_no';
+export type WebsiteEventType = 'cta' | 'map' | 'content';
+export type WebsiteEventAction =
+  | 'install_click'
+  | 'download_click'
+  | 'map_yes'
+  | 'map_no'
+  | 'guide_cta_click'
+  | 'faq_expand'
+  | 'guide_engaged'
+  | 'uninstall_view';
 
 export type WebsiteEventPayload = {
   eventId: string;

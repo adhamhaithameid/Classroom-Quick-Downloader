@@ -2,6 +2,7 @@
   import { base } from '$app/paths';
   import { STORE_LINKS } from '$lib/config';
   import SeoMeta from '$lib/components/SeoMeta.svelte';
+  import { trackFaqExpand } from '$lib/analytics/websiteEvents';
 
   type FaqItem = {
     id: string;
@@ -404,6 +405,13 @@
       openIds.delete(id);
     } else {
       openIds.add(id);
+      for (const section of sections) {
+        const item = section.items.find((candidate) => candidate.id === id);
+        if (item) {
+          trackFaqExpand(item.q, section.title);
+          break;
+        }
+      }
     }
     openIds = new Set(openIds);
   }
@@ -463,7 +471,6 @@
     <div class="orb orb-4"></div>
     <div class="orb orb-5"></div>
   </div>
-  <div class="fq-grid-bg" aria-hidden="true"></div>
 
   <!-- Hero -->
   <section class="fq-hero">
@@ -502,7 +509,7 @@
   <section class="fq-body-section">
     <div class="fq-wrap">
       {#if filteredSections.length === 0}
-        <div class="fq-empty fq-reveal">
+        <div class="fq-empty fq-reveal glass-panel">
           <span class="fq-empty-icon">🔍</span>
           <h3>No results for "{searchQuery}"</h3>
           <p>Try different keywords or <button type="button" class="fq-clear-link" on:click={clearSearch}>clear your search</button>.</p>
@@ -511,7 +518,7 @@
 
       <div class="fq-sections">
         {#each filteredSections as section, sIdx}
-          <div class="fq-section fq-reveal" style="animation-delay: {sIdx * 0.05}s">
+          <div class="fq-section fq-reveal glass-panel" style="animation-delay: {sIdx * 0.05}s">
             <header class="fq-section-head">
               <span class="fq-section-icon">{section.icon}</span>
               <div>
@@ -524,7 +531,7 @@
             <div class="fq-list">
               {#each section.items as item}
                 <button
-                  class="fq-item"
+                  class="fq-item glass-panel glass-hover"
                   class:open={openIds.has(item.id)}
                   type="button"
                   on:click={() => toggle(item.id)}
@@ -559,7 +566,7 @@
   <!-- CTA -->
   <section class="fq-cta-section">
     <div class="fq-wrap">
-      <div class="fq-cta-card fq-reveal">
+      <div class="fq-cta-card fq-reveal glass-panel">
         <h2>Still have questions?</h2>
         <p>Reach out by email and we'll get back to you.</p>
         <div class="fq-cta-actions">
@@ -608,13 +615,6 @@
   .orb-4 { width: 420px; height: 420px; background: #bbf7d0; top: 65%; left: 3%; opacity: 0.22; }
   .orb-5 { width: 340px; height: 340px; background: #a5f3fc; top: 85%; right: 5%; opacity: 0.18; }
 
-  .fq-grid-bg {
-    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none; z-index: 0; opacity: 0.03;
-    background-image: linear-gradient(var(--text) 1px, transparent 1px), linear-gradient(90deg, var(--text) 1px, transparent 1px);
-    background-size: 60px 60px;
-  }
-
   /* ── Hero ───────────────────────── */
   .fq-hero {
     position: relative; z-index: 2;
@@ -624,7 +624,7 @@
 
   .fq-mega {
     font-size: clamp(36px, 5vw, 60px);
-    font-weight: 900; line-height: 1.15;
+    font-weight: 800; line-height: 1.15;
     letter-spacing: -0.03em; margin: 0 0 20px;
     padding-bottom: 0.1em;
     background: linear-gradient(135deg, var(--green), var(--green-light), #10b981);
@@ -668,12 +668,16 @@
   .fq-search-input {
     width: 100%; padding: 16px 48px 16px 50px;
     border-radius: 16px; font-size: 15px; font-weight: 500;
-    border: 1.5px solid var(--border-subtle);
-    background: rgba(255,255,255,0.7);
-    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1.5px solid var(--glass-border);
+    background: var(--glass-bg);
     color: var(--text);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.04);
-    transition: all 0.25s ease;
+    box-shadow:
+      0 1px 2px rgba(15, 20, 25, 0.05),
+      0 12px 30px rgba(15, 20, 25, 0.1),
+      inset 0 1px 0 var(--glass-highlight);
+    transition:
+      border-color 0.3s ease,
+      box-shadow 0.45s var(--glass-ease);
     box-sizing: border-box;
   }
 
@@ -708,12 +712,8 @@
   .fq-sections { display: grid; gap: 24px; }
 
   .fq-section {
-    background: rgba(255,255,255,0.6);
-    border: 1px solid var(--border-subtle);
     border-radius: 20px;
-    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
     padding: 28px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
   }
 
   .fq-section-head {
@@ -738,23 +738,22 @@
 
   .fq-item {
     text-align: left;
-    background: rgba(255,255,255,0.75);
-    border: 1px solid var(--border-subtle);
     border-radius: var(--radius-sm);
     padding: 0; cursor: pointer; width: 100%;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 1px 3px rgba(15,20,25,0.03);
   }
 
   .fq-item:hover {
-    border-color: rgba(26,139,85,0.18);
-    box-shadow: 0 2px 8px rgba(15,20,25,0.05);
+    transform: translateY(-2px);
   }
 
   .fq-item.open {
-    border-color: rgba(26,139,85,0.28);
-    box-shadow: 0 4px 16px rgba(15,20,25,0.06);
-    background: rgba(255,255,255,0.9);
+    border-color: rgba(26, 139, 85, 0.28);
+    box-shadow:
+      0 4px 16px rgba(15, 20, 25, 0.06),
+      0 0 0 1px rgba(26, 139, 85, 0.08),
+      inset 0 1px 0 var(--glass-highlight);
+    background:
+      linear-gradient(120deg, rgba(255, 255, 255, 0.78), rgba(248, 252, 249, 0.62));
   }
 
   .fq-question {
@@ -785,7 +784,6 @@
   .fq-empty {
     text-align: center;
     padding: 48px 24px;
-    background: rgba(255,255,255,0.55);
     border: 1px dashed var(--border-subtle);
     border-radius: 20px;
   }
@@ -808,16 +806,12 @@
 
   .fq-cta-card {
     text-align: center;
-    background: rgba(255,255,255,0.55);
-    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-    border: 1px solid var(--border-subtle);
     border-radius: 24px;
     padding: 56px 48px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.04);
   }
 
   .fq-cta-card h2 {
-    font-size: clamp(28px, 3.5vw, 40px); font-weight: 900;
+    font-size: clamp(28px, 3.5vw, 40px); font-weight: 800;
     letter-spacing: -0.03em; margin: 0 0 12px;
   }
 
@@ -860,6 +854,7 @@
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
+
   @keyframes slideDown {
     from { opacity: 0; transform: translateY(-5px); }
     to { opacity: 1; transform: translateY(0); }
@@ -910,6 +905,13 @@
     .fq-chevron {
       width: 24px;
       height: 24px;
+    }
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .fq-search-input {
+      background: #fcfefd;
+      border-color: rgba(226, 232, 240, 0.9);
     }
   }
 </style>

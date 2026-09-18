@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Shkarko",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Duke shkarkuar…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Duke provuar…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Përfundoi",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Gabim",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Dështoi.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Shkarko",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Shkarkim i shpejtë",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "komente",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "E redaktuar",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Shkarko të gjitha",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "skedar",
+    "description": "file"
+  },
+  "files": {
+    "message": "skedarë",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Numri i komenteve në këtë postim",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Shkarkimi u ndërpre.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Koha e ekzekutimit nuk është e disponueshme",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Nuk mundi të fillonte.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Gabim komunikimi.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "komente",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Anulo",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Anuluar",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

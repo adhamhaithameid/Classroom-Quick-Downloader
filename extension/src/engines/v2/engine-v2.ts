@@ -58,6 +58,7 @@ import type {
   FlagDecision,
   PlacementDecision,
   DecisionTrace,
+  SelectorStats,
 } from '../types';
 import {
   createPostScorer,
@@ -75,15 +76,37 @@ import { keywordDetector } from '../../detect/keyword/keyword-detector';
 import { runComparison, installCompareGlobals } from '../../compare/compare-runner';
 import type { ScannedPost, ScannedFile } from '../../v2/model/dom-scanner';
 import { renderBatch, removeStaleButtons, removeAllV2Buttons } from '../../v2/render/button-renderer';
+import { ensurePostClickWiring, resetDownloadController } from '../../v2/render/download-controller';
+import { resetDownloadAllController } from '../../v2/render/download-all-controller';
+import { resolveDownloadUrl } from '../../v2/decision/download-url';
+import { sanitizeFileName } from '../../core/name/sanitize';
 import { injectV2Styles, removeV2Styles } from '../../v2/render/button-styles';
 import { renderFlagBadge, removeAllV2Badges } from '../../v2/render/flag-renderer';
 import { removeFlagStyles } from '../../v2/render/flag-styles';
 import { validateBatch, clearInstabilityState } from '../../v2/repair/deep-validator';
+import { getPageDomPort } from '../../adapters/dom/mutation-observer-dom-port';
 import { CorrectionQueue } from '../../v2/repair/correction-queue';
 import { BudgetController } from '../../v2/telemetry/budget-controller';
 import { PerformanceMonitor } from '../../v2/telemetry/performance-monitor';
 import type { BudgetSnapshot } from '../../v2/telemetry/budget-controller';
-import type { PerformanceSummary } from '../../v2/telemetry/performance-monitor';
+import type { PerformanceSummary, TimingPercentiles } from '../../v2/telemetry/performance-monitor';
+
+// ============================================================================
+// TARGETED MUTATION SCAN BOUND (S11, gate G5)
+// ============================================================================
+
+/**
+ * Maximum number of post cards a single mutation batch may touch before the
+ * batch escalates from a targeted scan to a full page scan.
+ *
+ * A targeted per-post pass costs ~0.3-0.5ms; eight posts keep the worst
+ * targeted batch safely under the 6ms FAST_PASS_TARGET while still covering
+ * every realistic interactive batch (one card appended, one attachment
+ * added, one accordion toggled). Batches beyond the bound — initial page
+ * render, SPA view swap, a Classroom re-render of the whole stream — are
+ * exactly the cases where a full page scan is the efficient move anyway.
+ */
+export const TARGETED_SCAN_MAX_POSTS = 8;
 
 // ============================================================================
 // V2 ENGINE CLASS
@@ -118,6 +141,9 @@ export class EngineV2 implements CQDEngine {
   private placementDecisions: PlacementDecision[] = [];
   private decisionTraces: Map<string, DecisionTrace> = new Map();
 
+  /** S5 additive: what the last render cycle applied, for the RenderEngine role. */
+  private lastRenderApplied: Array<{ postId: string; kind: 'button' | 'flag' | 'all' }> = [];
+
   // -- Performance tracking --
   private scanCount = 0;
   private totalScanMs = 0;
@@ -127,6 +153,12 @@ export class EngineV2 implements CQDEngine {
   private budgetController = new BudgetController();
   private performanceMonitor = new PerformanceMonitor();
   private deepValidationScheduled = false;
+
+  /** S5 additive: optional publish hook — fires once per correction this
+   *  engine actually handles, for the HardenEngine role to publish
+   *  'correction:needed'. Undefined by default: with no listener wired this
+   *  field is never invoked and behavior is unchanged. */
+  onCorrectionSeen?: (item: import('../../v2/repair/deep-validator').CorrectionItem) => void;
 
   // ========================================================================
   // LIFECYCLE
@@ -199,6 +231,10 @@ export class EngineV2 implements CQDEngine {
     // Let the detector drop whatever it cached for this page, to free memory
     keywordDetector.reset();
 
+    // Drop in-flight download state (pending buttons died with the page)
+    resetDownloadController();
+    resetDownloadAllController();
+
     // Flush Phase 5 systems
     this.correctionQueue.flush();
     clearInstabilityState();
@@ -241,14 +277,70 @@ export class EngineV2 implements CQDEngine {
    * 2. Add or remove file attachments (Drive anchors)
    * 3. Change attributes on flag-related elements
    *
-   * Everything else is ignored. This makes handleMutations() FAST.
-   * Target: <6ms p95.
+   * S11 (gate G5): when a relevant batch can be resolved to specific post
+   * cards, ONLY those posts run through the per-post pipeline
+   * (targetedScan) — reusing the exact ingest/render functions fullScan
+   * uses per post, so detection semantics are unchanged. The full page
+   * scan remains for view changes/init and as the bounded escalation for
+   * batches that are too large or unresolvable. Target: <6ms p95.
    */
   handleMutations(mutations: MutationRecord[]): void {
     if (!this.isActive || !this.postScorer) return;
 
+    // S11: time the REAL mutation handling — the relevance scan plus any
+    // scan dispatch — into the 'handleMutations' histogram, using the
+    // same startTimer/stopTimer pattern fullScan uses for 'fullScan'. The
+    // early return above stays untimed (nothing was handled), mirroring how
+    // fullScan excludes its own guards. p95 of this label is the fast-pass
+    // budget metric (<6ms, budget-controller FAST_PASS_TARGET).
+    this.performanceMonitor.startTimer('handleMutations');
     const startTime = performance.now();
-    let needsRescan = false;
+
+    // Resolve which post cards this batch actually touches. null means the
+    // batch is relevant but cannot be scoped (or exceeds the targeted
+    // bound) — the bounded escalation is the full page scan.
+    const affected = this.resolveAffectedPosts(mutations);
+
+    if (affected === null) {
+      this.fullScan();
+    } else if (affected.posts.size > 0 || affected.hadRemovals) {
+      this.targetedScan(affected.posts, affected.hadRemovals);
+    }
+    // else: every record in the batch was irrelevant — nothing to scan.
+
+    const elapsed = performance.now() - startTime;
+    this.totalScanMs += elapsed;
+    this.performanceMonitor.stopTimer('handleMutations');
+  }
+
+  // ========================================================================
+  // TARGETED MUTATION SCANNING (S11)
+  // ========================================================================
+
+  /**
+   * Resolve the post cards a mutation batch touches.
+   *
+   * Relevance rules are IDENTICAL to the pre-S11 gate (isRelevantNode on
+   * added/removed nodes; the same four attribute names) — this function
+   * only adds resolution of WHICH post cards were touched:
+   *
+   * - added node → itself (if it is a post card), its containing post card
+   *   (attachment landed inside one), and any post cards it contains
+   *   (a container rendered several posts at once).
+   * - removed node → the containing post card re-scans (its file set
+   *   shrank); removed post cards are dropped by targetedScan's
+   *   connectivity sweep.
+   * - attribute change → the post card the changed element belongs to.
+   *
+   * Returns null — escalate to fullScan — when a relevant record resolves
+   * to no post card (e.g. a Drive anchor added outside any post) or when
+   * the touched-post count exceeds TARGETED_SCAN_MAX_POSTS.
+   */
+  private resolveAffectedPosts(
+    mutations: MutationRecord[],
+  ): { posts: Set<HTMLElement>; hadRemovals: boolean } | null {
+    const posts = new Set<HTMLElement>();
+    let hadRemovals = false;
 
     for (const mutation of mutations) {
       // Skip mutations on our own injected elements
@@ -257,23 +349,30 @@ export class EngineV2 implements CQDEngine {
       if (target.hasAttribute?.('data-cqd-injected')) continue;
 
       if (mutation.type === 'childList') {
-        // Check if any added/removed nodes contain posts or files
         for (const node of mutation.addedNodes) {
-          if (this.isRelevantNode(node)) {
-            needsRescan = true;
-            break;
-          }
+          if (node.nodeType !== 1) continue;
+          const el = node as HTMLElement;
+          if (!this.isRelevantNode(el)) continue;
+          const before = posts.size;
+          this.collectTouchedPosts(el, posts);
+          // Relevant but resolves to no post card — the old behavior
+          // (full page scan) is the safe escalation.
+          if (posts.size === before) return null;
+          if (posts.size > TARGETED_SCAN_MAX_POSTS) return null;
         }
-        if (!needsRescan) {
-          for (const node of mutation.removedNodes) {
-            if (this.isRelevantNode(node)) {
-              needsRescan = true;
-              break;
-            }
-          }
+        for (const node of mutation.removedNodes) {
+          if (node.nodeType !== 1) continue;
+          if (!this.isRelevantNode(node as HTMLElement)) continue;
+          hadRemovals = true;
+          // The removed node is already detached (closest() can't reach
+          // it), but the post card that HELD it is still connected and its
+          // file set just shrank — re-scan that card. Removed post cards
+          // themselves are dropped by the connectivity sweep.
+          const containing = target.closest?.('[data-stream-item-id]') as HTMLElement | null;
+          if (containing) this.collectTouchedPosts(containing, posts);
         }
       } else if (mutation.type === 'attributes') {
-        // Only care about specific attribute changes
+        // Only care about specific attribute changes (same list as before S11)
         const attr = mutation.attributeName;
         if (
           attr === 'data-stream-item-id' ||
@@ -281,19 +380,164 @@ export class EngineV2 implements CQDEngine {
           attr === 'aria-expanded' ||
           attr === 'aria-label'
         ) {
-          needsRescan = true;
+          const before = posts.size;
+          this.collectTouchedPosts(target, posts);
+          if (posts.size === before) return null;
+          if (posts.size > TARGETED_SCAN_MAX_POSTS) return null;
         }
       }
 
-      if (needsRescan) break;
+      if (posts.size > TARGETED_SCAN_MAX_POSTS) return null;
     }
 
-    if (needsRescan) {
-      this.fullScan();
+    return { posts, hadRemovals };
+  }
+
+  /**
+   * Add the post card(s) an element belongs to or contains to the touched
+   * set. Applies the same nested-card skip fullScan uses (material cards
+   * nested inside assignment cards) so only top-level cards are ingested.
+   */
+  private collectTouchedPosts(el: HTMLElement, posts: Set<HTMLElement>): void {
+    if (posts.size > TARGETED_SCAN_MAX_POSTS) return; // escalation already decided
+
+    if (el.hasAttribute?.('data-stream-item-id')) {
+      if (!el.parentElement?.closest('[data-stream-item-id]')) {
+        posts.add(el);
+      }
     }
+
+    const containing = el.closest?.('[data-stream-item-id]') as HTMLElement | null;
+    if (containing && containing !== el) {
+      if (!containing.parentElement?.closest('[data-stream-item-id]')) {
+        posts.add(containing);
+      }
+    }
+
+    if (el.querySelectorAll) {
+      for (const nested of el.querySelectorAll('[data-stream-item-id]')) {
+        if (posts.size > TARGETED_SCAN_MAX_POSTS) return;
+        this.collectTouchedPosts(nested as HTMLElement, posts);
+      }
+    }
+  }
+
+  /**
+   * Scan ONLY the posts a mutation batch touched, through the same
+   * per-post pipeline fullScan runs (ingestPost → discoverFiles +
+   * detectFlags, then the same render seam). Everything about per-post
+   * semantics — PostNode map, fallback ids, flag decision recording, render
+   * dedup — is the shared code; the only difference is the loop bound.
+   *
+   * Removal parity: fullScan drops tracked posts that vanished from the
+   * DOM; a targeted batch cannot rebuild the seen-set, but the same
+   * liveness test (element.isConnected) drops exactly those posts.
+   */
+  private targetedScan(affectedPosts: Set<HTMLElement>, hadRemovals: boolean): void {
+    if (!this.isActive || !this.postScorer || !this.fileScorer) return;
+
+    // Budget gate: skip if hard cap hit (same gate as fullScan)
+    if (this.budgetController.isHardCapHit()) return;
+
+    this.performanceMonitor.startTimer('targetedScan');
+    const startTime = performance.now();
+    this.scanCount++;
+
+    // 1. INGEST the touched posts (same per-post pipeline as fullScan).
+    for (const postEl of affectedPosts) {
+      this.ingestPost(postEl);
+    }
+
+    // 2. CLEANUP — drop posts whose element left the DOM (removal parity
+    //    with fullScan's seen-set cleanup).
+    if (hadRemovals) {
+      for (const [postId, post] of this.postMap.entries()) {
+        if (!post.element.isConnected) {
+          this.postMap.delete(postId);
+          this.flagDecisions.delete(postId);
+          this.decisionTraces.delete(postId);
+        }
+      }
+    }
+
+    // 3. RENDER — flags, placements and buttons, scoped to the touched posts.
+    this.renderAffectedPosts(affectedPosts);
 
     const elapsed = performance.now() - startTime;
     this.totalScanMs += elapsed;
+
+    // 4. RECORD TIMING + BUDGET CHECK — a targeted scan IS a fast pass.
+    this.performanceMonitor.stopTimer('targetedScan');
+    this.budgetController.recordFastPass(elapsed);
+    this.budgetController.updatePostCount(this.postMap.size);
+
+    // 5. SCHEDULE DEEP VALIDATION (idle time, self-throttling — same as fullScan)
+    this.scheduleDeepValidation();
+  }
+
+  /**
+   * Render phase for a targeted scan: flag badges, placement decisions and
+   * buttons for the touched posts only.
+   *
+   * Mirrors the fullScan render seam exactly — same mode gate for flags,
+   * same ungated button path, same lastRenderApplied cycle record — with
+   * the loop bound narrowed to the affected posts. The tracked
+   * placementDecisions array stays coherent: the affected posts' old
+   * decisions (re-planned here) and any decisions whose target detached
+   * from the DOM (removed files/posts) are replaced by the fresh ones.
+   */
+  private renderAffectedPosts(affectedPosts: Set<HTMLElement>): void {
+    // Same cycle-record semantics as fullScan: the render phase starts by
+    // resetting what the last render cycle applied.
+    this.lastRenderApplied = [];
+
+    // Flags — same mode gate as renderDetectedFlags.
+    const mode = engineRegistry.getMode();
+    if (mode === 'v2' || mode === 'v3') {
+      for (const postEl of affectedPosts) {
+        const postId = postEl.getAttribute('data-stream-item-id');
+        if (!postId) continue;
+        const decision = this.flagDecisions.get(postId);
+        if (decision) this.renderFlagForPost(postId, decision);
+      }
+    }
+
+    // PLAN — only the touched posts, through the same per-post placement
+    // engine fullScan uses.
+    const affectedNodes: PostNode[] = [];
+    for (const postEl of affectedPosts) {
+      const postId = postEl.getAttribute('data-stream-item-id');
+      const post = postId ? this.postMap.get(postId) : undefined;
+      if (post) affectedNodes.push(post);
+    }
+
+    const freshDecisions: PlacementDecision[] = [];
+    for (const post of affectedNodes) {
+      freshDecisions.push(...this.planPlacementForPost(post));
+    }
+
+    // MERGE — keep every decision that is still live and does not belong to
+    // a touched post; drop detached targets (files/posts removed since the
+    // decision was planned) and the touched posts' old decisions (re-planned
+    // above). fullScan rebuilds this array wholesale; this is the targeted
+    // equivalent.
+    const kept = this.placementDecisions.filter((d) => {
+      if (!d.targetElement.isConnected) return false;
+      for (const postEl of affectedPosts) {
+        if (postEl.contains(d.targetElement)) return false;
+      }
+      return true;
+    });
+    this.placementDecisions = [...kept, ...freshDecisions];
+
+    // RENDER buttons for the fresh decisions only (ungated, mirroring
+    // renderPlacedButtons), then scoped stale-button cleanup + click wiring.
+    if (freshDecisions.length > 0) {
+      const fileMap = this.buildFileMap();
+      renderBatch(freshDecisions, fileMap);
+      this.recordRenderedButtons(freshDecisions);
+    }
+    this.cleanupAndWirePosts(affectedNodes);
   }
 
   // ========================================================================
@@ -338,35 +582,7 @@ export class EngineV2 implements CQDEngine {
       // are nested inside assignment cards
       if (postEl.parentElement?.closest('[data-stream-item-id]')) continue;
 
-      const postId =
-        postEl.getAttribute('data-stream-item-id') ||
-        `v2-fallback-${Math.random().toString(36).slice(2)}`;
-      seenPostIds.add(postId);
-
-      // Get or create the PostNode
-      let post = this.postMap.get(postId);
-      if (!post) {
-        post = {
-          id: postId,
-          element: postEl,
-          viewKind: this.currentView || ('unknown' as ViewKind),
-          files: [],
-          flags: null,
-          lastScannedAt: 0,
-        };
-        this.postMap.set(postId, post);
-        this.elementToPostId.set(postEl, postId);
-      }
-
-      // Update element reference (it might have been re-rendered)
-      post.element = postEl;
-      post.lastScannedAt = Date.now();
-
-      // 2a. EXTRACT FILES from this post
-      post.files = this.discoverFiles(postEl);
-
-      // 2b. DETECT FLAGS for this post
-      post.flags = this.detectFlags(postEl, postId);
+      seenPostIds.add(this.ingestPost(postEl));
     }
 
     // 3. CLEANUP — Remove posts that are no longer in the DOM
@@ -378,12 +594,16 @@ export class EngineV2 implements CQDEngine {
       }
     }
 
-    // 4. PLAN PLACEMENTS (compute-only, no rendering)
+    // 4. PLAN PLACEMENTS
     this.placementDecisions = this.planPlacements();
 
-    // V2 is detection-only: NO rendering. Legacy handles all visuals.
-    // this.renderDetectedFlags();    ← removed: legacy badges are perfect
-    // this.renderPlacedButtons();    ← removed: legacy buttons are perfect
+    // 4b. RENDER — through the render strategy. The strategy self-gates on
+    // mode: as the PRIMARY engine ('v2'/'v3') V2 renders its own flags and
+    // buttons; as the shadow secondary ('legacy'/'shadow') it is a no-op and
+    // V1 keeps handling all visuals (D8: a primary that renders nothing is
+    // the Liskov failure that made 'v2' mode a black hole).
+    this.renderDetectedFlags();
+    this.renderPlacedButtons();
 
     const elapsed = performance.now() - startTime;
     this.totalScanMs += elapsed;
@@ -454,6 +674,52 @@ export class EngineV2 implements CQDEngine {
   }
 
   // ========================================================================
+  // PER-POST PIPELINE (shared by fullScan and targetedScan)
+  // ========================================================================
+
+  /**
+   * Run one post element through the per-post pipeline: resolve/create its
+   * PostNode, extract files, detect flags. This is the EXACT work
+   * fullScan performs per post — targetedScan reuses it verbatim so
+   * detection semantics cannot drift between the two scan paths.
+   *
+   * @returns The post id the element was ingested under (caller adds it to
+   * its seen-set; fullScan uses it for removal cleanup).
+   */
+  private ingestPost(postEl: HTMLElement): string {
+    const postId =
+      postEl.getAttribute('data-stream-item-id') ||
+      `v2-fallback-${Math.random().toString(36).slice(2)}`;
+
+    // Get or create the PostNode
+    let post = this.postMap.get(postId);
+    if (!post) {
+      post = {
+        id: postId,
+        element: postEl,
+        viewKind: this.currentView || ('unknown' as ViewKind),
+        files: [],
+        flags: null,
+        lastScannedAt: 0,
+      };
+      this.postMap.set(postId, post);
+      this.elementToPostId.set(postEl, postId);
+    }
+
+    // Update element reference (it might have been re-rendered)
+    post.element = postEl;
+    post.lastScannedAt = Date.now();
+
+    // EXTRACT FILES from this post
+    post.files = this.discoverFiles(postEl);
+
+    // DETECT FLAGS for this post
+    post.flags = this.detectFlags(postEl, postId);
+
+    return postId;
+  }
+
+  // ========================================================================
   // FILE DISCOVERY
   // ========================================================================
 
@@ -472,11 +738,18 @@ export class EngineV2 implements CQDEngine {
   private discoverFiles(postEl: HTMLElement): FileNode[] {
     if (!this.fileScorer) return [];
 
-    const fileResult = this.fileScorer.queryAll(postEl);
+    // z57 S2: the UNION across candidates — one post routinely mixes Drive
+    // and Docs attachments, each matched by a different candidate at the same
+    // priority, and queryAll's single-winner semantics would drop every kind
+    // but the best candidate's.
+    const fileResult = this.fileScorer.queryAllCandidates(postEl);
     const files: FileNode[] = [];
     const seenIds = new Set<string>();
+    const seenElements = new Set<HTMLElement>();
 
     for (const el of fileResult.allElements) {
+      if (seenElements.has(el)) continue;
+      seenElements.add(el);
       const file = this.extractFileNode(el);
       if (file && !seenIds.has(file.canonicalId)) {
         seenIds.add(file.canonicalId);
@@ -495,10 +768,12 @@ export class EngineV2 implements CQDEngine {
    * (due to authuser, hl params) will get the same canonical ID.
    */
   private extractFileNode(el: HTMLElement): FileNode | null {
-    // Determine the source URL
+    // Determine the source URL — Drive AND Docs anchors qualify (z57 S2).
     const href = el.tagName === 'A'
       ? (el as HTMLAnchorElement).href
-      : el.querySelector<HTMLAnchorElement>('a[href*="drive.google.com"]')?.href;
+      : el.querySelector<HTMLAnchorElement>(
+          'a[href*="drive.google.com"], a[href*="docs.google.com"], a[href*="classroom.google.com/drive"]',
+        )?.href;
 
     if (!href) return null;
 
@@ -545,11 +820,20 @@ export class EngineV2 implements CQDEngine {
     let name = '';
     let ext = '';
 
-    // Try aria-label first (most complete name)
+    // Try aria-label first (most complete name). Classroom prefixes
+    // attachment aria-labels with "Attachment: " — V1's text-based extraction
+    // never carried the prefix, so strip it to keep data-cqd-name identical.
     const ariaLabel = el.getAttribute('aria-label') ||
       el.querySelector('[aria-label]')?.getAttribute('aria-label');
     if (ariaLabel) {
-      name = ariaLabel;
+      name = ariaLabel.replace(/^attachment:\s*/i, '').trim() || ariaLabel;
+    }
+
+    // Fall back to the anchor's visible text (first non-empty line), mirroring
+    // V1's extractFileMeta text fallback.
+    if (!name) {
+      const line = (el.textContent || '').split('\n').map(l => l.trim()).find(Boolean);
+      if (line) name = line;
     }
 
     // Try to extract extension from the URL or name
@@ -560,9 +844,12 @@ export class EngineV2 implements CQDEngine {
 
     return {
       canonicalId,
-      name: name || 'Untitled',
+      name: name ? sanitizeFileName(name) : 'Untitled',
       ext,
-      downloadUrl: href,
+      // The model carries the CONVERTED direct-download URL (docs → Drive
+      // byte-serving endpoint), so every downstream consumer (button dataset,
+      // click request, group enumeration) sees one canonical URL.
+      downloadUrl: resolveDownloadUrl(href),
       element: el,
       idSource,
     };
@@ -634,6 +921,11 @@ export class EngineV2 implements CQDEngine {
    * detection-only and this method is a no-op.
    */
   private renderDetectedFlags(): void {
+    // S5 additive: the render cycle starts here — renderDetectedFlags runs
+    // first in every fullScan, so resetting at its start gives both render
+    // strategies one shared per-cycle record (buttons append after flags).
+    this.lastRenderApplied = [];
+
     // Only render when V2 is the primary engine
     const mode = engineRegistry.getMode();
     if (mode !== 'v2' && mode !== 'v3') {
@@ -642,17 +934,28 @@ export class EngineV2 implements CQDEngine {
     }
 
     for (const [postId, decision] of this.flagDecisions) {
-      const postNode = this.postMap.get(postId);
-      if (!postNode?.element || !postNode.element.isConnected) {
-        // Post was removed from DOM — skip rendering
-        continue;
-      }
+      this.renderFlagForPost(postId, decision);
+    }
+  }
 
-      try {
-        renderFlagBadge(decision, postNode.element);
-      } catch (err) {
-        console.warn(`[Engine V2] Flag render failed for post ${postId}:`, err);
-      }
+  /**
+   * Render the flag badge for ONE post (per-post body of
+   * renderDetectedFlags — shared with the S11 targeted render path).
+   */
+  private renderFlagForPost(postId: string, decision: FlagDecision): void {
+    const postNode = this.postMap.get(postId);
+    if (!postNode?.element || !postNode.element.isConnected) {
+      // Post was removed from DOM — skip rendering
+      return;
+    }
+
+    try {
+      renderFlagBadge(decision, postNode.element);
+      // S5 additive: the flag is on the DOM — record it (inside the try,
+      // so a failed render is not recorded as applied).
+      this.lastRenderApplied.push({ postId, kind: 'flag' });
+    } catch (err) {
+      console.warn(`[Engine V2] Flag render failed for post ${postId}:`, err);
     }
   }
 
@@ -721,6 +1024,10 @@ export class EngineV2 implements CQDEngine {
   private handleCorrection(item: import('../../v2/repair/deep-validator').CorrectionItem): boolean {
     if (!this.isActive) return false;
 
+    // S5 additive: publish hook for the HardenEngine role — one call per
+    // correction actually handled, before any op-specific repair runs.
+    this.onCorrectionSeen?.(item);
+
     try {
       switch (item.op) {
         case 'inject-button': {
@@ -746,12 +1053,10 @@ export class EngineV2 implements CQDEngine {
         case 'remove-flag': {
           const post = this.postMap.get(item.postId);
           if (!post) return false;
-          const badge = post.element.querySelector('.cqd-v2-flag');
-          if (badge) badge.remove();
-          const overlay = post.element.querySelector('.cqd-v2-overlay');
-          if (overlay) overlay.remove();
-          post.element.removeAttribute('data-cqd-v2-flag');
-          post.element.removeAttribute('data-cqd-v2-flag-verdict');
+          // z57 S4: flag artifacts carry the V2 marker attribute.
+          for (const el of Array.from(post.element.querySelectorAll('[data-cqd-v2-flag]'))) {
+            el.remove();
+          }
           return true;
         }
 
@@ -796,38 +1101,47 @@ export class EngineV2 implements CQDEngine {
     const allDecisions: PlacementDecision[] = [];
 
     for (const post of this.postMap.values()) {
-      // Convert PostNode → ScannedPost for the placement engine
-      // The placement engine uses ScannedPost/ScannedFile types from dom-scanner
-      // which are structurally compatible with PostNode/FileNode
-      const scannedPost: ScannedPost = {
-        id: post.id,
-        element: post.element,
-        fingerprint: `${post.id}-${post.files.length}-${post.lastScannedAt}`,
-        files: post.files.map((f): ScannedFile => ({
-          canonicalId: f.canonicalId,
-          element: f.element,
-          idSource: f.idSource,
-          name: f.name,
-          ext: f.ext,
-          downloadUrl: f.downloadUrl,
-        })),
-        isExpanded: true, // Default to expanded — accordion check done by recipe
-        isConnected: post.element.isConnected,
-      };
-
-      // Check accordion state for classwork views
-      // If the post has an aria-expanded attribute, use its value
-      const expandToggle = post.element.querySelector('[aria-expanded]');
-      if (expandToggle) {
-        scannedPost.isExpanded = expandToggle.getAttribute('aria-expanded') === 'true';
-      }
-
-      // Compute placement decisions for this post
-      const postDecisions = computePlacement(scannedPost, this.currentView);
-      allDecisions.push(...postDecisions);
+      allDecisions.push(...this.planPlacementForPost(post));
     }
 
     return allDecisions;
+  }
+
+  /**
+   * Compute placement decisions for ONE post (per-post body of
+   * planPlacements — shared with the S11 targeted render path).
+   */
+  private planPlacementForPost(post: PostNode): PlacementDecision[] {
+    if (!this.currentView) return [];
+
+    // Convert PostNode → ScannedPost for the placement engine
+    // The placement engine uses ScannedPost/ScannedFile types from dom-scanner
+    // which are structurally compatible with PostNode/FileNode
+    const scannedPost: ScannedPost = {
+      id: post.id,
+      element: post.element,
+      fingerprint: `${post.id}-${post.files.length}-${post.lastScannedAt}`,
+      files: post.files.map((f): ScannedFile => ({
+        canonicalId: f.canonicalId,
+        element: f.element,
+        idSource: f.idSource,
+        name: f.name,
+        ext: f.ext,
+        downloadUrl: f.downloadUrl,
+      })),
+      isExpanded: true, // Default to expanded — accordion check done by recipe
+      isConnected: post.element.isConnected,
+    };
+
+    // Check accordion state for classwork views
+    // If the post has an aria-expanded attribute, use its value
+    const expandToggle = post.element.querySelector('[aria-expanded]');
+    if (expandToggle) {
+      scannedPost.isExpanded = expandToggle.getAttribute('aria-expanded') === 'true';
+    }
+
+    // Compute placement decisions for this post
+    return computePlacement(scannedPost, this.currentView);
   }
 
   /**
@@ -845,7 +1159,23 @@ export class EngineV2 implements CQDEngine {
   private renderPlacedButtons(): void {
     if (this.placementDecisions.length === 0) return;
 
-    // Build a file map for the renderer
+    // Render all buttons in one batch
+    const fileMap = this.buildFileMap();
+    renderBatch(this.placementDecisions, fileMap);
+
+    // S5 additive: record what the batch applied (see recordRenderedButtons).
+    this.recordRenderedButtons(this.placementDecisions);
+
+    // Clean up stale buttons (files removed since last scan) + click wiring.
+    this.cleanupAndWirePosts(this.postMap.values());
+  }
+
+  /**
+   * Build the canonical file-id → ScannedFile map the batch renderer
+   * resolves decisions by (per-post body extracted for the S11 targeted
+   * render path; pure in-memory work over the post map).
+   */
+  private buildFileMap(): Map<string, ScannedFile> {
     const fileMap = new Map<string, ScannedFile>();
     for (const post of this.postMap.values()) {
       for (const file of post.files) {
@@ -859,16 +1189,62 @@ export class EngineV2 implements CQDEngine {
         });
       }
     }
+    return fileMap;
+  }
 
-    // Render all buttons in one batch
-    renderBatch(this.placementDecisions, fileMap);
+  /**
+   * Record which placement decisions the last render batch applied (S5
+   * additive — runs only after renderBatch returns, so a batch that throws
+   * leaves the cycle with no button entries). postId is resolved without
+   * DOM: a download-all decision carries it in its fileId, a single-file
+   * decision maps through the post's own file list. Decisions whose post
+   * cannot be resolved were not rendered by the batch either, so they are
+   * not recorded as applied.
+   */
+  private recordRenderedButtons(decisions: PlacementDecision[]): void {
+    const fileToPost = new Map<string, string>();
+    for (const [pid, post] of this.postMap) {
+      for (const f of post.files) fileToPost.set(f.canonicalId, pid);
+      fileToPost.set(`download-all:${pid}`, pid);
+    }
+    for (const decision of decisions) {
+      const pid = fileToPost.get(decision.fileId);
+      if (pid !== undefined) {
+        this.lastRenderApplied.push({ postId: pid, kind: 'button' });
+      }
+    }
+  }
 
-    // Clean up stale buttons (files that were removed since last scan)
-    for (const post of this.postMap.values()) {
+  /**
+   * Remove stale buttons (files that no longer exist in the post) and
+   * ensure the delegated click wiring, for the given posts. Per-post body
+   * extracted from renderPlacedButtons so the S11 targeted path applies
+   * the same lifecycle to just the touched posts.
+   */
+  private cleanupAndWirePosts(posts: Iterable<PostNode>): void {
+    // Materialize once: the caller may pass a live Map iterator
+    // (renderPlacedButtons passes postMap.values()), and this function walks
+    // the posts twice — stale-button cleanup first, then click wiring. A
+    // consumed iterator would silently skip the wiring pass and leave every
+    // button dead (caught by qa-02/06/08, 2026-09-17).
+    const postList = Array.from(posts);
+
+    for (const post of postList) {
       const validIds = new Set(post.files.map(f => f.canonicalId));
       // Also keep the Download All button
       validIds.add(`download-all:${post.id}`);
       removeStaleButtons(post.element, validIds);
+    }
+
+    // z57 S1: the render seam owns the button lifecycle, so the delegated
+    // click wiring lives here too — every rendered post root gets the one
+    // delegated handler routing clicks into the download pipeline.
+    for (const post of postList) {
+      try {
+        ensurePostClickWiring(post.element);
+      } catch (err) {
+        console.warn(`[Engine V2] Click wiring failed for post ${post.id}:`, err);
+      }
     }
   }
 
@@ -892,6 +1268,11 @@ export class EngineV2 implements CQDEngine {
     return this.decisionTraces.get(postId) ?? null;
   }
 
+  /** S5 additive: what the last render cycle applied, for the RenderEngine role. */
+  getLastRenderApplied(): Array<{ postId: string; kind: 'button' | 'flag' | 'all' }> {
+    return this.lastRenderApplied;
+  }
+
   // ========================================================================
   // PHASE 5 PUBLIC API — Telemetry + Repair
   // ========================================================================
@@ -901,6 +1282,43 @@ export class EngineV2 implements CQDEngine {
    */
   getPerformanceSummary(): PerformanceSummary {
     return this.performanceMonitor.getPerformanceSummary();
+  }
+
+  /**
+   * Get the handleMutations timing histogram (S11 additive).
+   *
+   * The p95 of this label is the fast-pass budget metric (<6ms per mutation
+   * batch, budget-controller FAST_PASS_TARGET). The qa-perf journey reads it
+   * through the `window.__cqdPerfSnapshot()` debug probe, and the debug panel
+   * can read it here without reaching into the private monitor.
+   */
+  getMutationTimings(): TimingPercentiles | null {
+    return this.performanceMonitor.getPercentiles('handleMutations');
+  }
+
+  /**
+   * S11 #615 selector audit: how the CURRENT file map's canonical ids
+   * resolved. `extractFileNode` resolves ids through a priority chain
+   * (data-drive-id → URL parse → data-id combo → URL hash); url-hash is the
+   * last-resort fallback that depends on volatile URL text, so a rising
+   * hashIdRate is the early warning that Classroom changed its attachment
+   * markup (ENGINE_V4_SYSTEM_DESIGN §5 rule 1). Exposed through the
+   * `window.__cqdPerfSnapshot()` debug probe alongside the timings.
+   */
+  getSelectorStats(): SelectorStats {
+    let totalFiles = 0;
+    let hashIdCount = 0;
+    for (const post of this.postMap.values()) {
+      for (const file of post.files) {
+        totalFiles++;
+        if (file.idSource === 'url-hash') hashIdCount++;
+      }
+    }
+    return {
+      hashIdCount,
+      totalFiles,
+      hashIdRate: totalFiles > 0 ? hashIdCount / totalFiles : 0,
+    };
   }
 
   /**
@@ -947,7 +1365,7 @@ export class EngineV2 implements CQDEngine {
       }
 
       // Check duplicate badges
-      const badges = post.element.querySelectorAll('.cqd-v2-flag');
+      const badges = post.element.querySelectorAll('[data-cqd-v2-flag="badge"]');
       if (badges.length > 1) {
         duplicates += badges.length - 1;
       }
@@ -983,7 +1401,7 @@ export class EngineV2 implements CQDEngine {
       if (!post) continue;
       flagChecks++;
 
-      const badge = post.element.querySelector('.cqd-v2-flag');
+      const badge = post.element.querySelector('[data-cqd-v2-flag="badge"]');
       const hasBadge = !!badge;
       const wantsBadge = decision.finalVerdict !== 'none';
 
@@ -1033,7 +1451,8 @@ export class EngineV2 implements CQDEngine {
     if (
       el.querySelector?.('[data-stream-item-id]') ||
       el.querySelector?.('[data-drive-id]') ||
-      el.querySelector?.('a[href*="drive.google.com"]')
+      el.querySelector?.('a[href*="drive.google.com"]') ||
+      el.querySelector?.('a[href*="docs.google.com"]')
     ) {
       return true;
     }
@@ -1050,6 +1469,11 @@ export class EngineV2 implements CQDEngine {
    *
    * Timeout: 5 seconds max. If no posts appear, we scan anyway
    * (the page might genuinely have no posts).
+   *
+   * S10: the wait rides the shared page DomPort as a transient
+   * subscription instead of constructing a dedicated MutationObserver.
+   * The port delivers batches containing childList records; each of the
+   * three exit paths (ready, timeout, abort) owns its unsubscribe.
    */
   private waitForContentReady(signal: AbortSignal): Promise<void> {
     return new Promise<void>((resolve) => {
@@ -1059,32 +1483,30 @@ export class EngineV2 implements CQDEngine {
         return;
       }
 
-      // Set up a MutationObserver to wait for posts
-      const observer = new MutationObserver(() => {
-        if (document.querySelector('[data-stream-item-id]')) {
-          observer.disconnect();
-          clearTimeout(timeout);
-          resolve();
-        }
-      });
+      // Transient subscription on the shared page observer
+      const unsubscribe = getPageDomPort().observe(
+        { childList: true, subtree: true },
+        () => {
+          if (document.querySelector('[data-stream-item-id]')) {
+            unsubscribe();
+            clearTimeout(timeout);
+            resolve();
+          }
+        },
+      );
 
       // Timeout after 5 seconds
       const timeout = setTimeout(() => {
-        observer.disconnect();
+        unsubscribe();
         resolve();
       }, 5000);
 
       // If the signal is aborted, clean up
       signal.addEventListener('abort', () => {
-        observer.disconnect();
+        unsubscribe();
         clearTimeout(timeout);
         resolve();
       }, { once: true });
-
-      observer.observe(document.body, {
-        childList: true,
-        subtree: true,
-      });
     });
   }
 }

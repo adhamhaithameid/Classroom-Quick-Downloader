@@ -2,203 +2,36 @@
 import { DOWNLOAD_ICON_SVG_URL, SUCCESS_ICON_SVG_URL, CANCEL_ICON_SVG_URL } from './icons';
 
 const STYLE_ID = 'cqd-style';
+const STYLE_ID_STUDENT_WORK = 'cqd-sw-style';
 const SPINNER_SIZE_PX = 16;
 
 const TRANSITION_MS = 120; // Reduced from 150ms for snappier feel
 const TRANSITION_STR = `${TRANSITION_MS}ms cubic-bezier(0.2, 0, 0, 1)`;
 
-export function injectStyles(): void {
-  if (typeof document === 'undefined') return;
-  if (document.getElementById(STYLE_ID)) return;
+// =============================================================================
+// S11 (S10-parked de-dupe): SINGLE SOURCE for the download-button CSS emitted
+// by BOTH sheets — the FULL V1 sheet (injectStyles) and the student-work
+// SCOPED sheet (injectStudentWorkStyles). The declarations exist exactly once,
+// here. Tokens, substituted by renderSharedButtonSheet():
+//   %CQD_BTN%         row-button selector — FULL: '.cqd-download-btn';
+//                     SW: the data-cqd-sw :is(...) scope argument
+//   %CQD_ALL%         download-all selector — FULL: '.cqd-download-all-btn';
+//                     SW: the by-status host-scoped descendant
+//   %CQD_KF%          cancel/pulse keyframe prefix — FULL: '' (cancelClick);
+//                     SW: 'cqdSw' so the coexisting sheets keep distinct
+//                     keyframe namespaces
+//   %CQD_D%           descendant prefix for the bare helper classes
+//                     (.cqd-download-icon / .cqd-error-detail / .cqd-spinner) —
+//                     FULL: '' (page-wide classes are FULL-sheet property);
+//                     SW: button-scoped so nothing leaks to V2-owned buttons
+//   %CQD_ICON_SIZES%  FULL-only icon-size utilities; '' in the SW sheet
+//   %CQD_BETWEEN%     FULL-only overlay/flag sections + the Download-All
+//                     header; the SW sheet keeps only its own header
+// The FULL sheet's rendered output stays byte-identical to the pre-de-dupe
+// text; the scoped sheet renders the same declaration blocks.
+// =============================================================================
 
-  const style = document.createElement('style');
-  style.id = STYLE_ID;
-  style.textContent = `
-    :root {
-      --cqd-transition: ${TRANSITION_STR};
-
-      /* Spinner */
-      --cqd-spinner-border: rgba(255, 255, 255, 0.22);
-      --cqd-spinner-top: #ffffff;
-
-      /* =================================================================
-       * COLOR PALETTE (Light)
-       * ================================================================= */
-      --cqd-color-normal: #005DD7;
-      --cqd-shadow-normal: 0 8px 22px rgba(0, 93, 215, 0.40);
-      --cqd-shadow-normal-strong: 0 12px 28px rgba(0, 93, 215, 0.70);
-
-      --cqd-color-success: #00A82D;
-      --cqd-shadow-success: 0 12px 28px rgba(0, 168, 45, 0.40);
-      --cqd-shadow-success-strong: 0 12px 28px rgba(0, 168, 45, 0.70);
-
-      --cqd-color-error: #FF4036;
-      --cqd-shadow-error: 0 12px 28px rgba(255, 64, 54, 0.40);
-      --cqd-shadow-error-strong: 0 12px 28px rgba(255, 64, 54, 0.70);
-
-      --cqd-color-trying: #FFD93D;
-      --cqd-shadow-trying: 0 12px 28px rgba(255, 217, 61, 0.40);
-      --cqd-shadow-trying-strong: 0 12px 28px rgba(255, 217, 61, 0.70);
-
-      --cqd-color-cancel: #EC6300;
-      --cqd-shadow-cancel: 0 12px 28px rgba(236, 99, 0, 0.40);
-      --cqd-shadow-cancel-strong: 0 12px 28px rgba(236, 99, 0, 0.70);
-
-      --cqd-color-comment: #9B00FF;
-      --cqd-color-edited: #007F8D;
-
-      --cqd-shadow-base: 0 0px 10px rgba(15, 23, 42, 0.22);
-      --cqd-shadow-hover: 0 10px 24px rgba(15, 23, 42, 0.30);
-    }
-
-    /* =================================================================
-     * DARK MODE
-     * ================================================================= */
-    .cqd-theme-dark {
-      --cqd-color-normal: #006EFF;
-      --cqd-shadow-normal: 0 8px 22px rgba(0, 110, 255, 0.40);
-      --cqd-shadow-normal-strong: 0 12px 28px rgba(0, 110, 255, 0.70);
-
-      --cqd-color-success: #07DA3F;
-      --cqd-shadow-success: 0 12px 28px rgba(7, 218, 63, 0.40);
-      --cqd-shadow-success-strong: 0 12px 28px rgba(7, 218, 63, 0.70);
-
-      --cqd-color-error: #FF4036;
-      --cqd-shadow-error: 0 12px 28px rgba(255, 64, 54, 0.40);
-      --cqd-shadow-error-strong: 0 12px 28px rgba(255, 64, 54, 0.70);
-
-      --cqd-color-trying: #FFD93D;
-      --cqd-shadow-trying: 0 12px 28px rgba(255, 217, 61, 0.40);
-      --cqd-shadow-trying-strong: 0 12px 28px rgba(255, 217, 61, 0.70);
-
-      --cqd-color-cancel: #FF9142;
-      --cqd-shadow-cancel: 0 12px 28px rgba(255, 145, 66, 0.40);
-      --cqd-shadow-cancel-strong: 0 12px 28px rgba(255, 145, 66, 0.70);
-
-      --cqd-color-comment: #9B00FF;
-      --cqd-color-edited: #00D6EE;
-
-      --cqd-spinner-border: rgba(15, 23, 42, 0.22);
-      --cqd-spinner-top: #0f172a;
-    }
-
-    div[data-stream-item-id] {
-      overflow: visible !important;
-      contain: none !important;
-      z-index: 1;
-    }
-
-    /* Classwork tab: li elements with data-stream-item-id */
-    li[data-stream-item-id] {
-      overflow: visible !important;
-      contain: none !important;
-      position: relative;
-      z-index: 1;
-    }
-
-    /* Classwork tab: ensure header row has proper flex display for button placement */
-    li[data-stream-item-id] .jWCzBe.gmNu1d {
-      display: flex !important;
-      flex-wrap: wrap !important;
-      align-items: center !important;
-    }
-
-    /* Classwork tab: button styling within header */
-    li[data-stream-item-id] .cqd-download-all-btn {
-      margin-inline-end: 8px;
-    }
-
-    /* Classwork tab: flag badges positioning */
-    li[data-stream-item-id] .cqd-flag,
-    li[data-stream-item-id] .cqd-comment-badge,
-    li[data-stream-item-id] .cqd-edited-badge,
-    li[data-stream-item-id] .cqd-both-badge {
-      z-index: 9999;
-    }
-
-    /* ===============================
-     * 1. DOWNLOAD BUTTON (Single)
-     * =============================== */
-    .cqd-download-btn {
-      position: absolute;
-      top: 50%;
-      right: 8px;
-      z-index: 5;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      height: 40px;
-      width: auto;
-      min-width: 40px;
-      max-width: 40px;
-      padding: 0;
-      border: none;
-      border-radius: 9999px;
-      background-color: var(--cqd-color-normal);
-      color: #ffffff;
-      box-shadow: var(--cqd-shadow-base);
-      cursor: pointer;
-      transform: translateY(-50%) scale(1);
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      font-size: 13px;
-      font-weight: 600;
-      white-space: nowrap;
-      overflow: hidden;
-      will-change: transform, box-shadow, width, border-radius, padding-inline;
-      transition:
-        max-width var(--cqd-transition),
-        padding-inline var(--cqd-transition),
-        border-radius var(--cqd-transition),
-        box-shadow var(--cqd-transition),
-        transform var(--cqd-transition),
-        background-color var(--cqd-transition);
-    }
-
-    body[data-cqd-dir="rtl"] .cqd-download-btn {
-      right: auto;
-      left: 8px;
-    }
-
-    .cqd-download-btn:not(.cqd-loading):not(.cqd-trying):not(.cqd-success):not(.cqd-error):hover {
-      width: auto;
-      max-width: 250px;
-      padding-inline: 12px;
-      box-shadow: var(--cqd-shadow-hover);
-      justify-content: flex-start;
-      transform: translateY(-50%) scale(1);
-      border-radius: 20px;
-    }
-
-    .cqd-download-btn:focus-visible {
-      outline: 2px solid #ffffff;
-      outline-offset: 2px;
-      transform: scale(0.97);
-    }
-
-    .cqd-download-btn:active {
-      transform: translateY(-50%) scale(0.97);
-    }
-
-    .cqd-download-btn .cqd-icon-wrapper {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-
-    .cqd-download-icon {
-      display: block;
-      width: 24px;
-      height: 24px;
-      background-image: url("${DOWNLOAD_ICON_SVG_URL}");
-      background-repeat: no-repeat;
-      background-position: center;
-      background-size: 24px 24px;
-      flex-shrink: 0;
-      transform-origin: center;
-      transition: width var(--cqd-transition), height var(--cqd-transition);
-    }
-
+const FULL_SHEET_ICON_SIZES = `
     .cqd-icon-small {
       width: 16px;
       height: 16px;
@@ -216,212 +49,9 @@ export function injectStyles(): void {
       height: 32px;
       background-size: 32px 32px;
     }
+`;
 
-    .cqd-download-btn .cqd-label {
-      opacity: 0;
-      margin-left: 0;
-      max-width: 0;
-      overflow: hidden;
-      transition: opacity var(--cqd-transition), max-width var(--cqd-transition), margin-left var(--cqd-transition);
-    }
-
-    .cqd-download-btn:not(.cqd-loading):not(.cqd-trying):not(.cqd-success):not(.cqd-error):hover .cqd-label {
-      opacity: 1;
-      max-width: 150px;
-      margin-left: 4px;
-    }
-
-    .cqd-download-btn.cqd-loading,
-    .cqd-download-btn.cqd-trying,
-    .cqd-download-btn.cqd-success,
-    .cqd-download-btn.cqd-error {
-      padding-inline: 12px;
-      border-radius: 20px;
-      justify-content: flex-start;
-      box-shadow: var(--cqd-shadow-normal);
-      width: auto;
-      min-width: 140px; /* Consistent width to prevent hover stuttering */
-      max-width: 300px;
-      transform: translateY(-50%) scale(1);
-    }
-
-    .cqd-download-btn.cqd-trying {
-      background-color: var(--cqd-color-trying);
-      box-shadow: var(--cqd-shadow-trying);
-    }
-
-    .cqd-download-btn.cqd-loading:hover {
-      box-shadow: var(--cqd-shadow-normal-strong);
-    }
-
-    .cqd-download-btn.cqd-trying:hover {
-      box-shadow: var(--cqd-shadow-trying-strong);
-    }
-
-    .cqd-download-btn.cqd-cancel,
-    .cqd-download-btn.cqd-cancelled {
-      background-color: var(--cqd-color-cancel);
-      box-shadow: var(--cqd-shadow-cancel);
-      padding-inline: 12px;
-      border-radius: 20px;
-      justify-content: flex-start;
-      width: auto;
-      min-width: 140px;
-      max-width: 300px;
-      transform: translateY(-50%) scale(1);
-      transition: all var(--cqd-transition);
-      cursor: pointer;
-    }
-
-    /* Cancel state - smooth entry animation when hover starts */
-    .cqd-download-btn.cqd-loading:hover,
-    .cqd-download-btn.cqd-trying:hover {
-      transition: background-color 0.2s ease-out, box-shadow 0.2s ease-out;
-    }
-
-    .cqd-download-btn.cqd-cancelled {
-      cursor: not-allowed;
-      filter: saturate(0.85) brightness(0.95); /* No transparency, just subtle desaturation */
-      /* Click animation class applied via JS */
-    }
-
-    /* Click animation: cancel → cancelled */
-    @keyframes cancelClick {
-      0% {
-        transform: translateY(-50%) scale(1);
-      }
-      30% {
-        transform: translateY(-50%) scale(1.08);
-      }
-      60% {
-        transform: translateY(-50%) scale(0.96);
-      }
-      100% {
-        transform: translateY(-50%) scale(1);
-      }
-    }
-
-    .cqd-download-btn.cqd-cancel-click-anim {
-      animation: cancelClick 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-    }
-
-    .cqd-download-btn.cqd-cancel:hover {
-      transform: translateY(-50%) scale(1.05);
-      box-shadow: var(--cqd-shadow-cancel-strong);
-    }
-
-    .cqd-download-btn.cqd-cancel .cqd-label,
-    .cqd-download-btn.cqd-cancelled .cqd-label {
-      opacity: 1;
-      max-width: 150px;
-      margin-left: 12px;
-    }
-
-    /* Cancel icon pulse animation */
-    .cqd-download-btn.cqd-cancel .cqd-download-icon {
-      animation: cancelPulse 1.5s ease-in-out infinite;
-    }
-
-    @keyframes cancelPulse {
-      0%, 100% {
-        transform: scale(1) rotate(0deg);
-      }
-      50% {
-        transform: scale(1.1) rotate(15deg);
-      }
-    }
-
-    .cqd-download-btn.cqd-loading .cqd-label,
-    .cqd-download-btn.cqd-trying .cqd-label {
-      opacity: 1;
-      max-width: 150px;
-      margin-left: 12px;
-    }
-
-    .cqd-download-btn.cqd-success {
-      background-color: var(--cqd-color-success);
-      box-shadow: var(--cqd-shadow-success);
-    }
-
-    .cqd-download-btn.cqd-success:hover {
-      box-shadow: var(--cqd-shadow-success-strong);
-    }
-
-    .cqd-download-btn.cqd-success .cqd-label {
-      opacity: 1;
-      max-width: 150px;
-      margin-left: 8px;
-    }
-
-    .cqd-download-btn.cqd-error {
-      width: auto;
-      min-width: 90px;
-      background-color: var(--cqd-color-error);
-      box-shadow: var(--cqd-shadow-error);
-      height: 40px;
-      max-width: 150px;
-      max-height: 40px;
-      padding: 0 12px;
-      padding-top: 0;
-      padding-bottom: 0;
-      align-items: center;
-      transition: all var(--cqd-transition);
-    }
-
-    .cqd-error-detail {
-      display: block;
-      font-size: 11px;
-      font-weight: 500;
-      line-height: 1.3;
-      margin: 0;
-      opacity: 0;
-      max-height: 0;
-      overflow: hidden;
-      white-space: normal;
-      transform: translateY(4px);
-      transition: all var(--cqd-transition);
-    }
-
-    .cqd-download-btn.cqd-error:hover {
-      width: 350px;
-      max-width: 360px;
-      height: 60px;
-      max-height: 61px;
-      padding: 8px;
-      border-radius: 18px;
-      align-items: center;
-      gap: 7px;
-      box-shadow: var(--cqd-shadow-error-strong);
-    }
-
-    .cqd-download-btn.cqd-error:hover .cqd-label {
-      opacity: 0;
-      max-width: 0;
-      margin: 0;
-    }
-
-    .cqd-download-btn.cqd-error:hover .cqd-error-detail {
-      opacity: 1;
-      max-height: 60px;
-      margin-top: 4px;
-      transform: translateY(0);
-    }
-
-    .cqd-spinner {
-      background-image: none;
-      border-radius: 9999px;
-      width: ${SPINNER_SIZE_PX}px;
-      height: ${SPINNER_SIZE_PX}px;
-      border: 3px solid var(--cqd-spinner-border);
-      border-top-color: var(--cqd-spinner-top);
-      animation: cqd-spin 0.65s linear infinite;
-    }
-
-    @keyframes cqd-spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
-
+const FULL_SHEET_BETWEEN = `
     /* ===============================
      * 2. COMMENTS & EDITED (Overlay)
      * =============================== */
@@ -922,8 +552,301 @@ export function injectStyles(): void {
 
     /* ===============================
      * 1b. DOWNLOAD ALL BUTTON (Header-aligned)
-     * =============================== */
-    .cqd-download-all-btn {
+     * =============================== */`;
+
+const SW_BETWEEN_HEADER = `
+    /* ===============================
+     * DOWNLOAD ALL (by-status board control)
+     * =============================== */`;
+
+// NOTE: the template starts straight after the backtick and is NOT trimmed —
+// the leading indent of the first rule is significant CSS text.
+export const SHARED_BUTTON_SHEET = `    %CQD_BTN% {
+      position: absolute;
+      top: 50%;
+      right: 8px;
+      z-index: 5;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 40px;
+      width: auto;
+      min-width: 40px;
+      max-width: 40px;
+      padding: 0;
+      border: none;
+      border-radius: 9999px;
+      background-color: var(--cqd-color-normal);
+      color: #ffffff;
+      box-shadow: var(--cqd-shadow-base);
+      cursor: pointer;
+      transform: translateY(-50%) scale(1);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      will-change: transform, box-shadow, width, border-radius, padding-inline;
+      transition:
+        max-width var(--cqd-transition),
+        padding-inline var(--cqd-transition),
+        border-radius var(--cqd-transition),
+        box-shadow var(--cqd-transition),
+        transform var(--cqd-transition),
+        background-color var(--cqd-transition);
+    }
+
+    body[data-cqd-dir="rtl"] %CQD_BTN% {
+      right: auto;
+      left: 8px;
+    }
+
+    %CQD_BTN%:not(.cqd-loading):not(.cqd-trying):not(.cqd-success):not(.cqd-error):hover {
+      width: auto;
+      max-width: 250px;
+      padding-inline: 12px;
+      box-shadow: var(--cqd-shadow-hover);
+      justify-content: flex-start;
+      transform: translateY(-50%) scale(1);
+      border-radius: 20px;
+    }
+
+    %CQD_BTN%:focus-visible {
+      outline: 2px solid #ffffff;
+      outline-offset: 2px;
+      transform: scale(0.97);
+    }
+
+    %CQD_BTN%:active {
+      transform: translateY(-50%) scale(0.97);
+    }
+
+    %CQD_BTN% .cqd-icon-wrapper {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    %CQD_D%.cqd-download-icon {
+      display: block;
+      width: 24px;
+      height: 24px;
+      background-image: url("${DOWNLOAD_ICON_SVG_URL}");
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: 24px 24px;
+      flex-shrink: 0;
+      transform-origin: center;
+      transition: width var(--cqd-transition), height var(--cqd-transition);
+    }
+%CQD_ICON_SIZES%
+    %CQD_BTN% .cqd-label {
+      opacity: 0;
+      margin-left: 0;
+      max-width: 0;
+      overflow: hidden;
+      transition: opacity var(--cqd-transition), max-width var(--cqd-transition), margin-left var(--cqd-transition);
+    }
+
+    %CQD_BTN%:not(.cqd-loading):not(.cqd-trying):not(.cqd-success):not(.cqd-error):hover .cqd-label {
+      opacity: 1;
+      max-width: 150px;
+      margin-left: 4px;
+    }
+
+    %CQD_BTN%.cqd-loading,
+    %CQD_BTN%.cqd-trying,
+    %CQD_BTN%.cqd-success,
+    %CQD_BTN%.cqd-error {
+      padding-inline: 12px;
+      border-radius: 20px;
+      justify-content: flex-start;
+      box-shadow: var(--cqd-shadow-normal);
+      width: auto;
+      min-width: 140px; /* Consistent width to prevent hover stuttering */
+      max-width: 300px;
+      transform: translateY(-50%) scale(1);
+    }
+
+    %CQD_BTN%.cqd-trying {
+      background-color: var(--cqd-color-trying);
+      box-shadow: var(--cqd-shadow-trying);
+    }
+
+    %CQD_BTN%.cqd-loading:hover {
+      box-shadow: var(--cqd-shadow-normal-strong);
+    }
+
+    %CQD_BTN%.cqd-trying:hover {
+      box-shadow: var(--cqd-shadow-trying-strong);
+    }
+
+    %CQD_BTN%.cqd-cancel,
+    %CQD_BTN%.cqd-cancelled {
+      background-color: var(--cqd-color-cancel);
+      box-shadow: var(--cqd-shadow-cancel);
+      padding-inline: 12px;
+      border-radius: 20px;
+      justify-content: flex-start;
+      width: auto;
+      min-width: 140px;
+      max-width: 300px;
+      transform: translateY(-50%) scale(1);
+      transition: all var(--cqd-transition);
+      cursor: pointer;
+    }
+
+    /* Cancel state - smooth entry animation when hover starts */
+    %CQD_BTN%.cqd-loading:hover,
+    %CQD_BTN%.cqd-trying:hover {
+      transition: background-color 0.2s ease-out, box-shadow 0.2s ease-out;
+    }
+
+    %CQD_BTN%.cqd-cancelled {
+      cursor: not-allowed;
+      filter: saturate(0.85) brightness(0.95); /* No transparency, just subtle desaturation */
+      /* Click animation class applied via JS */
+    }
+
+    /* Click animation: cancel → cancelled */
+    @keyframes %CQD_KF_CLICK% {
+      0% {
+        transform: translateY(-50%) scale(1);
+      }
+      30% {
+        transform: translateY(-50%) scale(1.08);
+      }
+      60% {
+        transform: translateY(-50%) scale(0.96);
+      }
+      100% {
+        transform: translateY(-50%) scale(1);
+      }
+    }
+
+    %CQD_BTN%.cqd-cancel-click-anim {
+      animation: %CQD_KF_CLICK% 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    %CQD_BTN%.cqd-cancel:hover {
+      transform: translateY(-50%) scale(1.05);
+      box-shadow: var(--cqd-shadow-cancel-strong);
+    }
+
+    %CQD_BTN%.cqd-cancel .cqd-label,
+    %CQD_BTN%.cqd-cancelled .cqd-label {
+      opacity: 1;
+      max-width: 150px;
+      margin-left: 12px;
+    }
+
+    /* Cancel icon pulse animation */
+    %CQD_BTN%.cqd-cancel .cqd-download-icon {
+      animation: %CQD_KF_PULSE% 1.5s ease-in-out infinite;
+    }
+
+    @keyframes %CQD_KF_PULSE% {
+      0%, 100% {
+        transform: scale(1) rotate(0deg);
+      }
+      50% {
+        transform: scale(1.1) rotate(15deg);
+      }
+    }
+
+    %CQD_BTN%.cqd-loading .cqd-label,
+    %CQD_BTN%.cqd-trying .cqd-label {
+      opacity: 1;
+      max-width: 150px;
+      margin-left: 12px;
+    }
+
+    %CQD_BTN%.cqd-success {
+      background-color: var(--cqd-color-success);
+      box-shadow: var(--cqd-shadow-success);
+    }
+
+    %CQD_BTN%.cqd-success:hover {
+      box-shadow: var(--cqd-shadow-success-strong);
+    }
+
+    %CQD_BTN%.cqd-success .cqd-label {
+      opacity: 1;
+      max-width: 150px;
+      margin-left: 8px;
+    }
+
+    %CQD_BTN%.cqd-error {
+      width: auto;
+      min-width: 90px;
+      background-color: var(--cqd-color-error);
+      box-shadow: var(--cqd-shadow-error);
+      height: 40px;
+      max-width: 150px;
+      max-height: 40px;
+      padding: 0 12px;
+      padding-top: 0;
+      padding-bottom: 0;
+      align-items: center;
+      transition: all var(--cqd-transition);
+    }
+
+    %CQD_D%.cqd-error-detail {
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      line-height: 1.3;
+      margin: 0;
+      opacity: 0;
+      max-height: 0;
+      overflow: hidden;
+      white-space: normal;
+      transform: translateY(4px);
+      transition: all var(--cqd-transition);
+    }
+
+    %CQD_BTN%.cqd-error:hover {
+      width: 350px;
+      max-width: 360px;
+      height: 60px;
+      max-height: 61px;
+      padding: 8px;
+      border-radius: 18px;
+      align-items: center;
+      gap: 7px;
+      box-shadow: var(--cqd-shadow-error-strong);
+    }
+
+    %CQD_BTN%.cqd-error:hover .cqd-label {
+      opacity: 0;
+      max-width: 0;
+      margin: 0;
+    }
+
+    %CQD_BTN%.cqd-error:hover .cqd-error-detail {
+      opacity: 1;
+      max-height: 60px;
+      margin-top: 4px;
+      transform: translateY(0);
+    }
+
+    %CQD_D%.cqd-spinner {
+      background-image: none;
+      border-radius: 9999px;
+      width: ${SPINNER_SIZE_PX}px;
+      height: ${SPINNER_SIZE_PX}px;
+      border: 3px solid var(--cqd-spinner-border);
+      border-top-color: var(--cqd-spinner-top);
+      animation: cqd-spin 0.65s linear infinite;
+    }
+
+    @keyframes cqd-spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+%CQD_BETWEEN%
+    %CQD_ALL% {
       /* Progress control (0% to 100%) */
       --cqd-progress: 0%;
       position: absolute;
@@ -958,13 +881,13 @@ export function injectStyles(): void {
     }
     
     /* Hidden state with fade-out transition */
-    .cqd-download-all-btn.cqd-hidden {
+    %CQD_ALL%.cqd-hidden {
       opacity: 0;
       pointer-events: none;
     }
 
     /* When injected into the header flex structure */
-    .cqd-download-all-btn.cqd-in-header {
+    %CQD_ALL%.cqd-in-header {
       position: relative;
       top: auto;
       right: auto;
@@ -983,7 +906,7 @@ export function injectStyles(): void {
     }
 
     /* Classwork header button: ensure proper positioning next to three-dots */
-    .cqd-download-all-btn.cqd-classwork-header {
+    %CQD_ALL%.cqd-classwork-header {
       position: relative;
       transform: none;
       flex-shrink: 0;
@@ -994,56 +917,56 @@ export function injectStyles(): void {
     }
 
     /* Ensure button hover doesn't overlap adjacent elements */
-    .cqd-download-all-btn.cqd-in-header:hover,
-    .cqd-download-all-btn.cqd-classwork-header:hover {
+    %CQD_ALL%.cqd-in-header:hover,
+    %CQD_ALL%.cqd-classwork-header:hover {
       z-index: 101;
     }
 
     /* RTL fallback only for non-header cases (absolute positioned at top corner) */
-    body[data-cqd-dir="rtl"] .cqd-download-all-btn:not(.cqd-in-header) {
+    body[data-cqd-dir="rtl"] %CQD_ALL%:not(.cqd-in-header) {
       right: auto;
       left: 48px;
     }
 
-    .cqd-download-all-btn:hover {
+    %CQD_ALL%:hover {
       box-shadow: var(--cqd-shadow-normal-strong);
     }
 
-    .cqd-download-all-btn:active {
+    %CQD_ALL%:active {
       transform: scale(0.97);
     }
 
     /* Keep pointer cursor even while disabled */
-    .cqd-download-all-btn[disabled] {
+    %CQD_ALL%[disabled] {
       cursor: pointer;
     }
 
     /* FULL SUCCESS STATE (Solid Green) */
-    .cqd-download-all-btn.cqd-all-success {
+    %CQD_ALL%.cqd-all-success {
       background-color: var(--cqd-color-success);
       box-shadow: var(--cqd-shadow-success);
     }
 
-    .cqd-download-all-btn.cqd-all-error {
+    %CQD_ALL%.cqd-all-error {
       background-color: var(--cqd-color-error);
       box-shadow: var(--cqd-shadow-error);
     }
 
     /* CANCEL STATE (Orange - hover to cancel during download) */
-    .cqd-download-all-btn.cqd-all-cancel {
+    %CQD_ALL%.cqd-all-cancel {
       background-color: var(--cqd-color-cancel);
       box-shadow: var(--cqd-shadow-cancel);
       min-width: 140px; /* Keep same width as downloading state */
     }
 
-    .cqd-download-all-btn.cqd-all-cancelled {
+    %CQD_ALL%.cqd-all-cancelled {
       background-color: var(--cqd-color-cancel);
       box-shadow: var(--cqd-shadow-cancel);
       min-width: 140px; /* Match cancel state width */
     }
 
     /* PROGRESS BAR OVERLAY (Fills up) */
-    .cqd-download-all-btn::after {
+    %CQD_ALL%::after {
       content: '';
       position: absolute;
       top: 0;
@@ -1057,26 +980,26 @@ export function injectStyles(): void {
       opacity: 1;
     }
 
-    .cqd-download-all-btn.cqd-all-success::after {
+    %CQD_ALL%.cqd-all-success::after {
       opacity: 0;
     }
 
     /* Content layers */
-    .cqd-download-all-btn .cqd-download-all-main,
-    .cqd-download-all-btn .cqd-download-all-sub,
-    .cqd-download-all-btn .cqd-download-all-icon-wrapper {
+    %CQD_ALL% .cqd-download-all-main,
+    %CQD_ALL% .cqd-download-all-sub,
+    %CQD_ALL% .cqd-download-all-icon-wrapper {
       position: relative;
       z-index: 2;
     }
 
-    .cqd-download-all-btn .cqd-download-all-icon-wrapper {
+    %CQD_ALL% .cqd-download-all-icon-wrapper {
       display: inline-flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
     }
 
-    .cqd-download-all-btn .cqd-download-all-icon {
+    %CQD_ALL% .cqd-download-all-icon {
       width: 18px;
       height: 18px;
       background-image: url("${DOWNLOAD_ICON_SVG_URL}");
@@ -1089,13 +1012,13 @@ export function injectStyles(): void {
     }
 
     /* Swap icon on success */
-    .cqd-download-all-btn.cqd-all-success .cqd-download-all-icon {
+    %CQD_ALL%.cqd-all-success .cqd-download-all-icon {
       background-image: url("${SUCCESS_ICON_SVG_URL}");
     }
 
     /* Swap icon on cancel/cancelled with smooth transition */
-    .cqd-download-all-btn.cqd-all-cancel .cqd-download-all-icon,
-    .cqd-download-all-btn.cqd-all-cancelled .cqd-download-all-icon {
+    %CQD_ALL%.cqd-all-cancel .cqd-download-all-icon,
+    %CQD_ALL%.cqd-all-cancelled .cqd-download-all-icon {
       background-image: url("${CANCEL_ICON_SVG_URL}");
       animation: none;
       border: none;
@@ -1104,7 +1027,7 @@ export function injectStyles(): void {
     }
 
     /* Spinner when disabled (Loading) but not success/error/cancel */
-    .cqd-download-all-btn[disabled]:not(.cqd-all-success):not(.cqd-all-error):not(.cqd-all-cancel):not(.cqd-all-cancelled) .cqd-download-all-icon {
+    %CQD_ALL%[disabled]:not(.cqd-all-success):not(.cqd-all-error):not(.cqd-all-cancel):not(.cqd-all-cancelled) .cqd-download-all-icon {
       background-image: none;
       border-radius: 9999px;
       width: ${SPINNER_SIZE_PX}px;
@@ -1114,12 +1037,12 @@ export function injectStyles(): void {
       animation: cqd-spin 0.65s linear infinite;
     }
 
-    .cqd-download-all-btn .cqd-download-all-main {
+    %CQD_ALL% .cqd-download-all-main {
       font-weight: 600;
     }
 
     /* Download All Sub-Text Behavior (Hover & Active) */
-    .cqd-download-all-btn .cqd-download-all-sub {
+    %CQD_ALL% .cqd-download-all-sub {
       font-size: 11px;
       opacity: 0;
       max-width: 0;
@@ -1133,18 +1056,273 @@ export function injectStyles(): void {
     }
 
     /* Hover State: Reveal sub-text */
-    .cqd-download-all-btn:not([disabled]):hover .cqd-download-all-sub {
+    %CQD_ALL%:not([disabled]):hover .cqd-download-all-sub {
       opacity: 0.9;
       max-width: 100px;
       margin-left: 4px;
     }
 
     /* Active/Disabled State: Always show sub-text (progress) */
-    .cqd-download-all-btn[disabled] .cqd-download-all-sub {
+    %CQD_ALL%[disabled] .cqd-download-all-sub {
       opacity: 0.9;
       max-width: 100px;
       margin-left: 4px;
+    }`;
+
+interface SharedButtonVars {
+  /** Row-button selector (FULL: '.cqd-download-btn'; SW: :is(...) scope). */
+  btn: string;
+  /** Download-all selector (FULL: '.cqd-download-all-btn'; SW: host-scoped). */
+  all: string;
+  /** Cancel keyframe name (FULL: 'cancelClick'; SW: 'cqdSwCancelClick'). */
+  kfClick: string;
+  /** Pulse keyframe name (FULL: 'cancelPulse'; SW: 'cqdSwCancelPulse'). */
+  kfPulse: string;
+  /** Descendant prefix for bare helper classes (FULL: ''; SW: button + ' '). */
+  descendant: string;
+  /** FULL-only icon-size utilities; '' in the scoped sheet. */
+  iconSizes: string;
+  /** FULL-only overlay/flag sections + Download-All header; SW keeps its own. */
+  between: string;
+}
+
+function renderSharedButtonSheet(v: SharedButtonVars): string {
+  return SHARED_BUTTON_SHEET.replaceAll('%CQD_BTN%', v.btn)
+    .replaceAll('%CQD_ALL%', v.all)
+    .replaceAll('%CQD_KF_CLICK%', v.kfClick)
+    .replaceAll('%CQD_KF_PULSE%', v.kfPulse)
+    .replaceAll('%CQD_D%', v.descendant)
+    .replaceAll('%CQD_ICON_SIZES%', v.iconSizes)
+    .replaceAll('%CQD_BETWEEN%', v.between);
+}
+
+const SW_BTN_SELECTOR =
+  ':is(.cqd-download-btn[data-cqd-sw="true"], .cqd-download-btn[data-cqd-sw-bs="true"])';
+const SW_ALL_SELECTOR = '[data-cqd-sw-bs-host="true"] .cqd-download-all-btn';
+
+const FULL_SHEET_BUTTONS: SharedButtonVars = {
+  btn: '.cqd-download-btn',
+  all: '.cqd-download-all-btn',
+  kfClick: 'cancelClick',
+  kfPulse: 'cancelPulse',
+  descendant: '',
+  iconSizes: FULL_SHEET_ICON_SIZES,
+  between: FULL_SHEET_BETWEEN,
+};
+
+const SW_SHEET_BUTTONS: SharedButtonVars = {
+  btn: SW_BTN_SELECTOR,
+  all: SW_ALL_SELECTOR,
+  kfClick: 'cqdSwCancelClick',
+  kfPulse: 'cqdSwCancelPulse',
+  descendant: `${SW_BTN_SELECTOR} `,
+  iconSizes: '',
+  between: SW_BETWEEN_HEADER,
+};
+
+export function injectStyles(): void {
+  if (typeof document === 'undefined') return;
+  if (document.getElementById(STYLE_ID)) return;
+
+  const style = document.createElement('style');
+  style.id = STYLE_ID;
+  style.textContent = `
+    :root {
+      --cqd-transition: ${TRANSITION_STR};
+
+      /* Spinner */
+      --cqd-spinner-border: rgba(255, 255, 255, 0.22);
+      --cqd-spinner-top: #ffffff;
+
+      /* =================================================================
+       * COLOR PALETTE (Light)
+       * ================================================================= */
+      --cqd-color-normal: #005DD7;
+      --cqd-shadow-normal: 0 8px 22px rgba(0, 93, 215, 0.40);
+      --cqd-shadow-normal-strong: 0 12px 28px rgba(0, 93, 215, 0.70);
+
+      --cqd-color-success: #00A82D;
+      --cqd-shadow-success: 0 12px 28px rgba(0, 168, 45, 0.40);
+      --cqd-shadow-success-strong: 0 12px 28px rgba(0, 168, 45, 0.70);
+
+      --cqd-color-error: #FF4036;
+      --cqd-shadow-error: 0 12px 28px rgba(255, 64, 54, 0.40);
+      --cqd-shadow-error-strong: 0 12px 28px rgba(255, 64, 54, 0.70);
+
+      --cqd-color-trying: #FFD93D;
+      --cqd-shadow-trying: 0 12px 28px rgba(255, 217, 61, 0.40);
+      --cqd-shadow-trying-strong: 0 12px 28px rgba(255, 217, 61, 0.70);
+
+      --cqd-color-cancel: #EC6300;
+      --cqd-shadow-cancel: 0 12px 28px rgba(236, 99, 0, 0.40);
+      --cqd-shadow-cancel-strong: 0 12px 28px rgba(236, 99, 0, 0.70);
+
+      --cqd-color-comment: #9B00FF;
+      --cqd-color-edited: #007F8D;
+
+      --cqd-shadow-base: 0 0px 10px rgba(15, 23, 42, 0.22);
+      --cqd-shadow-hover: 0 10px 24px rgba(15, 23, 42, 0.30);
     }
+
+    /* =================================================================
+     * DARK MODE
+     * ================================================================= */
+    .cqd-theme-dark {
+      --cqd-color-normal: #006EFF;
+      --cqd-shadow-normal: 0 8px 22px rgba(0, 110, 255, 0.40);
+      --cqd-shadow-normal-strong: 0 12px 28px rgba(0, 110, 255, 0.70);
+
+      --cqd-color-success: #07DA3F;
+      --cqd-shadow-success: 0 12px 28px rgba(7, 218, 63, 0.40);
+      --cqd-shadow-success-strong: 0 12px 28px rgba(7, 218, 63, 0.70);
+
+      --cqd-color-error: #FF4036;
+      --cqd-shadow-error: 0 12px 28px rgba(255, 64, 54, 0.40);
+      --cqd-shadow-error-strong: 0 12px 28px rgba(255, 64, 54, 0.70);
+
+      --cqd-color-trying: #FFD93D;
+      --cqd-shadow-trying: 0 12px 28px rgba(255, 217, 61, 0.40);
+      --cqd-shadow-trying-strong: 0 12px 28px rgba(255, 217, 61, 0.70);
+
+      --cqd-color-cancel: #FF9142;
+      --cqd-shadow-cancel: 0 12px 28px rgba(255, 145, 66, 0.40);
+      --cqd-shadow-cancel-strong: 0 12px 28px rgba(255, 145, 66, 0.70);
+
+      --cqd-color-comment: #9B00FF;
+      --cqd-color-edited: #00D6EE;
+
+      --cqd-spinner-border: rgba(15, 23, 42, 0.22);
+      --cqd-spinner-top: #0f172a;
+    }
+
+    div[data-stream-item-id] {
+      overflow: visible !important;
+      contain: none !important;
+      z-index: 1;
+    }
+
+    /* Classwork tab: li elements with data-stream-item-id */
+    li[data-stream-item-id] {
+      overflow: visible !important;
+      contain: none !important;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Classwork tab: ensure header row has proper flex display for button placement */
+    li[data-stream-item-id] .jWCzBe.gmNu1d {
+      display: flex !important;
+      flex-wrap: wrap !important;
+      align-items: center !important;
+    }
+
+    /* Classwork tab: button styling within header */
+    li[data-stream-item-id] .cqd-download-all-btn {
+      margin-inline-end: 8px;
+    }
+
+    /* Classwork tab: flag badges positioning */
+    li[data-stream-item-id] .cqd-flag,
+    li[data-stream-item-id] .cqd-comment-badge,
+    li[data-stream-item-id] .cqd-edited-badge,
+    li[data-stream-item-id] .cqd-both-badge {
+      z-index: 9999;
+    }
+
+    /* ===============================
+     * 1. DOWNLOAD BUTTON (Single)
+     * =============================== */
+${renderSharedButtonSheet(FULL_SHEET_BUTTONS)}
+  `.trim();
+  (document.head || document.documentElement).appendChild(style);
+}
+
+/**
+ * Student-work-scoped stylesheet (z57 tail).
+ *
+ * The two student-work entrypoints run in EVERY engine mode, but in v2 the
+ * V2 engine ships its own stylesheet for the SAME `.cqd-download-btn` /
+ * `.cqd-download-all-btn` markup contract. Injecting the full V1 sheet there
+ * re-imposes V1 geometry (absolute 40px circles, z-index 5) on V2's buttons,
+ * making neighbors intercept each other's clicks (qa-06 regression). So the
+ * student-work stacks inject THIS sheet instead: the same button CSS, scoped
+ * to the buttons THEY create —
+ *   - row buttons carry data-cqd-sw / data-cqd-sw-bs (entrypoints set them),
+ *   - the by-status Download All control lives under the host marked
+ *     data-cqd-sw-bs-host (student_work_by_status sets it).
+ * The full sheet stays owned by the V1 stacks (observers/download_all/frames);
+ * in legacy mode both sheets coexist and the scoped rules resolve to the same
+ * visual result. The declarations are the shared SHARED_BUTTON_SHEET
+ * constant — the SAME single source injectStyles renders; only the selectors,
+ * keyframe prefix and FULL-only sections differ per sheet.
+ */
+export function injectStudentWorkStyles(): void {
+  if (typeof document === 'undefined') return;
+  if (document.getElementById(STYLE_ID_STUDENT_WORK)) return;
+
+  const style = document.createElement('style');
+  style.id = STYLE_ID_STUDENT_WORK;
+  style.textContent = `
+    :root {
+      --cqd-transition: ${TRANSITION_STR};
+
+      /* Spinner */
+      --cqd-spinner-border: rgba(255, 255, 255, 0.22);
+      --cqd-spinner-top: #ffffff;
+
+      --cqd-color-normal: #005DD7;
+      --cqd-shadow-normal: 0 8px 22px rgba(0, 93, 215, 0.40);
+      --cqd-shadow-normal-strong: 0 12px 28px rgba(0, 93, 215, 0.70);
+
+      --cqd-color-success: #00A82D;
+      --cqd-shadow-success: 0 12px 28px rgba(0, 168, 45, 0.40);
+      --cqd-shadow-success-strong: 0 12px 28px rgba(0, 168, 45, 0.70);
+
+      --cqd-color-error: #FF4036;
+      --cqd-shadow-error: 0 12px 28px rgba(255, 64, 54, 0.40);
+      --cqd-shadow-error-strong: 0 12px 28px rgba(255, 64, 54, 0.70);
+
+      --cqd-color-trying: #FFD93D;
+      --cqd-shadow-trying: 0 12px 28px rgba(255, 217, 61, 0.40);
+      --cqd-shadow-trying-strong: 0 12px 28px rgba(255, 217, 61, 0.70);
+
+      --cqd-color-cancel: #EC6300;
+      --cqd-shadow-cancel: 0 12px 28px rgba(236, 99, 0, 0.40);
+      --cqd-shadow-cancel-strong: 0 12px 28px rgba(236, 99, 0, 0.70);
+
+      --cqd-shadow-base: 0 0px 10px rgba(15, 23, 42, 0.22);
+      --cqd-shadow-hover: 0 10px 24px rgba(15, 23, 42, 0.30);
+    }
+
+    .cqd-theme-dark {
+      --cqd-color-normal: #006EFF;
+      --cqd-shadow-normal: 0 8px 22px rgba(0, 110, 255, 0.40);
+      --cqd-shadow-normal-strong: 0 12px 28px rgba(0, 110, 255, 0.70);
+
+      --cqd-color-success: #07DA3F;
+      --cqd-shadow-success: 0 12px 28px rgba(7, 218, 63, 0.40);
+      --cqd-shadow-success-strong: 0 12px 28px rgba(7, 218, 63, 0.70);
+
+      --cqd-color-error: #FF4036;
+      --cqd-shadow-error: 0 12px 28px rgba(255, 64, 54, 0.40);
+      --cqd-shadow-error-strong: 0 12px 28px rgba(255, 64, 54, 0.70);
+
+      --cqd-color-trying: #FFD93D;
+      --cqd-shadow-trying: 0 12px 28px rgba(255, 217, 61, 0.40);
+      --cqd-shadow-trying-strong: 0 12px 28px rgba(255, 217, 61, 0.70);
+
+      --cqd-color-cancel: #FF9142;
+      --cqd-shadow-cancel: 0 12px 28px rgba(255, 145, 66, 0.40);
+      --cqd-shadow-cancel-strong: 0 12px 28px rgba(255, 145, 66, 0.70);
+
+      --cqd-spinner-border: rgba(15, 23, 42, 0.22);
+      --cqd-spinner-top: #0f172a;
+    }
+
+    /* ===============================
+     * DOWNLOAD BUTTON (student-work rows)
+     * =============================== */
+${renderSharedButtonSheet(SW_SHEET_BUTTONS)}
   `.trim();
   (document.head || document.documentElement).appendChild(style);
 }

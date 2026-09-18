@@ -1,74 +1,29 @@
 // filepath: extension/entrypoints/content/file-meta.ts
 /**
  * File metadata extraction from attachment containers.
+ *
+ * The naming logic lives in src/core/name/ (S7): strip/sanitize/verify/derive.
+ * This module is the DOM adapter — tooltip/text extraction — over the shared
+ * core, so the content script and any other consumer use the exact same
+ * sanitize pipeline.
  */
 
 import type { FileMeta } from './types';
+import {
+  sanitizeFileName,
+  fileNameExtension,
+  deriveFileNameFromUrl,
+} from '../../src/core/name/sanitize';
 
-/** Labels to strip from filenames */
-// who names their file "Compressed archive" anyway
-const GARBAGE_LABELS = [
-  'Microsoft Excel',
-  'Microsoft Word',
-  'Microsoft PowerPoint',
-  'Compressed archive',
-  'Binary',
-  'Unknown',
-  'Google Sheets',
-  'Google Docs',
-  'Google Slides',
-  'Text File',
-  'PDF',
-  'Video',
-  'Image',
-  'Audio',
-  'Text',
-  'Word',
-  'Excel',
-  'PowerPoint',
-  'Archive',
-  'Zip',
-  'File',
-  'Document',
-  'Shortcut',
-  'Code',
-];
-
-/**
- * Clean attachment name by removing garbage labels and duplicated text.
- */
-export function cleanAttachmentName(rawName: string): string {
-  if (!rawName) return '';
-  let name = rawName.trim();
-
-  for (const label of GARBAGE_LABELS) {
-    if (name.endsWith(label)) {
-      const potential = name.slice(0, -label.length).trim();
-      if (potential.length > 0) {
-        name = potential;
-        break;
-      }
-    }
-  }
-
-  // Detect duplicated text (e.g., "file.txtfile.txt")
-  if (name.length > 0 && name.length % 2 === 0) {
-    const mid = name.length / 2;
-    if (name.slice(0, mid) === name.slice(mid)) return name.slice(0, mid);
-  }
-
-  // Detect repeated extensions (e.g., ".pdf.pdf")
-  const repeatRegex = /\.([a-zA-Z0-9]{2,10})\1$/i;
-  const repeatMatch = name.match(repeatRegex);
-  if (repeatMatch) return name.slice(0, -repeatMatch[1].length).trim();
-
-  return name;
-}
+/** Back-compat alias — the canonical pipeline is core/name/sanitize. */
+export const cleanAttachmentName = sanitizeFileName;
 
 /**
  * Extract file metadata from container element.
  */
-export function extractFileMeta(container: HTMLElement, url: string): FileMeta {
+export function extractFileMeta(container: HTMLElement, url: string, lang?: string): FileMeta {
+  const pageLang = lang ?? (typeof document !== 'undefined' ? document.documentElement?.lang || '' : '');
+
   let name: string | undefined;
 
   // Try tooltip/ARIA first because accessibility = free metadata hack
@@ -89,20 +44,15 @@ export function extractFileMeta(container: HTMLElement, url: string): FileMeta {
 
   // Fall back to URL path
   if (!name) {
-    try {
-      const u = new URL(url);
-      const pathName = decodeURIComponent(u.pathname.split('/').pop() || '');
-      if (pathName && pathName.includes('.')) name = pathName;
-    } catch { /* ignore */ }
+    name = deriveFileNameFromUrl(url) ?? undefined;
   }
 
-  if (name) name = cleanAttachmentName(name);
+  if (name) name = sanitizeFileName(name, pageLang);
 
   // Extract extension
   let ext: string | undefined;
   if (name) {
-    const m = name.match(/\.([a-zA-Z0-9]{2,10})$/);
-    if (m) ext = m[1].toLowerCase();
+    ext = fileNameExtension(name) ?? undefined;
   }
 
   return { name, ext, kind: 'other' };

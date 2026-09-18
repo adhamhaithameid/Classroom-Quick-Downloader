@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "አውርድ",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "በማውረድ ላይ…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "በመሞከር ላይ…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "ወርዷል",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "ስህተት",
+    "description": "error"
+  },
+  "failed": {
+    "message": "አልተሳካም።",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "አውርድ",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "ፈጣን ማውረድ",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "አስተያየቶች",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "ተስተካክሏል",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "ሁሉንም ያውርዱ",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "ፋይል",
+    "description": "file"
+  },
+  "files": {
+    "message": "ፋይሎች",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "በዚህ ልጥፍ ላይ የአስተያየቶች ብዛት",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "ማውረድ ተቋርጧል።",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "የሩጫ ጊዜ አይገኝም",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "መጀመር አልተቻለም።",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "የግንኙነት ስህተት።",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "አስተያየቶች",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "ሰርዝ",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "ተሰርዟል",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

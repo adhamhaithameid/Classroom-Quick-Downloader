@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'svelte/server';
-import { GOOGLE_SITE_VERIFICATION } from '$lib/config';
+import { APP_VERSION, GOOGLE_SITE_VERIFICATION, STORE_LINKS } from '$lib/config';
 
 const mockState = vi.hoisted(() => ({
   path: '/overview',
@@ -54,10 +54,132 @@ describe('site layout shell', () => {
     const html = squish(body);
 
     expect(html).toContain('l2-nav-shell');
-    expect(html).toContain('l2-footer');
+    expect(html).toContain('cqd-footer');
     expect(html).toContain('Install for Chrome');
     expect(html).toContain('href="/"');
     expect(html).toContain('aria-current="page"');
+  });
+
+  it('mounts the shared ambient background (orbs + grid) on every route', () => {
+    mockState.path = '/faq';
+    mockState.status = 200;
+    const { body } = render(Layout);
+    const html = squish(body);
+
+    expect(html).toContain('l2-page-orbs');
+    expect(html).toContain('l2-page-grid');
+  });
+
+  it('renders crawlable hover megamenus with described links in server markup', () => {
+    mockState.path = '/overview';
+    mockState.status = 200;
+    const { body } = render(Layout);
+    const html = squish(body);
+
+    expect(html).toContain('aria-haspopup="true"');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain('l2-nav-dropdown');
+    // Dropdown panels ship in SSR HTML (hidden until hover) so crawlers see
+    // the internal link graph even without JavaScript.
+    expect(html).toContain('href="/security"');
+    expect(html).toContain('href="/watch/cqd-demo"');
+    expect(html).toContain('href="/download-all-attachments-google-classroom"');
+    expect(html).toContain('href="/bulk-download-google-classroom-assignments"');
+    expect(html).toContain('href="/download-google-classroom-materials-fast"');
+    expect(html).toContain('href="/support"');
+    expect(html).toContain('href="/google-workspace-school-accounts-support"');
+    expect(html).toContain('href="/google-drive-cant-scan-virus-warning-download"');
+    expect(html).toContain('href="/press-kit"');
+    expect(html).toContain('href="/featured"');
+    expect(html).toContain('l2-nav-menu-featured');
+  });
+
+  it('renders the GitHub hover preview and alternate-browser install circles', () => {
+    mockState.path = '/overview';
+    mockState.status = 200;
+    const { body } = render(Layout);
+    const html = squish(body);
+
+    // GitHub link is a menu trigger wired to the shared panel.
+    expect(html).toContain('data-menu-key="github"');
+    expect(html).toContain('id="nav-menu-github"');
+    expect(html).toContain('aria-controls="nav-menu-github"');
+    expect(html).toContain('Star on GitHub');
+    expect(html).toContain('adhamhaithameid/Classroom-Quick-Downloader');
+
+    // Alternate-browser circles under the install CTA open the real stores.
+    expect(html).toContain('aria-label="Install for Firefox"');
+    expect(html).toContain('aria-label="Install for Microsoft Edge"');
+    expect(html).toContain(`href="${STORE_LINKS.firefox}"`);
+    expect(html).toContain(`href="${STORE_LINKS.edge}"`);
+  });
+
+  it('ships the pill scroll shell without a pre-hydrated scrolled state', () => {
+    mockState.path = '/overview';
+    mockState.status = 200;
+    const { body } = render(Layout);
+    const html = squish(body);
+
+    expect(html).toContain('l2-nav-float');
+    expect(html).toContain('l2-nav-bar');
+    expect(html).toContain('l2-nav-backdrop');
+    // Scroll state is client-only: SSR must never ship the pill pre-applied.
+    expect(html).not.toContain('is-scrolled');
+    expect(html).not.toContain('menu-open');
+  });
+
+  it('renders the four-layer premium footer with CTA, navigation, principles, and legal bar', () => {
+    mockState.path = '/overview';
+    mockState.status = 200;
+    const { body } = render(Layout);
+    const html = squish(body);
+
+    // Layer 1: final installation CTA
+    expect(html).toContain('One last click');
+    expect(html).toContain('Ready to save hours?');
+    expect(html).toContain('Install Classroom Quick Downloader in under 10 seconds. Free forever. No account required.');
+    expect(html).toContain('Works with Brave, Opera, Vivaldi, Arc and more.');
+    // Layer 2: product identity + navigation grid
+    expect(html).toContain('Classroom Quick');
+    expect(html).toContain('Download Classroom files without repetitive clicking.');
+    expect(html).toContain('Version');
+    expect(html).toContain(`>${APP_VERSION}<`);
+    expect(html).toContain('aria-label="Product"');
+    expect(html).toContain('aria-label="Support"');
+    expect(html).toContain('aria-label="Install"');
+    expect(html).toContain('How it works');
+    expect(html).toContain('Report issue');
+    expect(html).toContain('ft-mega');
+    // The wordmark canvas ships in SSR markup; the shatter/ripple
+    // interaction is progressive enhancement layered on top of it.
+    expect(html).toContain('ft-mega-canvas');
+    expect(html).toContain('aria-hidden="true"');
+    // Layer 3: principles strip
+    expect(html).toContain('Instant.');
+    expect(html).toContain('Private.');
+    expect(html).toContain('Transparent.');
+    expect(html).toContain('Universal.');
+    // Layer 4: legal + identity bar
+    expect(html).toContain(`© ${new Date().getFullYear()} Classroom Quick Downloader`);
+    expect(html).toContain('Not affiliated with Google or Google Classroom');
+    expect(html).toContain('Built by Adham Haitham');
+    // Store install links come from the centralized config
+    expect(html).toContain(`href="${STORE_LINKS.chrome}"`);
+    expect(html).toContain(`href="${STORE_LINKS.firefox}"`);
+    expect(html).toContain(`href="${STORE_LINKS.edge}"`);
+  });
+
+  it('never ships hidden reveal state in server-rendered footer markup', () => {
+    // The reveal system must fail open: content is visible by default and
+    // only hidden client-side when the observer is actually running. If SSR
+    // markup ever ships the hidden state, a missed observer callback (fast
+    // scroll, layout shift, no-JS) leaves the footer permanently blank.
+    mockState.path = '/overview';
+    mockState.status = 200;
+    const { body } = render(Layout);
+
+    expect(body).toContain('cqd-reveal');
+    expect(body).not.toContain('cqd-reveal-pending');
   });
 
   it('keeps chrome visible on standard content routes', () => {
@@ -67,10 +189,10 @@ describe('site layout shell', () => {
     const html = squish(body);
 
     expect(html).toContain('l2-nav-shell');
-    expect(html).toContain('l2-footer');
+    expect(html).toContain('cqd-footer');
     expect(html).toContain('href="/privacy"');
     expect(html).toContain('aria-current="page"');
-    expect(html).toContain('Contact');
+    expect(html).toContain('Built by Adham Haitham');
   });
 
   it('renders missing-path 404s in the full-bleed route shell', () => {
@@ -82,6 +204,6 @@ describe('site layout shell', () => {
     expect(html).toContain('site-main-overview-style');
     expect(html).not.toContain('class="l2-wrap"');
     expect(html).toContain('l2-nav-shell');
-    expect(html).toContain('l2-footer');
+    expect(html).toContain('cqd-footer');
   });
 });

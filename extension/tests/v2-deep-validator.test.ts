@@ -83,16 +83,19 @@ function addButton(el: HTMLElement, fileId: string): HTMLElement {
 
 function addBadge(el: HTMLElement, verdict: string): HTMLElement {
   const badge = document.createElement('div');
-  badge.className = `cqd-v2-flag cqd-v2-flag-${verdict}`;
+  badge.className = verdict === 'both' ? 'cqd-flag cqd-both-badge' : `cqd-flag cqd-${verdict}-badge`;
+  // z57 S4: the V2 marker + rendered kind live on the badge element itself.
+  badge.setAttribute('data-cqd-injected', 'true');
+  badge.setAttribute('data-cqd-v2-flag', 'badge');
+  badge.setAttribute('data-cqd-flag-kind', verdict);
   el.appendChild(badge);
-  el.setAttribute('data-cqd-v2-flag', 'true');
-  el.setAttribute('data-cqd-v2-flag-verdict', verdict);
   return badge;
 }
 
 function addOverlay(el: HTMLElement): HTMLElement {
   const overlay = document.createElement('div');
-  overlay.className = 'cqd-v2-overlay';
+  overlay.className = 'cqd-overlay-container';
+  overlay.setAttribute('data-cqd-v2-flag', 'overlay');
   el.appendChild(overlay);
   return overlay;
 }
@@ -487,5 +490,57 @@ describe('validateBatch', () => {
     const result = validateBatch([], new Map(), []);
     expect(result.duration_ms).toBeGreaterThanOrEqual(0);
     expect(result.interrupted).toBe(false);
+  });
+});
+
+// ===========================================================================
+// z57 — the Download All group control is NOT an orphaned file button. Its
+// data-cqd-file-id carries the download-all: prefix and must survive
+// validation while real file buttons keep the orphan cleanup.
+// ===========================================================================
+describe('CHECK 2: Download All group control (z57)', () => {
+  it('never flags the download-all control as an orphaned button', async () => {
+    const { validateBatch } = await import('../src/v2/repair/deep-validator');
+    const post = document.createElement('article');
+    post.setAttribute('data-stream-item-id', 'z-group');
+    document.body.appendChild(post);
+    const fileBtn = document.createElement('button');
+    fileBtn.setAttribute('data-cqd-injected', 'true');
+    fileBtn.setAttribute('data-cqd-file-id', 'drive-REALFILE');
+    post.appendChild(fileBtn);
+    const groupBtn = document.createElement('button');
+    groupBtn.setAttribute('data-cqd-injected', 'true');
+    groupBtn.setAttribute('data-cqd-file-id', 'download-all:z-group');
+    post.appendChild(groupBtn);
+
+    const result = validateBatch(
+      [
+        {
+          id: 'z-group',
+          element: post,
+          viewKind: 'stream' as never,
+          files: [
+            {
+              canonicalId: 'drive-REALFILE',
+              element: post,
+              idSource: 'data-drive-id' as const,
+              name: 'f.pdf',
+              ext: 'pdf',
+              downloadUrl: 'https://drive.usercontent.google.com/download?id=REALFILE',
+            },
+          ],
+          flags: null,
+          lastScannedAt: Date.now(),
+        },
+      ],
+      new Map(),
+      [],
+      undefined,
+      () => 16,
+      undefined,
+    );
+
+    const removals = result.corrections.filter((c) => c.op === 'remove-button');
+    expect(removals).toHaveLength(0);
   });
 });

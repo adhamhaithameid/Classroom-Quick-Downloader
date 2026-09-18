@@ -1,0 +1,102 @@
+{
+  "download": {
+    "message": "Kurukura",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Nkurukura…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Ngerageza…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Nkurukurwa",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Enshobi",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Yagwisa.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Kurukura",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Kurukura mangu",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "ebiteekateeko",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "ekiteekateeko",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Yakyebemberwa",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Kurukura byona",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "fayiro",
+    "description": "file"
+  },
+  "files": {
+    "message": "enfayiro",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Omuwendo gw'ebiteekateeko aha post egi",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Ebiro aha kakati k'okupostinga n'okukyebembera kwekyehererukira",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Okurukura kwahagarara.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime tikyariho",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Tikyasobora kutandika.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Enshobi y'okukwatagana.",
+    "description": "commError"
+  },
+  "modified": {
+    "message": "Yakyebemberwa",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "bwanyima y'okupostinga",
+    "description": "after_posting"
+  },
+  "cancel": {
+    "message": "Hagarika",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Kyahagarikwa",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Hagarika Byona",
+    "description": "cancelAll"
+  }
+}

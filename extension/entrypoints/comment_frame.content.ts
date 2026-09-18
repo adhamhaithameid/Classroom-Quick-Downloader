@@ -5,10 +5,12 @@ import { t, getCurrentCachedLanguage } from './content/i18n';
 import { detectComments } from './content/smart-detector';
 import { isPageDark } from './content/theme';
 import { subscribeToGlobalState, createCommentBadge } from './content/flags';
+import { gateV1Stack } from './content/mode-gate';
 import { triggerPostClick, upgradeCombinedBadge, ATTR_COMMENT_COUNT } from './content/both-badge';
 import { triggerPulseEffect, markTargetElements } from './content/pulse-effect';
 import { queryPostCards } from './content/post-card-utils';
 import { isStudentWorkRoute } from '../src/student_work/url-classifier';
+import { getPageDomPort } from '../src/adapters/dom/mutation-observer-dom-port';
 
 // Selector for the main stream card (works for both Stream and Classwork tabs)
 // Stream: div[data-stream-item-id], Classwork: li[data-stream-item-id]
@@ -32,9 +34,12 @@ function escapeRegex(str: string): string {
 // Per-tab + runtime state
 // let tabEnabled = true; // Removed
 let running = false;
-let domObserver: MutationObserver | null = null;
-let heartbeatId: number | null = null;
-let urlObserver: MutationObserver | null = null;
+// S10: both watchers ride the shared page DomPort (one platform observer per
+// page). The 2500ms heartbeat is deleted — mutation, scroll, and ONE bounded
+// settle scan after start cover rescan duty.
+let domUnsubscribe: (() => void) | null = null;
+let urlUnsubscribe: (() => void) | null = null;
+let settleScanId: number | null = null;
 
 // Flag toggle state (controlled from popup)
 let commentsFlagEnabled = true;
@@ -112,12 +117,16 @@ export default defineContentScript({
   matches: ['https://classroom.google.com/*'],
   runAt: 'document_idle',
   main() {
+    // S10 T4: mode gate — while the engine mode is 'v2' the V2 engine
+    // renders and this V1 stack stays inert; live cqdV2Mode flips hot
+    // stop/start it. The global enabled flag behaves exactly as before.
+    const gated = gateV1Stack({
+      start: startCommentsFeature,
+      stop: stopCommentsFeature,
+    });
     // Subscribe to global enabled/disabled events
     // This handles initial check AND live updates
-    subscribeToGlobalState(
-      () => startCommentsFeature(),
-      () => stopCommentsFeature()
-    );
+    subscribeToGlobalState(gated.start, gated.stop);
   },
 });
 
@@ -147,38 +156,44 @@ function startCommentsFeature(): void {
   // Scroll listener (Fixes missing frames after hard scroll)
   window.addEventListener('scroll', scanForComments, { passive: true });
 
-  domObserver = new MutationObserver(() => {
-    if (commentScanScheduled) return;
-    commentScanScheduled = true;
-    requestAnimationFrame(() => {
-      commentScanScheduled = false;
-      if (!running) return;
-      scanForComments();
-    });
-  });
+  domUnsubscribe = getPageDomPort().observe(
+    {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['style'], // Monitor style so we can re-apply position:relative
+    },
+    () => {
+      if (commentScanScheduled) return;
+      commentScanScheduled = true;
+      requestAnimationFrame(() => {
+        commentScanScheduled = false;
+        if (!running) return;
+        scanForComments();
+      });
+    },
+  );
 
-  domObserver.observe(document.body, {
-    childList: true,
-    subtree: true,
-    attributes: true, 
-    attributeFilter: ['style'], // Monitor style so we can re-apply position:relative
-  });
-
-  heartbeatId = window.setInterval(() => {
+  // Heartbeat deleted (S10): one bounded settle scan catches late-settling
+  // DOM right after start; mutations + scroll handle everything after.
+  settleScanId = window.setTimeout(() => {
+    settleScanId = null;
     if (!running) return;
     scanForComments();
-  }, 2500);
+  }, 1500);
 
   let lastUrl = location.href;
-  urlObserver = new MutationObserver(() => {
-    const url = location.href;
-    if (url !== lastUrl) {
-      lastUrl = url;
-      if (!running) return;
-      setTimeout(scanForComments, 500);
-    }
-  });
-  urlObserver.observe(document, { subtree: true, childList: true });
+  urlUnsubscribe = getPageDomPort().observe(
+    { subtree: true, childList: true },
+    () => {
+      const url = location.href;
+      if (url !== lastUrl) {
+        lastUrl = url;
+        if (!running) return;
+        setTimeout(scanForComments, 500);
+      }
+    },
+  );
 }
 
 function stopCommentsFeature(): void {
@@ -187,17 +202,17 @@ function stopCommentsFeature(): void {
 
   window.removeEventListener('scroll', scanForComments);
 
-  if (domObserver) {
-    domObserver.disconnect();
-    domObserver = null;
+  if (domUnsubscribe) {
+    domUnsubscribe();
+    domUnsubscribe = null;
   }
-  if (heartbeatId != null) {
-    window.clearInterval(heartbeatId);
-    heartbeatId = null;
+  if (urlUnsubscribe) {
+    urlUnsubscribe();
+    urlUnsubscribe = null;
   }
-  if (urlObserver) {
-    urlObserver.disconnect();
-    urlObserver = null;
+  if (settleScanId != null) {
+    window.clearTimeout(settleScanId);
+    settleScanId = null;
   }
   commentScanScheduled = false;
 

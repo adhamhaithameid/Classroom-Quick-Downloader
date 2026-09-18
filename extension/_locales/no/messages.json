@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Last ned",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Laster ned…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Prøver…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Ferdig",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Feil",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Mislyktes.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Last ned",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Rask nedlasting",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "kommentarer",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Redigert",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Last ned alle",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "fil",
+    "description": "file"
+  },
+  "files": {
+    "message": "filer",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Antall kommentarer på dette innlegget",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Nedlasting avbrutt.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Kjøretid ikke tilgjengelig",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Kunne ikke starte.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Kommunikasjonsfeil.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Dager mellom publisering og siste redigering",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "kommentarer",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Avbryt",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Avbrutt",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Avbryt alle",
+    "description": "cancelAll"
+  }
+}

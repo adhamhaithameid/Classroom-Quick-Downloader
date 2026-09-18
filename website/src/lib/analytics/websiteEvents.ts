@@ -246,6 +246,36 @@ export function trackWebsiteEvent(input: WebsiteEventInput): void {
   }
 }
 
+export function trackGuideCtaClick(placement: 'guide_primary' | 'guide_secondary', pagePath: string): void {
+  trackWebsiteEvent({
+    eventType: 'cta',
+    action: 'guide_cta_click',
+    placement,
+    pagePath
+  });
+}
+
+export function trackFaqExpand(question: string, sectionTitle: string): void {
+  trackWebsiteEvent({
+    eventType: 'content',
+    action: 'faq_expand',
+    placement: 'faq_item',
+    meta: { question, section: sectionTitle }
+  });
+}
+
+export const GUIDE_ENGAGEMENT_PERCENT = 75 as const;
+
+export function trackGuideEngaged(pagePath: string): void {
+  trackWebsiteEvent({
+    eventType: 'content',
+    action: 'guide_engaged',
+    placement: 'guide_scroll',
+    pagePath,
+    meta: { percent: GUIDE_ENGAGEMENT_PERCENT }
+  });
+}
+
 function handleVisibilityChange(): void {
   if (typeof document === 'undefined') return;
   if (document.visibilityState === 'hidden') {

@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Download",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "ʻOku download…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "ʻOku feinga…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Kuo download",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Hala",
+    "description": "error"
+  },
+  "failed": {
+    "message": "ʻIkai lava.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Download",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Download vave",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "ngaahi fakamatala",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "fakamatala",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Kuo liliu",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Download kotoa",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "faile",
+    "description": "file"
+  },
+  "files": {
+    "message": "ngaahi faile",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Lau ʻo e ngaahi fakamatala ʻi he post ko eni",
+    "description": "commentsTooltip"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "download_interrupted": {
+    "message": "Download kuo tuku.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime ʻoku ʻikai maʻu",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "ʻIkai lava ke kamata.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Hala ʻi he fetuʻutaki.",
+    "description": "commError"
+  },
+  "cancel": {
+    "message": "Kaniseli",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Kuo kaniseli",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

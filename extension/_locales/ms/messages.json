@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Muat turun",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Memuat turun…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Mencuba…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Selesai",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Ralat",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Gagal.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Muat turun",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Muat turun pantas",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "komen",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Diedit",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Muat turun semua",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "fail",
+    "description": "file"
+  },
+  "files": {
+    "message": "fail",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Bilangan komen pada hantaran ini",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Muat turun terganggu.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Masa larian tidak tersedia",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Tidak dapat memulakan.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Ralat komunikasi.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Hari antara posting dan suntingan terakhir",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "komen",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Batal",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Dibatalkan",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Batalkan semua",
+    "description": "cancelAll"
+  }
+}

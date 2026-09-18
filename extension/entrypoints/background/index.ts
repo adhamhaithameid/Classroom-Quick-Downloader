@@ -4,17 +4,21 @@
  * Wires together all modules and sets up Chrome API listeners.
  *
  * This is the unified background script that works across browsers.
- * Firefox and Chrome/Edge have slightly different download handling
- * (Firefox uses bypass tabs exclusively for Drive).
+ * The download flow is tab-free: Drive downloads target the usercontent
+ * byte-serving endpoint natively on every browser; browser differences are
+ * limited to the filename hooks (onDeterminingFilename vs onCreated).
  */
 
 import {
   pendingByRequestId,
-  pendingByDownloadId,
   pendingByUrl,
-  pendingByUrlAdd,
-  pendingByUrlGet,
-  pendingByBypassTabId,
+  bindDownloadId,
+  unbindDownloadId,
+  getPendingByRequestId,
+  getPendingByDownloadId,
+  getUnclaimedPendingByUrl,
+  setPendingExpiredHook,
+  isRegistered,
   cancelledByUs,
   recentDownloads,
   CLEANUP_INTERVAL_MS,
@@ -29,9 +33,11 @@ import { sendStatusToTab } from './message-sender';
 import {
   handleDownloadRequest,
   startNextDriveAttempt,
-  openDriveBypassTab,
+  startSingleAttempt,
 } from './download-handler';
 import { refreshRemoteAnalyticsConfig, recordDownloadEvent } from '../utils/analytics';
+import { createWorkerRuntimeBridge } from '../../src/adapters/bridge/runtime-bridge';
+import { startBridgeDownloadService } from './bridge-download-service';
 import { UNINSTALL_SITE_URL } from '../utils/analytics/constants';
 import { t } from '../content/i18n';
 import {
@@ -177,85 +183,81 @@ export default defineBackground(() => {
     return false;
   });
 
-  // 1) Messages from drive_bypass.content.ts
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (sender.id !== chrome.runtime.id) return false;
-    if (!message || !sender.tab || sender.tab.id == null) return false;
-
-    const tabId = sender.tab.id;
-    const pending = pendingByBypassTabId.get(tabId);
-
-    // Consent gate for drive_bypass: only tabs the extension itself opened
-    // (openDriveBypassTab) may auto-click through Drive interstitials.
-    // Answered BEFORE the CQD_* drop-guard below, because unregistered tabs
-    // are exactly the ones this check exists for.
-    if (message.type === 'CQD_QUERY_BYPASS_CONSENT') {
-      sendResponse({ allowed: pendingByBypassTabId.has(tabId) });
-      return;
-    }
-
-    if (!pending && typeof message.type === 'string' && message.type.startsWith('CQD_')) {
-      return;
-    }
-
-    if (message.type === 'CQD_BYPASS_SUCCESS') {
-      if (pending) {
-        pending.fallbackStarted = true;
-        sendStatusToTab(pending, 'success');
-        pending.finalized = true;
-      }
-      pendingByBypassTabId.delete(tabId);
-      setTimeout(() => {
-        try {
-          chrome.tabs.remove(tabId);
-        } catch {}
-      }, 5000);
-      return;
-    }
-
-    if (message.type === 'CQD_403_SEEN' && pending) {
-      pending.confirmed403 = true;
-      pending.fallbackStarted = true;
-      pendingByBypassTabId.delete(tabId);
-      try {
-        chrome.tabs.remove(tabId);
-      } catch {}
-
-      if (IS_FIREFOX) {
-        sendStatusToTab(pending, 'error', 'Access denied. Try opening the file directly.', 'ACCESS_DENIED');
-        recordDownloadEvent({
-          type: pending.fileMeta?.ext || 'unknown',
-          status: 'fail',
-          duration_ms: Date.now() - pending.startTime,
-          bypass_used: true,
-          error_type: 'ACCESS_DENIED_FIREFOX',
-        });
-        cleanup(pending);
-      } else {
-        if (!pending.htmlSeen) {
-          pending.htmlSeen = true;
-          sendStatusToTab(pending, 'trying', 'Trying your other Google accounts…', 'AUTH_LOOP');
+  /**
+   * No-dead-ends: retry the SAME attempt (same URL, same account) once for
+   * transient server/network failures. Used by the onChanged taxonomy.
+   */
+  function retrySameAttempt(pending: PendingDownloadLike): void {
+    if (pending.isDrive) {
+      const url =
+        typeof pending.currentAuthUser === 'number'
+          ? buildUrlWithAuthUser(pending.baseUrl, pending.currentAuthUser)
+          : pending.baseUrl;
+      chrome.downloads.download({ url, saveAs: false, conflictAction: 'uniquify' }, (id) => {
+        if (chrome.runtime.lastError || !id) {
+          const _ = chrome.runtime.lastError;
+          sendStatusToTab(pending, 'error', t('downloadInterrupted'), 'RETRY_START_FAIL');
+          cleanup(pending);
+          return;
         }
-        startNextDriveAttempt(pending);
-      }
-      return;
+        bindDownloadId(pending, id);
+      });
+    } else {
+      startSingleAttempt(pending);
     }
+  }
 
-    if (message.type === 'CQD_REGISTER_BYPASS_URL' && pending && typeof message.url === 'string') {
-      pendingByUrlAdd(message.url, pending);
-      return;
+  /**
+   * Stall deadline: a pending that never settles must not leave the user's
+   * button in "trying" until the silent TTL reap. The registry fires this
+   * hook after PENDING_DEADLINE_MS.
+   */
+  setPendingExpiredHook((pending) => {
+    if (pending.currentDownloadId != null) {
+      try {
+        chrome.downloads.cancel(pending.currentDownloadId, () => {
+          const _ = chrome.runtime.lastError;
+        });
+      } catch {
+        // Already gone.
+      }
     }
+    sendStatusToTab(pending, 'error', 'This download timed out. Try again.', 'TIMEOUT');
+    cleanup(pending);
   });
 
-  // 2) onDeterminingFilename (Chrome only)
+  /**
+   * A forbidden-family failure (403/HTML response) for a Drive pending:
+   * cycle to the next signed-in account. Failure reasons are indistinguishable
+   * across accounts — a later account may hold access even when earlier ones
+   * got 403s — so the sweep always runs to its 10-account bound (invisible to
+   * the user, a few seconds) before the honest terminal. Finalized pendings
+   * (success already reported) are never resurrected.
+   */
+  function handleForbiddenFailure(pending: PendingDownloadLike): void {
+    if (pending.finalized) return;
+    if (!pending.htmlSeen) {
+      pending.htmlSeen = true;
+      sendStatusToTab(pending, 'trying', 'Trying your other Google accounts…', 'AUTH_LOOP');
+    }
+    startNextDriveAttempt(pending);
+  }
+
+  type PendingDownloadLike = NonNullable<ReturnType<typeof getPendingByDownloadId>>;
+
+  // 0) Bridge download service (S6/G2): serves CQD_BRIDGE_REQUEST messages
+  //    from the page bus over the worker runtime bridge. Inert until the page
+  //    side sends one; the legacy message flow is untouched.
+  startBridgeDownloadService(createWorkerRuntimeBridge());
+
+  // 1) onDeterminingFilename (Chrome only)
   if (!IS_FIREFOX && chrome.downloads && chrome.downloads.onDeterminingFilename) {
     chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
-      let pending = pendingByDownloadId.get(item.id);
+      let pending = getPendingByDownloadId(item.id);
       if (!pending) {
-        pending = pendingByUrlGet(item.url) ?? pendingByUrlGet(item.finalUrl || item.url);
+        pending = getUnclaimedPendingByUrl(item.url) ?? getUnclaimedPendingByUrl(item.finalUrl || item.url);
         if (pending) {
-          if (pending.currentDownloadId == null) pending.currentDownloadId = item.id;
-          pendingByDownloadId.set(item.id, pending);
+          bindDownloadId(pending, item.id);
         }
       }
       if (!pending) {
@@ -274,27 +276,26 @@ export default defineBackground(() => {
       const userWantedHtml =
         expectedKind === 'html' || expectedExt === 'html' || expectedExt === 'htm';
 
-      if (looksLikeHtml && !userWantedHtml && pending.isDrive) {
+      if (looksLikeHtml && !userWantedHtml) {
         cancelledByUs.add(item.id);
         chrome.downloads.cancel(item.id, () => {
           const _ = chrome.runtime.lastError;
-          pendingByDownloadId.delete(item.id);
-          if (!pending.htmlSeen) {
-            pending.htmlSeen = true;
+          unbindDownloadId(item.id);
+          if (pending.isDrive) {
+            // An HTML response instead of the file is a forbidden/interstitial
+            // page — a forbidden-family failure. Zero-tab contract: no bypass
+            // tab; retry under the next signed-in account until the sweep
+            // exhausts, then the honest terminal.
+            handleForbiddenFailure(pending);
+          } else {
+            // Non-Drive HTML (sign-in page, error page): never save garbage.
             sendStatusToTab(
               pending,
-              'trying',
-              'Google Drive needs an extra confirmation…',
-              'HTML_INTERCEPT'
+              'error',
+              'This link requires signing in — open it in a browser tab and try again.',
+              'HTML_RESPONSE',
             );
-          }
-          if (pending.confirmed403) {
-            startNextDriveAttempt(pending);
-            return;
-          }
-          if (!pending.fallbackStarted) {
-            pending.fallbackStarted = true;
-            openDriveBypassTab(pending, item.finalUrl || item.url || pending.baseUrl);
+            cleanup(pending, item.id);
           }
         });
         return;
@@ -309,23 +310,14 @@ export default defineBackground(() => {
     });
   }
 
-  // 2b) onCreated (Firefox)
+  // 2) onCreated (Firefox)
   if (IS_FIREFOX && chrome.downloads && chrome.downloads.onCreated) {
     chrome.downloads.onCreated.addListener((item) => {
-      let pending = pendingByDownloadId.get(item.id);
+      let pending = getPendingByDownloadId(item.id);
 
       if (!pending && item.url) {
         const downloadFileId = extractDriveFileId(item.url);
         if (downloadFileId) {
-          // Check bypass tabs
-          for (const [tabId, p] of pendingByBypassTabId.entries()) {
-            const pendingFileId =
-              extractDriveFileId(p.baseUrl) || extractDriveFileId(p.originalUrl);
-            if (pendingFileId === downloadFileId) {
-              pending = p;
-              break;
-            }
-          }
           // Check URL map (each URL may have multiple pending downloads)
           if (!pending) {
             outer: for (const [url, bucket] of pendingByUrl.entries()) {
@@ -356,60 +348,175 @@ export default defineBackground(() => {
         }
         // Fallback: URL map exact match (prefer entry without a download ID yet)
         if (!pending) {
-          pending = pendingByUrlGet(item.url);
+          pending = getUnclaimedPendingByUrl(item.url);
         }
       }
 
-      if (pending) {
-        pending.currentDownloadId = item.id;
-        pendingByDownloadId.set(item.id, pending);
-        const ext = getFilenameExt(item.filename);
-        if (ext) pending.finalExtension = ext;
-        if (!pending.finalized) {
-          sendStatusToTab(pending, 'success');
-          pending.finalized = true;
-        }
+      if (!pending) return;
+      const p = pending;
+
+      // Firefox has no onDeterminingFilename: an HTML "download" is Drive's
+      // interstitial or an error page, not the file. Cancel + erase it and
+      // treat it as a forbidden-family failure (zero-tab contract).
+      const mime = (item.mime || '').toLowerCase();
+      const looksLikeHtml =
+        mime.includes('html') ||
+        getFilenameExt(item.filename) === 'html' ||
+        getFilenameExt(item.filename) === 'htm';
+      if (looksLikeHtml) {
+        cancelledByUs.add(item.id);
+        chrome.downloads.cancel(item.id, () => {
+          const _ = chrome.runtime.lastError;
+          chrome.downloads.erase({ id: item.id }, () => {
+            const _2 = chrome.runtime.lastError;
+          });
+          unbindDownloadId(item.id);
+          if (p.isDrive) {
+            handleForbiddenFailure(p);
+          } else {
+            // Non-Drive HTML: never save garbage (Firefox branch).
+            sendStatusToTab(
+              p,
+              'error',
+              'This link requires signing in — open it in a browser tab and try again.',
+              'HTML_RESPONSE',
+            );
+            cleanup(p, item.id);
+          }
+        });
+        return;
       }
+
+      // Correlate only: success is reported by the onChanged 'complete'
+      // event, like Chromium — a download that has merely STARTED is not a
+      // download that finished (Firefox-honesty fix).
+      bindDownloadId(pending, item.id);
+      const ext = getFilenameExt(item.filename);
+      if (ext) pending.finalExtension = ext;
     });
   }
 
-  // 3) onChanged: Analytics trigger
+  // 3) onChanged: settle + analytics
   chrome.downloads.onChanged.addListener((delta) => {
-    const pending = pendingByDownloadId.get(delta.id);
+    const pending = getPendingByDownloadId(delta.id);
     if (!pending) return;
 
     if (delta.state && delta.state.current === 'complete') {
-      const duration = Date.now() - pending.startTime;
-      const ext = pending.finalExtension || pending.fileMeta?.ext || 'unknown';
-      sendStatusToTab(pending, 'success');
-      recordDownloadEvent({
-        type: ext,
-        status: 'success',
-        duration_ms: duration,
-        bypass_used: !!pending.fallbackStarted,
-      });
-      if (pending.fileMeta?.name) recentDownloads.set(pending.fileMeta.name, Date.now());
-      cleanup(pending, delta.id);
+      // No-dead-ends: verify what actually landed. Chromium does NOT always
+      // fire onDeterminingFilename (a text/html response with no
+      // Content-Disposition completes silently), so read the finished
+      // DownloadItem: an HTML "download" of a Drive file is an error page —
+      // erase it and walk the forbidden path instead of reporting a fake
+      // success.
+      const reportSuccess = (finalFilename?: string): void => {
+        const duration = Date.now() - pending.startTime;
+        const ext =
+          pending.finalExtension ||
+          (finalFilename ? getFilenameExt(finalFilename) : undefined) ||
+          pending.fileMeta?.ext ||
+          'unknown';
+        sendStatusToTab(pending, 'success');
+        recordDownloadEvent({
+          type: ext,
+          status: 'success',
+          duration_ms: duration,
+          bypass_used: false,
+        });
+        if (pending.fileMeta?.name) recentDownloads.set(pending.fileMeta.name, Date.now());
+        cleanup(pending, delta.id);
+      };
+      try {
+        chrome.downloads.search({ id: delta.id }, (items) => {
+          const _ = chrome.runtime.lastError;
+          const item = items?.[0];
+          const itemMime = (item?.mime || '').toLowerCase();
+          if (pending.isDrive && !pending.finalized && itemMime.includes('html')) {
+            cancelledByUs.add(delta.id);
+            chrome.downloads.cancel(delta.id, () => {
+              const _e = chrome.runtime.lastError;
+              chrome.downloads.erase({ id: delta.id }, () => {
+                const _e2 = chrome.runtime.lastError;
+              });
+              unbindDownloadId(delta.id);
+              handleForbiddenFailure(pending);
+            });
+            return;
+          }
+          reportSuccess(item?.filename);
+        });
+      } catch {
+        // Search unavailable — report the completion without verification.
+        reportSuccess(undefined);
+      }
       return;
     }
 
     if (delta.state && delta.state.current === 'interrupted') {
       if (cancelledByUs.has(delta.id)) {
         cancelledByUs.delete(delta.id);
-        pendingByDownloadId.delete(delta.id);
+        unbindDownloadId(delta.id);
         return;
       }
-      const duration = Date.now() - pending.startTime;
       const errorType = delta.error?.current || 'UNKNOWN_INTERRUPT';
+
+      if (pending.finalized) {
+        // Success was already reported (Firefox onCreated correlation path);
+        // the pending must still settle NOW, event-driven — not linger to the
+        // TTL sweep.
+        cleanup(pending, delta.id);
+        return;
+      }
+
+      // USER_CANCELED from the browser's own download shelf is the USER's
+      // cancellation — report it as cancelled, never as an error.
+      if (errorType === 'USER_CANCELED') {
+        sendStatusToTab(pending, 'cancelled');
+        cleanup(pending, delta.id);
+        return;
+      }
+
+      const forbiddenFamily =
+        errorType === 'SERVER_FORBIDDEN' || errorType === 'ACCESS_DENIED';
+      if (pending.isDrive && forbiddenFamily) {
+        unbindDownloadId(delta.id);
+        handleForbiddenFailure(pending);
+        return;
+      }
+
+      // No-dead-ends taxonomy: transient server/network failures get ONE
+      // in-place retry (same URL, same account) before the honest terminal;
+      // permanent failures fail fast with a message that names the cause.
+      const TRANSIENT = new Set(['NETWORK_FAILED', 'SERVER_FAILED', 'NETWORK_TIMED_OUT']);
+      const PERMANENT_MESSAGE: Record<string, string> = {
+        FILE_FAILED: 'The file could not be saved. Try downloading it again.',
+        STORAGE_FULL: 'Your disk is full — free up some space and try again.',
+        CRASH: 'The browser crashed during the download. Try again.',
+        SERVER_BAD_CONTENT: 'The file is no longer available at its source.',
+        FILE_VIRUS_INFECTED: 'The file is infected and was blocked by your browser.',
+        FILE_BLOCKED: 'Your browser blocked this file type for security reasons.',
+      };
+      if (TRANSIENT.has(errorType) && !pending.transientRetried) {
+        pending.transientRetried = true;
+        unbindDownloadId(delta.id);
+        setTimeout(() => {
+          if (!isRegistered(pending.requestId) || pending.finalized) return;
+          retrySameAttempt(pending);
+        }, 2_000);
+        sendStatusToTab(pending, 'trying', 'Retrying…', 'TRANSIENT_RETRY');
+        return;
+      }
+
+      const duration = Date.now() - pending.startTime;
       const ext = pending.finalExtension || pending.fileMeta?.ext || 'unknown';
       recordDownloadEvent({
         type: ext,
         status: 'fail',
         duration_ms: duration,
-        bypass_used: !!pending.fallbackStarted,
+        bypass_used: false,
         error_type: errorType,
       });
-      sendStatusToTab(pending, 'error', t('downloadInterrupted'));
+      const guidance = PERMANENT_MESSAGE[errorType];
+      sendStatusToTab(pending, 'error', guidance ?? t('downloadInterrupted'), errorType);
       cleanup(pending, delta.id);
     }
   });
@@ -429,7 +536,7 @@ export default defineBackground(() => {
     const requestId = message.requestId as string | undefined;
     if (!requestId) return false;
 
-    const pending = pendingByRequestId.get(requestId);
+    const pending = getPendingByRequestId(requestId);
     if (!pending) return false;
 
     pending.isCancelled = true;
@@ -447,21 +554,11 @@ export default defineBackground(() => {
       // Cancelled before download ID assigned
     }
 
-    for (const [tabId, p] of pendingByBypassTabId.entries()) {
-      if (p.requestId === requestId) {
-        try {
-          chrome.tabs.remove(tabId);
-        } catch {}
-        pendingByBypassTabId.delete(tabId);
-        break;
-      }
-    }
-
     recordDownloadEvent({
       type: pending.fileMeta?.ext || 'unknown',
       status: 'cancelled',
       duration_ms: Date.now() - pending.startTime,
-      bypass_used: pending.fallbackStarted || false,
+      bypass_used: false,
     });
 
     cleanup(pending);

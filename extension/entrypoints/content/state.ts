@@ -20,6 +20,7 @@ export const DRIVE_ANCHOR_SELECTOR = [
   'a[href*="docs.google.com/document/"]',
   'a[href*="docs.google.com/presentation/"]',
   'a[href*="docs.google.com/drawings/"]',
+  'a[href*="docs.google.com/spreadsheets/"]',
   'a[href*="/file/d/"]',
 ].join(', ');
 
@@ -39,14 +40,15 @@ export const ATTACHMENT_CONTAINER_SELECTOR = [
   '.ndfuHe',  // Student Work attachment wrapper
 ].join(', ');
 
-/** Patterns to identify Drive URLs */
+/** Patterns to identify Drive URLs. The last entry is scoped to Google hosts:
+ *  a bare /file/d/ match made ANY external link look like a Drive file, and
+ *  the download validator then rejected it — a button that can only produce
+ *  a dead end. External links never get download buttons. */
 export const DRIVE_URL_PATTERNS: RegExp[] = [
-  /https:\/\/drive\.google\.com\/file\/d\//,
-  /https:\/\/drive\.google\.com\/open\?/,
-  /https:\/\/drive\.google\.com\/uc\?/,
+  /https:\/\/drive\.google\.com\/(?:u\/\d+\/)?(?:file\/d\/|open\?|uc\?)/,
   /https:\/\/classroom\.google\.com\/drive\//,
-  /https:\/\/docs\.google\.com\/(?:document|presentation|drawings)\/d\//,
-  /\/file\/d\/[A-Za-z0-9_-]+/,
+  /https:\/\/docs\.google\.com\/(?:u\/\d+\/)?(?:document|presentation|drawings|spreadsheets)\/d\//,
+  /https:\/\/[a-z0-9.-]+\.google(?:usercontent)?\.com\/[^/]*\/file\/d\/[A-Za-z0-9_-]+/,
 ];
 
 // --- DOM ATTRIBUTES ---
@@ -55,8 +57,7 @@ export const INJECTED_ATTR = 'data-cqd-injected';
 export const PROCESSED_ATTR = 'data-cqd-processed';
 
 // --- TIMING CONSTANTS ---
-// magic numbers 
-export const RESCAN_INTERVAL_MS = 2000;
+// magic numbers
 export const RESCAN_DEBOUNCE_MS = 150;
 export const LOADING_MIN_MS = 600;
 export const FEEDBACK_SUCCESS_MS = 2000;
@@ -74,9 +75,8 @@ export function setScanTimeoutId(id: number | null) { scanTimeoutId = id; }
 export let observer: MutationObserver | null = null;
 export function setObserver(obs: MutationObserver | null) { observer = obs; }
 
-/** Rescan interval ID */
-export let rescanIntervalId: number | null = null;
-export function setRescanIntervalId(id: number | null) { rescanIntervalId = id; }
+// S10: rescanIntervalId/setRescanIntervalId deleted — the rescan interval no
+// longer exists anywhere; entrypoints hold their own port unsubscribe handles.
 
 /** Map of pending buttons by request ID */
 export const pendingButtons = new Map<string, PendingButton>();

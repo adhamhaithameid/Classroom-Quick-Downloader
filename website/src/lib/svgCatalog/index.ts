@@ -14,3 +14,5 @@ export { doodleItems } from './doodles';
 
 export const categories: SvgCategory[] = [...c1, ...c2, ...c3, ...c4];
 
+export { resolvePlacementSvg } from './placements';
+

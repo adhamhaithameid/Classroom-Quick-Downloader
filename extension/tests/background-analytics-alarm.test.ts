@@ -47,7 +47,7 @@ describe('background analytics alarm', () => {
 
     expect((chrome as any).alarms.create).toHaveBeenCalledTimes(3);
     expect((chrome as any).alarms.create).toHaveBeenNthCalledWith(1, 'CQD_ANALYTICS_FLUSH', { periodInMinutes: 5 });
-    expect((chrome as any).alarms.create).toHaveBeenNthCalledWith(2, 'CQD_ANALYTICS_CONFIG', { periodInMinutes: 180 });
+    expect((chrome as any).alarms.create).toHaveBeenNthCalledWith(2, 'CQD_ANALYTICS_CONFIG', { periodInMinutes: 1440 });
     expect((chrome as any).alarms.create).toHaveBeenNthCalledWith(3, 'CQD_CHANGELOG_DAILY', expect.objectContaining({ periodInMinutes: 1440 }));
     expect(addListener).toHaveBeenCalledTimes(1);
 
@@ -60,6 +60,16 @@ describe('background analytics alarm', () => {
     listener({ name: 'CQD_CHANGELOG_DAILY' });
     await Promise.resolve();
     expect(fetchChangelogSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates the config refresh alarm with a daily period', async () => {
+    const { mod } = await loadAlarmModule(false);
+    mod.ensureAnalyticsAlarm();
+
+    const create = (chrome as any).alarms.create as ReturnType<typeof vi.fn>;
+    const configCall = create.mock.calls.find((call) => call[0] === 'CQD_ANALYTICS_CONFIG');
+    expect(configCall).toBeDefined();
+    expect(configCall?.[1]).toEqual({ periodInMinutes: 1440 });
   });
 
   it('no-ops when alarms API is unavailable', async () => {

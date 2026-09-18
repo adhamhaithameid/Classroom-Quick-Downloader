@@ -88,9 +88,10 @@ describe('renderFlagBadge', () => {
 
     renderFlagBadge(decision, post);
 
-    const badge = post.querySelector('.cqd-v2-flag');
+    const badge = post.querySelector('[data-cqd-v2-flag="badge"]');
     expect(badge).not.toBeNull();
-    expect(badge!.classList.contains('cqd-v2-flag-comment')).toBe(true);
+    expect(badge!.classList.contains('cqd-comment-badge')).toBe(true);
+    expect(badge!.classList.contains('cqd-flag')).toBe(true);
   });
 
   it('creates an edited badge for "edited" verdict', () => {
@@ -102,7 +103,7 @@ describe('renderFlagBadge', () => {
 
     renderFlagBadge(decision, post);
 
-    const badge = post.querySelector('.cqd-v2-flag-edited');
+    const badge = post.querySelector('.cqd-edited-badge');
     expect(badge).not.toBeNull();
   });
 
@@ -117,11 +118,12 @@ describe('renderFlagBadge', () => {
 
     renderFlagBadge(decision, post);
 
-    const badge = post.querySelector('.cqd-v2-flag-both');
+    const badge = post.querySelector('.cqd-both-badge');
     expect(badge).not.toBeNull();
-    // Both badge should have separator
-    const separator = badge!.querySelector('.cqd-v2-flag-separator');
-    expect(separator).not.toBeNull();
+    // Combined pill: comment + plus + edit sections (V1 both-badge structure)
+    expect(badge!.querySelectorAll('.cqd-both-section')).toHaveLength(2);
+    expect(badge!.querySelector('.cqd-both-plus')).not.toBeNull();
+    expect(post.querySelectorAll('.cqd-overlay-container')).toHaveLength(1);
   });
 
   it('does not create badge for "none" verdict', () => {
@@ -130,7 +132,7 @@ describe('renderFlagBadge', () => {
 
     renderFlagBadge(decision, post);
 
-    const badge = post.querySelector('.cqd-v2-flag');
+    const badge = post.querySelector('[data-cqd-v2-flag="badge"]');
     expect(badge).toBeNull();
   });
 
@@ -145,7 +147,7 @@ describe('renderFlagBadge', () => {
     renderFlagBadge(decision, post);
     renderFlagBadge(decision, post);
 
-    const badges = post.querySelectorAll('.cqd-v2-flag');
+    const badges = post.querySelectorAll('[data-cqd-v2-flag="badge"]');
     expect(badges.length).toBe(1);
   });
 
@@ -158,15 +160,15 @@ describe('renderFlagBadge', () => {
       commentScore: 80,
       commentCount: 3,
     }), post);
-    expect(post.querySelector('.cqd-v2-flag-comment')).not.toBeNull();
+    expect(post.querySelector('.cqd-comment-badge')).not.toBeNull();
 
     // Then: edited badge (replaces comment)
     renderFlagBadge(makeDecision({
       finalVerdict: 'edited',
       editedScore: 50,
     }), post);
-    expect(post.querySelector('.cqd-v2-flag-comment')).toBeNull();
-    expect(post.querySelector('.cqd-v2-flag-edited')).not.toBeNull();
+    expect(post.querySelector('.cqd-comment-badge')).toBeNull();
+    expect(post.querySelector('.cqd-edited-badge')).not.toBeNull();
   });
 
   it('removes badge when verdict becomes "none"', () => {
@@ -178,11 +180,11 @@ describe('renderFlagBadge', () => {
       commentScore: 80,
       commentCount: 3,
     }), post);
-    expect(post.querySelector('.cqd-v2-flag')).not.toBeNull();
+    expect(post.querySelector('[data-cqd-v2-flag="badge"]')).not.toBeNull();
 
     // Remove via "none" verdict
     renderFlagBadge(makeDecision({ finalVerdict: 'none' }), post);
-    expect(post.querySelector('.cqd-v2-flag')).toBeNull();
+    expect(post.querySelector('[data-cqd-v2-flag="badge"]')).toBeNull();
   });
 
   it('sets data attributes on post', () => {
@@ -193,21 +195,30 @@ describe('renderFlagBadge', () => {
       commentCount: 2,
     }), post);
 
-    expect(post.hasAttribute('data-cqd-v2-flag')).toBe(true);
-    expect(post.getAttribute('data-cqd-v2-flag-verdict')).toBe('comment');
+    // z57 S4: the marker + rendered kind live on the badge element itself,
+    // not the post (the classes are now the shared V1 contract).
+    const badge = post.querySelector('[data-cqd-v2-flag="badge"]');
+    expect(badge).not.toBeNull();
+    expect(badge!.getAttribute('data-cqd-flag-kind')).toBe('comment');
+    expect(badge!.getAttribute('data-cqd-comment-count')).toBe('2');
   });
 
-  it('adds overlay border', () => {
+  it('adds the overlay frame for edited and both verdicts', () => {
     const post = createPost();
     renderFlagBadge(makeDecision({
-      finalVerdict: 'comment',
-      commentScore: 80,
-      commentCount: 2,
+      finalVerdict: 'edited',
+      editedScore: 50,
     }), post);
+    expect(post.querySelector('.cqd-overlay-container.cqd-edited')).not.toBeNull();
 
-    const overlay = post.querySelector('.cqd-v2-overlay');
-    expect(overlay).not.toBeNull();
-    expect(overlay!.classList.contains('cqd-v2-flag-border-comment')).toBe(true);
+    const post2 = createPost();
+    renderFlagBadge(makeDecision({
+      finalVerdict: 'both',
+      commentScore: 80,
+      editedScore: 50,
+      commentCount: 2,
+    }), post2);
+    expect(post2.querySelector('.cqd-overlay-container.cqd-both')).not.toBeNull();
   });
 
   it('badge has tooltip and aria-label', () => {
@@ -218,7 +229,7 @@ describe('renderFlagBadge', () => {
       commentCount: 5,
     }), post);
 
-    const badge = post.querySelector('.cqd-v2-flag') as HTMLElement;
+    const badge = post.querySelector('[data-cqd-v2-flag="badge"]') as HTMLElement;
     expect(badge.title).toContain('comment');
     expect(badge.getAttribute('aria-label')).toBeTruthy();
   });
@@ -239,9 +250,7 @@ describe('removeStaleBadges', () => {
 
     removeStaleBadges(post);
 
-    expect(post.querySelector('.cqd-v2-flag')).toBeNull();
-    expect(post.querySelector('.cqd-v2-overlay')).toBeNull();
-    expect(post.hasAttribute('data-cqd-v2-flag')).toBe(false);
+    expect(post.querySelector('[data-cqd-v2-flag]')).toBeNull();
   });
 
   it('is safe to call on post without badge', () => {

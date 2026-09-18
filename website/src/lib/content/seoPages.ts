@@ -6,10 +6,17 @@ export type SeoCta = {
   external?: boolean;
 };
 
+export type SeoSectionLink = {
+  label: string;
+  href: string;
+  external?: boolean;
+};
+
 export type SeoSection = {
   heading: string;
   paragraphs?: string[];
   bullets?: string[];
+  links?: SeoSectionLink[];
 };
 
 export type SeoFaq = {
@@ -59,7 +66,7 @@ export const seoPages = {
     eyebrow: 'Use Case',
     h1: 'How To Download All Attachments From Google Classroom',
     intro:
-      'Classroom Quick Downloader adds download buttons directly inside Google Classroom so you can download every attachment from an assignment without opening each file.',
+      'To download all attachments from Google Classroom in one pass, install a bulk-download extension such as Classroom Quick Downloader (CQD), open the assignment or class, and click Download All — every attached file saves to your device in one queued run. Manually, you would open each file\'s preview and save it one at a time.',
     keywords:
       'download all google classroom attachments, bulk download google classroom files, classroom quick downloader',
     sections: [
@@ -75,12 +82,16 @@ export const seoPages = {
         heading: 'Step-By-Step: Download Every Attachment In One Click',
         paragraphs: ['Once the extension is installed, the whole workflow happens on pages you already use:'],
         bullets: [
-          'Install CQD from the Chrome Web Store, Firefox Add-ons, or Edge Add-ons — no account or sign-up is required.',
+          'Install CQD from the Chrome Web Store, from [our Firefox install guide](/install/firefox), or from [our Edge install guide](/install/edge) — no account or sign-up is required.',
           'Open Google Classroom normally and navigate to any class.',
           'On the Classwork tab (or Stream), CQD automatically detects the downloadable attachments on each post — nothing to configure or toggle.',
           'Click the Download All control on the assignment you need.',
           'Your browser queues and saves every detected file natively, exactly as if you had downloaded each one by hand.',
           'Keep working while downloads finish in the background; progress is visible and in-flight downloads can be cancelled individually.'
+        ],
+        links: [
+          { label: 'Firefox install guide', href: '/install/firefox' },
+          { label: 'Edge install guide', href: '/install/edge' }
         ]
       },
       {
@@ -97,6 +108,10 @@ export const seoPages = {
           'Drive-only large files: very large files may show Google\'s "can\'t scan for viruses" interstitial when opened manually; see our dedicated guide for handling that warning.',
           'Refresh after install: if buttons do not appear right after installing, reload the Classroom tab once so the extension can attach to the page.',
           'Student Work: recent versions also support downloading attachments from student submissions in class tools where your teacher has enabled access.'
+        ],
+        links: [
+          { label: 'Fix the Drive virus-scan warning', href: '/google-drive-cant-scan-virus-warning-download' },
+          { label: 'Works with Google Workspace for Education', href: '/google-workspace-school-accounts-support' }
         ]
       },
       {
@@ -139,7 +154,7 @@ export const seoPages = {
     path: '/bulk-download-google-classroom-assignments',
     title: 'Bulk Download Google Classroom Assignments — Free',
     description:
-      'Bulk download every Google Classroom assignment file at once with one-click queueing and browser-native downloads. Free, open source, no sign-up needed.',
+      'Bulk download every Google Classroom assignment file at once with one-click queueing and browser-native downloads. Free extension, no sign-up needed.',
     eyebrow: 'Use Case',
     h1: 'Bulk Download Google Classroom Assignments',
     intro:
@@ -335,7 +350,7 @@ export const seoPages = {
         heading: 'If Your School Manages The Browser',
         paragraphs: ['Managed Chromebooks and school-controlled browsers can restrict what gets installed. If CQD is blocked or missing from the store on a school device, that is policy, not a technical failure. What tends to work:'],
         bullets: [
-          'Send your IT admin the official store link plus the open-source GitHub repository for review.',
+          'Send your IT admin the official store link plus the public GitHub repository, where the manifest and code can be reviewed directly.',
           'Point out the privacy posture: no file contents read, no third-party tracking, aggregate-only metrics.',
           'Ask whether your school allows a student-requested extension allowlist process — many do.',
           'On personal devices, install from the same store links with no restrictions.'
@@ -475,7 +490,7 @@ export const seoPages = {
       {
         question: 'Is there any premium tier for more speed?',
         answer:
-          'No tiers exist. CQD is free and open source; speed is a property of the architecture (native browser queueing), not a paid unlock.'
+          'No tiers exist. CQD is completely free; speed is a property of the architecture (native browser queueing), not a paid unlock.'
       }
     ]
   }),
@@ -484,7 +499,7 @@ export const seoPages = {
     path: '/install/chrome',
     title: 'Install Classroom Quick Downloader For Chrome (Free)',
     description:
-      'Add Classroom Quick Downloader to Chrome in under a minute and download all Google Classroom attachments in one click. Free, open source, no account.',
+      'Add Classroom Quick Downloader to Chrome in under a minute and download all Google Classroom attachments in one click. Free, no account.',
     eyebrow: 'Install Guide',
     h1: 'Install CQD For Chrome',
     intro: 'Chrome is the fastest way to get started with CQD. Installation takes less than a minute.',
@@ -548,7 +563,7 @@ export const seoPages = {
       {
         question: 'Is Classroom Quick Downloader free on Chrome?',
         answer:
-          'Completely — no premium tier, no trial limits, no ads. It is open source, so the full codebase is auditable on GitHub at any time.'
+          'Completely — no premium tier, no trial limits, no ads. The full codebase is publicly available on GitHub, so you can audit it at any time.'
       },
       {
         question: 'Does it work on Chromebooks?',
@@ -572,7 +587,7 @@ export const seoPages = {
     path: '/install/firefox',
     title: 'Install Classroom Quick Downloader For Firefox',
     description:
-      'Add Classroom Quick Downloader from Firefox Add-ons and bulk download Google Classroom attachments in one click. Free, open source, no account required.',
+      'Add Classroom Quick Downloader from Firefox Add-ons and bulk download Google Classroom attachments in one click. Free, no account required.',
     eyebrow: 'Install Guide',
     h1: 'Install CQD For Firefox',
     intro: 'CQD is available on Firefox Add-ons with the same one-click download workflow.',
@@ -660,7 +675,7 @@ export const seoPages = {
     path: '/install/edge',
     title: 'Install Classroom Quick Downloader For Microsoft Edge',
     description:
-      'Add Classroom Quick Downloader from Microsoft Edge Add-ons and download every Google Classroom attachment in one click. Free, open source, no account.',
+      'Add Classroom Quick Downloader from Microsoft Edge Add-ons and download every Google Classroom attachment in one click. Free, no account.',
     eyebrow: 'Install Guide',
     h1: 'Install CQD For Edge',
     intro: 'Edge users can install CQD directly from Microsoft Edge Add-ons.',
@@ -757,15 +772,50 @@ export const seoPages = {
     secondaryCta: { label: 'Read Privacy Summary', href: '/privacy' },
     sections: [
       {
+        heading: 'Requested Permissions, Line By Line',
+        paragraphs: [
+          'CQD requests three browser permissions plus scoped host access. All of it is declared in the public manifest, and nothing on this page is hidden in fine print:'
+        ],
+        bullets: [
+          '"downloads" — saves files to your device through your browser\'s normal download flow.',
+          '"storage" — keeps your in-extension preferences and download state on your own device.',
+          '"alarms" — schedules routine cleanup of stale internal download records.',
+          'Host access to classroom.google.com — detects attachments and adds download buttons inside Classroom.',
+          'Host access to drive.google.com and drive.usercontent.google.com — used only when a bulk download has to fetch a file through Drive, including the "can\'t scan for viruses" interstitial.',
+          'Host access to accounts.google.com — resolves which of your signed-in accounts can access a file during bulk downloads.',
+          'No "tabs", "history", "bookmarks", or "activeTab" permissions are requested.'
+        ]
+      },
+      {
         heading: 'Data Boundaries',
         paragraphs: [
           'CQD does not read or upload classroom file contents.',
+          'Files travel directly from Google\'s servers to your browser — they are never proxied through a CQD server.',
           'Operational reliability metrics are aggregate-only and designed to avoid personal profiling.'
         ]
       },
       {
         heading: 'Disclosure Process',
-        paragraphs: ['Security issues can be reported through the repository security channels for triage and coordinated fixes.']
+        paragraphs: [
+          'Security issues can be reported through the repository\'s security channels (see SECURITY.md) for triage and coordinated fixes.'
+        ]
+      }
+    ],
+    faqs: [
+      {
+        question: 'Does CQD need access to my Google account?',
+        answer:
+          'CQD never sees your password or credentials. It runs inside the Classroom pages you are already signed in to and uses the same download endpoints your browser uses when you click a file manually.'
+      },
+      {
+        question: 'What data does CQD send anywhere?',
+        answer:
+          'Only aggregate reliability counters: download outcomes (success, fail, cancel), file type, browser and extension version, and country-level totals. No file contents, file names, credentials, or personal identifiers. The full list is on the privacy page.'
+      },
+      {
+        question: 'Can I verify any of this myself?',
+        answer:
+          'Yes. The manifest, source code, issue tracker, and release history are all public on GitHub, so every permission and claim on this page can be checked against the code that ships.'
       }
     ]
   }),
@@ -876,7 +926,7 @@ export const seoPages = {
       {
         heading: 'Transparency And Trust',
         paragraphs: [
-          'CQD is fully open source — the repository, issue tracker, and changelog are public, so any claim on this site can be checked against code. That matters more in education than most categories: school devices, student accounts, and institutional data raise the stakes of "trust me" extensions. Whatever tool you pick, prefer one where permissions are explained line-by-line rather than buried in a wall of text.'
+          'CQD\'s code is public — the repository, issue tracker, and changelog are public, so any claim on this site can be checked against the code that ships. That matters more in education than most categories: school devices, student accounts, and institutional data raise the stakes of "trust me" extensions. Whatever tool you pick, prefer one where permissions are explained line-by-line rather than buried in a wall of text.'
         ]
       },
       {
@@ -910,7 +960,7 @@ export const seoPages = {
       {
         question: 'Is Classroom Quick Downloader open source?',
         answer:
-          'Yes — source, issues, and release notes are public on GitHub. We consider auditability a feature in the education space and would encourage the same standard for any competing tool.'
+          'CQD is source-available rather than open-source in the strict sense: the full code, issue tracker, and release notes are public on GitHub under the PolyForm Noncommercial license, so anyone can audit them, and the extension is free for personal and educational use.'
       },
       {
         question: 'Can I run both extensions at once?',
@@ -969,7 +1019,7 @@ export const seoPages = {
           'Permissions: minimal, explained, and scoped to what the tool claims to do.',
           'Data practices: explicit about what leaves the browser; aggregate-only beats profile-building.',
           'Maintenance: visible release history and a public changelog.',
-          'Source availability: open source where possible, especially on school devices.',
+          'Source availability: publicly auditable code, especially on school devices.',
           'Reviews with substance: store reviews that mention specific workflows beat star-count alone.'
         ]
       },
@@ -1021,7 +1071,7 @@ export const seoPages = {
     path: '/compare/classroom-quick-downloader-vs-classfetch',
     title: 'Classroom Quick Downloader vs Classfetch: Compared',
     description:
-      'Classroom Quick Downloader vs Classfetch compared on download speed, reliability, requested permissions, and privacy-first design. Free and open source.',
+      'Classroom Quick Downloader vs Classfetch compared on download speed, reliability, requested permissions, and privacy-first design. Free, with public source code.',
     eyebrow: 'Comparison',
     h1: 'Classroom Quick Downloader vs Classfetch',
     intro: 'This page compares key workflow outcomes and practical differences between CQD and Classfetch.',
@@ -1083,7 +1133,7 @@ export const seoPages = {
       {
         question: 'Which one respects privacy more?',
         answer:
-          'We are confident in CQD\'s posture because it is verifiable: open source code, no file-content access, aggregate-only metrics, no account system. Apply the same verification standard to any competitor\'s claims.'
+          'We are confident in CQD\'s posture because it is verifiable: publicly auditable code, no file-content access, aggregate-only metrics, no account system. Apply the same verification standard to any competitor\'s claims.'
       },
       {
         question: 'Does CQD have features Classfetch lacks?',

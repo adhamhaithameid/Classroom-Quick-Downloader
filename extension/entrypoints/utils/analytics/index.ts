@@ -24,10 +24,12 @@ export type {
 
 let opChain: Promise<void> = Promise.resolve();
 
-function enqueueOp(op: () => Promise<void>): void {
-  opChain = opChain.then(op).catch(() => {
+function enqueueOp(op: () => Promise<void>): Promise<void> {
+  const result = opChain.then(op).catch(() => {
     // Analytics operation error - silently ignored
   });
+  opChain = result;
+  return result;
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -122,9 +124,10 @@ export const Analytics = {
 
   /**
    * Best-effort flush. Called by chrome.alarms from background.
+   * Resolves when the flush pass completes (never rejects).
    */
-  flush(): void {
-    enqueueOp(() => internalFlush());
+  flush(): Promise<void> {
+    return enqueueOp(() => internalFlush());
   },
 
   /**
@@ -179,7 +182,7 @@ export async function refreshRemoteAnalyticsConfig(): Promise<void> {
     if (isFiniteNumber(json.maxRetry)) {
       updates.maxRetry = clampInt(json.maxRetry, 0, 20);
     }
-    if (json.flushMode === 'next_day' || json.flushMode === 'time_based') {
+    if (json.flushMode === 'next_day' || json.flushMode === 'time_based' || json.flushMode === 'weekly') {
       updates.flushMode = json.flushMode;
     }
     if (typeof json.remoteEnabled === 'boolean') {

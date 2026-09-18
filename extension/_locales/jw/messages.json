@@ -1,0 +1,102 @@
+{
+  "download": {
+    "message": "Unduh",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Ngunduh…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Nyoba…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Rampung",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Kesalahan",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Gagal.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Unduh",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Unduh cepet",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "komentar",
+    "description": "comments"
+  },
+  "comment_singular": {
+    "message": "komentar",
+    "description": "commentSingular"
+  },
+  "edited": {
+    "message": "Diedit",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Unduh kabeh",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "berkas",
+    "description": "file"
+  },
+  "files": {
+    "message": "berkas",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Jumlah komentar ing postingan iki",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Unduhan diselani.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Runtime ora kasedhiya",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Ora bisa miwiti.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Kesalahan komunikasi.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Dina antarane posting lan suntingan pungkasan",
+    "description": "editedTooltip"
+  },
+  "modified": {
+    "message": "Diowahi",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "bubar posting",
+    "description": "after_posting"
+  },
+  "cancel": {
+    "message": "Batal",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Dibatalké",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Batal Kabeh",
+    "description": "cancelAll"
+  }
+}

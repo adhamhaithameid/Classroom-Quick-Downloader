@@ -52,7 +52,7 @@ export interface AnalyticsConfig {
   batchSize: number;
   maxDailyRequests: number;
   maxRetry: number;
-  flushMode: 'next_day' | 'time_based';
+  flushMode: 'next_day' | 'time_based' | 'weekly';
   lowUsageFlushMinutes: number;
   midUsageFlushMinutes: number;
   highUsageFlushMinutes: number;
@@ -77,6 +77,9 @@ export interface AnalyticsMeta {
   lastPerfMs?: number | null;
   serverTimeOffsetMs?: number | null;
   lastCommittedSeq?: number | null;
+  lastWeeklyFlushSlotKey?: string | null;
+  weeklyOffsetSlotKey?: string | null;
+  weeklyOffsetMinutes?: number | null;
 }
 
 export interface RateLimitState {

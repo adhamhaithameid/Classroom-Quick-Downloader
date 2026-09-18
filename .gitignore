@@ -58,3 +58,10 @@ __pycache__/
 # Claude Code local config
 CLAUDE.md
 .claude/
+tests/e2e/.firefox-profile/
+# e2e global-setup build stamp (source hash of the last Chrome build)
+tests/e2e/.build-stamp
+
+# Stryker mutation testing (extension)
+extension/.stryker-tmp/
+extension/reports/

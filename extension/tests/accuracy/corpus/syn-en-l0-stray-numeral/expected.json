@@ -1,0 +1,15 @@
+{
+  "viewKind": "stream",
+  "lang": "en",
+  "note": "Synthetic (en): D5 regression. The L0 DOM-truth chip (.qCWAqb .huI6Cb) holds an id-like numeral 99999 — below the parser sanity ceiling (100000), so the numeral parser accepts it, but far above any plausible Classroom comment count — and no other comment evidence exists anywhere in the post. S0 must sanity-check the numeral it trusts (value plausibility plus chip shape); a bare acceptance would mark the comment flag present with count 99999 and beat every other layer.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-en-stray-1",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    }
+  ],
+  "caseId": "syn-en-l0-stray-numeral"
+}

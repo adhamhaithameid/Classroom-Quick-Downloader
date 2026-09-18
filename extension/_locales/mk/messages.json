@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Преземи",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Преземање…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Се обидувам…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Готово",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Грешка",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Неуспешно.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Преземи",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Брзо преземање",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "коментари",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Изменето",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Преземи ги сите",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "датотека",
+    "description": "file"
+  },
+  "files": {
+    "message": "датотеки",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Број на коментари на оваа објава",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Преземањето е прекинато.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Времето на извршување не е достапно",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Не можеше да започне.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Грешка во комуникацијата.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "коментари",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Откажи",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Откажано",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Cancel All",
+    "description": "cancelAll"
+  }
+}

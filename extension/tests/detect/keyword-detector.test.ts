@@ -118,4 +118,69 @@ describe('KeywordDetector', () => {
 
     expect(obs.viewKind).toBe(ViewKind.ASSIGNMENT_DETAILS);
   });
+
+  it('does not trust an id-like numeral in the DOM-truth chip (D5)', () => {
+    // Same guard as the structural chain — the two L0s share one core helper
+    // so a count believed by one is believed by the other.
+    const post = createPost('<div class="qCWAqb"><div class="huI6Cb">99999</div></div>');
+    const obs = detector.observe(post, { postId: 'p11', viewKind: ViewKind.STREAM, lang: 'en' });
+
+    expect(obs.comment.present).toBe(false);
+    expect(obs.comment.count).toBeNull();
+  });
+
+  it('floors a corroborated sub-threshold count+keyword shell at the decide threshold (D12)', () => {
+    // Drifted count chip (no golden/L0/L1/L2 layer fires) plus an independent
+    // edited marker: the L4 score (20) alone dies below comment_show (40), but
+    // a parsed count with keyword evidence corroborated by the edited channel
+    // must not lose its verdict.
+    const post = createPost(
+      '<div class="IMvYId">Edited Mar 10</div>' +
+        '<footer><div class="post-comment-count">4 class comments</div></footer>',
+    );
+    const obs = detector.observe(post, { postId: 'p12', viewKind: ViewKind.STREAM, lang: 'en' });
+
+    expect(obs.comment.count).toBe(4);
+    expect(obs.comment.strength).toBe(40);
+    expect(obs.comment.present).toBe(true);
+  });
+
+  it('does not floor a sub-threshold count+keyword shell without edited corroboration (D12)', () => {
+    // Same drifted chip, no edited marker: the low L4 score still loses its
+    // verdict at the decide layer. Score floor, not unconditional present.
+    const post = createPost(
+      '<footer><div class="post-comment-count">4 class comments</div></footer>',
+    );
+    const obs = detector.observe(post, { postId: 'p13', viewKind: ViewKind.STREAM, lang: 'en' });
+
+    expect(obs.comment.count).toBe(4);
+    expect(obs.comment.strength).toBeLessThan(40);
+    expect(obs.comment.present).toBe(true); // observation-level fact only
+  });
+
+  it('scores the captured .comment-count chip shell at golden confidence (S12)', () => {
+    // Google's own comment-count chip class as captured in the live fixtures
+    // (classwork-material-post-en.html, mixed-links-post-en.html). Unlike the
+    // drifted `post-comment-count` shape above, the real chip class is golden
+    // layer evidence — the count must clear the decide threshold on its own,
+    // with no edited marker to corroborate it.
+    const post = createPost('<div class="comment-count">2 class comments</div>');
+    const obs = detector.observe(post, { postId: 'p14', viewKind: ViewKind.STREAM, lang: 'en' });
+
+    expect(obs.comment.count).toBe(2);
+    expect(obs.comment.strength).toBeGreaterThanOrEqual(40);
+    expect(obs.comment.present).toBe(true);
+  });
+
+  it('detects the Hungarian edited marker through a real hu keyword table (S12)', () => {
+    // Before S12 there was no `hu` entry, so getEditedKeywords('hu') silently
+    // fell back to English and '(szerkesztve: ...)' never matched anything.
+    const post = createPost(
+      '<div class="JZk9qf Vu2fZd">Közzétéve: márc. 1. (szerkesztve: márc. 10.)</div>',
+    );
+    const obs = detector.observe(post, { postId: 'p15', viewKind: ViewKind.STREAM, lang: 'hu' });
+
+    expect(obs.edited.present).toBe(true);
+    expect(obs.edited.strength).toBeGreaterThanOrEqual(35);
+  });
 });

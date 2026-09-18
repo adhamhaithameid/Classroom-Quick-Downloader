@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "הורדה",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "מוריד…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "מנסה…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "הושלם",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "שגיאה",
+    "description": "error"
+  },
+  "failed": {
+    "message": "נכשל",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "הורדה",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "הורדה מהירה",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "תגובות",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "נערך",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "הורד הכל",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "קובץ",
+    "description": "file"
+  },
+  "files": {
+    "message": "קבצים",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "מספר התגובות בפוסט זה",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "ההורדה הופסקה.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "סביבת ריצה לא זמינה",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "לא היה ניתן להתחיל.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "שגיאת תקשורת.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Days between posting and the last edit",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "תגובות",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "ביטול",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "בוטל",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "ביטול הכל",
+    "description": "cancelAll"
+  }
+}

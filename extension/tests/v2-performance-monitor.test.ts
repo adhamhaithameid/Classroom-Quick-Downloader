@@ -6,7 +6,7 @@
  * injected element counting, and performance summaries.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   PerformanceMonitor,
   computePercentiles,
@@ -16,6 +16,7 @@ import type {
   TimingPercentiles,
 } from '../src/v2/telemetry/performance-monitor';
 import type { DecisionTrace, ViewKind } from '../src/engines/types';
+import { EngineV2 } from '../src/engines/v2/engine-v2';
 
 // ============================================================================
 // SETUP
@@ -307,5 +308,125 @@ describe('Reset', () => {
     monitor.startTimer('active');
     monitor.reset();
     expect(monitor.stopTimer('active')).toBe(-1); // Timer was cleared
+  });
+});
+
+// ============================================================================
+// HANDLE MUTATIONS INSTRUMENTATION (Engine V4 S11 — G5 budget gate)
+// ============================================================================
+//
+// The 'handleMutations' label is the fast-pass budget metric (<6ms p95,
+// budget-controller FAST_PASS_TARGET). It is only a real measurement if
+// EngineV2.handleMutations actually records it on every batch it handles —
+// these tests drive the engine with real mutation batches and read the
+// histogram back through the engine's own monitor.
+
+describe('handleMutations instrumentation (S11)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  /** v2-engines idiom: init with a pre-aborted signal (skips content wait). */
+  async function makeEngine(): Promise<EngineV2> {
+    const engine = new EngineV2();
+    const controller = new AbortController();
+    controller.abort();
+    await engine.init('stream' as ViewKind, controller.signal);
+    return engine;
+  }
+
+  /** One real childList batch adding a post card to the live DOM. */
+  function makeRelevantMutation(postId: string): MutationRecord[] {
+    const addedNode = document.createElement('div');
+    addedNode.setAttribute('data-stream-item-id', postId);
+    document.body.appendChild(addedNode);
+
+    return [{
+      type: 'childList',
+      addedNodes: [addedNode] as any,
+      removedNodes: [] as any,
+      target: document.body,
+      attributeName: null,
+      attributeNamespace: null,
+      nextSibling: null,
+      previousSibling: null,
+      oldValue: null,
+    }];
+  }
+
+  /** Read the engine's own monitor (same private-state idiom as v2-engines). */
+  function monitorOf(engine: EngineV2): PerformanceMonitor {
+    return (engine as unknown as { performanceMonitor: PerformanceMonitor })
+      .performanceMonitor;
+  }
+
+  it('records the handleMutations label after N real mutation batches', async () => {
+    const engine = await makeEngine();
+
+    for (let i = 0; i < 6; i++) {
+      engine.handleMutations(makeRelevantMutation(`perf-post-${i}`));
+    }
+
+    const p = monitorOf(engine).getPercentiles('handleMutations');
+    expect(p).not.toBeNull();
+    expect(p!.count).toBe(6);
+    expect(typeof p!.p95).toBe('number');
+    // jsdom's clock quantizes to whole ms, so a real sub-ms batch can legiti-
+    // mately record as 0 here; the deterministic >0 proof lives in the clock
+    // test below and the live p95 budget check in qa-perf.
+    expect(p!.p95).toBeGreaterThanOrEqual(0);
+
+    engine.destroy();
+  });
+
+  it('grows the sample count with each handled batch', async () => {
+    const engine = await makeEngine();
+
+    for (let i = 0; i < 3; i++) {
+      engine.handleMutations(makeRelevantMutation(`grow-a-${i}`));
+    }
+    expect(monitorOf(engine).getTimingCount('handleMutations')).toBe(3);
+
+    for (let i = 0; i < 4; i++) {
+      engine.handleMutations(makeRelevantMutation(`grow-b-${i}`));
+    }
+    expect(monitorOf(engine).getTimingCount('handleMutations')).toBe(7);
+
+    engine.destroy();
+  });
+
+  it('measures real elapsed time — p95 > 0 under a monotonic clock', async () => {
+    const engine = await makeEngine();
+
+    // Stub the clock to advance on every read: if the timer window actually
+    // wraps the mutation handling, the recorded duration must be > 0.
+    let t = 0;
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => (t += 0.5));
+    try {
+      engine.handleMutations(makeRelevantMutation('clock-post'));
+    } finally {
+      clock.mockRestore();
+    }
+
+    const p = monitorOf(engine).getPercentiles('handleMutations');
+    expect(p).not.toBeNull();
+    expect(p!.count).toBe(1);
+    expect(p!.p95).toBeGreaterThan(0);
+
+    engine.destroy();
+  });
+
+  it('exposes mutation timings via the public accessor', async () => {
+    const engine = await makeEngine();
+
+    engine.handleMutations(makeRelevantMutation('accessor-post'));
+
+    const p = engine.getMutationTimings();
+    expect(p).not.toBeNull();
+    expect(p!.count).toBe(1);
+    expect(typeof p!.p95).toBe('number');
+    expect(p!.p95).toBeGreaterThanOrEqual(0);
+
+    engine.destroy();
   });
 });

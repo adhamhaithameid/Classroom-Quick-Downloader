@@ -1,0 +1,94 @@
+{
+  "download": {
+    "message": "Pobierz",
+    "description": "download"
+  },
+  "downloading": {
+    "message": "Pobieranie…",
+    "description": "downloading"
+  },
+  "trying": {
+    "message": "Próba…",
+    "description": "trying"
+  },
+  "downloaded": {
+    "message": "Pobrano",
+    "description": "downloaded"
+  },
+  "error": {
+    "message": "Błąd",
+    "description": "error"
+  },
+  "failed": {
+    "message": "Nieudane.",
+    "description": "failed"
+  },
+  "aria_download": {
+    "message": "Pobierz",
+    "description": "ariaDownload"
+  },
+  "title_quick": {
+    "message": "Szybkie pobieranie",
+    "description": "titleQuick"
+  },
+  "comments": {
+    "message": "komentarze",
+    "description": "comments"
+  },
+  "edited": {
+    "message": "Edytowano",
+    "description": "edited"
+  },
+  "download_all": {
+    "message": "Pobierz wszystko",
+    "description": "downloadAll"
+  },
+  "file": {
+    "message": "plik",
+    "description": "file"
+  },
+  "files": {
+    "message": "pliki",
+    "description": "files"
+  },
+  "comments_tooltip": {
+    "message": "Liczba komentarzy do tego wpisu",
+    "description": "commentsTooltip"
+  },
+  "download_interrupted": {
+    "message": "Pobieranie przerwane.",
+    "description": "downloadInterrupted"
+  },
+  "runtime_error": {
+    "message": "Środowisko uruchomieniowe niedostępne",
+    "description": "runtimeError"
+  },
+  "start_error": {
+    "message": "Nie można uruchomić.",
+    "description": "startError"
+  },
+  "comm_error": {
+    "message": "Błąd komunikacji.",
+    "description": "commError"
+  },
+  "edited_tooltip": {
+    "message": "Dni między opublikowaniem a ostatnią edycją",
+    "description": "editedTooltip"
+  },
+  "comment_singular": {
+    "message": "komentarz",
+    "description": "commentSingular"
+  },
+  "cancel": {
+    "message": "Anuluj",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Anulowano",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Anuluj wszystko",
+    "description": "cancelAll"
+  }
+}

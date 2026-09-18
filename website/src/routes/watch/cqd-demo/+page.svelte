@@ -107,10 +107,10 @@
   </p>
 
   <p class="watch-links">
-    <a href="{base}/install/chrome">Install for Chrome</a>
-    <a href="{base}/download-all-attachments-google-classroom">Step-by-step guide</a>
-    <a href="{base}/watch/manual-vs-cqd">Watch the manual vs CQD comparison video</a>
-    <a href="{base}/">Back to homepage</a>
+    <a class="glass-panel glass-hover" href="{base}/install/chrome">Install for Chrome</a>
+    <a class="glass-panel glass-hover" href="{base}/download-all-attachments-google-classroom">Step-by-step guide</a>
+    <a class="glass-panel glass-hover" href="{base}/watch/manual-vs-cqd">Watch the manual vs CQD comparison video</a>
+    <a class="glass-panel glass-hover" href="{base}/">Back to homepage</a>
   </p>
 </article>
 
@@ -154,17 +154,17 @@
   }
 
   .watch-page li::marker {
-    color: #047857;
+    color: var(--gc-green);
     font-weight: 700;
   }
 
   .watch-frame {
     margin-top: 1rem;
-    border: 1px solid #dbe5ef;
+    border: 1px solid var(--glass-border);
     border-radius: 1rem;
     overflow: hidden;
     background: #000;
-    box-shadow: 0 14px 36px rgba(15, 23, 42, 0.1);
+    box-shadow: 0 14px 36px rgba(15, 23, 42, 0.12), inset 0 1px 0 var(--glass-highlight);
   }
 
   .watch-frame video {
@@ -183,19 +183,15 @@
   }
 
   .watch-links a {
-    border: 1px solid #d1d5db;
     border-radius: 999px;
     padding: 0.45rem 0.75rem;
     text-decoration: none;
     color: #0f172a;
     font-weight: 600;
     font-size: 0.9rem;
-    background: #fff;
   }
 
   .watch-links a:hover {
-    border-color: rgba(4, 120, 87, 0.35);
-    color: #047857;
-    background: rgba(4, 120, 87, 0.05);
+    color: var(--gc-green);
   }
 </style>

@@ -24,47 +24,13 @@ export const UNIVERSAL_DIGIT_REGEX = new RegExp(`[${D}]`, 'gu');
 // BIDI CONTROL CHARACTERS TO STRIP
 // ============================================================================
 
-const BIDI_CONTROL_CHARS: RegExp = new RegExp(
-  '[' +
-    '\u200B\u200C\u200D' + // Zero-width spaces/joiners
-    '\u200E\u200F' +       // LTR/RTL marks
-    '\u202A-\u202E' +      // Directional embeddings/overrides
-    '\u2066-\u2069' +      // Isolates
-    '\u061C' +             // Arabic Letter Mark
-    '\uFEFF' +             // BOM
-    '\u00AD' +             // Soft hyphen
-  ']',
-  'gu'
-);
+// Text normalization lives in src/core/detect/normalize.ts (Engine V4 S4 core
+// extraction). Re-exported here so every V1 consumer keeps its import path;
+// new code should import from core directly.
+import { normalizeText, normalizeForComparison } from '../../src/core/detect/normalize';
+import { matchesNormalizedKeyword } from '../../src/core/detect/matching';
 
-const WHITESPACE_VARIANTS: RegExp = /[\u00A0\u2000-\u200A\u202F\u205F\u3000]/gu;
-
-// ============================================================================
-// TEXT NORMALIZATION ENGINE
-// ============================================================================
-
-/**
- * Normalizes text by stripping invisible BiDi control characters.
- * ALL scanning MUST pass through this function.
- */
-export function normalizeText(text: string): string {
-  if (!text) return '';
-  return text
-    .replace(BIDI_CONTROL_CHARS, '')
-    .replace(WHITESPACE_VARIANTS, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-/**
- * Aggressive normalization for comparison (lowercase, no punctuation).
- */
-export function normalizeForComparison(text: string): string {
-  return normalizeText(text)
-    .toLowerCase()
-    .replace(/[()[\]{}.,،!?:;'"]/g, '')
-    .trim();
-}
+export { normalizeText, normalizeForComparison };
 
 // ============================================================================
 // UNICODE INTEGER PARSING
@@ -101,13 +67,25 @@ const WORD_NUMBERS: Record<string, number> = {
 };
 
 /**
- * Parse word-numbers from text
+ * Parse word-numbers from text.
+ *
+ * Token-exact matching (D2): split on punctuation/symbol/space boundaries and
+ * compare whole tokens. Substring matching (`.includes`) made 'unusual'
+ * match the Spanish/French 'un' and invent a phantom count of 1 whenever a
+ * comment keyword also matched. All WORD_NUMBERS keys are single tokens, so
+ * exact token equality is the right semantic; normalizeForComparison already
+ * lowercases, so the comparison stays case-insensitive.
  */
 function parseWordNumber(text: string): number | null {
   const normalized = normalizeForComparison(text);
-  for (const [word, value] of Object.entries(WORD_NUMBERS)) {
-    if (normalized.includes(word.toLowerCase())) {
-      return value;
+  const tokens = normalized.split(/[\s\p{P}\p{S}]+/u).filter(Boolean);
+  for (const token of tokens) {
+    // Own-property guard: an arbitrary page token must not resolve through
+    // the prototype chain — inherited members ('constructor', 'toString',
+    // 'valueOf', 'hasOwnProperty', …) are !== undefined and would otherwise
+    // escape this `number | null` function as a function object.
+    if (Object.hasOwn(WORD_NUMBERS, token)) {
+      return WORD_NUMBERS[token];
     }
   }
   return null;
@@ -207,6 +185,10 @@ export const extractNumber = parseUnicodeInteger;
 const MONTH_MAP: Record<string, number> = {
   // English
   jan:0, feb:1, mar:2, apr:3, may:4, jun:5, jul:6, aug:7, sep:8, oct:9, nov:10, dec:11,
+  // English full names — month keys match whole tokens (D15), so the long
+  // forms must be their own keys instead of riding on the abbreviation.
+  january:0, february:1, march:2, april:3, june:5, july:6, august:7,
+  september:8, october:9, november:10, december:11,
   // French (unique keys only)
   janv:0, févr:1, mars:2, avr:3, mai:4, juin:5, juil:6, août:7, sept:8, déc:11,
   // Spanish
@@ -257,7 +239,10 @@ export function parseUnicodeDate(dateString: string): { date: Date; raw: string;
   else if (numbers.length === 2 && words.length >= 1) {
     for (const w of words) {
       for (const [key, val] of Object.entries(MONTH_MAP)) {
-        if (w.includes(key)) {
+        // D15: whole-token month matching via the shared D6 matcher —
+        // 'mar' must not fire inside 'market'. Unspaced-script keys
+        // (Arabic) keep containment there, matching D6 semantics.
+        if (matchesNormalizedKeyword(w, key)) {
           month = val;
           break;
         }
@@ -428,7 +413,7 @@ const COMMENT_KEYWORDS_OTHER: Record<string, CommentKeywords> = {
   th: { singular: ['ความคิดเห็น'], plural: ['ความคิดเห็น'], classComment: ['ความคิดเห็นของชั้นเรียน'] },
   el: { singular: ['σχόλιο'], plural: ['σχόλια'], classComment: ['σχόλιο τάξης'] },
   ka: { singular: ['კომენტარი'], plural: ['კომენტარები'], classComment: ['კლასის კომენტარი'] },
-  hy: { singular: ['մեկdelays'], plural: ['մegdelays'], classComment: ['delays'] },
+  hy: { singular: ['մեկնաբանություն'], plural: ['մեկնաբանություններ'], classComment: ['դասարանի մեկնաբանություն'] },
   am: { singular: ['አስተያየት'], plural: ['አስተያየቶች'], classComment: ['የክፍል አስተያየት'] },
   bn: { singular: ['মন্তব্য'], plural: ['মন্তव्यগুলি'], classComment: ['ক্লাس মন্তব্য'] },
   ta: { singular: ['கருத்து'], plural: ['கருத்துகள்'], classComment: ['வகுப்பு கருத்து'] },
@@ -466,6 +451,10 @@ const EDITED_KEYWORDS_LATIN: Record<string, string[]> = {
   nl: ['bewerkt', 'gewijzigd', 'wijziging', 'bewerking'],
   pl: ['edytowano', 'zmieniono', 'modyfikacja', 'zmiana', 'edycja'],
   cs: ['upraveno', 'změněno', 'úprava', 'změna'],
+  // Hungarian (S12): Classroom renders the edit marker as
+  // "(szerkesztve: <date>)". Before S12 there was no hu entry and the loader
+  // silently fell back to English, so Hungarian edited posts went unseen.
+  hu: ['szerkesztve', 'szerkesztett', 'módosítva', 'utolsó szerkesztés'],
   ro: ['editat', 'modificat', 'modificare', 'ultima modificare'],
   tr: ['düzenlendi', 'değiştirildi', 'düzenleme', 'değişiklik'],
   vi: ['đã chỉnh sửa', 'sửa đổi', 'chỉnh sửa'],
@@ -521,7 +510,7 @@ const EDITED_KEYWORDS_OTHER: Record<string, string[]> = {
   th: ['แก้ไขแล้ว', 'แก้ไขล่าสุด', 'การแก้ไข'],
   el: ['επεξεργάστηκε', 'τροποποιήθηκε', 'τροποποίηση', 'επεξεργασία'],
   ka: ['რედაქტირებულია', 'შეცვლილია', 'რედაქტირება', 'ცვლილება'],
-  hy: ['խdelays', 'փdelays', 'խdelays'],
+  hy: ['խմբագրված', 'վերջին խմբագրումը', 'փոփոխված'],
   am: ['ተስተካክል', 'ተቀይሮ', 'አርትዕ', 'ለውጥ'],
   bn: ['সম্পাদিত', 'পরিবর্তিত', 'সম্পাদনা'],
   ta: ['திருத்தப்பட்டது', 'மாற்றப்பட்டது', 'திருத்தம்'],
@@ -620,6 +609,14 @@ export const GOLDEN_SELECTORS = {
     // Click area / comment button selectors
     '.yqQS0c',
     '.gVJHxe',
+    // Captured comment-count chip shells (S12): the live fixtures
+    // (classwork-material-post-en.html, mixed-links-post-en.html,
+    // stream-flagged-post-en.html, rtl-flagged-post-ar.html) all carry the
+    // count text in a dedicated .comment-count/.comment-text container. These
+    // are golden-layer evidence — a count+keyword match there must clear the
+    // decide threshold on its own, not die in the L4 TreeWalker below it.
+    '.comment-count',
+    '.comment-text',
     // Semantic fallbacks
     '[aria-label*="comment"]',
     '[aria-label*="Comment"]',
@@ -696,10 +693,10 @@ export function hasDatePattern(text: string): boolean {
 
 export function isExcludedCommentPattern(text: string): boolean {
   const normalized = normalizeForComparison(text);
-  return COMMENT_EXCLUSION_PATTERNS.some(p => normalized.includes(normalizeForComparison(p)));
+  return COMMENT_EXCLUSION_PATTERNS.some(p => matchesNormalizedKeyword(normalized, normalizeForComparison(p)));
 }
 
 export function isExcludedEditedPattern(text: string): boolean {
   const normalized = normalizeForComparison(text);
-  return EDITED_EXCLUSION_PATTERNS.some(p => normalized.includes(normalizeForComparison(p)));
+  return EDITED_EXCLUSION_PATTERNS.some(p => matchesNormalizedKeyword(normalized, normalizeForComparison(p)));
 }

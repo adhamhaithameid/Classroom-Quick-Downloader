@@ -39,6 +39,7 @@
  */
 
 import { ViewKind } from '../../engines/types';
+import { getPageDomPort } from '../../adapters/dom/mutation-observer-dom-port';
 
 // ============================================================================
 // ROUTE PATTERNS — Ordered by specificity (most specific first!)
@@ -245,7 +246,8 @@ export class RouteWatcher {
   private currentViewKind: ViewKind | null = null;
   private lastUrl: string = '';
   private debounceTimer: number | null = null;
-  private titleObserver: MutationObserver | null = null;
+  /** Unsubscribe handle for the title subscription on the shared page DomPort (S10). */
+  private unsubscribeTitle: (() => void) | null = null;
   private abortController: AbortController | null = null;
 
   /** Original history methods (saved before monkey-patching) */
@@ -288,11 +290,19 @@ export class RouteWatcher {
     window.addEventListener('popstate', () => this.onPossibleUrlChange(), { signal });
 
     // 3. MutationObserver on <title> as a fallback
-    // When the title changes, the page has likely navigated
+    // When the title changes, the page has likely navigated.
+    // S10: multiplexed on the shared page DomPort instead of a dedicated
+    // platform observer. Same subscription options as the old dedicated
+    // observer — childList + characterData with subtree. The port observes
+    // the whole document, so the callback now sees document-wide
+    // childList/characterData batches; onPossibleUrlChange() debounces and
+    // no-ops when the URL is unchanged, so extra deliveries are harmless.
     const titleEl = document.querySelector('title');
     if (titleEl) {
-      this.titleObserver = new MutationObserver(() => this.onPossibleUrlChange());
-      this.titleObserver.observe(titleEl, { childList: true, characterData: true, subtree: true });
+      this.unsubscribeTitle = getPageDomPort().observe(
+        { childList: true, characterData: true, subtree: true },
+        () => this.onPossibleUrlChange(),
+      );
     }
 
     // Initial classification
@@ -314,10 +324,10 @@ export class RouteWatcher {
       this.abortController = null;
     }
 
-    // Disconnect the title observer
-    if (this.titleObserver) {
-      this.titleObserver.disconnect();
-      this.titleObserver = null;
+    // Drop the title subscription on the shared page DomPort
+    if (this.unsubscribeTitle) {
+      this.unsubscribeTitle();
+      this.unsubscribeTitle = null;
     }
 
     // Clear any pending debounce

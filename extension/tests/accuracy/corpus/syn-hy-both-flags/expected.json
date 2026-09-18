@@ -1,0 +1,15 @@
+{
+  "viewKind": "stream",
+  "lang": "hy",
+  "note": "Synthetic (hy): both signals on one card. D1 regression - the hy keyword tables contained corrupted strings ('մեկdelays', 'խdelays') mixing Armenian script with the English word 'delays', so Armenian comment/edited detection could never fire.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-hy-1",
+      "commentPresent": true,
+      "commentCount": 6,
+      "editedPresent": true
+    }
+  ],
+  "caseId": "syn-hy-both-flags"
+}

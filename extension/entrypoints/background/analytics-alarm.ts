@@ -12,7 +12,7 @@ let analyticsAlarmInitialized = false;
 /**
  * Set up Chrome alarms for periodic analytics operations.
  * - Flush events every 5 minutes
- * - Refresh remote config every 3 hours
+ * - Refresh remote config once a day
  * - Refresh changelog once/day at 6pm UTC
  */
 export function ensureAnalyticsAlarm(): void {
@@ -22,7 +22,7 @@ export function ensureAnalyticsAlarm(): void {
 
   try {
     chrome.alarms.create('CQD_ANALYTICS_FLUSH', { periodInMinutes: 5 });
-    chrome.alarms.create('CQD_ANALYTICS_CONFIG', { periodInMinutes: 180 });
+    chrome.alarms.create('CQD_ANALYTICS_CONFIG', { periodInMinutes: 1440 });
 
     // Changelog: once/day at 6pm UTC
     const now = new Date();

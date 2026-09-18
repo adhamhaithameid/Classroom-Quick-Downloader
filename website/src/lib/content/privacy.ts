@@ -18,7 +18,7 @@ export const privacyContent: ManualPrivacyContent = {
   headline: 'Privacy at a glance',
   description:
     'Classroom Quick Downloader uses aggregated operational analytics to keep downloads reliable across browsers. We do not collect private classroom file contents.',
-  lastUpdatedAtUtc: Date.UTC(2026, 1, 27, 0, 0, 0),
+  lastUpdatedAtUtc: Date.UTC(2026, 8, 12, 0, 0, 0),
   fullPrivacyUrl:
     'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/PRIVACY.md',
   sections: [
@@ -31,7 +31,7 @@ export const privacyContent: ManualPrivacyContent = {
         'Download outcomes (success, fail, cancel) as counts — never individual file details.',
         'Browser and extension version for compatibility tracking.',
         'Country-level activity trends for service quality monitoring.',
-        'Page view counts on the CQD website (no personal identifiers attached).'
+        'Aggregate page and interaction counts on the CQD website (e.g. which guides are read or which FAQ questions are opened) — no personal identifiers attached.'
       ]
     },
     {
@@ -113,10 +113,13 @@ export const privacyContent: ManualPrivacyContent = {
       summary:
         'CQD requests only the minimum permissions needed to function. Here\'s what each one does and why.',
       bullets: [
-        '"activeTab" — Allows the extension to interact with the current Classroom tab when you click.',
-        '"downloads" — Required to trigger file downloads to your device.',
-        '"Host permission for classroom.google.com" — Lets CQD detect and modify the Classroom UI to add download buttons.',
-        'No "tabs", "history", "bookmarks", or broad host permissions are requested.',
+        '"downloads" — Required to save files to your device through your browser\'s normal download flow.',
+        '"storage" — Keeps your in-extension preferences and download state on your own device.',
+        '"alarms" — Schedules routine cleanup of stale internal download records in the background.',
+        '"Host access to classroom.google.com" — Lets CQD detect attachments and add download buttons inside Classroom.',
+        '"Host access to drive.google.com and drive.usercontent.google.com" — Used only when a bulk download has to fetch a file through Drive (including the "can\'t scan for viruses" interstitial), never to browse your Drive.',
+        '"Host access to accounts.google.com" — Resolves which of your signed-in accounts can access a file during bulk downloads.',
+        'No "tabs", "history", "bookmarks", or "activeTab" permissions are requested.',
         'All permissions are listed in the extension manifest, which is publicly auditable on GitHub.'
       ]
     },

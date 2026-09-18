@@ -1,0 +1,14 @@
+{
+  "caseId": "syn-en-commentary-false-positive",
+  "viewKind": "stream",
+  "lang": "en",
+  "note": "D6 regression: the standalone word 'commentary' sits in the post body (the golden .asQXV.QRiHXd container is a leaf, so layer-3 reads it as one text node) and the '4' of 'chapter 4' hands the layer a phantom count. Substring keyword matching fires 'comment' inside 'commentary' and flags a post with no comment UI. Whole-token matching must leave this post unflagged.",
+  "posts": [
+    {
+      "postId": "synth-en-commentary-1",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    }
+  ]
+}

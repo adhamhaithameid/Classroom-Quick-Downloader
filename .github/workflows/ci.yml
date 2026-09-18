@@ -92,6 +92,16 @@ jobs:
       - name: Run Extension Tests
         run: pnpm -C extension test
 
+      - name: Verify _locales Drift (generated from i18n.ts)
+        run: |
+          pnpm -C extension run locales:generate
+          git diff --exit-code -- extension/_locales extension/src/_locales
+          if [ -n "$(git status --porcelain -- extension/_locales extension/src/_locales)" ]; then
+            echo "::error::extension/_locales is out of sync with extension/entrypoints/content/i18n.ts — run 'pnpm -C extension run locales:generate' and commit the result."
+            git status --porcelain -- extension/_locales extension/src/_locales
+            exit 1
+          fi
+
       - name: Run Extension Golden Regression Suites
         run: |
           if [ -f extension/tests/classroom-baseline-regression.test.ts ]; then
@@ -103,6 +113,7 @@ jobs:
       - name: Run Extension Accuracy Gate
         run: |
           if [ -d extension/tests/accuracy/corpus ]; then
+            pnpm -C extension run corpus:check
             pnpm -C extension run test:accuracy
           else
             echo "Accuracy corpus is not present on this branch yet; skipping."
@@ -128,7 +139,19 @@ jobs:
   extension-e2e:
     name: Extension — Real Browser E2E
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 20 min for the Chromium leg + 5 for the Edge smoke leg (S11 gate G5)
+    # + headroom for the conditional signed Firefox leg (S11 T3).
+    timeout-minutes: 35
+    # Secrets cannot be referenced in `if:` directly — map them to job env
+    # (absent repo secrets resolve to "") and branch on env in the steps
+    # below. Required repo secrets for the signed Firefox leg (S11 T3):
+    #   AMO_JWT_ISSUER — Mozilla addons-server API key issuer
+    #                    (https://addons.mozilla.org/developers/addon/api/key/)
+    #   AMO_JWT_SECRET — the matching API key secret
+    # Without them the signed leg is skipped with a log line, not a failure.
+    env:
+      AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+      AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -147,14 +170,36 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
+      - name: Install Playwright Chromium + Edge
+        run: pnpm exec playwright install --with-deps chromium msedge
 
       - name: Build Extension
         run: pnpm -C extension build
 
       - name: Run Extension E2E
         run: xvfb-run -a pnpm run test:e2e
+
+      - name: Run Extension E2E (Edge smoke)
+        run: xvfb-run -a pnpm run test:e2e:edge
+
+      # Signed Firefox leg (S11 T3): AMO-sign the firefox-mv2 zip, then run
+      # the qa journeys against the signed xpi (it survives Playwright's
+      # bundled Firefox, unlike the unsigned sideload). Only runs when both
+      # secrets exist; QA_SIGNED_XPI is scoped to this step so the config
+      # gains the qa-firefox-signed project only here.
+      - name: Sign extension (AMO) + signed Firefox QA leg
+        if: ${{ env.AMO_JWT_ISSUER != '' && env.AMO_JWT_SECRET != '' }}
+        env:
+          QA_SIGNED_XPI: ${{ github.workspace }}/extension/.output/signed.xpi
+        run: |
+          pnpm exec playwright install firefox
+          pnpm -C extension firefox
+          pnpm -C extension sign:extension
+          xvfb-run -a pnpm -C extension test:qa:firefox-signed
+
+      - name: Signed Firefox QA leg skipped (no AMO credentials)
+        if: ${{ env.AMO_JWT_ISSUER == '' || env.AMO_JWT_SECRET == '' }}
+        run: echo "Signed Firefox QA leg skipped — set repo secrets AMO_JWT_ISSUER and AMO_JWT_SECRET to enable (see extension/tools/sign-extension.mjs)."
 
       - name: Upload Playwright Report
         if: failure()

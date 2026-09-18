@@ -23,6 +23,8 @@ type TestContext = {
     pendingByUrlAdd: (url: string, pending: PendingDownload) => void;
     pendingByUrlRemove: ReturnType<typeof vi.fn>;
     pendingByUrlGet: (url: string) => PendingDownload | undefined;
+    registerPending: (pending: PendingDownload) => void;
+    bindDownloadId: (pending: PendingDownload, downloadId: number) => boolean;
   };
   cleanupSpy: ReturnType<typeof vi.fn>;
   sendStatusSpy: ReturnType<typeof vi.fn>;
@@ -43,7 +45,6 @@ function makePending(overrides: Partial<PendingDownload> = {}): PendingDownload 
     fileMeta: { ext: 'pdf', name: 'file.pdf' },
     tabId: 17,
     attemptedAuthUsers: [],
-    fallbackStarted: false,
     isCancelled: false,
     ...overrides,
   };
@@ -65,14 +66,37 @@ function installChromeMocks() {
 async function loadDownloadHandler(options: LoadOptions = {}): Promise<TestContext> {
   vi.resetModules();
 
+  const pendingByRequestId = new Map<string, PendingDownload>();
+  const pendingByDownloadId = new Map<number, PendingDownload>();
   const pendingByUrl = new Map<string, Set<PendingDownload>>();
+  const pendingByBypassTabId = new Map<number, PendingDownload>();
+  const indexUrl = (url: string, p: PendingDownload) => {
+    let bucket = pendingByUrl.get(url);
+    if (!bucket) { bucket = new Set(); pendingByUrl.set(url, bucket); }
+    bucket.add(p);
+  };
   const stateModule = {
-    pendingByRequestId: new Map<string, PendingDownload>(),
-    pendingByDownloadId: new Map<number, PendingDownload>(),
+    setPendingExpiredHook: vi.fn(),
+    pendingByRequestId,
+    pendingByDownloadId,
     pendingByUrl,
-    pendingByBypassTabId: new Map<number, PendingDownload>(),
+    pendingByBypassTabId,
     AUTHUSER_CANDIDATES: options.authCandidates ?? [0, 1, 2],
     IS_FIREFOX: options.isFirefox ?? false,
+    // D11 registry semantics (mirrors the real state module): binds require
+    // the pending to still be authoritative, ids cannot be cross-claimed.
+    registerPending: (p: PendingDownload) => {
+      pendingByRequestId.set(p.requestId, p);
+      indexUrl(p.baseUrl, p);
+    },
+    bindDownloadId: (p: PendingDownload, downloadId: number) => {
+      if (pendingByRequestId.get(p.requestId) !== p) return false;
+      const existing = pendingByDownloadId.get(downloadId);
+      if (existing !== undefined && existing !== p) return false;
+      p.currentDownloadId = downloadId;
+      pendingByDownloadId.set(downloadId, p);
+      return true;
+    },
     pendingByUrlAdd: (url: string, pending: PendingDownload) => {
       let bucket = pendingByUrl.get(url);
       if (!bucket) { bucket = new Set(); pendingByUrl.set(url, bucket); }
@@ -112,7 +136,7 @@ async function loadDownloadHandler(options: LoadOptions = {}): Promise<TestConte
     getFilenameExt: vi.fn((filename?: string) => filename?.split('.').pop()?.toLowerCase()),
   }));
   vi.doMock('../entrypoints/background/cleanup', () => ({ cleanup: cleanupSpy }));
-  vi.doMock('../entrypoints/background/message-sender', () => ({ sendStatusToTab: sendStatusSpy }));
+  vi.doMock('../entrypoints/background/message-sender', () => ({ sendStatusToTab: sendStatusSpy, setDownloadStatusListener: vi.fn() }));
   vi.doMock('../entrypoints/utils/analytics', () => ({ recordDownloadEvent: recordSpy }));
   vi.doMock('../src/v2/decision/download-validator', () => ({
     validateDownloadUrl: validateSpy,
@@ -189,6 +213,7 @@ describe('background download handler', () => {
   it('startSingleAttempt stores pending download on success', async () => {
     const ctx = await loadDownloadHandler();
     const pending = makePending();
+    ctx.stateModule.registerPending(pending); // D11: binds require authority
     (chrome.runtime as { lastError?: { message: string } }).lastError = undefined;
     (chrome.downloads.download as any).mockImplementation((_: unknown, cb: (id?: number) => void) => cb(42));
     const respondOnce = vi.fn();
@@ -198,22 +223,6 @@ describe('background download handler', () => {
     expect(pending.currentDownloadId).toBe(42);
     expect(ctx.stateModule.pendingByDownloadId.get(42)).toBe(pending);
     expect(respondOnce).toHaveBeenCalledWith({ started: true, requestId: pending.requestId, downloadId: 42 });
-  });
-
-  it('openDriveBypassTab tracks bypass tab IDs when a tab is returned', async () => {
-    const ctx = await loadDownloadHandler({ isFirefox: true });
-    const pending = makePending({ isDrive: true });
-    (chrome.tabs.create as any).mockImplementation((_: unknown, cb: (tab: { id?: number }) => void) => cb({ id: 77 }));
-    ctx.mod.openDriveBypassTab(pending, 'https://drive.google.com/uc?id=abc');
-    expect(ctx.stateModule.pendingByBypassTabId.get(77)).toBe(pending);
-  });
-
-  it('openDriveBypassTab ignores tabs without numeric IDs', async () => {
-    const ctx = await loadDownloadHandler({ isFirefox: true });
-    const pending = makePending({ isDrive: true });
-    (chrome.tabs.create as any).mockImplementation((_: unknown, cb: (tab: { id?: number }) => void) => cb({}));
-    ctx.mod.openDriveBypassTab(pending, 'https://drive.google.com/uc?id=abc');
-    expect(ctx.stateModule.pendingByBypassTabId.size).toBe(0);
   });
 
   it('startNextDriveAttempt fails when all auth users are exhausted', async () => {
@@ -226,7 +235,7 @@ describe('background download handler', () => {
     expect(ctx.sendStatusSpy).toHaveBeenCalledWith(
       pending,
       'error',
-      'Access denied for all accounts.',
+      'Access denied for all your accounts. Open the file directly in Drive to confirm access.',
       'AUTH_ALL_FAILED',
     );
     expect(ctx.cleanupSpy).toHaveBeenCalledWith(pending);
@@ -247,18 +256,23 @@ describe('background download handler', () => {
     }));
   });
 
-  it('startNextDriveAttempt uses bypass tab path in Firefox mode', async () => {
+  it('startNextDriveAttempt downloads natively in Firefox mode (zero-tab contract)', async () => {
     const ctx = await loadDownloadHandler({ isFirefox: true, authCandidates: [3] });
     const pending = makePending({ isDrive: true, attemptedAuthUsers: [] });
-    (chrome.tabs.create as any).mockImplementation((_: unknown, cb: (tab: { id?: number }) => void) => cb({ id: 5 }));
+    ctx.stateModule.registerPending(pending); // D11: binds require authority
     ctx.mod.startNextDriveAttempt(pending);
     expect(pending.currentAuthUser).toBe(3);
-    expect(ctx.stateModule.pendingByBypassTabId.get(5)).toBe(pending);
+    expect(chrome.downloads.download).toHaveBeenCalledWith(
+      expect.objectContaining({ url: expect.stringContaining('authuser=3') }),
+      expect.any(Function),
+    );
+    expect(chrome.tabs.create).not.toHaveBeenCalled();
   });
 
   it('startNextDriveAttempt retries auth user after browser start failure in Chromium mode', async () => {
     const ctx = await loadDownloadHandler({ isFirefox: false, authCandidates: [0, 1] });
     const pending = makePending({ isDrive: true });
+    ctx.stateModule.registerPending(pending); // D11: binds require authority
     let calls = 0;
     (chrome.downloads.download as any).mockImplementation((_: unknown, cb: (id?: number) => void) => {
       calls += 1;
@@ -288,6 +302,7 @@ describe('background download handler', () => {
           : { valid: true, reason: 'OK', url, host: 'drive.google.com' },
     });
     const pending = makePending({ isDrive: true });
+    ctx.stateModule.registerPending(pending); // D11: binds require authority
     (chrome.downloads.download as any).mockImplementation((_: unknown, cb: (id?: number) => void) => {
       (chrome.runtime as { lastError?: { message: string } }).lastError = undefined;
       cb(55);
@@ -327,15 +342,18 @@ describe('background download handler', () => {
     expect(ctx.stateModule.pendingByDownloadId.has(123)).toBe(true);
   });
 
-  it('handleDownloadRequest uses firefox Drive bypass flow and responds once', async () => {
+  it('handleDownloadRequest downloads natively on Firefox and responds once (zero-tab contract)', async () => {
     const ctx = await loadDownloadHandler({
       isFirefox: true,
       initialAuthUser: 4,
-      normalizeResult: { baseUrl: 'https://drive.google.com/uc?id=abc', isDrive: true },
+      normalizeResult: { baseUrl: 'https://drive.usercontent.google.com/download?id=abc&export=download&confirm=t', isDrive: true },
     });
-    (chrome.tabs.create as any).mockImplementation((_: unknown, cb: (tab: { id?: number }) => void) => cb({ id: 300 }));
     const sendResponse = vi.fn();
 
+    (chrome.downloads.download as any).mockImplementation((_: unknown, cb: (id?: number) => void) => {
+      (chrome.runtime as { lastError?: { message: string } }).lastError = undefined;
+      cb(300);
+    });
     ctx.mod.handleDownloadRequest(
       { url: 'https://drive.google.com/open?id=abc&authuser=4', requestId: 'req-firefox' },
       { tab: { id: 12 } } as chrome.runtime.MessageSender,
@@ -345,33 +363,41 @@ describe('background download handler', () => {
     expect(ctx.extractAuthSpy).toHaveBeenCalled();
     const pending = ctx.stateModule.pendingByRequestId.get('req-firefox');
     expect(pending?.attemptedAuthUsers).toContain(4);
-    expect(sendResponse).toHaveBeenCalledWith({ started: true, requestId: 'req-firefox', userMessage: 'Opening Drive tab…' });
+    expect(chrome.downloads.download).toHaveBeenCalledWith(
+      expect.objectContaining({ url: expect.stringContaining('authuser=4') }),
+      expect.any(Function),
+    );
+    expect(chrome.tabs.create).not.toHaveBeenCalled();
+    expect(sendResponse).toHaveBeenCalledWith({ started: true, requestId: 'req-firefox', downloadId: expect.any(Number) });
   });
 
   it('handleDownloadRequest firefox flow uses base URL when no initial auth is found', async () => {
     const ctx = await loadDownloadHandler({
       isFirefox: true,
       initialAuthUser: undefined,
-      normalizeResult: { baseUrl: 'https://drive.google.com/uc?id=xyz', isDrive: true },
+      normalizeResult: { baseUrl: 'https://drive.usercontent.google.com/download?id=xyz&export=download&confirm=t', isDrive: true },
     });
-    const createSpy = chrome.tabs.create as any;
-    createSpy.mockImplementation((opts: { url: string }, cb: (tab: { id?: number }) => void) => cb({ id: 987 }));
     const sendResponse = vi.fn();
 
+    (chrome.downloads.download as any).mockImplementation((_: unknown, cb: (id?: number) => void) => {
+      (chrome.runtime as { lastError?: { message: string } }).lastError = undefined;
+      cb(987);
+    });
     ctx.mod.handleDownloadRequest(
       { url: 'https://drive.google.com/open?id=xyz', requestId: 'req-firefox-no-auth' },
       { tab: { id: 31 } } as chrome.runtime.MessageSender,
       sendResponse,
     );
 
-    expect(createSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ url: 'https://drive.google.com/uc?id=xyz' }),
+    expect(chrome.downloads.download).toHaveBeenCalledWith(
+      expect.objectContaining({ url: 'https://drive.usercontent.google.com/download?id=xyz&export=download&confirm=t' }),
       expect.any(Function),
     );
+    expect(chrome.tabs.create).not.toHaveBeenCalled();
     expect(sendResponse).toHaveBeenCalledWith({
       started: true,
       requestId: 'req-firefox-no-auth',
-      userMessage: 'Opening Drive tab…',
+      downloadId: expect.any(Number),
     });
   });
 
@@ -421,16 +447,16 @@ describe('background download handler', () => {
     );
   });
 
-  it('handleDownloadRequest falls back to bypass tab when native Drive start fails', async () => {
+  it('handleDownloadRequest retries a refused start once, then fails with guidance (zero-tab contract)', async () => {
+    vi.useFakeTimers();
     const ctx = await loadDownloadHandler({
       isFirefox: false,
-      normalizeResult: { baseUrl: 'https://drive.google.com/uc?id=abc', isDrive: true },
+      normalizeResult: { baseUrl: 'https://drive.usercontent.google.com/download?id=abc&export=download&confirm=t', isDrive: true },
     });
     (chrome.downloads.download as any).mockImplementation((_: unknown, cb: (id?: number) => void) => {
       (chrome.runtime as { lastError?: { message: string } }).lastError = { message: 'blocked' };
       cb(undefined);
     });
-    (chrome.tabs.create as any).mockImplementation((_: unknown, cb: (tab: { id?: number }) => void) => cb({ id: 301 }));
 
     const sendResponse = vi.fn();
     ctx.mod.handleDownloadRequest(
@@ -439,16 +465,20 @@ describe('background download handler', () => {
       sendResponse,
     );
 
+    // One automatic retry after the 1s backoff, then the honest terminal.
+    expect(chrome.downloads.download).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(1_100);
+    expect(chrome.downloads.download).toHaveBeenCalledTimes(2);
     expect(ctx.recordSpy).toHaveBeenCalledWith(expect.objectContaining({
       status: 'fail',
       error_type: 'BROWSER_START_FAIL',
     }));
     expect(sendResponse).toHaveBeenCalledWith({
-      started: true,
-      requestId: 'req-fallback',
-      userMessage: 'Browser blocked. Trying Drive tab…',
+      started: false,
+      userMessage: expect.stringContaining('Browser blocked the download'),
     });
-    expect(ctx.stateModule.pendingByBypassTabId.get(301)?.requestId).toBe('req-fallback');
+    expect(ctx.cleanupSpy).toHaveBeenCalled();
+    expect(chrome.tabs.create).not.toHaveBeenCalled();
   });
 
   it('handleDownloadRequest processes repeated callback without duplicate responses', async () => {
@@ -467,12 +497,8 @@ describe('background download handler', () => {
       { tab: { id: 21 } } as chrome.runtime.MessageSender,
       sendResponse,
     );
+    // The duplicate callback is swallowed by respondOnce deduplication.
     expect(sendResponse).toHaveBeenCalledTimes(1);
-    expect(sendResponse).toHaveBeenCalledWith({
-      started: true,
-      requestId: 'req-repeat',
-      userMessage: 'Browser blocked. Trying Drive tab…',
-    });
   });
 
   it('handleDownloadRequest handles cancellation race after download ID assignment', async () => {

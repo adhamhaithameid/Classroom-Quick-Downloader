@@ -20,6 +20,7 @@ async function loadSidecar() {
 
   vi.doMock('../entrypoints/content/styles', () => ({
     injectStyles: vi.fn(),
+    injectStudentWorkStyles: vi.fn(),
   }));
 
   vi.doMock('../entrypoints/content/file-meta', () => ({
@@ -296,5 +297,24 @@ describe('student_work_sidecar content script', () => {
       'https://drive.google.com/uc?export=download&id=FILE_VIDEO_2',
       'https://drive.google.com/uc?export=download&id=FILE_JSON_3',
     ]);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* z57 tail: all-modes download stack + scoped stylesheet              */
+/* ------------------------------------------------------------------ */
+
+describe('z57 tail: student_work_sidecar runs in ALL engine modes', () => {
+  it('is NOT wrapped in the S10 v2 mode gate (row buttons must render in v2)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const source = readFileSync(
+      resolve(process.cwd(), 'entrypoints/student_work_sidecar.content.ts'),
+      'utf-8',
+    );
+    expect(source).not.toContain('gateV1Stack');
+    expect(source).not.toContain("from './content/mode-gate'");
+    expect(source).toContain('injectStudentWorkStyles');
+    expect(source).not.toMatch(/\binjectStyles\(/);
   });
 });

@@ -52,14 +52,36 @@ export default defineContentScript({
       ]);
 
       // 1. Register engine instances
+      const engineV2 = new EngineV2();
       engineRegistry.register(new EngineV1());
-      engineRegistry.register(new EngineV2());
+      engineRegistry.register(engineV2);
       engineRegistry.register(new EngineV3());
 
       console.log('[CQD V2 Bootstrap] Engines registered:', engineRegistry.getSummary());
 
+      // 1b. S11 additive: extension-world perf probe — `__cqdPerfSnapshot()`
+      //     returns the V2 engine's live timing histograms (currently the
+      //     handleMutations fast-pass label, the <6ms p95 budget metric) plus
+      //     the #615 selector audit (hash-id fallback rate — the Classroom
+      //     markup-drift early warning, ENGINE_V4_SYSTEM_DESIGN §5 rule 1).
+      //     Getter-shaped like __cqdDomPortInfo so every call reads current
+      //     state, and plain-object/number-only so it serializes over CDP.
+      //     Content scripts run in an isolated world, so the page's main
+      //     world never sees this; qa-perf reads it over CDP Runtime.evaluate.
+      const perfHost = window as unknown as {
+        __cqdPerfSnapshot?: () => {
+          handleMutations: import('../src/v2/telemetry/performance-monitor').TimingPercentiles | null;
+          selectorStats: import('../src/engines/types').SelectorStats;
+        };
+      };
+      perfHost.__cqdPerfSnapshot ??= () => ({
+        handleMutations: engineV2.getMutationTimings(),
+        selectorStats: engineV2.getSelectorStats(),
+      });
+
       // 2. Initialize mode controller
-      //    Reads cqdV2Mode from chrome.storage.local (default: 'shadow')
+      //    Reads cqdV2Mode from chrome.storage.local (default: 'legacy' —
+      //    shadow is an explicit opt-in, see mode-controller.ts D9)
       //    Sets up message listener for popup → content script mode changes
       //    Sets up storage.onChanged listener for cross-tab mode sync
       await initModeController();
@@ -74,6 +96,41 @@ export default defineContentScript({
       orchestrator.start();
 
       console.log('[CQD V2 Bootstrap] Orchestrator started');
+
+      // 3b. Bridge relay (S6/G2): page bus download topics cross the
+      //     BridgePort to the background worker. Inert until something
+      //     publishes download:requested — zero behavior change today.
+      const { createPageRuntimeBridge } = await import('../src/adapters/bridge/runtime-bridge');
+      const { wireBridgeRelay } = await import('../src/v2/orchestrator/bridge-relay');
+      wireBridgeRelay(orchestrator.getBus(), createPageRuntimeBridge());
+
+      // 3c. Download path (z57 S1): the page-side caller for the bridge —
+      //     delegated button clicks publish download:requested on the page
+      //     bus and drive button states from download:settled. Wired before
+      //     the orchestrator's first scan so a click can never race the bus.
+      const { wireDownloadPath } = await import('../src/v2/render/download-controller');
+      wireDownloadPath(orchestrator.getBus());
+
+      // 3d. Download All group machine (z57 S3): the Download All run state
+      //     machine driving staggered per-file requests through the same bus
+      //     path, with cancel over the existing CQD_CANCEL_DOWNLOAD message.
+      await import('../src/v2/render/download-all-controller').then((m) =>
+        m.installDownloadAllController(),
+      );
+
+      // 3e. Live flag toggles (z57 S4): the popup's cqd-flag-toggle message
+      //     flips badge visibility without a reload (qa-03 golden rule 8).
+      //     Inert in non-v2 modes — the badge registry is empty when V2
+      //     doesn't render, so V1's own listeners stay the only handlers.
+      if (typeof chrome !== 'undefined' && chrome?.runtime?.onMessage) {
+        const { applyFlagToggle } = await import('../src/v2/render/flag-renderer');
+        chrome.runtime.onMessage.addListener((message: { type?: string; flag?: string; enabled?: boolean }) => {
+          if (!message || message.type !== 'cqd-flag-toggle') return;
+          if (message.flag === 'commentsFlagEnabled' || message.flag === 'editedFlagEnabled') {
+            applyFlagToggle(message.flag, message.enabled !== false);
+          }
+        });
+      }
 
       // 4. Initialize debug panel (Ctrl+Shift+D to toggle)
       try {

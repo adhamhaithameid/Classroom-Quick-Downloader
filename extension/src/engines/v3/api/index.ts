@@ -1,4 +1,5 @@
 export * from './types';
+export * from './config';
 export * from './route-context';
 export * from './token-provider';
 export * from './classroom-api-client';

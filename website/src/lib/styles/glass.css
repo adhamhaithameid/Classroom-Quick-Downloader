@@ -1,0 +1,150 @@
+/* ── Glass design system ────────────────────────────────────────────────
+   The single source of the site's glass language, shared with the navbar:
+   translucent gradient surface, saturated blur, white specular edge, a top
+   sheen, a pointer-tracked specular sweep, the springy easing, and the
+   staggered entrance. Components consume these classes and add only their
+   own specifics (radius, padding, lift amount, accents) in scoped styles.
+
+   .glass-panel  — the surface: background, border, blur, layered shadow,
+                   top sheen (::before), springy transition.
+   .glass-hover  — add for interactive cards: springy lift + green halo on
+                   hover, cursor-tracked sweep (::after, fed by the
+                   glassSheen action writing --card-mx/--card-my).
+   .glass-icon   — icon tiles inside .glass-hover cards get the nav glyph
+                   flourish (scale + tilt) on card hover.
+   .glass-stagger — one-shot entrance cascade paced by --card-i; pair with
+                   a parent "pending" gate (see overview's l2-reveal).
+   Tokens live in app.css (:root). */
+
+.glass-panel {
+  position: relative;
+  overflow: hidden;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  box-shadow:
+    0 1px 2px rgba(15, 20, 25, 0.05),
+    0 12px 30px rgba(15, 20, 25, 0.1),
+    0 8px 24px rgba(26, 139, 85, 0.08),
+    inset 0 1px 0 var(--glass-highlight);
+  transition:
+    transform 0.45s var(--glass-ease),
+    box-shadow 0.45s var(--glass-ease),
+    border-color 0.3s ease;
+}
+
+/* Top specular band + diagonal gloss — the navbar sheen. */
+.glass-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 36%),
+    linear-gradient(120deg, rgba(255, 255, 255, 0.3), rgba(239, 247, 250, 0.16) 48%, rgba(255, 255, 255, 0.28));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.glass-hover {
+  /* Only genuine controls advertise clickability — content cards keep the
+     default cursor even though they share the hover motion. */
+}
+
+.glass-hover:is(a, button) {
+  cursor: pointer;
+}
+
+.glass-hover:hover,
+.glass-hover:focus-visible {
+  transform: translateY(-3px);
+  border-color: rgba(26, 139, 85, 0.22);
+  box-shadow:
+    0 8px 20px rgba(26, 139, 85, 0.12),
+    0 0 0 1px rgba(26, 139, 85, 0.06),
+    0 20px 44px rgba(15, 20, 25, 0.12),
+    inset 0 1px 0 var(--glass-highlight);
+}
+
+/* Cursor-tracked specular sweep. */
+.glass-hover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    240px circle at var(--card-mx, 50%) var(--card-my, 0%),
+    rgba(255, 255, 255, 0.55),
+    rgba(255, 255, 255, 0) 72%
+  );
+  transition: opacity 0.35s ease;
+}
+
+.glass-hover:hover::after,
+.glass-hover:focus-visible::after {
+  opacity: 1;
+}
+
+/* Nav glyph flourish for icon tiles. */
+.glass-icon {
+  transition: transform 0.3s var(--glass-ease), box-shadow 0.3s ease;
+}
+
+.glass-hover:hover .glass-icon {
+  transform: scale(1.06) rotate(-3deg);
+  box-shadow: 0 4px 10px rgba(26, 139, 85, 0.18);
+}
+
+/* Entrance cascade — the nav dropdown's "retyped" feel, paced per card
+   with --card-i. `backwards` fill hides each card during its delay and
+   releases the transform once done, so hover transitions stay live. */
+.glass-stagger {
+  animation: card-glass-in 0.6s var(--glass-ease) backwards;
+  animation-delay: calc(0.06s + var(--card-i, 0) * 0.07s);
+}
+
+@keyframes card-glass-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-panel,
+  .glass-hover,
+  .glass-icon,
+  .glass-stagger {
+    transition: none;
+    animation: none;
+  }
+
+  .glass-panel::before,
+  .glass-hover::after {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass-panel,
+  .glass-hover {
+    background: #fcfefd;
+    border-color: rgba(226, 232, 240, 0.9);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .glass-panel::before,
+  .glass-hover::after {
+    display: none;
+  }
+}

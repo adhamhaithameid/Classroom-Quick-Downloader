@@ -183,7 +183,7 @@ export function computePlacement(
       decisions.push({
         fileId: downloadAllId,
         targetElement: anchor.element,
-        insertionPoint: recipe.downloadAll.insertionPoint,
+        insertionPoint: downloadAllInsertionPoint(recipe.downloadAll.insertionPoint, anchor),
         anchorSelector: anchor.selectorUsed,
         confidence: anchor.confidence,
         reasonCodes: buildReasonCodes(anchor, 'download-all', recipe),
@@ -193,6 +193,23 @@ export function computePlacement(
   }
 
   return decisions;
+}
+
+/**
+ * z57 S3: when no header anchor exists the fallback target IS the post root,
+ * and a 'before' insertion would drop the button OUTSIDE the post card —
+ * visible to nobody. V1's outcome (button inside the card, near the header)
+ * degrades to appending into the post root instead.
+ */
+function downloadAllInsertionPoint(
+  recipePoint: InsertionPoint,
+  anchor: AnchorResult,
+): InsertionPoint {
+  // Fallback to post-root target: never insert outside it.
+  if (anchor.isFallback && (recipePoint === 'before' || recipePoint === 'after')) {
+    return 'append';
+  }
+  return recipePoint;
 }
 
 /**
@@ -230,7 +247,7 @@ export function computeDownloadAllPlacement(
   return {
     fileId: downloadAllId,
     targetElement: anchor.element,
-    insertionPoint: recipe.downloadAll.insertionPoint,
+    insertionPoint: downloadAllInsertionPoint(recipe.downloadAll.insertionPoint, anchor),
     anchorSelector: anchor.selectorUsed,
     confidence: anchor.confidence,
     reasonCodes: buildReasonCodes(anchor, 'download-all', recipe),
