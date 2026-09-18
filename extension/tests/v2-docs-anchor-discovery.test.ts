@@ -17,7 +17,7 @@ import { createFileAnchorScorer } from '../src/v2/selectors/selector-registry';
  * Attach one post (with the given attachment anchor markup) to the document
  * and run the real EngineV2 file discovery over it.
  */
-function discover(attachmentHtml: string): Array<{ canonicalId: string; name: string; downloadUrl: string }> {
+function discover(attachmentHtml: string): Array<{ canonicalId: string; name: string; ext?: string; downloadUrl: string }> {
   document.body.innerHTML = `
     <div data-stream-item-id="docs-post-1">
       <article>
@@ -32,7 +32,7 @@ function discover(attachmentHtml: string): Array<{ canonicalId: string; name: st
   const scorer = createFileAnchorScorer();
   const found = scorer.queryAllCandidates(postEl).allElements;
   const extract = (engine as unknown as {
-    extractFileNode: (el: HTMLElement) => { canonicalId: string; name: string; downloadUrl: string } | null;
+    extractFileNode: (el: HTMLElement) => { canonicalId: string; name: string; ext?: string; downloadUrl: string } | null;
   }).extractFileNode.bind(engine);
 
   const out: Array<{ canonicalId: string; name: string; downloadUrl: string }> = [];
