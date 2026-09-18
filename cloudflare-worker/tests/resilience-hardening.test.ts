@@ -3,8 +3,6 @@ import worker from "../src/index";
 import type { Env as WorkerEnv } from "../src/types";
 import { TEST_DO_SHARED_SECRET } from "./helpers/dummy-secrets";
 
-const ANALYTICS_CONFIG_KV_KEY = "analytics:config:v1";
-
 function makeKvMock(initial: Record<string, string> = {}) {
   const store = new Map<string, string>(Object.entries(initial));
   const get = vi.fn(async (key: string) => store.get(key) ?? null);
