@@ -159,6 +159,13 @@ test.describe("qa-perf fast-pass budget", () => {
 
   test.beforeAll(async ({}, testInfo) => {
     const browser = projectBrowser(testInfo.project.name);
+    if (browser !== "chromium") {
+      // The probe reads the extension's isolated world over CDP
+      // Runtime.evaluate — a Chromium-only mechanism. On Firefox the check
+      // cannot run without faking it; classify honestly and skip.
+      test.skip(true, "HARNESS: extension-world probe uses CDP — Chromium-only; Firefox has no CDP");
+      return;
+    }
     const session = await launchQaContext(browser, scenario());
     context = session.context;
     closeQa = session.close;
