@@ -104,23 +104,18 @@ describe('overview visual guardrails', () => {
     expect(pinnedStar?.type).toBe('doodle');
   });
 
-  it('renders the compact trust strip with evidence-linked claims', () => {
+  it('renders the disclaimer and store CTAs without overclaiming', () => {
     const { body } = render(OverviewPage);
     const html = squish(body);
 
-    // One unique subtext per chip, so a missing or reworded chip fails.
-    expect(html).toContain('no ads, no premium tier');
-    expect(html).toContain('nothing to sign up for');
-    expect(html).toContain('no file contents collected');
-    expect(html).toContain('straight from Google to you');
-    expect(html).toContain('audit the code on GitHub');
-    expect(html).toContain('l2-trust-row');
+    // The page promises exactly what the extension does - no more.
+    expect(html).toContain('in one click for every assignment');
+    expect(html).toContain('Not affiliated with Google or Google Classroom.');
+    expect(html).toContain('Also works on Brave');
 
-    // Every claim links to the page that proves it.
-    expect(html).toContain('href="/faq"');
-    expect(html).toContain('href="/privacy"');
-    expect(html).toContain('href="/security"');
-    expect(html).toContain('github.com/adhamhaithameid/Classroom-Quick-Downloader');
+    // Store CTAs point at the real listings and open safely.
+    expect(html).toContain('chromewebstore.google.com/detail/classroom-quick-downloade');
+    expect(html).toContain('addons.mozilla.org/en-US/firefox/addon/classroom-quick-downloader');
     expect(html).toContain('target="_blank"');
     expect(html).toContain('rel="noopener noreferrer"');
   });
