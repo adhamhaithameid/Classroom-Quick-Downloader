@@ -113,6 +113,7 @@ jobs:
       - name: Run Extension Accuracy Gate
         run: |
           if [ -d extension/tests/accuracy/corpus ]; then
+            pnpm -C extension run corpus:check
             pnpm -C extension run test:accuracy
           else
             echo "Accuracy corpus is not present on this branch yet; skipping."
