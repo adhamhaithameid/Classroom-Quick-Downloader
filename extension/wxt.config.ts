@@ -41,10 +41,15 @@ export default defineConfig({
       'storage',
       'alarms',
       // S13 API assist (docs/engine/api-assist-setup.md): exposes
-      // chrome.identity. Inert until manifest oauth2.client_id is set —
-      // isApiConfigured() requires BOTH, so the v3 engine stays dormant.
+      // chrome.identity. Together with the oauth2 block below this
+      // activates the v3 ApiDetector engine (isApiConfigured() requires
+      // both).
       'identity'
     ],
+    oauth2: {
+      client_id: "1002516920728-9lsgcjbbk2rvheeibaktfoigm0t02goi.apps.googleusercontent.com",
+      scopes: ["https://www.googleapis.com/auth/classroom.readonly"],
+    },
     host_permissions: [
       'https://drive.google.com/*',
       'https://classroom.google.com/*',
