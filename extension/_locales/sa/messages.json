@@ -60,7 +60,7 @@
     "description": "commentsTooltip"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "प्रकाशनस्य अन्तिमसम्पादनस्य च मध्ये दिनानि",
     "description": "editedTooltip"
   },
   "download_interrupted": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "सर्वाणि निरस्तुम्",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "परिवर्तितम्",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "प्रकाशनानन्तरम्",
+    "description": "after_posting"
   }
 }
