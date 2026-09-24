@@ -104,6 +104,14 @@ Good homes:
 2. `extension/tests/classroom-visual-regression.test.ts`
 3. `extension/tests/classroom-dom-stress.test.ts`
 
+Capturing in a non-English (or non-Arabic) language also grows the
+**language ground-truth corpus**: the committed fixtures are what
+`tests/e2e/live/language-reconcile.spec.ts` audits the detection keyword
+lists against (see `docs/TWO_LANGUAGE_SIGNALS.md` § Keyword verification) —
+a new-language capture extends that verification for free. For bulk
+string capture across all languages, use the live corpus pipeline instead
+(`pnpm test:live:langs`, `docs/LIVE_CLASSROOM_TESTING.md`).
+
 ## Step 4 - Update the capture metadata
 
 Update:
