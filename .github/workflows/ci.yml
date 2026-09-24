@@ -129,8 +129,11 @@ jobs:
   # Extension E2E — real Chromium with the extension loaded
   #
   # These specs route https://classroom.google.com/** to local fixtures, so
-  # they need no Google account. They must run headed (extension APIs are
-  # unavailable in headless Chrome), hence xvfb on the Linux runner.
+  # they need no Google account. They run fully headless: Chromium's new
+  # headless mode (channel 'chromium') supports extension APIs, and the specs'
+  # manual launchPersistentContext calls default to headless (E2E_HEADED=1
+  # opts back into a visible window locally). Parity was verified A/B on
+  # 2026-09-19: identical 20/20 pass set headed vs headless.
   #
   # This suite existed since 2026-03 but was unrunnable: @playwright/test had
   # been removed from devDependencies as "unused" while playwright.config.ts
@@ -177,10 +180,10 @@ jobs:
         run: pnpm -C extension build
 
       - name: Run Extension E2E
-        run: xvfb-run -a pnpm run test:e2e
+        run: pnpm run test:e2e
 
-      - name: Run Extension E2E (Edge smoke)
-        run: xvfb-run -a pnpm run test:e2e:edge
+      - name: Run Extension E2E (Edge)
+        run: pnpm run test:e2e:edge
 
       # Signed Firefox leg (S11 T3): AMO-sign the firefox-mv2 zip, then run
       # the qa journeys against the signed xpi (it survives Playwright's
@@ -195,7 +198,7 @@ jobs:
           pnpm exec playwright install firefox
           pnpm -C extension firefox
           pnpm -C extension sign:extension
-          xvfb-run -a pnpm -C extension test:qa:firefox-signed
+          pnpm -C extension test:qa:firefox-signed
 
       - name: Signed Firefox QA leg skipped (no AMO credentials)
         if: ${{ env.AMO_JWT_ISSUER == '' || env.AMO_JWT_SECRET == '' }}
