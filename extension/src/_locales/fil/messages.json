@@ -82,5 +82,21 @@
   "cancel_all": {
     "message": "Kanselahin lahat",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Binago",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "pagkatapos ng pag-post",
+    "description": "after_posting"
+  },
+  "comment_singular": {
+    "message": "komento",
+    "description": "commentSingular"
+  },
+  "edited_tooltip": {
+    "message": "Araw pagitan ng pag-post at huling pag-edit",
+    "description": "editedTooltip"
   }
 }
