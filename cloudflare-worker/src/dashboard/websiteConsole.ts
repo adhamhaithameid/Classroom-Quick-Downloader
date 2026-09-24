@@ -254,7 +254,7 @@ export function renderWebsiteConsole(scriptNonce?: string): string {
     <header class="top">
       <div class="title">
         <h1>Website Data Console</h1>
-        <p>Cloudflare runtime visibility for website telemetry, cache state, and Oracle sync.</p>
+        <p>Cloudflare runtime visibility for website telemetry, cache state, and archive sync.</p>
       </div>
       <div class="top-actions">
         <a class="btn" href="/dashboard">Back To Main Dashboard</a>
@@ -283,6 +283,16 @@ export function renderWebsiteConsole(scriptNonce?: string): string {
         <h2>Last Correlation</h2>
         <div class="metric" id="telemetry-correlation" style="font-size:1rem;">—</div>
         <div class="metric-sub" id="telemetry-ack">last ack</div>
+      </article>
+      <article class="card">
+        <h2>D1 Archive</h2>
+        <div class="metric" id="archive-batches">—</div>
+        <div class="metric-sub" id="archive-meta">archived batches · last write —</div>
+      </article>
+      <article class="card">
+        <h2>Oracle Mirror</h2>
+        <div class="metric" id="mirror-state" style="font-size:1rem;">—</div>
+        <div class="metric-sub" id="mirror-meta">optional external forwarding</div>
       </article>
     </section>
 
@@ -409,8 +419,8 @@ export function renderWebsiteConsole(scriptNonce?: string): string {
 
       function formatRuntime(summary) {
         if (!summary || !summary.runtime) return { pill: "warn", label: "unknown", desc: "Runtime status unavailable" };
-        if (summary.runtime.oracleReachable === false) {
-          return { pill: "danger", label: "Degraded", desc: "Oracle/DO sync path currently degraded" };
+        if (summary.runtime.d1ArchiveConfigured === false) {
+          return { pill: "danger", label: "Degraded", desc: "D1 archive binding is not configured" };
         }
         return { pill: "ok", label: "Healthy", desc: "Worker, KV, and D1 checks passed" };
       }
@@ -434,6 +444,32 @@ export function renderWebsiteConsole(scriptNonce?: string): string {
 
           setText("telemetry-correlation", String((((data || {}).telemetry || {}).lastCorrelationId) || "—"));
           setText("telemetry-ack", "last ack: " + formatTs((((data || {}).telemetry || {}).lastBatchAckAtUtc) || null));
+
+          var archive = (data || {}).archive || {};
+          setText("archive-batches", String(archive.totalBatches || 0));
+          setText("archive-meta", "archived batches · last write " + formatTs(archive.lastArchivedAtUtc || null));
+
+          var mirrorForwards = archive.mirrorForwards || 0;
+          var mirrorFailures = archive.mirrorFailures || 0;
+          var mirrorPill = document.getElementById("mirror-state");
+          if (mirrorPill) {
+            if (!archive.mirrorConfigured) {
+              mirrorPill.textContent = "off";
+              mirrorPill.style.color = "var(--text-muted, #888)";
+            } else if (mirrorFailures > 0 && mirrorForwards === 0) {
+              mirrorPill.textContent = "failing";
+              mirrorPill.style.color = "var(--danger, #e5484d)";
+            } else {
+              mirrorPill.textContent = "on · " + mirrorForwards + " ok / " + mirrorFailures + " fail";
+              mirrorPill.style.color = mirrorFailures > 0 ? "var(--warn, #f5a623)" : "var(--success, #2e7d32)";
+            }
+          }
+          setText(
+            "mirror-meta",
+            archive.mirrorConfigured
+              ? "last ok: " + formatTs(archive.mirrorLastOkAtUtc || null) + (archive.mirrorLastError ? " · last error: " + archive.mirrorLastError : "")
+              : "not configured — set ORACLE_ENDPOINT to enable"
+          );
           return data;
         } catch (err) {
           setPill("summary-pill", "danger");
