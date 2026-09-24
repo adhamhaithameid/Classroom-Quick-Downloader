@@ -34,6 +34,7 @@ import {
   handleDownloadRequest,
   startNextDriveAttempt,
   startSingleAttempt,
+  startDownloadWithTimeout,
 } from './download-handler';
 import { Analytics, refreshRemoteAnalyticsConfig, recordDownloadEvent } from '../utils/analytics';
 import { installRuntimeErrorReporting } from '../utils/analytics/runtime-errors';
@@ -215,15 +216,28 @@ export default defineBackground(() => {
         typeof pending.currentAuthUser === 'number'
           ? buildUrlWithAuthUser(pending.baseUrl, pending.currentAuthUser)
           : pending.baseUrl;
-      chrome.downloads.download({ url, saveAs: false, conflictAction: 'uniquify' }, (id) => {
-        if (chrome.runtime.lastError || !id) {
-          const _ = chrome.runtime.lastError;
-          sendStatusToTab(pending, 'error', t('downloadInterrupted'), 'RETRY_START_FAIL');
+      // S2: same start-timeout contract as the primary attempt paths.
+      startDownloadWithTimeout(
+        url,
+        pending,
+        (downloadId, hadError) => {
+          if (hadError || downloadId == null) {
+            sendStatusToTab(pending, 'error', t('downloadInterrupted'), 'RETRY_START_FAIL');
+            cleanup(pending);
+            return;
+          }
+          bindDownloadId(pending, downloadId);
+        },
+        () => {
+          sendStatusToTab(
+            pending,
+            'error',
+            'The download could not be started — the source never responded. Try again.',
+            'DOWNLOAD_START_TIMEOUT',
+          );
           cleanup(pending);
-          return;
-        }
-        bindDownloadId(pending, id);
-      });
+        },
+      );
     } else {
       startSingleAttempt(pending);
     }

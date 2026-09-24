@@ -20,6 +20,63 @@ import { recordDownloadEvent } from '../utils/analytics';
 import { validateDownloadUrl } from '../../src/v2/decision/download-validator';
 
 /**
+ * S2 (audit docs/SECURITY_AUDIT_EXTENSION_2026-09-24.md): the
+ * chrome.downloads.download callback never fires when the target host accepts
+ * the connection but stalls, which used to leave the CQD_DOWNLOAD response
+ * dangling until the 150s stall deadline reaped the pending. Every start now
+ * races the callback against DOWNLOAD_START_TIMEOUT_MS and settles honestly;
+ * a late callback after the timeout cancels the stray download and never
+ * resurrects the settled flow.
+ */
+export const DOWNLOAD_START_TIMEOUT_MS = 15_000;
+
+type StartHandler = (downloadId: number | undefined, hadError: boolean) => void;
+
+export function startDownloadWithTimeout(
+  url: string,
+  pending: PendingDownload,
+  handleStart: StartHandler,
+  onTimeout: () => void,
+): void {
+  let settled = false;
+  const timer = setTimeout(() => {
+    if (settled) return;
+    settled = true;
+    pending.startTimedOut = true;
+    if (pending.isCancelled) return;
+    onTimeout();
+  }, DOWNLOAD_START_TIMEOUT_MS);
+  try {
+    chrome.downloads.download(
+      { url, saveAs: false, conflictAction: 'uniquify' },
+      (downloadId) => {
+        clearTimeout(timer);
+        if (pending.startTimedOut) {
+          // Timeout already settled the flow. Kill the stray download if it
+          // eventually started; never double-settle or resurrect.
+          if (downloadId) {
+            try {
+              chrome.downloads.cancel(downloadId, () => { const _ = chrome.runtime.lastError; });
+            } catch { /* already gone */ }
+          } else {
+            void chrome.runtime.lastError;
+          }
+          return;
+        }
+        settled = true;
+        handleStart(downloadId, !!chrome.runtime.lastError || !downloadId);
+      },
+    );
+  } catch {
+    clearTimeout(timer);
+    if (!settled) {
+      settled = true;
+      handleStart(undefined, true);
+    }
+  }
+}
+
+/**
  * Start a single (non-Drive) download attempt.
  */
 export function startSingleAttempt(
@@ -36,10 +93,11 @@ export function startSingleAttempt(
     return;
   }
 
-  chrome.downloads.download(
-    { url: pending.baseUrl, saveAs: false, conflictAction: 'uniquify' },
-    (downloadId) => {
-      if (chrome.runtime.lastError || !downloadId) {
+  startDownloadWithTimeout(
+    pending.baseUrl,
+    pending,
+    (downloadId, hadError) => {
+      if (hadError) {
         recordDownloadEvent({
           type: pending.fileMeta?.ext || 'unknown',
           status: 'fail',
@@ -51,9 +109,29 @@ export function startSingleAttempt(
         respondOnce?.({ started: false, userMessage: 'Browser blocked download.' });
         return;
       }
-      bindDownloadId(pending, downloadId);
+      bindDownloadId(pending, downloadId as number);
       respondOnce?.({ started: true, requestId: pending.requestId, downloadId });
-    }
+    },
+    () => {
+      recordDownloadEvent({
+        type: pending.fileMeta?.ext || 'unknown',
+        status: 'fail',
+        duration_ms: Date.now() - pending.startTime,
+        bypass_used: false,
+        error_type: 'DOWNLOAD_START_TIMEOUT',
+      });
+      cleanup(pending);
+      sendStatusToTab(
+        pending,
+        'error',
+        'The download could not be started — the source never responded. Try again.',
+        'DOWNLOAD_START_TIMEOUT',
+      );
+      respondOnce?.({
+        started: false,
+        userMessage: 'The download could not be started — the source never responded. Try again.',
+      });
+    },
   );
 }
 
@@ -105,15 +183,32 @@ export function startNextDriveAttempt(pending: PendingDownload): void {
     return;
   }
 
-  chrome.downloads.download(
-    { url: attemptUrl, saveAs: false, conflictAction: 'uniquify' },
-    (downloadId) => {
-      if (chrome.runtime.lastError || !downloadId) {
+  startDownloadWithTimeout(
+    attemptUrl,
+    pending,
+    (downloadId, hadError) => {
+      if (hadError) {
         startNextDriveAttempt(pending);
         return;
       }
-      bindDownloadId(pending, downloadId);
-    }
+      bindDownloadId(pending, downloadId as number);
+    },
+    () => {
+      recordDownloadEvent({
+        type: pending.fileMeta?.ext || 'unknown',
+        status: 'fail',
+        duration_ms: Date.now() - pending.startTime,
+        bypass_used: false,
+        error_type: 'DOWNLOAD_START_TIMEOUT',
+      });
+      sendStatusToTab(
+        pending,
+        'error',
+        'The download could not be started — the source never responded. Try again.',
+        'DOWNLOAD_START_TIMEOUT',
+      );
+      cleanup(pending);
+    },
   );
 }
 
@@ -207,9 +302,10 @@ export function handleDownloadRequest(
     }
 
     const attemptDriveStart = (): void => {
-      chrome.downloads.download(
-        { url: firstUrl, saveAs: false, conflictAction: 'uniquify' },
-        (id) => {
+      startDownloadWithTimeout(
+        firstUrl,
+        pending,
+        (id, hadError) => {
           // Race condition check
           if (pending.isCancelled) {
             if (id) chrome.downloads.cancel(id, () => { const _ = chrome.runtime.lastError; });
@@ -217,8 +313,7 @@ export function handleDownloadRequest(
             return;
           }
 
-          if (chrome.runtime.lastError || !id) {
-            const _ = chrome.runtime.lastError;
+          if (hadError) {
             // No-dead-ends: the browser can transiently refuse a start.
             // Retry ONCE after a short beat, then settle with guidance.
             if (!pending.startRetried && !pending.isCancelled) {
@@ -244,9 +339,29 @@ export function handleDownloadRequest(
             cleanup(pending);
             return;
           }
-          bindDownloadId(pending, id);
+          bindDownloadId(pending, id as number);
           respondOnce({ started: true, requestId, downloadId: id });
-        }
+        },
+        () => {
+          recordDownloadEvent({
+            type: pending.fileMeta?.ext || 'unknown',
+            status: 'fail',
+            duration_ms: Date.now() - pending.startTime,
+            bypass_used: false,
+            error_type: 'DOWNLOAD_START_TIMEOUT',
+          });
+          respondOnce({
+            started: false,
+            userMessage: 'The download could not be started — the source never responded. Try again.',
+          });
+          sendStatusToTab(
+            pending,
+            'error',
+            'The download could not be started — the source never responded. Try again.',
+            'DOWNLOAD_START_TIMEOUT',
+          );
+          cleanup(pending);
+        },
       );
     };
     attemptDriveStart();
