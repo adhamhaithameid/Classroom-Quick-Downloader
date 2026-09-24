@@ -1,5 +1,15 @@
 @import './lib/styles/glass.css';
 
+/* Branded cursor (docs/CURSOR.md): while the custom cursor layer is live it
+   marks the true pointer position, so every native cursor stands down
+   site-wide. `cqd-cursor-live` is runtime-only — added by the brandedCursor
+   action on fine-pointer devices after activation, removed on teardown — so
+   no-JS and touch visitors keep full native behavior. */
+html.cqd-cursor-live,
+html.cqd-cursor-live * {
+  cursor: none !important;
+}
+
 /* Visual identity guard: keep Plus Jakarta Sans as the primary UI font.
    The webfont stylesheet is linked from src/app.html (preconnect to
    fonts.googleapis.com + fonts.gstatic.com, display=swap) so it is discovered
