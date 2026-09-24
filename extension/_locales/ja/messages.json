@@ -4,7 +4,7 @@
     "description": "download"
   },
   "downloading": {
-    "message": "DL中…",
+    "message": "ダウンロード中…",
     "description": "downloading"
   },
   "trying": {
@@ -40,7 +40,7 @@
     "description": "edited"
   },
   "download_all": {
-    "message": "すべてDL",
+    "message": "すべてダウンロード",
     "description": "downloadAll"
   },
   "file": {
@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "全てキャンセル",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "変更済み",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "投稿後",
+    "description": "after_posting"
   }
 }
