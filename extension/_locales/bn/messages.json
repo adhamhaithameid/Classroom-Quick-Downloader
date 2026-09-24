@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "সব বাতিল",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "পরিবর্তিত",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "পোস্ট করার পরে",
+    "description": "after_posting"
   }
 }
