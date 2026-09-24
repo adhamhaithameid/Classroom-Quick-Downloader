@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "Atcelt visu",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Mainīts",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "pēc publicēšanas",
+    "description": "after_posting"
   }
 }
