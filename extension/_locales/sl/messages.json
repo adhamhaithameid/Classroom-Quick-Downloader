@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "Prekliči vse",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Spremenjeno",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "po objavi",
+    "description": "after_posting"
   }
 }
