@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "ยกเลิกทั้งหมด",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "ถูกแก้ไข",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "หลังจากโพสต์",
+    "description": "after_posting"
   }
 }
