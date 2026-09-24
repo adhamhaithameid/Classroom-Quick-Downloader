@@ -1129,7 +1129,7 @@
                     </span>
                   </a>
                 {/if}
-                <span class="l2-nav-bmc-label">Support the Me</span>
+                <span class="l2-nav-bmc-label">Support Me</span>
                 <a
                   class="l2-nav-bmc"
                   href={BUY_COFFEE_URL}
@@ -1197,7 +1197,7 @@
               </a>
             </div>
           </div>
-          <span class="l2-nav-bmc-label l2-nav-bmc-label-center">Support the Me</span>
+          <span class="l2-nav-bmc-label l2-nav-bmc-label-center">Support Me</span>
           <a
             class="l2-nav-bmc"
             href={BUY_COFFEE_URL}
