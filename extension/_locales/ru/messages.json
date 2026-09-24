@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "Отменить все",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Изменено",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "после публикации",
+    "description": "after_posting"
   }
 }
