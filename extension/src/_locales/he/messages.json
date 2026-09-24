@@ -72,7 +72,7 @@
     "description": "commError"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "הימים בין הפרסום לעריכה האחרונה",
     "description": "editedTooltip"
   },
   "comment_singular": {
@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "ביטול הכל",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "שונה",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "לאחר הפרסום",
+    "description": "after_posting"
   }
 }
