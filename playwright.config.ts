@@ -12,8 +12,9 @@
  * then point Playwright at the built output directory.
  *
  * Extensions run headless via Chromium's new headless mode (channel
- * 'chromium'). Playwright handles
- * this gracefully — it opens a real browser window for the tests.
+ * 'chromium'), which — unlike the bundled old headless — supports the
+ * extension APIs. Tests run with no visible window; set E2E_HEADED=1 to
+ * opt back into a real browser window for debugging.
  *
  * The test flow:
  * 1. Build the extension (done in globalSetup)
@@ -65,7 +66,9 @@ export default defineConfig({
   projects: [
     {
       name: 'extension-chromium',
-      testIgnore: /[/\\]qa[/\\]/,
+      // live/ is excluded like qa/: those specs launch their own persistent
+      // contexts on the dedicated signed-in profile (tests/e2e/live/).
+      testIgnore: /[/\\](qa|live)[/\\]/,
       use: {
         ...devices['Desktop Chrome'],
         // channel 'chromium' = new headless, the build that supports extensions.
@@ -86,17 +89,30 @@ export default defineConfig({
     },
 
     // ────────────────────────────────────────────────────────────────────
-    // Edge smoke (S11 gate G5: Chrome + Edge smoke green in CI).
-    // Mirrors extension-chromium — same extension launch args, same qa/
-    // testIgnore scheme — but on the msedge channel and restricted to the
-    // smoke subset: the qa/ journeys stay on the qa-* projects (they launch
-    // their own contexts via the harness) and the heavier specs stay
-    // chromium-only.
+    // NOTE — there is deliberately NO 'extension-chrome' (branded Google
+    // Chrome) project. Since Chrome 137, branded builds ignore
+    // --load-extension/--disable-extensions-except (anti-abuse), so no
+    // extension can be tested there at all (verified 2026-09-19 on Chrome
+    // 150: service worker never registers, content scripts never inject).
+    // The Chrome ENGINE is covered by extension-chromium — Chrome for
+    // Testing is Google's own test build and still honors the flags.
+    // tools/check-chrome-support.mjs re-probes branded Chrome if you want to
+    // re-introduce a project after a Google policy change.
+    // Microsoft Edge is separately branded and still honors the flags today
+    // (its leg runs the full suite green); if a future Edge update drops
+    // them, this suite fails loudly and edge coverage falls back to the
+    // chromium project.
+    // ────────────────────────────────────────────────────────────────────
+
+    // ────────────────────────────────────────────────────────────────────
+    // Microsoft Edge (S11 gate G5). Runs the FULL suite (spec launchers take
+    // the project channel — 'msedge' here — so the Edge leg is never a fake
+    // vanilla-Chromium pass); qa/ journeys stay on the qa-* projects (they
+    // launch their own contexts via the harness).
     // ────────────────────────────────────────────────────────────────────
     {
       name: 'extension-edge',
-      testMatch: [/[/\\]core-flow\.spec\.ts/, /[/\\]extension-smoke\.spec\.ts/],
-      testIgnore: /[/\\]qa[/\\]/,
+      testIgnore: /[/\\](qa|live)[/\\]/,
       use: {
         ...devices['Desktop Chrome'],
         channel: 'msedge',
@@ -115,6 +131,26 @@ export default defineConfig({
     },
 
     // ────────────────────────────────────────────────────────────────────
+    // LIVE REAL-CLASSROOM suite (tests/e2e/live/) — real classroom.google.com
+    // against the user's own account, both student and teacher roles.
+    // Launches its own persistent context on the dedicated manually-signed-in
+    // profile (tests/e2e/.live-profile, created once by `pnpm
+    // test:live:login`). Gated in-spec by LIVE_CLASSROOM=1 — without the gate
+    // the browser specs skip with an actionable reason and the offline parser
+    // unit tests (parse.spec.ts) still run. NEVER run in CI (real account).
+    // Docs: docs/LIVE_CLASSROOM_TESTING.md · Research:
+    // docs/research/live-classroom-e2e-testing.md
+    // ────────────────────────────────────────────────────────────────────
+    {
+      name: 'live-chromium',
+      testMatch: /tests\/e2e\/live\/.*\.spec\.ts/,
+      use: {
+        browserName: 'chromium',
+        acceptDownloads: true,
+      },
+    },
+
+    // ────────────────────────────────────────────────────────────────────
     // Manual-QA Replay (docs/superpowers/specs/2026-09-12-manual-qa-replay-design.md)
     // These specs launch their own persistent contexts via the harness —
     // per-browser project selection is what the specs read to pick the
@@ -122,6 +158,18 @@ export default defineConfig({
     // ────────────────────────────────────────────────────────────────────
     {
       name: 'qa-chromium',
+      testMatch: /tests\/e2e\/qa\/.*\.spec\.ts/,
+      use: {
+        browserName: 'chromium',
+        acceptDownloads: true,
+      },
+    },
+    // Journey suite on Edge stable (harness resolves the launch channel from
+    // the project name — see projectChannel in harness.ts). There is no
+    // qa-chrome for the same reason there is no extension-chrome: branded
+    // Chrome ignores the extension load flags (see the note above).
+    {
+      name: 'qa-edge',
       testMatch: /tests\/e2e\/qa\/.*\.spec\.ts/,
       use: {
         browserName: 'chromium',

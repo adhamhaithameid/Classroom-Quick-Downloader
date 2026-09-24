@@ -74,7 +74,7 @@ test.describe("qa-03 flags", () => {
 
   test.beforeAll(async ({}, testInfo) => {
     browser = projectBrowser(testInfo.project.name);
-    const session = await launchQaContext(browser, scenario("en", "ltr", "light"));
+    const session = await launchQaContext(browser, scenario("en", "ltr", "light"), { project: testInfo.project.name });
     context = session.context;
     closeQa = session.close;
     // Bail out of UI setup when the extension host never came up (Firefox);
@@ -170,7 +170,7 @@ test.describe("qa-03 flags", () => {
   });
 
   test("dark theme badges carry the dark class", async ({}, testInfo) => {
-    const session = await launchQaContext("chromium", scenario("en", "ltr", "dark"));
+    const session = await launchQaContext("chromium", scenario("en", "ltr", "dark"), { project: testInfo.project.name });
     try {
       const darkPage = await session.context.newPage();
       const darkCapture = captureConsole(darkPage);
@@ -196,7 +196,7 @@ test.describe("qa-03 flags", () => {
   });
 
   test("RTL layout keeps badges anchored to their cards", async ({}, testInfo) => {
-    const session = await launchQaContext("chromium", scenario("ar", "rtl", "light"));
+    const session = await launchQaContext("chromium", scenario("ar", "rtl", "light"), { project: testInfo.project.name });
     try {
       const rtlPage = await session.context.newPage();
       const rtlCapture = captureConsole(rtlPage);
