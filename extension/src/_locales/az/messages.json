@@ -72,7 +72,7 @@
     "description": "commError"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "Yerləşdirmə ilə son düzəliş arasındakı günlər",
     "description": "editedTooltip"
   },
   "comment_singular": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Hamısını ləğv et",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Dəyişdirilib",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "yerləşdirildikdən sonra",
+    "description": "after_posting"
   }
 }
