@@ -6,6 +6,18 @@ const CATCHUP_PX = 0.1;
 const INFLUENCE_EPS = 0.001;
 const LEAVE_EASE = 0.88;
 
+export interface GridBendParams {
+  /**
+   * True while the host layer is known to be invisible — occluded by the
+   * sheet or behind the hidden footer window. The canvas switches off (the
+   * static CSS grid stands back in) and the window listeners no-op, so a
+   * hidden instance never paints. Driven by +layout.svelte's reveal state
+   * through AmbientBackground's `paused` prop; Svelte calls `update` when
+   * it flips.
+   */
+  paused?: boolean;
+}
+
 /**
  * Paints the 60px engineering grid on a viewport-fixed canvas and bends the
  * lines gently around a fine pointer. Activation is gated on
@@ -15,11 +27,28 @@ const LEAVE_EASE = 0.88;
  * `bend-live` class on `canvas.parentElement`; the wrapper's own
  * `opacity: 0.05` composites the strokes, so none is set here.
  *
+ * Pointer-gated: the canvas only ever paints for an actual pointer — the
+ * first pointermove activates it, and it deactivates again once the field
+ * fully relaxes. Without a pointer there is nothing to bend around, and the
+ * CSS twin paints the same grid for free; auto-activating on mount or
+ * un-pause used to keep a full-viewport canvas redrawing through every
+ * scroll frame of the footer reveal with the pointer parked, and end each
+ * reveal with a canvas→CSS swap.
+ *
+ * Sleep-at-rest: once the pointer leaves and the influence fully relaxes,
+ * the canvas is drawing the unbent grid — pixel-true with the CSS twin —
+ * so the action deactivates and the CSS gradient scrolls for free. (On the
+ * footer-window instance the CSS twin is doc-aligned via --ft-grid-y,
+ * written by +layout.svelte, so that swap cannot shift the grid phase.)
+ *
  * House conventions: passive listeners, no per-event layout reads, cursor
  * smoothing is frame-rate independent, and the rAF loop fully stops once
  * the field settles.
  */
-export function gridBend(canvas: HTMLCanvasElement): { destroy(): void } {
+export function gridBend(
+  canvas: HTMLCanvasElement,
+  params?: GridBendParams
+): { update(params?: GridBendParams): void; destroy(): void } {
   const finePointer = window.matchMedia('(pointer: fine)');
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const ctx = canvas.getContext('2d');
@@ -27,6 +56,7 @@ export function gridBend(canvas: HTMLCanvasElement): { destroy(): void } {
   let vw = 0;
   let vh = 0;
   let active = false;
+  let paused = params?.paused ?? false;
   let raf = 0;
   let lastTime = 0;
   let dirty = true;
@@ -117,6 +147,11 @@ export function gridBend(canvas: HTMLCanvasElement): { destroy(): void } {
     if (dirty || catchingUp || easing) {
       dirty = false;
       raf = requestAnimationFrame(frame);
+    } else if (!inside && active) {
+      // Fully relaxed with the pointer gone: the canvas is painting the
+      // unbent grid — identical to the CSS twin — so stand down and let
+      // the CSS gradient scroll for free until the next pointer contact.
+      deactivate();
     } else {
       // Snap to the exact rest frame so the settled grid is pixel-true.
       smoothX = targetX;
@@ -127,7 +162,7 @@ export function gridBend(canvas: HTMLCanvasElement): { destroy(): void } {
   }
 
   function startLoop(): void {
-    if (!active || raf || document.hidden) return;
+    if (!active || paused || raf || document.hidden) return;
     lastTime = performance.now();
     raf = requestAnimationFrame(frame);
   }
@@ -140,11 +175,18 @@ export function gridBend(canvas: HTMLCanvasElement): { destroy(): void } {
   }
 
   function onPointerMove(event: PointerEvent): void {
+    if (paused) return;
+    const woke = !active;
+    if (woke) {
+      if (!gatesPass() || !ctx) return;
+      activate();
+    }
     targetX = event.clientX;
     targetY = event.clientY;
     inside = true;
-    if (!seenPointer) {
-      // First contact initializes the smoothed position: no swoosh from (0, 0).
+    if (!seenPointer || woke) {
+      // First contact — or waking from sleep, where the old smoothed
+      // position is stale — initializes at the pointer: no swoosh.
       seenPointer = true;
       smoothX = targetX;
       smoothY = targetY;
@@ -153,16 +195,21 @@ export function gridBend(canvas: HTMLCanvasElement): { destroy(): void } {
   }
 
   function onLeave(): void {
+    if (paused || !active) return;
     inside = false;
     startLoop();
   }
 
   function onScroll(): void {
+    /* A sleeping canvas paints the unbent grid; the CSS twin already
+       scrolls for free, so only an active, unpaused canvas repaints. */
+    if (paused || !active) return;
     dirty = true;
     startLoop();
   }
 
   function onResize(): void {
+    if (paused || !active) return;
     size();
     startLoop();
   }
@@ -173,11 +220,12 @@ export function gridBend(canvas: HTMLCanvasElement): { destroy(): void } {
   }
 
   function onGatesChange(): void {
-    if (gatesPass()) {
-      if (!active) activate();
-    } else if (active) {
+    if (paused) return;
+    if (!gatesPass() && active) {
       deactivate();
     }
+    /* Gates becoming passable never auto-activates: the next pointermove
+       wakes the canvas (see onPointerMove). */
   }
 
   function activate(): void {
@@ -200,7 +248,21 @@ export function gridBend(canvas: HTMLCanvasElement): { destroy(): void } {
     canvas.style.display = 'none';
   }
 
-  if (gatesPass()) activate();
+  function applyPaused(next: boolean): void {
+    if (paused === next) return;
+    paused = next;
+    if (paused) {
+      stopLoop();
+      deactivate();
+    } else {
+      /* Un-pausing stays dark: without a pointer there is nothing to bend
+         around, and the CSS twin paints the same grid. The next pointermove
+         activates (and re-inits smoothing — no swoosh from a stale (0, 0)). */
+      seenPointer = false;
+    }
+  }
+
+  /* No auto-activation at mount either — pointer-gated for life. */
   finePointer.addEventListener?.('change', onGatesChange);
   reducedMotion.addEventListener?.('change', onGatesChange);
   window.addEventListener('pointermove', onPointerMove, { passive: true });
@@ -210,6 +272,9 @@ export function gridBend(canvas: HTMLCanvasElement): { destroy(): void } {
   document.addEventListener('visibilitychange', onVisibility);
 
   return {
+    update(next?: GridBendParams): void {
+      applyPaused(next?.paused ?? false);
+    },
     destroy(): void {
       deactivate();
       finePointer.removeEventListener?.('change', onGatesChange);
