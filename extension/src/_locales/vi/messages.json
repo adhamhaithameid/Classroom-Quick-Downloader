@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "Hủy tất cả",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Đã sửa đổi",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "sau khi đăng",
+    "description": "after_posting"
   }
 }
