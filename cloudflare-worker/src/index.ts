@@ -1,13 +1,20 @@
 // filepath: cloudflare-worker/src/index.ts
 import { renderDashboard, renderLoginPage, renderWebsiteConsole } from "./dashboard";
 import { renderReleaseNotesPage, sanitizeReleaseEntries } from "./release-notes";
-import {
-  isAllowInsecureOracleEndpointEnabled,
-  resolveOracleEndpoint,
-  shouldWarnOnInsecureOracleEndpoint,
-} from "./oracle-endpoint";
 import { timingSafeStringEqual } from "./timing";
 import { ANALYTICS_CONFIG_KV_KEY, ANALYTICS_CONFIG_KV_TTL_SECONDS } from "./downloads_do";
+import { fetchStoreStats } from "./store-stats";
+import type { StoreStatsSnapshot } from "./store-stats";
+import { computeTrends } from "./archive-trends";
+import type { TrendsSeries } from "./archive-trends";
+import {
+  createEmptyStoreHealthDoc,
+  evaluateScrapeHealth,
+  mergeScrapeOutcomes,
+} from "./store-stats";
+import type { StoreHealthDoc } from "./store-stats";
+import { fetchStoreReviews, mergeStoreReviews } from "./store-reviews";
+import type { StoreReview, StoreReviewsSnapshot } from "./store-reviews";
 import type { Env as WorkerEnv, StatsResponse } from "./types";
 
 type WorkerLogLevel = "info" | "warn" | "error";
@@ -468,11 +475,24 @@ function getDownloadsStub(env: WorkerEnv): DurableObjectStub {
 
 const WEBSITE_EVENTS_SCHEMA_VERSION = "1" as const;
 const SITE_SNAPSHOT_KV_KEY = "site:v1:snapshot";
-const SITE_CACHE_TTL_SECONDS = 6 * 60 * 60;
+// Freshness is timestamp-based (SITE_CACHE_REVALIDATE_AFTER_MS); the KV entry
+// itself is kept for a year so the last-good snapshot survives long DO outages
+// instead of expiring exactly when it would be needed most.
+const SITE_KV_RETENTION_SECONDS = 365 * 24 * 60 * 60;
 const SITE_CACHE_REVALIDATE_AFTER_MS = 6 * 60 * 60 * 1000;
-const ORACLE_PULL_HOURS_UTC = new Set([0, 3, 6, 9, 12, 15, 18, 21]);
-const ORACLE_EXPORT_HOURS_UTC = new Set([1, 4, 7, 10, 13, 16, 19, 22]);
-const ORACLE_PUBLIC_WEBSITE_PATHS = new Set<string>([
+const SITE_SNAPSHOT_REFRESH_HOURS_UTC = new Set([0, 3, 6, 9, 12, 15, 18, 21]);
+const SITE_EXPORT_HOURS_UTC = new Set([1, 4, 7, 10, 13, 16, 19, 22]);
+const STORE_STATS_KV_KEY = "site:v1:store-stats";
+const STORE_STATS_REFRESH_MS = 6 * 60 * 60 * 1000;
+const STORE_HEALTH_KV_KEY = "site:v1:scrape-health";
+const TRENDS_KV_KEY = "site:v1:trends";
+const TRENDS_ARCHIVE_ROW_LIMIT = 400;
+const SCRAPE_FAIL_THRESHOLD = 3;
+const SCRAPE_STALE_OK_MS = 48 * 60 * 60 * 1000;
+const SCRAPE_ALERT_MIN_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const STORE_REVIEWS_KV_KEY = "site:v1:store-reviews";
+const STORE_REVIEWS_REFRESH_MS = 12 * 60 * 60 * 1000;
+const PUBLIC_WEBSITE_DATA_PATHS = new Set<string>([
   "/api/public/website/snapshot",
   "/api/public/website/overview",
   "/api/public/website/map",
@@ -490,11 +510,11 @@ const SNAPSHOT_FALLBACK_PATHS = new Set<string>([
   "/api/public/website/status",
   "/api/public/website/changelog",
 ]);
-const ORACLE_PUBLIC_PROXY_CIRCUIT_TTL_MS = 60_000;
-let oraclePublicProxyCircuitOpenUntilMs = 0;
+const PUBLIC_DATA_CIRCUIT_TTL_MS = 60_000;
+let publicDataCircuitOpenUntilMs = 0;
 
-function isOraclePublicWebsiteRoute(pathname: string): boolean {
-  return ORACLE_PUBLIC_WEBSITE_PATHS.has(pathname);
+function isPublicWebsiteDataRoute(pathname: string): boolean {
+  return PUBLIC_WEBSITE_DATA_PATHS.has(pathname);
 }
 
 function isLegacyChangelogAdminRoute(pathname: string): boolean {
@@ -566,7 +586,7 @@ function isPublicCorsRoute(pathname: string): boolean {
     pathname === "/track" ||
     pathname === "/api/site/v1/snapshot" ||
     pathname === "/api/site/v1/privacy" ||
-    isOraclePublicWebsiteRoute(pathname)
+    isPublicWebsiteDataRoute(pathname)
   );
 }
 
@@ -766,7 +786,7 @@ function isCorsOriginAllowedForPath(request: Request, env: WorkerEnv, pathname: 
 
 function corsAllowedHeadersForPath(pathname: string): string {
   if (
-    isOraclePublicWebsiteRoute(pathname) ||
+    isPublicWebsiteDataRoute(pathname) ||
     pathname === "/api/public/website/events" ||
     pathname === "/api/site/v1/events" ||
     pathname === "/api/site/v1/snapshot" ||
@@ -1497,6 +1517,7 @@ const WEBSITE_CONSOLE_ADMIN_PATHS = new Set<string>([
   "/admin/website/console/d1/query",
   "/admin/website/console/telemetry",
   "/admin/website/console/snapshot/raw",
+  "/admin/website/console/archive-trends",
 ]);
 
 const WEBSITE_CONSOLE_RAW_PATHS = new Set<string>([
@@ -1544,11 +1565,15 @@ async function fetchDoWebsiteStatus(env: WorkerEnv): Promise<Record<string, unkn
 async function executeD1All(
   env: WorkerEnv,
   query: string,
+  params: unknown[] = [],
 ): Promise<Record<string, unknown>[]> {
   if (!env.SITE_CACHE_DB || typeof env.SITE_CACHE_DB.prepare !== "function") {
     throw new Error("d1_not_configured");
   }
-  const prepared = env.SITE_CACHE_DB.prepare(query) as D1PreparedStatementLike;
+  const baseStatement = env.SITE_CACHE_DB.prepare(query) as D1PreparedStatementLike;
+  const prepared = (params.length > 0
+    ? baseStatement.bind(...params)
+    : baseStatement) as D1PreparedStatementLike;
   const result = await prepared.all<Record<string, unknown>>();
   if (result && result.success === false) {
     throw new Error(result.error || "d1_query_failed");
@@ -1687,7 +1712,7 @@ async function handleWebsiteConsoleAdminEndpoint(
         runtime: {
           kvConfigured: !!env.SITE_SNAPSHOT_KV,
           d1Configured: !!env.SITE_CACHE_DB,
-          oracleReachable: true,
+          d1ArchiveConfigured: !!env.SITE_CACHE_DB,
         },
         snapshot: {
           snapshotId: typeof cachedSnapshot?.snapshotId === "string" ? cachedSnapshot.snapshotId : null,
@@ -1699,6 +1724,10 @@ async function handleWebsiteConsoleAdminEndpoint(
         },
         telemetry: (doStatus.telemetry && typeof doStatus.telemetry === "object") ? doStatus.telemetry : {},
         doWebsite: (doStatus.website && typeof doStatus.website === "object") ? doStatus.website : {},
+        archive: (doStatus.archive && typeof doStatus.archive === "object")
+          ? doStatus.archive
+          : { mirrorConfigured: false, mirrorForwards: 0, mirrorFailures: 0, mirrorLastOkAtUtc: null, mirrorLastError: null, totalBatches: 0, lastArchivedAtUtc: null },
+        scrapeHealth: await readStoreHealth(env),
       };
       return withCors(
         request,
@@ -1721,6 +1750,39 @@ async function handleWebsiteConsoleAdminEndpoint(
         publicSnapshot: (doStatus.publicSnapshot && typeof doStatus.publicSnapshot === "object")
           ? doStatus.publicSnapshot
           : {},
+      };
+      return withCors(
+        request,
+        new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=utf-8" },
+        }),
+        env,
+      );
+    }
+
+    if (pathname === "/admin/website/console/archive-trends") {
+      const trends = await readTrendsKv(env);
+      let totalBatches = 0;
+      let lastArchivedAtUtc: number | null = null;
+      try {
+        const rows = await executeD1All(
+          env,
+          "SELECT COUNT(*) AS total_batches, MAX(archived_at_utc) AS last_archived_at_utc FROM event_archive",
+        );
+        const row = rows[0] ?? {};
+        totalBatches = typeof row.total_batches === "number" ? row.total_batches : 0;
+        lastArchivedAtUtc = typeof row.last_archived_at_utc === "number" ? row.last_archived_at_utc : null;
+      } catch {
+        // Archive introspection is best-effort.
+      }
+      const payload = {
+        ok: true,
+        code: "ok",
+        message: "website_console_archive_trends",
+        generatedAtUtc: Date.now(),
+        archive: { totalBatches, lastArchivedAtUtc },
+        trends,
       };
       return withCors(
         request,
@@ -1910,7 +1972,7 @@ async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): P
   }
 
   if (pathname === "/admin/website/snapshot/refresh" && request.method === "POST") {
-    await refreshSiteSnapshotCacheFromOracle(env);
+    await refreshSiteSnapshotSelfServe(env);
     const cachedRaw = await readSiteSnapshotCache(env);
     let refreshedVersion: string | null = null;
     if (cachedRaw) {
@@ -2162,19 +2224,15 @@ async function handleReleaseNotes(request: Request, env: WorkerEnv): Promise<Res
   });
 }
 
-async function handleOraclePublicWebsiteProxy(request: Request, env: WorkerEnv): Promise<Response> {
+/**
+ * Self-serve public website data routes (overview/map/status/changelog).
+ * Payloads are sliced from the edge-built snapshot; on build failure the
+ * last-good KV snapshot answers instead. Oracle is no longer consulted.
+ */
+async function handlePublicWebsiteDataRoute(request: Request, env: WorkerEnv): Promise<Response> {
   const pathname = new URL(request.url).pathname;
-  let allowedMethods = new Set(["GET"]);
-  if (pathname === "/api/public/website/uninstall") {
-    allowedMethods = new Set(["POST"]);
-  }
-  // NEWSLETTER_CTA_DISABLED_ROLLBACK_START
-  // else if (pathname === "/api/public/website/newsletter/subscribe") {
-  //   allowedMethods = new Set(["POST"]);
-  // }
-  // NEWSLETTER_CTA_DISABLED_ROLLBACK_END
 
-  if (!allowedMethods.has(request.method)) {
+  if (request.method !== "GET") {
     return withCors(
       request,
       new Response(JSON.stringify({ ok: false, error: "method_not_allowed" }), {
@@ -2185,153 +2243,63 @@ async function handleOraclePublicWebsiteProxy(request: Request, env: WorkerEnv):
     );
   }
 
-  // Migration-safe behavior: keep the legacy override path (when explicitly
-  // enabled) while defaulting to HTTPS enforcement.
-  const resolvedOracleEndpoint = resolveOracleEndpoint(env.ORACLE_ENDPOINT, {
-    allowInsecureHttp: isAllowInsecureOracleEndpointEnabled(env.ALLOW_INSECURE_ORACLE_ENDPOINT),
-  });
-  if (shouldWarnOnInsecureOracleEndpoint("worker.publicWebsiteProxy", resolvedOracleEndpoint)) {
-    logEvent("warn", "oracle_insecure_endpoint_override_in_use", {
-      context: "worker.publicWebsiteProxy",
-      oracleEndpoint: resolvedOracleEndpoint.ok ? resolvedOracleEndpoint.baseUrl : env.ORACLE_ENDPOINT,
-    });
-  }
-  if (!resolvedOracleEndpoint.ok) {
-    return withCors(
-      request,
-      new Response(JSON.stringify({ ok: false, error: resolvedOracleEndpoint.error }), {
-        status: 503,
-        headers: { "content-type": "application/json; charset=utf-8" },
-      }),
-      env,
-    );
-  }
-
-  const targetUrl = `${resolvedOracleEndpoint.baseUrl}${pathname}`;
-  const canFallbackToSnapshot =
-    request.method === "GET" &&
-    SNAPSHOT_FALLBACK_PATHS.has(pathname);
-
-  if (canFallbackToSnapshot && Date.now() < oraclePublicProxyCircuitOpenUntilMs) {
-    const fallbackPayload = await getSnapshotFallbackPayload(pathname, env);
-    if (fallbackPayload) {
-      return withCors(
-        request,
-        new Response(JSON.stringify(fallbackPayload), {
-          status: 200,
-          headers: {
-            "content-type": "application/json; charset=utf-8",
-            "cache-control": "public, max-age=120, s-maxage=300",
-            "x-site-fallback": "snapshot-cache",
-            "x-upstream-status": "circuit_open",
-          },
-        }),
-        env,
-      );
-    }
-  }
-
-  const upstreamHeaders = new Headers();
-  const contentType = request.headers.get("content-type");
-  if (contentType) upstreamHeaders.set("content-type", contentType);
-  const requestedWith = request.headers.get("x-requested-with");
-  if (requestedWith) upstreamHeaders.set("x-requested-with", requestedWith);
-  const origin = request.headers.get("origin");
-  if (origin) upstreamHeaders.set("origin", origin);
-  const forwardedFor = request.headers.get("cf-connecting-ip");
-  if (forwardedFor) upstreamHeaders.set("x-forwarded-for", forwardedFor);
-
-  const hasBody = request.method !== "GET" && request.method !== "HEAD";
-  const requestBody = hasBody ? await request.text() : undefined;
-
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-  try {
-    const timeoutController = new AbortController();
-    timeoutId = setTimeout(() => timeoutController.abort("oracle_public_proxy_timeout"), 8_000);
-    const upstream = await fetch(targetUrl, {
-      method: request.method,
-      headers: upstreamHeaders,
-      body: requestBody,
-      redirect: "follow",
-      signal: timeoutController.signal,
-    });
-    clearTimeout(timeoutId);
-    timeoutId = null;
-    const body = await upstream.text();
-
-    if (!upstream.ok && canFallbackToSnapshot) {
-      if (upstream.status >= 500) {
-        oraclePublicProxyCircuitOpenUntilMs = Date.now() + ORACLE_PUBLIC_PROXY_CIRCUIT_TTL_MS;
+  if (Date.now() >= publicDataCircuitOpenUntilMs) {
+    try {
+      const cachedRaw = await readSiteSnapshotCache(env);
+      let prevSnapshot: Record<string, unknown> | null = null;
+      if (cachedRaw) {
+        try {
+          prevSnapshot = asRecord(JSON.parse(cachedRaw));
+        } catch {
+          prevSnapshot = null;
+        }
       }
-      const fallbackPayload = await getSnapshotFallbackPayload(pathname, env);
-      if (fallbackPayload) {
+      const built = await buildSelfServeSiteSnapshot(env, prevSnapshot);
+      const payload = buildSnapshotFallbackPayload(pathname, built);
+      if (payload) {
+        publicDataCircuitOpenUntilMs = 0;
         return withCors(
           request,
-          new Response(JSON.stringify(fallbackPayload), {
+          new Response(JSON.stringify({ ...payload, ok: true }), {
             status: 200,
             headers: {
               "content-type": "application/json; charset=utf-8",
               "cache-control": "public, max-age=120, s-maxage=300",
-              "x-site-fallback": "snapshot-cache",
-              "x-upstream-status": String(upstream.status),
+              "x-site-source": "cloudflare-selfserve",
             },
           }),
           env,
         );
       }
-    }
-    if (upstream.ok) {
-      oraclePublicProxyCircuitOpenUntilMs = 0;
-    }
-
-    const responseHeaders = new Headers({
-      "content-type": upstream.headers.get("content-type") || "application/json; charset=utf-8",
-    });
-    const cacheControl = upstream.headers.get("cache-control");
-    if (cacheControl) responseHeaders.set("cache-control", cacheControl);
-    return withCors(
-      request,
-      new Response(body, {
-        status: upstream.status,
-        headers: responseHeaders,
-      }),
-      env,
-    );
-  } catch {
-    if (canFallbackToSnapshot) {
-      oraclePublicProxyCircuitOpenUntilMs = Date.now() + ORACLE_PUBLIC_PROXY_CIRCUIT_TTL_MS;
-    }
-    if (canFallbackToSnapshot) {
-      const fallbackPayload = await getSnapshotFallbackPayload(pathname, env);
-      if (fallbackPayload) {
-        return withCors(
-          request,
-          new Response(JSON.stringify(fallbackPayload), {
-            status: 200,
-            headers: {
-              "content-type": "application/json; charset=utf-8",
-              "cache-control": "public, max-age=120, s-maxage=300",
-              "x-site-fallback": "snapshot-cache",
-              "x-upstream-status": "timeout_or_unavailable",
-            },
-          }),
-          env,
-        );
-      }
-    }
-    return withCors(
-      request,
-      new Response(JSON.stringify({ ok: false, error: "upstream_unavailable" }), {
-        status: 502,
-        headers: { "content-type": "application/json; charset=utf-8" },
-      }),
-      env,
-    );
-  } finally {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
+    } catch {
+      publicDataCircuitOpenUntilMs = Date.now() + PUBLIC_DATA_CIRCUIT_TTL_MS;
     }
   }
+
+  const fallbackPayload = await getSnapshotFallbackPayload(pathname, env);
+  if (fallbackPayload) {
+    return withCors(
+      request,
+      new Response(JSON.stringify(fallbackPayload), {
+        status: 200,
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+          "cache-control": "public, max-age=120, s-maxage=300",
+          "x-site-fallback": "snapshot-cache",
+        },
+      }),
+      env,
+    );
+  }
+
+  return withCors(
+    request,
+    new Response(JSON.stringify({ ok: false, error: "upstream_unavailable" }), {
+      status: 502,
+      headers: { "content-type": "application/json; charset=utf-8" },
+    }),
+    env,
+  );
 }
 
 async function readSiteSnapshotCache(env: WorkerEnv): Promise<string | null> {
@@ -2347,7 +2315,7 @@ async function writeSiteSnapshotCache(env: WorkerEnv, payloadText: string): Prom
   try {
     if (!env.SITE_SNAPSHOT_KV) return;
     await env.SITE_SNAPSHOT_KV.put(SITE_SNAPSHOT_KV_KEY, payloadText, {
-      expirationTtl: SITE_CACHE_TTL_SECONDS,
+      expirationTtl: SITE_KV_RETENTION_SECONDS,
     });
   } catch {
     // Best-effort cache write only.
@@ -2456,41 +2424,421 @@ async function getSnapshotFallbackPayload(
   }
 }
 
-async function fetchOracleSnapshotPayload(env: WorkerEnv): Promise<Record<string, unknown>> {
-  // Migration-safe behavior: keep the legacy override path (when explicitly
-  // enabled) while defaulting to HTTPS enforcement.
-  const resolvedOracleEndpoint = resolveOracleEndpoint(env.ORACLE_ENDPOINT, {
-    allowInsecureHttp: isAllowInsecureOracleEndpointEnabled(env.ALLOW_INSECURE_ORACLE_ENDPOINT),
-  });
-  if (shouldWarnOnInsecureOracleEndpoint("worker.siteSnapshotFetch", resolvedOracleEndpoint)) {
-    logEvent("warn", "oracle_insecure_endpoint_override_in_use", {
-      context: "worker.siteSnapshotFetch",
-      oracleEndpoint: resolvedOracleEndpoint.ok ? resolvedOracleEndpoint.baseUrl : env.ORACLE_ENDPOINT,
-    });
+const PUBLIC_STORE_LINKS = {
+  chrome:
+    "https://chromewebstore.google.com/detail/classroom-quick-downloade/oemoongiefmpmomjikcjmkkkhffcbdid",
+  firefox: "https://addons.mozilla.org/en-US/firefox/addon/classroom-quick-downloader/",
+  edge:
+    "https://microsoftedge.microsoft.com/addons/detail/classroom-quick-downloade/ecojbijjkcjdolpeoiemnccgmaeomcmn",
+  github: "https://github.com/adhamhaithameid/Classroom-Quick-Downloader",
+} as const;
+
+const SITE_PRIVACY_URL = "https://classroom-quick-downloader.adhamhaithameid.is-a.dev/privacy";
+const SITE_FULL_PRIVACY_URL = `${PUBLIC_STORE_LINKS.github}/blob/main/PRIVACY.md`;
+
+async function readStoreStatsCache(env: WorkerEnv): Promise<StoreStatsSnapshot | null> {
+  try {
+    if (!env.SITE_SNAPSHOT_KV) return null;
+    const raw = await env.SITE_SNAPSHOT_KV.get(STORE_STATS_KV_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StoreStatsSnapshot | null;
+    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.browsers)) return null;
+    return parsed;
+  } catch {
+    return null;
   }
-  if (!resolvedOracleEndpoint.ok) {
-    throw new Error(resolvedOracleEndpoint.message);
+}
+
+async function writeStoreStatsCache(env: WorkerEnv, stats: StoreStatsSnapshot): Promise<void> {
+  try {
+    if (!env.SITE_SNAPSHOT_KV) return;
+    // One-year TTL: last-known store numbers persist even if a store changes
+    // its page structure for months; they refresh whenever scraping works.
+    await env.SITE_SNAPSHOT_KV.put(STORE_STATS_KV_KEY, JSON.stringify(stats), {
+      expirationTtl: SITE_KV_RETENTION_SECONDS,
+    });
+  } catch {
+    // Best-effort cache write only.
+  }
+}
+
+async function readStoreHealth(env: WorkerEnv): Promise<StoreHealthDoc> {
+  try {
+    if (!env.SITE_SNAPSHOT_KV) return createEmptyStoreHealthDoc();
+    const raw = await env.SITE_SNAPSHOT_KV.get(STORE_HEALTH_KV_KEY);
+    if (!raw) return createEmptyStoreHealthDoc();
+    const parsed = JSON.parse(raw) as StoreHealthDoc;
+    if (!parsed || typeof parsed !== "object" || typeof parsed.stores !== "object") {
+      return createEmptyStoreHealthDoc();
+    }
+    return parsed;
+  } catch {
+    return createEmptyStoreHealthDoc();
+  }
+}
+
+async function writeStoreHealth(env: WorkerEnv, doc: StoreHealthDoc): Promise<void> {
+  try {
+    if (!env.SITE_SNAPSHOT_KV) return;
+    await env.SITE_SNAPSHOT_KV.put(STORE_HEALTH_KV_KEY, JSON.stringify(doc), {
+      expirationTtl: SITE_KV_RETENTION_SECONDS,
+    });
+  } catch {
+    // Best-effort health bookkeeping only.
+  }
+}
+
+async function readTrendsKv(env: WorkerEnv): Promise<TrendsSeries | null> {
+  try {
+    if (!env.SITE_SNAPSHOT_KV) return null;
+    const raw = await env.SITE_SNAPSHOT_KV.get(TRENDS_KV_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as TrendsSeries | null;
+    if (!parsed || !Array.isArray(parsed.daily)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Cron-side trends computation: folds recent archived extension batches into
+ * a per-day downloads series and caches it for the public snapshot.
+ */
+async function refreshTrendsKv(env: WorkerEnv): Promise<void> {
+  try {
+    if (!env.SITE_CACHE_DB) return;
+    const since = Date.now() - 31 * 24 * 60 * 60 * 1000;
+    const rows = await executeD1All(
+      env,
+      "SELECT created_at_utc, payload FROM event_archive WHERE kind = ?1 AND created_at_utc >= ?2 ORDER BY created_at_utc ASC LIMIT " + TRENDS_ARCHIVE_ROW_LIMIT,
+      ["extension-batch", since],
+    );
+    const trends = computeTrends(rows, { now: Date.now(), windowDays: 28 });
+    if (!env.SITE_SNAPSHOT_KV) return;
+    await env.SITE_SNAPSHOT_KV.put(TRENDS_KV_KEY, JSON.stringify(trends), {
+      expirationTtl: SITE_KV_RETENTION_SECONDS,
+    });
+  } catch {
+    // Trends are additive; failures never break the snapshot pipeline.
+  }
+}
+
+async function recordScrapeOutcomes(env: WorkerEnv, outcomes: Record<string, "ok" | "fail">): Promise<void> {
+  const prev = await readStoreHealth(env);
+  const doc = mergeScrapeOutcomes(prev, outcomes, Date.now());
+  await writeStoreHealth(env, doc);
+}
+
+/**
+ * Cron-side scrape-freshness watchdog. Alerts when a store failed several
+ * consecutive attempts or its last success is stale (frozen numbers case).
+ * Alerts are rate-limited per distinct status via the health doc.
+ */
+async function maybeAlertScrapeHealth(env: WorkerEnv): Promise<void> {
+  const doc = await readStoreHealth(env);
+  const alerts = evaluateScrapeHealth(doc, {
+    now: Date.now(),
+    failThreshold: SCRAPE_FAIL_THRESHOLD,
+    staleOkMs: SCRAPE_STALE_OK_MS,
+  });
+  const status = alerts.length > 0 ? alerts.map((a) => `${a.store}:${a.reason}`).sort().join(",") : "ok";
+  const webhook = env.ALERT_WEBHOOK_URL;
+
+  if (alerts.length === 0) {
+    if (doc.lastAlertStatus !== null) {
+      // Recovery notification (once).
+      doc.lastAlertStatus = null;
+      doc.lastAlertAtUtc = Date.now();
+      await writeStoreHealth(env, doc);
+      if (webhook) {
+        try {
+          await fetch(webhook, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ ok: true, status: "ok", source: "scrape-health", recoveredAtUtc: Date.now() }),
+          });
+        } catch {
+          // Best-effort recovery notice.
+        }
+      }
+    }
+    return;
   }
 
-  const upstream = await fetch(`${resolvedOracleEndpoint.baseUrl}/api/public/website/snapshot`, {
-    method: "GET",
-    headers: { accept: "application/json" },
-    cache: "no-store",
-    redirect: "follow",
-  });
-  if (!upstream.ok) {
-    throw new Error(`oracle_http_${upstream.status}`);
+  const sameStatus = doc.lastAlertStatus === status;
+  const lastAlertAt = doc.lastAlertAtUtc ?? 0;
+  if (sameStatus && Date.now() - lastAlertAt < SCRAPE_ALERT_MIN_INTERVAL_MS) {
+    return;
   }
-  let payload: unknown;
+  doc.lastAlertStatus = status;
+  doc.lastAlertAtUtc = Date.now();
+  await writeStoreHealth(env, doc);
+
+  logEvent("warn", "scrape_health_degraded", { status });
+  if (!webhook) return;
   try {
-    payload = await upstream.json();
+    await fetch(webhook, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        ok: false,
+        status: "warn",
+        source: "scrape-health",
+        alerts,
+        thresholds: { failThreshold: SCRAPE_FAIL_THRESHOLD, staleOkMs: SCRAPE_STALE_OK_MS },
+        notifiedAtUtc: Date.now(),
+      }),
+    });
   } catch {
-    throw new Error("oracle_invalid_json");
+    // Webhook must never break the cron.
   }
-  if (!payload || typeof payload !== "object") {
-    throw new Error("oracle_invalid_snapshot");
+}
+
+async function refreshStoreStats(
+  env: WorkerEnv,
+  maxAgeMs: number,
+): Promise<StoreStatsSnapshot | null> {
+  const cached = await readStoreStatsCache(env);
+  if (cached && Date.now() - cached.fetchedAtUtc < maxAgeMs) return cached;
+
+  try {
+    const { snapshot, outcomes } = await fetchStoreStats();
+    await recordScrapeOutcomes(env, outcomes);
+    if (snapshot && snapshot.browsers.length > 0) {
+      await writeStoreStatsCache(env, snapshot);
+      return snapshot;
+    }
+  } catch {
+    // Fall through to the cached numbers.
   }
-  return payload as Record<string, unknown>;
+  return cached;
+}
+
+async function readStoreReviewsCache(env: WorkerEnv): Promise<StoreReviewsSnapshot | null> {
+  try {
+    if (!env.SITE_SNAPSHOT_KV) return null;
+    const raw = await env.SITE_SNAPSHOT_KV.get(STORE_REVIEWS_KV_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StoreReviewsSnapshot | null;
+    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.reviews)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+async function writeStoreReviewsCache(env: WorkerEnv, snapshot: StoreReviewsSnapshot): Promise<void> {
+  try {
+    if (!env.SITE_SNAPSHOT_KV) return;
+    // 30-day TTL: reviews survive long scraping outages as last-good.
+    await env.SITE_SNAPSHOT_KV.put(STORE_REVIEWS_KV_KEY, JSON.stringify(snapshot), {
+      expirationTtl: 30 * 24 * 60 * 60,
+    });
+  } catch {
+    // Best-effort cache write only.
+  }
+}
+
+/**
+ * Refresh the live store reviews. Merges fresh scrapes over the previous KV
+ * snapshot (union by id) so a partial scrape can never drop known reviews.
+ */
+async function refreshStoreReviews(
+  env: WorkerEnv,
+  maxAgeMs: number,
+): Promise<StoreReviewsSnapshot | null> {
+  const cached = await readStoreReviewsCache(env);
+  if (cached && Date.now() - cached.fetchedAtUtc < maxAgeMs) return cached;
+
+  try {
+    const fresh = await fetchStoreReviews();
+    if (fresh && fresh.reviews.length > 0) {
+      const merged: StoreReviewsSnapshot = {
+        fetchedAtUtc: fresh.fetchedAtUtc,
+        reviews: mergeStoreReviews(cached?.reviews ?? [], fresh.reviews),
+      };
+      await writeStoreReviewsCache(env, merged);
+      return merged;
+    }
+  } catch {
+    // Fall through to the cached reviews.
+  }
+  return cached;
+}
+
+type DoPublicSiteMetrics = {
+  downloads: number;
+  success: number;
+  fail: number;
+  countries: Array<{ countryCode: string; count: number }>;
+};
+
+async function fetchDoPublicSiteMetrics(env: WorkerEnv): Promise<DoPublicSiteMetrics | null> {
+  try {
+    const stub = getDownloadsStub(env);
+    const res = await stub.fetch(new Request("https://do/public/site-metrics", { method: "GET" }));
+    if (!res.ok) return null;
+    const payload = (await res.json()) as {
+      totals?: { downloads?: unknown; success?: unknown; fail?: unknown };
+      countries?: unknown;
+    };
+    const asCount = (value: unknown): number =>
+      typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+    const countries = Array.isArray(payload.countries)
+      ? payload.countries
+          .map((row) => {
+            const item = (row ?? {}) as { countryCode?: unknown; count?: unknown };
+            return {
+              countryCode:
+                typeof item.countryCode === "string" ? item.countryCode.trim().toUpperCase() : "",
+              count: asCount(item.count),
+            };
+          })
+          .filter((row) => /^[A-Z]{2}$/.test(row.countryCode) && row.count > 0)
+      : [];
+    return {
+      downloads: asCount(payload.totals?.downloads),
+      success: asCount(payload.totals?.success),
+      fail: asCount(payload.totals?.fail),
+      countries,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function readPrevLiveSinceUtc(prevSnapshot: Record<string, unknown> | null): number | null {
+  const overview = asRecord(prevSnapshot?.overview);
+  const status = asRecord(overview?.status);
+  const liveSinceUtc = Number(status?.liveSinceUtc);
+  return Number.isFinite(liveSinceUtc) && liveSinceUtc > 0 ? liveSinceUtc : null;
+}
+
+/**
+ * Build the public website snapshot entirely on the edge: download totals and
+ * country counts come from the durable object's live counters, while install
+ * numbers, ratings, and versions come from the store-stats scraper (KV-cached).
+ * Throws when the DO metrics are unavailable so callers can serve the
+ * last-good KV snapshot instead of a hollow payload.
+ */
+async function buildSelfServeSiteSnapshot(
+  env: WorkerEnv,
+  prevSnapshot: Record<string, unknown> | null,
+): Promise<Record<string, unknown>> {
+  // Metrics first: a DO failure aborts the build before any store scraping.
+  const metrics = await fetchDoPublicSiteMetrics(env);
+  if (!metrics || (metrics.downloads <= 0 && metrics.countries.length === 0)) {
+    throw new Error("do_site_metrics_unavailable");
+  }
+  const storeStats = await refreshStoreStats(env, STORE_STATS_REFRESH_MS);
+  const storeReviews = await refreshStoreReviews(env, STORE_REVIEWS_REFRESH_MS);
+  const trends = await readTrendsKv(env);
+
+  const now = Date.now();
+  const browsers = storeStats?.browsers ?? [];
+  const usersTotal = browsers.reduce(
+    (sum, browser) => sum + (browser.usersCount > 0 ? browser.usersCount : 0),
+    0,
+  );
+  const fullChangelogUrl = `${PUBLIC_STORE_LINKS.github}/blob/main/user-friendly-changelog.md`;
+
+  const overview = {
+    schemaVersion: "1",
+    ok: true,
+    generatedAt: now,
+    totals: {
+      downloads: metrics.downloads,
+      success: metrics.success,
+      fail: metrics.fail,
+    },
+    installs: {
+      usersTotal,
+      lastSyncedAtUtc: storeStats?.fetchedAtUtc ?? now,
+      browsers,
+    },
+    versions: storeStats?.versions ?? { chrome: null, firefox: null, edge: null, github: null },
+    status: {
+      systemLive: true,
+      liveSinceUtc: readPrevLiveSinceUtc(prevSnapshot) ?? now,
+      workerHealth: "up",
+    },
+    links: { ...PUBLIC_STORE_LINKS },
+  };
+
+  const mapTotalDownloads = metrics.countries.reduce((sum, row) => sum + row.count, 0);
+  const map = {
+    schemaVersion: "1",
+    ok: true,
+    generatedAt: now,
+    granularity: "country",
+    countries: metrics.countries,
+    totals: { countries: metrics.countries.length, downloads: mapTotalDownloads },
+    privacyNote: "Country-level usage is aggregated without storing raw IP addresses.",
+  };
+
+  // Changelog entries are intentionally empty: the website renders release
+  // notes from its source-controlled manual changelog and merges them
+  // client-side when the snapshot ships none.
+  const changelog = {
+    schemaVersion: "1",
+    ok: true,
+    generatedAt: now,
+    headline: "Release notes",
+    description: "Release highlights are maintained in source control.",
+    entries: [] as unknown[],
+    fullChangelogUrl,
+    lastUpdatedAtUtc: null,
+  };
+
+  return {
+    schemaVersion: "1",
+    ok: true,
+    generatedAt: now,
+    snapshotId: `ws-cf-selfserve-${now}`,
+    overview,
+    map,
+    changelog,
+    userChangelogSummary: {
+      headline: changelog.headline,
+      description: changelog.description,
+      entriesCount: 0,
+      lastUpdatedAtUtc: null,
+      fullChangelogUrl,
+    },
+    privacy: {
+      headline: "Privacy-first",
+      description: "Telemetry is minimized and public metrics are aggregated only.",
+      userPrivacyUrl: SITE_PRIVACY_URL,
+      fullPrivacyUrl: SITE_FULL_PRIVACY_URL,
+    },
+    testimonials: {
+      schemaVersion: "1",
+      ok: true,
+      generatedAt: now,
+      fetchedAtUtc: storeReviews?.fetchedAtUtc ?? now,
+      reviews: storeReviews?.reviews ?? [],
+    },
+    ...(trends ? { trends } : {}),
+  };
+}
+
+async function refreshSiteSnapshotSelfServe(env: WorkerEnv): Promise<void> {
+  try {
+    const cachedRaw = await readSiteSnapshotCache(env);
+    let prevSnapshot: Record<string, unknown> | null = null;
+    if (cachedRaw) {
+      try {
+        prevSnapshot = asRecord(JSON.parse(cachedRaw));
+      } catch {
+        prevSnapshot = null;
+      }
+    }
+    const built = await buildSelfServeSiteSnapshot(env, prevSnapshot);
+    await writeSiteSnapshotCache(env, JSON.stringify(buildSiteSnapshotEnvelope(built)));
+  } catch {
+    // Best effort. Failures are surfaced through existing health endpoints.
+  }
 }
 
 async function handleSiteV1Snapshot(request: Request, env: WorkerEnv): Promise<Response> {
@@ -2523,7 +2871,8 @@ async function handleSiteV1Snapshot(request: Request, env: WorkerEnv): Promise<R
     }
 
     try {
-      const refreshedSnapshot = await fetchOracleSnapshotPayload(env);
+      const prevSnapshot = asRecord(JSON.parse(cachedRaw));
+      const refreshedSnapshot = await buildSelfServeSiteSnapshot(env, prevSnapshot);
       const refreshedPayloadText = JSON.stringify(buildSiteSnapshotEnvelope(refreshedSnapshot));
       await writeSiteSnapshotCache(env, refreshedPayloadText);
       return withCors(
@@ -2540,8 +2889,8 @@ async function handleSiteV1Snapshot(request: Request, env: WorkerEnv): Promise<R
       );
     } catch {
       // Self-heal: re-put the stale payload verbatim so its KV TTL extends.
-      // Without this, a long Oracle outage lets the snapshot expire and the
-      // website loses its last-good fallback entirely.
+      // Without this, a long self-serve outage (DO + stores unreachable) lets
+      // the snapshot expire and the website loses its last-good fallback.
       await writeSiteSnapshotCache(env, cachedRaw);
       return withCors(
         request,
@@ -2559,8 +2908,8 @@ async function handleSiteV1Snapshot(request: Request, env: WorkerEnv): Promise<R
   }
 
   try {
-    const snapshot = await fetchOracleSnapshotPayload(env);
-    const enveloped = buildSiteSnapshotEnvelope(snapshot);
+    const builtSnapshot = await buildSelfServeSiteSnapshot(env, null);
+    const enveloped = buildSiteSnapshotEnvelope(builtSnapshot);
     const payloadText = JSON.stringify(enveloped);
     await writeSiteSnapshotCache(env, payloadText);
     return withCors(
@@ -2587,7 +2936,7 @@ async function handleSiteV1Snapshot(request: Request, env: WorkerEnv): Promise<R
   }
 }
 
-async function handleSiteV1Privacy(request: Request, env: WorkerEnv): Promise<Response> {
+async function handleSiteV1Privacy(request: Request, _env: WorkerEnv): Promise<Response> {
   if (request.method !== "GET") {
     return withCors(
       request,
@@ -2595,46 +2944,33 @@ async function handleSiteV1Privacy(request: Request, env: WorkerEnv): Promise<Re
         status: 405,
         headers: { "content-type": "application/json; charset=utf-8" },
       }),
-      env,
+      _env,
     );
   }
 
-  try {
-    const snapshot = await fetchOracleSnapshotPayload(env);
-    const privacy = (snapshot.privacy && typeof snapshot.privacy === "object")
-      ? snapshot.privacy
-      : {
-          headline: "Privacy-first by design",
-          summary: "Classroom Quick Downloader keeps telemetry minimal and avoids raw IP storage in public payloads.",
-        };
-    const payload = {
-      ok: true,
-      schemaVersion: "1",
-      generatedAtUtc: Date.now(),
-      sessionPinned: true,
-      privacy,
-    };
-    return withCors(
-      request,
-      new Response(JSON.stringify(payload), {
-        status: 200,
-        headers: {
-          "content-type": "application/json; charset=utf-8",
-          "cache-control": "public, max-age=120, s-maxage=300",
-        },
-      }),
-      env,
-    );
-  } catch {
-    return withCors(
-      request,
-      new Response(JSON.stringify({ ok: false, error: "upstream_unavailable" }), {
-        status: 502,
-        headers: { "content-type": "application/json; charset=utf-8" },
-      }),
-      env,
-    );
-  }
+  const payload = {
+    ok: true,
+    schemaVersion: "1",
+    generatedAtUtc: Date.now(),
+    sessionPinned: true,
+    privacy: {
+      headline: "Privacy-first by design",
+      summary: "Classroom Quick Downloader keeps telemetry minimal and avoids raw IP storage in public payloads.",
+      userPrivacyUrl: SITE_PRIVACY_URL,
+      fullPrivacyUrl: SITE_FULL_PRIVACY_URL,
+    },
+  };
+  return withCors(
+    request,
+    new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "public, max-age=120, s-maxage=300",
+      },
+    }),
+    _env,
+  );
 }
 
 async function handleSiteV1Events(request: Request, env: WorkerEnv): Promise<Response> {
@@ -2666,16 +3002,6 @@ async function handleSiteV1Events(request: Request, env: WorkerEnv): Promise<Res
 
 function currentHourUtc(ts = Date.now()): number {
   return new Date(ts).getUTCHours();
-}
-
-async function refreshSiteSnapshotCacheFromOracle(env: WorkerEnv): Promise<void> {
-  try {
-    const snapshot = await fetchOracleSnapshotPayload(env);
-    const payloadText = JSON.stringify(buildSiteSnapshotEnvelope(snapshot));
-    await writeSiteSnapshotCache(env, payloadText);
-  } catch {
-    // Best effort. Failures are surfaced through existing health endpoints.
-  }
 }
 
 async function flushWebsiteTelemetryViaDo(env: WorkerEnv): Promise<void> {
@@ -2800,8 +3126,13 @@ export default {
       return handleSiteV1Events(request, env);
     }
 
-    if (isOraclePublicWebsiteRoute(pathname)) {
-      return handleOraclePublicWebsiteProxy(request, env);
+    if (pathname === "/api/public/website/uninstall") {
+      // Uninstall feedback (POST submit / GET stats) is buffered in the DO.
+      return proxyToDO(request, env);
+    }
+
+    if (isPublicWebsiteDataRoute(pathname)) {
+      return handlePublicWebsiteDataRoute(request, env);
     }
 
     // Dashboard (requires session)
@@ -2876,6 +3207,7 @@ export default {
       pathname === "/admin/cut-power" ||
       pathname === "/admin/restore-power" ||
       pathname === "/admin/full-sync" ||
+      pathname === "/admin/storage-export" ||
       pathname === "/admin/update-config" ||
       pathname === "/admin/ip-allowlist" ||
       pathname === "/admin/website/status" ||
@@ -2905,15 +3237,17 @@ export default {
     await refreshAnalyticsConfigKvFromDo(env);
 
     // Ping pipeline health with admin credentials so the DO's webhook
-    // notifier fires on warn/critical (e.g. Oracle unreachable). Without
+    // notifier fires on warn/critical (e.g. archive writes failing). Without
     // this, alerts only trigger when an authorized admin polls by hand.
     await pingPipelineHealthAlerts(env);
 
-    if (ORACLE_PULL_HOURS_UTC.has(hour)) {
-      await refreshSiteSnapshotCacheFromOracle(env);
+    if (SITE_SNAPSHOT_REFRESH_HOURS_UTC.has(hour)) {
+      await refreshTrendsKv(env);
+      await refreshSiteSnapshotSelfServe(env);
+      await maybeAlertScrapeHealth(env);
     }
 
-    if (ORACLE_EXPORT_HOURS_UTC.has(hour)) {
+    if (SITE_EXPORT_HOURS_UTC.has(hour)) {
       await flushWebsiteTelemetryViaDo(env);
     }
   },
