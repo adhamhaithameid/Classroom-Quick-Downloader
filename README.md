@@ -8,11 +8,12 @@
 
 Built for students who want speed, fewer clicks, and less friction during busy weeks and exam season.
 
-[Install on Chrome](https://chromewebstore.google.com/detail/classroom-quick-downloade/oemoongiefmpmomjikcjmkkkhffcbdid) · [Install on Firefox](https://addons.mozilla.org/en-US/firefox/addon/classroom-quick-downloader/) · [Install on Edge](https://microsoftedge.microsoft.com/addons/detail/classroom-quick-downloade/ecojbijjkcjdolpeoiemnccgmaeomcmn)
+[Install on Chrome](https://chromewebstore.google.com/detail/classroom-quick-downloade/oemoongiefmpmomjikcjmkkkhffcbdid) · [Install on Firefox](https://addons.mozilla.org/en-US/firefox/addon/classroom-quick-downloader/) · [Install on Edge](https://microsoftedge.microsoft.com/addons/detail/classroom-quick-downloade/ecojbijjkcjdolpeoiemnccgmaeomcmn) · [🗺️ Explore the Knowledge Graph](https://adhamhaithameid.github.io/Classroom-Quick-Downloader/)
 
 <!-- Active badge set: Minimal Trust (Set A) -->
 
 ![Current Version](https://img.shields.io/github/v/release/adhamhaithameid/Classroom-Quick-Downloader?label=Version&color=blue)
+![Repo Age](https://img.shields.io/badge/Repo%20Age-since%20Nov%202025-blue)
 ![License](https://img.shields.io/badge/License-Proprietary%20%26%20Source%20Available-B22222)
 [![CI](https://img.shields.io/github/actions/workflow/status/adhamhaithameid/Classroom-Quick-Downloader/ci.yml?branch=main&label=CI)](https://github.com/adhamhaithameid/Classroom-Quick-Downloader/actions/workflows/ci.yml)
 
@@ -34,6 +35,7 @@ Built for students who want speed, fewer clicks, and less friction during busy w
 - [🔒 Privacy at a Glance](#privacy-at-a-glance)
 - [❓ FAQ](#faq)
 - [🧭 Technical Appendix](#technical-appendix)
+- [🧪 Development & Testing](#development--testing)
 - [🤝 Feedback](#feedback)
 - [⚠️ Licensing & Usage](#licensing)
 
@@ -56,6 +58,7 @@ Downloading class files one-by-one wastes time and focus. CQD makes the common s
 
 - **📦 Bulk Downloads**: Download all files from a Classroom post with one click.
 - **🔓 Smart Drive Handling**: Automatically handles Drive confirmation/bypass flows.
+- **🧯 Resilient Downloads**: Every download reaches a clear outcome — transient failures retry automatically, stalls time out with guidance, and error pages are never saved as files.
 - **🔄 Multi-Account Compatibility**: Better behavior when multiple Google accounts are signed in.
 - **📊 Local Activity Stats**: See your own download stats directly in the popup.
 - **🛡️ Privacy-First Analytics**: Anonymous operational metrics only, no personal file content.
@@ -98,10 +101,10 @@ Downloading class files one-by-one wastes time and focus. CQD makes the common s
 <a id="ops-status"></a>
 ## 🛠️ Ops Status
 
-- Latest full scan date: `2026-02-28` (security and dependency scans clean).
-- Cloudflare website traffic sync is implemented in Oracle dashboard APIs/UI.
-- Remaining rollout blocker is operational only: attach root custom domain to Cloudflare Pages, then apply redirect/env cutover.
-- Detailed status: [docs/MAJOR_SCAN_2026-02-28.md](docs/MAJOR_SCAN_2026-02-28.md) and [docs/DEPLOYMENT_RUNBOOK.md](docs/DEPLOYMENT_RUNBOOK.md).
+- Extension release line: `1.8.0` (2026-09-17) — the resilience release: full interrupt taxonomy, stall deadline, completion verification, and an adversarial test program. See the [Changelog](./CHANGELOG.md).
+- Security & dependency posture: 2026-09 security quality pass merged (deps updated, CodeQL warnings resolved); latest major scan: [docs/MAJOR_SCAN_2026-03-17.md](docs/MAJOR_SCAN_2026-03-17.md).
+- Websites: the marketing site deploys to Cloudflare Pages on every push to `main`, and an interactive codebase knowledge graph deploys to [GitHub Pages](https://adhamhaithameid.github.io/Classroom-Quick-Downloader/).
+- Deployment operations: [docs/DEPLOYMENT_RUNBOOK.md](docs/DEPLOYMENT_RUNBOOK.md).
 
 ---
 
@@ -111,6 +114,8 @@ Downloading class files one-by-one wastes time and focus. CQD makes the common s
 The project started from a simple student pain point: repetitive downloads in Google Classroom.
 
 What began as sketches on paper turned into a production extension used across multiple browsers and operating systems.
+
+> **Repo age**: first commit on November 8, 2025 — about 10 months of active development as of September 2026.
 
 ### 📝 The Paper Manifesto
 
@@ -188,12 +193,14 @@ Cancellation analytics are highly accurate overall, but extremely fast near-canc
 
 CQD is also backed by a distributed reliability pipeline, but the deep engineering docs are split by module for easier reading:
 
+- [Interactive Knowledge Graph (GitHub Pages)](https://adhamhaithameid.github.io/Classroom-Quick-Downloader/) — a live map of the codebase: components, edges, and communities, rebuilt on every push to `main`.
 - [Extension Docs](./extension/README.md)
 - [Cloudflare Worker Docs](./cloudflare-worker/README.md)
-- [Oracle Backend Docs](./oracle-backend/README.md)
+- [Backups & Data Portability](./docs/BACKUPS.md) — daily backup sheet, Google Sheets integration, restore procedures
+- [Oracle Backend Docs](./oracle-backend/README.md) — retired from the live data path (see `cloudflare-worker/README.md`)
 - [Architecture Overview](./docs/ARCHITECTURE.md)
-- [Edge Cache + Oracle Architecture](./docs/ARCHITECTURE_EDGE_CACHE_ORACLE.md)
-- [Website/Edge/Oracle Data Flow](./docs/DATA_FLOW_WEBSITE_EDGE_ORACLE.md)
+- [Edge Cache + Oracle Architecture](./docs/ARCHITECTURE_EDGE_CACHE_ORACLE.md) — legacy
+- [Website/Edge/Oracle Data Flow](./docs/DATA_FLOW_WEBSITE_EDGE_ORACLE.md) — legacy
 - [Manual Changelog Operations](./docs/MANUAL_CHANGELOG_OPERATIONS.md)
 - [Oracle Dashboard Dark UI Language](./docs/ORACLE_DASHBOARD_DARK_DESIGN_LANGUAGE.md)
 - [Jules Agent Automation](./.github/agents/jules/README.md)
@@ -215,6 +222,23 @@ graph TD
 - Session-based auth for dashboards.
 - Edge-side request controls and rate limits.
 - Privacy-first telemetry with non-PII aggregates.
+
+---
+
+<a id="development--testing"></a>
+## 🧪 Development & Testing
+
+```bash
+pnpm install            # bootstrap the workspace
+pnpm run test:gate      # full suite — enforced by a pre-push hook, 100% headless
+pnpm run test:e2e:matrix # real-browser cycle: Chromium + Edge + Firefox + Zen
+```
+
+Every real-browser suite runs headless by default (set `E2E_HEADED=1` for
+visible windows). A pre-push hook runs the complete test pyramid plus the
+Chromium and Edge E2E suites before anything reaches the remote. Per-browser
+coverage, the local gate, and why branded Chrome and Arc have no automated
+legs: [docs/E2E_BROWSER_MATRIX.md](docs/E2E_BROWSER_MATRIX.md).
 
 ---
 

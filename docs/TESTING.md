@@ -22,6 +22,7 @@
   - [CodeQL Analysis](#2-codeql-analysis-codeqlyml)
   - [Release Drafter](#3-release-drafter-release-drafteryml)
 - [Manual Testing Scripts](#manual-testing-scripts)
+- [Real-Browser E2E & Browser Matrix](#real-browser-e2e--browser-matrix)
 - [Git Hooks](#git-hooks)
 - [Running Everything at Once](#running-everything-at-once)
 - [Phase 12 + 13 Execution](#phase-12--13-execution)
@@ -146,7 +147,7 @@ Classroom-Quick-Downloader/
 
 ### Unit Tests
 
-**101 test files** covering every layer of the extension:
+**135 test files** (at last count, 2026-09) covering every layer of the extension:
 
 #### Content Script Layer (UI & DOM)
 
@@ -214,6 +215,25 @@ Classroom-Quick-Downloader/
 | 40 | `utils-global-state.test.ts` | Global state singleton |
 | 41 | `utils-language-controller.test.ts` | Language preference controller |
 | 42 | `xss-prevention.test.ts` | XSS prevention (`escapeHtml`, sanitization) |
+
+### Language & i18n Suite
+
+The language stack has its own contract tests — the "what" and "why" live in
+[docs/TWO_LANGUAGE_SIGNALS.md](TWO_LANGUAGE_SIGNALS.md):
+
+| Test File | What It Covers |
+|---|-----------|----------------|
+| `language-resolution.test.ts` | The shared resolver (`src/core/i18n/resolve.ts`): candidate order (page tag → base tag → browser tags → `en`), alias mapping (`iw→he`, `nb→no`, `tl→fil`, `zh-*` collapse), full-tag preservation (`zh-CN` never truncates to `zh`). |
+| `i18n-translations.test.ts` | The `TRANSLATIONS` completeness contract: no silent English leakage outside the declared fallbacks, every locale resolvable, completeness patch add/replace rules. |
+| `download-language-purity.test.ts` | Downloaded filenames carry no localized type-label residue ("Tömörített archívum") — the #541 regression guard. |
+| `content-i18n.test.ts` | UI string resolution via `t(key)` with page-first language detection. |
+| `utils-language-controller.test.ts` | `auto`/`english` modes, page-lang change re-resolution, stored state. |
+
+Beyond these unit suites, the **real-Classroom language corpus** lives in the
+E2E layer: `tests/e2e/live/language-reconcile.spec.ts` audits the detection
+keyword lists against real Classroom strings (en + ar fixtures in CI; every
+captured language after `pnpm test:live:langs`) — see
+[LIVE_CLASSROOM_TESTING.md](LIVE_CLASSROOM_TESTING.md).
 
 ### Integration Tests
 
@@ -495,6 +515,47 @@ bash ~/Classroom-Quick-Downloader/oracle-backend/scripts/deploy_main_inplace.sh
 
 ---
 
+## Real-Browser E2E & Browser Matrix
+
+The real-browser suites (Playwright + a geckodriver harness for Zen) run
+**headless by default** — no windows, no focus stealing. `E2E_HEADED=1` opts
+into visible windows. Full details, per-browser notes and troubleshooting:
+[E2E_BROWSER_MATRIX.md](E2E_BROWSER_MATRIX.md).
+
+```bash
+pnpm run test:e2e          # Chromium (Chrome engine via Chrome for Testing) — 4-spec main suite
+pnpm run test:e2e:edge     # Edge stable — FULL main suite
+pnpm run test:e2e:firefox  # qa-firefox journeys (extension legs need the AMO-signed xpi)
+pnpm run test:e2e:zen      # Zen Browser — geckodriver/WebDriver harness (launch + install + injection)
+pnpm run test:e2e:matrix   # chromium + edge + firefox + zen in one command
+pnpm run test:e2e:arc      # probe — Arc is not automatable; re-checks after Arc updates
+pnpm run test:e2e:chrome   # probe — branded Chrome 137+ ignores --load-extension; re-checks
+```
+
+Facts that keep surprising people:
+
+- **There is no branded-Chrome project**: since Chrome 137, Google Chrome
+  ignores `--load-extension`, so no extension can load there (verified on
+  Chrome 150). `channel: 'chromium'` (Chrome for Testing) is the Chrome
+  engine coverage. Edge, separately branded, still works — its leg runs the
+  full suite.
+- **Arc cannot be automated at all** (it strips the CDP debugging switches).
+- **Zen cannot run under Playwright** (Gecko fork; Playwright's Firefox
+  protocol only exists in its own build) — hence the standalone WebDriver
+  harness in `tests/e2e/zen/zen-extension.mjs`, which auto-downloads
+  geckodriver and verifies real content-script injection through a local
+  PAC-routed proxy.
+- Headed vs headless parity is proven: identical pass set on the full
+  Chromium suite (20/20 both modes).
+
+CI runs the Chromium + Edge legs on every PR (job `Extension — Real Browser
+E2E`, truly headless — no xvfb needed anymore), aggregated into the `CI ✅`
+summary job. Check whether they are required-for-merge under *Settings →
+Branches* — see [E2E_BROWSER_MATRIX.md](E2E_BROWSER_MATRIX.md) for the exact
+state and enablement command.
+
+---
+
 ## Git Hooks
 
 Pre-commit quality checks are enforced via [Husky](https://typicode.github.io/husky/).
@@ -502,6 +563,7 @@ Pre-commit quality checks are enforced via [Husky](https://typicode.github.io/hu
 | Hook | File | What It Does |
 |------|------|--------------|
 | `commit-msg` | `.husky/commit-msg` | Validates commit messages follow [Conventional Commits](https://www.conventionalcommits.org/) via `commitlint` |
+| `pre-push` | `.husky/pre-push` | Runs `pnpm run test:gate` (full strict pyramid + Chromium + Edge E2E, headless) so the complete suite passes on-device before anything reaches the remote. Skip one push with `git push --no-verify` |
 
 **Configuration:**
 - `commitlint.config.js` — extends `@commitlint/config-conventional`

@@ -2,6 +2,13 @@
 
 > Update (2026-02-28): Latest full-repository scan baseline is documented in /docs/MAJOR_SCAN_2026-02-28.md; deployment/rollout actions are tracked in /docs/DEPLOYMENT_RUNBOOK.md.
 
+> Update (2026-09-21): the analytics pipeline is now **Oracle-free** — the
+> Cloudflare Worker self-serves all public website data (edge snapshot + live
+> store scraping), flushed batches archive to D1, and daily backups land in
+> `backups/latest/` + the project Google Sheet. Current docs:
+> `cloudflare-worker/README.md` and `docs/BACKUPS.md`. The Go/Oracle sections
+> below describe the retired architecture and are kept for history.
+
 # 🏗️ System Architecture
 
 **Classroom Quick Downloader — Engineering Deep-Dive**
