@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "Ακύρωση όλων",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Τροποποιήθηκε",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "μετά τη δημοσίευση",
+    "description": "after_posting"
   }
 }
