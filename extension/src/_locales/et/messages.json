@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "Tühista kõik",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Muudetud",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "pärast postitamist",
+    "description": "after_posting"
   }
 }
