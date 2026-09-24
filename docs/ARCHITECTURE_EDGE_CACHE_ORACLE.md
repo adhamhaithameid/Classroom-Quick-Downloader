@@ -1,5 +1,9 @@
 # Architecture: Cloudflare Edge Cache + Oracle Source of Truth
 
+> ⚠️ **LEGACY (2026-09-21)** — the Oracle-backed flows described here are
+> retired; the pipeline is now Oracle-free. Current docs:
+> `cloudflare-worker/README.md` and `docs/BACKUPS.md`.
+
 ## 1. Purpose
 This document defines the production runtime architecture for public website data and telemetry.
 
