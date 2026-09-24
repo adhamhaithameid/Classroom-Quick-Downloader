@@ -46,7 +46,7 @@ import {
 } from '../../v2/decision/keyword-loader';
 import { ACTION_BUTTON_PATTERNS } from '../../core/detect/action-buttons';
 import { PLAUSIBLE_COMMENT_COUNT } from '../../core/detect/ceilings';
-import { parseCountChip } from '../../core/detect/numerals';
+import { MAX_COUNT_CHIP_LENGTH, parseCountChip } from '../../core/detect/numerals';
 import { matchesNormalizedKeyword } from '../../core/detect/matching';
 
 import {
@@ -212,6 +212,28 @@ function commentLayer0_DOMTruth(post: HTMLElement, keywords: CommentKeywords): C
         details: `L0-DOMTruth: "${chip.text}" via .qCWAqb .huI6Cb (count: ${chip.count})`,
       };
     }
+    // Word-bearing chip ("3 comments", "3 Kurskommentare", "コメント3件",
+    // "تعليقات الصف ٣" — live sweep 2026-09-20): some surfaces/locales render
+    // the word inside the authoritative chip. Same acceptance contract as the
+    // D13 span path: a parsed, plausible count CORROBORATED by a comment
+    // keyword in the chip's own text, within the chip length bound. Without
+    // the keyword the numeral is a stray id, not a count.
+    const text = normalizeText(huI6Cb.textContent ?? '');
+    const count = extractCount(text);
+    if (
+      count !== null &&
+      count > 0 &&
+      count < PLAUSIBLE_COMMENT_COUNT &&
+      text.length <= MAX_COUNT_CHIP_LENGTH &&
+      containsCommentKeyword(text, keywords, { attributeContext: true })
+    ) {
+      return {
+        score: 100,
+        count,
+        matchedText: text,
+        details: `L0-DOMTruth: "${text}" via .qCWAqb .huI6Cb word-bearing chip (count: ${count})`,
+      };
+    }
   }
 
   // Fallback 1: .qCWAqb.seqYL container
@@ -259,6 +281,19 @@ function commentLayer0_DOMTruth(post: HTMLElement, keywords: CommentKeywords): C
     const chip = parseCountChip(seqYL.textContent || '');
     if (chip) {
       return { score: 95, count: chip.count, matchedText: chip.text, details: `L0-DOMTruth: "${chip.text}" via .seqYL (count: ${chip.count})` };
+    }
+    // Word-bearing variant of the bare .seqYL shell — same keyword
+    // corroboration contract as the word-bearing .huI6Cb chip above.
+    const seqText = normalizeText(seqYL.textContent || '');
+    const seqCount = extractCount(seqText);
+    if (
+      seqCount !== null &&
+      seqCount > 0 &&
+      seqCount < PLAUSIBLE_COMMENT_COUNT &&
+      seqText.length <= MAX_COUNT_CHIP_LENGTH &&
+      containsCommentKeyword(seqText, keywords, { attributeContext: true })
+    ) {
+      return { score: 95, count: seqCount, matchedText: seqText, details: `L0-DOMTruth: "${seqText}" via .seqYL word-bearing chip (count: ${seqCount})` };
     }
   }
 
