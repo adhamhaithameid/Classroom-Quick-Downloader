@@ -60,7 +60,7 @@
     "description": "commentsTooltip"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "Arape oĩva jehai ha ipahapegua oñemoambuevo",
     "description": "editedTooltip"
   },
   "download_interrupted": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Mboguevo opavave",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Oñemoambue",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "ojehai rire",
+    "description": "after_posting"
   }
 }
