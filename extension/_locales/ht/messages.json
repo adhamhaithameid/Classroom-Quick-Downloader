@@ -60,7 +60,7 @@
     "description": "commentsTooltip"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "Jou ki ant piblikasyon an ak dènye modifikasyon an",
     "description": "editedTooltip"
   },
   "download_interrupted": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Anile tout",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Modifye",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "apre piblikasyon",
+    "description": "after_posting"
   }
 }
