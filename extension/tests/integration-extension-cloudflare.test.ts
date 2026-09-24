@@ -69,7 +69,7 @@ function installChromeStorage(seed: StorageMap = {}): StorageMap {
 
 async function buildIntegrationContext() {
   vi.resetModules();
-  let oracleChangelogPayload: Record<string, unknown> = {
+  let legacyChangelogPayload: Record<string, unknown> = {
     ok: true,
     entries: [],
     config: { rules: [] },
@@ -82,13 +82,11 @@ async function buildIntegrationContext() {
       WORKER_BASE_URL: 'https://worker.test',
       TRACK_URL: 'https://worker.test/track',
       CONFIG_URL: 'https://worker.test/config',
-      ORACLE_CHANGELOG_URL: 'https://oracle.test/api/public/extension/changelog',
     };
   });
 
   const state = new MockState();
   const env = {
-    ORACLE_ENDPOINT: 'http://oracle.invalid',
     DO_SHARED_SECRET: 'secret',
     MAX_BATCH_EVENTS: '10000',
   } as any;
@@ -123,11 +121,11 @@ async function buildIntegrationContext() {
       }));
     }
     if (url.pathname === '/api/public/extension/changelog') {
-      return new Response(JSON.stringify(oracleChangelogPayload), {
+      return new Response(JSON.stringify(legacyChangelogPayload), {
         status: 200,
         headers: {
           'Content-Type': 'application/json',
-          ETag: '"oracle-etag"',
+          ETag: '"changelog-etag"',
         },
       });
     }
@@ -140,10 +138,10 @@ async function buildIntegrationContext() {
   const analytics = await import('../entrypoints/utils/analytics/index');
   const changelog = await import('../entrypoints/utils/changelog');
 
-  const setOracleChangelogPayload = (payload: Record<string, unknown>) => {
-    oracleChangelogPayload = payload;
+  const setLegacyChangelogPayload = (payload: Record<string, unknown>) => {
+    legacyChangelogPayload = payload;
   };
-  return { durable, state, fetchSpy, storage, flush, analytics, changelog, setOracleChangelogPayload };
+  return { durable, state, fetchSpy, storage, flush, analytics, changelog, setLegacyChangelogPayload };
 }
 
 describe('extension <-> cloudflare integration', () => {
@@ -220,7 +218,7 @@ describe('extension <-> cloudflare integration', () => {
 
     await flush.internalFlush();
     const queueAfter = await storage.loadQueue();
-    // Extension keeps acknowledged events until committedSeq advances from Oracle.
+    // Extension keeps acknowledged events until committedSeq advances from the worker.
     expect(queueAfter.queue).toHaveLength(2);
     expect(queueAfter.queue.every((ev) => typeof ev.commitSeq === 'number')).toBe(true);
     expect(fetchSpy).toHaveBeenCalled();
