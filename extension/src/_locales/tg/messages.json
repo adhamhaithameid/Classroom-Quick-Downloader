@@ -72,7 +72,7 @@
     "description": "commError"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "Рӯзҳо байни нашр ва таҳрири охирин",
     "description": "editedTooltip"
   },
   "comment_singular": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Ҳамаро бекор кунед",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Тағйирёфта",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "баъди нашр",
+    "description": "after_posting"
   }
 }
