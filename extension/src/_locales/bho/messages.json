@@ -60,7 +60,7 @@
     "description": "commentsTooltip"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "पोस्ट आ अंतिम संपादन के बीच के दिन",
     "description": "editedTooltip"
   },
   "download_interrupted": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "सब रद्द करीं",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "बदलल गइल",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "पोस्ट करे के बाद",
+    "description": "after_posting"
   }
 }
