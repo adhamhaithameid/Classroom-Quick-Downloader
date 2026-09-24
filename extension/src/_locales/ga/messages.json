@@ -72,7 +72,7 @@
     "description": "commError"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "Lae idir an fhoilsiú agus an t-eagrú deiridh",
     "description": "editedTooltip"
   },
   "comment_singular": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Cealaigh gach rud",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Athraithe",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "tar éis foilsiú",
+    "description": "after_posting"
   }
 }
