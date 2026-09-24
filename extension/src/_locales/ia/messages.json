@@ -60,7 +60,7 @@
     "description": "commentsTooltip"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "Dies inter le publication e le ultime modification",
     "description": "editedTooltip"
   },
   "download_interrupted": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Cancellar toto",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Modificate",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "post le publication",
+    "description": "after_posting"
   }
 }
