@@ -74,10 +74,45 @@ export type SnapshotResponse = {
     userPrivacyUrl: string;
     fullPrivacyUrl: string;
   };
+  testimonials?: TestimonialsResponse;
+  trends?: WebsiteTrendsSeries;
+};
+
+export type StoreLiveReview = {
+  id: string;
+  store: 'chrome' | 'firefox' | 'edge';
+  reviewer: string;
+  rating: number;
+  text: string;
+  reviewUrl: string;
+  avatarUrl: string | null;
+  dateText: string;
+  dateUtc: number | null;
+  helpful: string | null;
+};
+
+export type TestimonialsResponse = {
+  schemaVersion: PublicSchemaVersion;
+  ok: boolean;
+  generatedAt: number;
+  fetchedAtUtc: number;
+  reviews: StoreLiveReview[];
+};
+
+export type WebsiteTrendDay = {
+  date: string;
+  downloads: number;
+};
+
+export type WebsiteTrendsSeries = {
+  daily: WebsiteTrendDay[];
+  weekOverWeekPercent: number | null;
+  computedAtUtc: number;
 };
 
 export type WebsiteSnapshot = {
-  source: 'oracle' | 'edge-backend';
+  /** 'oracle' is a legacy marker still present in persisted browser snapshots. */
+  source: 'edge-backend' | 'cloudflare-worker' | 'oracle';
   snapshotId: string;
   generatedAt: number;
   fetchedAtUtc: number;
@@ -87,10 +122,13 @@ export type WebsiteSnapshot = {
   changelog: UserChangelogResponse;
   userChangelogSummary: SnapshotResponse['userChangelogSummary'];
   privacy: SnapshotResponse['privacy'];
+  testimonials?: TestimonialsResponse;
+  trends?: WebsiteTrendsSeries;
 };
 
 export type WebsiteSnapshotFetchSource =
   | 'edge-backend'
+  | 'cloudflare-worker'
   | 'oracle'
   | 'memory-cache'
   | 'storage-cache'
@@ -223,7 +261,8 @@ export type WebsiteEventAction =
   | 'guide_cta_click'
   | 'faq_expand'
   | 'guide_engaged'
-  | 'uninstall_view';
+  | 'uninstall_view'
+  | 'page_error';
 
 export type WebsiteEventPayload = {
   eventId: string;
