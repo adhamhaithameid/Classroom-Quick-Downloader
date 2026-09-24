@@ -35,7 +35,6 @@ class MockState {
 
 function makeDO(): DownloadsDurable {
   const env = {
-    ORACLE_ENDPOINT: "https://example.com",
     DO_SHARED_SECRET: "secret",
     MAX_BATCH_EVENTS: "10000",
   } as unknown as DownloadsEnv;
