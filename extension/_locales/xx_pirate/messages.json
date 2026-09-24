@@ -90,5 +90,45 @@
   "comm_error": {
     "message": "Message in a bottle lost.",
     "description": "commError"
+  },
+  "modified": {
+    "message": "Modified",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "after posting",
+    "description": "after_posting"
+  },
+  "popup_extension_settings": {
+    "message": "Extension Settings",
+    "description": "popupExtensionSettings"
+  },
+  "popup_settings_section_general": {
+    "message": "General",
+    "description": "popupSettingsSectionGeneral"
+  },
+  "popup_settings_section_engine": {
+    "message": "Engine",
+    "description": "popupSettingsSectionEngine"
+  },
+  "popup_settings_section_flags": {
+    "message": "Flags",
+    "description": "popupSettingsSectionFlags"
+  },
+  "popup_engine_mode": {
+    "message": "Engine Mode",
+    "description": "popupEngineMode"
+  },
+  "popup_engine_mode_legacy": {
+    "message": "Legacy",
+    "description": "popupEngineModeLegacy"
+  },
+  "popup_engine_mode_new": {
+    "message": "New",
+    "description": "popupEngineModeNew"
+  },
+  "popup_engine_mode_api": {
+    "message": "API (beta)",
+    "description": "popupEngineModeApi"
   }
 }
