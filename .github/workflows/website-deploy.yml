@@ -187,6 +187,24 @@ jobs:
           fi
           echo "${ingest_response}" | grep -Eq '"ok"[[:space:]]*:[[:space:]]*true'
 
+      - name: Post-deploy production verification
+        env:
+          PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL }}
+        run: |
+          set -euo pipefail
+          # Full page-content + worker verification before search indexing runs.
+          # Retries absorb edge propagation delay for the fresh deployment.
+          for attempt in 1 2 3 4; do
+            if node tools/verify-production.mjs; then
+              echo "::notice::Post-deploy production verification passed (attempt ${attempt})."
+              exit 0
+            fi
+            echo "::warning::verify-production attempt ${attempt} failed; retrying"
+            sleep 30
+          done
+          echo "::error::Post-deploy production verification failed after retries"
+          exit 1
+
       - name: Submit indexing notifications (Bing + Google)
         env:
           PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL }}
