@@ -4,7 +4,7 @@
     "description": "download"
   },
   "downloading": {
-    "message": "Downloading…",
+    "message": "Descargans…",
     "description": "downloading"
   },
   "trying": {
@@ -72,7 +72,7 @@
     "description": "commError"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "Dies inter nuntiationem et ultimam mutationem",
     "description": "editedTooltip"
   },
   "comment_singular": {
@@ -80,7 +80,7 @@
     "description": "commentSingular"
   },
   "cancel": {
-    "message": "Cancel",
+    "message": "Irritare",
     "description": "cancel"
   },
   "cancelled": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Omnia irritare",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Mutatum",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "post nuntiationem",
+    "description": "after_posting"
   }
 }
