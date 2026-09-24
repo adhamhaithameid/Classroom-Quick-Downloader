@@ -50,10 +50,17 @@ function page(fixtureName: string, dir: 'ltr' | 'rtl' = 'ltr'): string {
  * without passing it through, the Edge project would silently launch vanilla
  * Chromium and the Edge leg would be a fake pass.
  */
+// Headless by default (new-headless Chromium loads extensions); E2E_HEADED=1
+// opts back into a visible window for debugging.
+const HEADLESS = process.env.E2E_HEADED !== '1';
+
 async function launchWithExtension(channel?: string): Promise<BrowserContext> {
   return chromium.launchPersistentContext('', {
-    channel,
-    headless: false,
+    // New headless (channel 'chromium') is the only headless build that loads
+    // extensions; the bundled vanilla headless would silently drop them, and
+    // the Edge project must keep its own channel.
+    channel: channel ?? 'chromium',
+    headless: HEADLESS,
     args: [
       `--disable-extensions-except=${EXTENSION_PATH}`,
       `--load-extension=${EXTENSION_PATH}`,
