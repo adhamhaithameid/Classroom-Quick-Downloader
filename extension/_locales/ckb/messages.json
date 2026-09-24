@@ -60,7 +60,7 @@
     "description": "commentsTooltip"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "ژمارەی ڕۆژ لە نێوان بڵاوکردنەوە و دوا دەستکاری",
     "description": "editedTooltip"
   },
   "download_interrupted": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "هەڵوەشاندنەوەی هەموو",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "دەستکاریکراوە",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "دوای بڵاوکردنەوە",
+    "description": "after_posting"
   }
 }
