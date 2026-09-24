@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "لغو همه",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "تغییر یافته",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "پس از ارسال",
+    "description": "after_posting"
   }
 }
