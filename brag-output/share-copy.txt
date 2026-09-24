@@ -1,1 +1,0 @@
-I built Classroom Quick Downloader to make grabbing class materials less repetitive: download one attachment or a whole post’s files from inside Google Classroom. Free for Chrome, Firefox and Edge; an independent project, not affiliated with Google or Google Classroom. Install: https://classroom-quick-downloader.adhamhaithameid.is-a.dev/

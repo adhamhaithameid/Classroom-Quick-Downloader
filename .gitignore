@@ -79,3 +79,11 @@ gui-test-screenshots/
 # Commit planner generated artifacts
 tools/commit-planner/data.js
 tools/commit-planner/data.json
+
+# session artifacts (local only)
+tests/e2e/.live-profile/
+brag-output/
+.scratch/
+.beads.gate.lock
+website/prototype-assets/
+website/prototype-*.html
