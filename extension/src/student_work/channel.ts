@@ -68,7 +68,7 @@ export function publishResolveResult(message: StudentWorkResolveResultMessage): 
       type: STUDENT_WORK_RESOLVE_PUBLISH_TYPE,
       payload: message,
     };
-    runtime.sendMessage(payload);
+    runtime.sendMessage(payload, () => { void chrome.runtime.lastError; });
   } catch {
     // Ignore runtime relay failures; resolver will timeout safely.
   }

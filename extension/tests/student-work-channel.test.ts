@@ -52,7 +52,7 @@ describe('student_work/channel', () => {
     expect(sendMessage).toHaveBeenCalledWith({
       type: STUDENT_WORK_RESOLVE_PUBLISH_TYPE,
       payload,
-    });
+    }, expect.any(Function));
   });
 
   it('publish is a no-op when chrome.runtime is unavailable (no unauthenticated channel fallback)', async () => {

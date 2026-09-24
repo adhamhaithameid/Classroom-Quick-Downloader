@@ -720,7 +720,7 @@ function App() {
             type: 'cqd-flag-toggle',
             flag,
             enabled: nextState,
-          });
+          }, () => { void chrome.runtime.lastError; });
         }
       });
     }
@@ -764,7 +764,7 @@ function App() {
     if (browserApi?.tabs?.query) {
       browserApi.tabs.query({ active: true, currentWindow: true }, (tabs: any[]) => {
         if (tabs?.[0]?.id) {
-          browserApi.tabs.sendMessage(tabs[0].id, { type: 'cqd-set-mode', mode: nextMode });
+          browserApi.tabs.sendMessage(tabs[0].id, { type: 'cqd-set-mode', mode: nextMode }, () => { void chrome.runtime.lastError; });
         }
       });
     }

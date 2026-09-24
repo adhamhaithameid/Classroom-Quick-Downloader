@@ -199,7 +199,7 @@ export default defineBackground(() => {
       chrome.tabs.sendMessage(sender.tab.id, {
         type: STUDENT_WORK_RESOLVE_RELAY_TYPE,
         payload: message.payload,
-      });
+      }, () => { void chrome.runtime.lastError; });
     } catch {
       // Ignore send failures when tab/frame is gone.
     }

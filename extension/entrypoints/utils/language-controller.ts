@@ -162,7 +162,7 @@ class LanguageController {
           type: 'CQD_LANGUAGE_CHANGED',
           language: this.state?.detectedLang,
           mode: this.state?.mode,
-        });
+        }, () => { void chrome.runtime.lastError; });
       }
     } catch {
       // Ignore messaging errors
