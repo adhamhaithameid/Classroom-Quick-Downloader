@@ -61,6 +61,9 @@ CLAUDE.md
 tests/e2e/.firefox-profile/
 # e2e global-setup build stamp (source hash of the last Chrome build)
 tests/e2e/.build-stamp
+# Live real-Classroom tests: dedicated signed-in browser profile + login state
+# (real Google session — never commit, never reuse the daily profile)
+tests/e2e/.live-profile/
 
 # Stryker mutation testing (extension)
 extension/.stryker-tmp/
