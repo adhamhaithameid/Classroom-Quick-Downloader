@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "Batalkan semua",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Diubah",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "setelah diposting",
+    "description": "after_posting"
   }
 }
