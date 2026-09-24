@@ -13,6 +13,18 @@ verified end-to-end, and the privacy model.
 
 ---
 
+> **Status 2026-09-19: FULLY CONFIGURED.** The OAuth client id is landed in
+> `wxt.config.ts` (`oauth2.client_id` + the read-only
+> `classroom.readonly` scope) together with the `identity` permission and
+> `default_locale` (commit series ending `1a8e5545` → the oauth2 landing).
+> The API engine now activates when a user selects Engine Mode → API
+> (explicit consent, #398). One owner-side nuance remains: the client id was
+> created for the STORE extension id — a local unpacked install derives a
+> different extension id unless the manifest pins a `key`, so a dev-build
+> consent prompt may show an origin-mismatch error. Store builds match.
+
+---
+
 ## 1. What the setup gate is
 
 Everything keys off one probe: `isApiConfigured()`
