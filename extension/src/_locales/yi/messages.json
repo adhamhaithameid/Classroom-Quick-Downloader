@@ -72,7 +72,7 @@
     "description": "commError"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "טעג צווישן פּאָסטן און דער לעצטער רעדאַקטירונג",
     "description": "editedTooltip"
   },
   "comment_singular": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "באָטל מאַכן אַלע",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "גענדערט",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "נאָך פּאָסטן",
+    "description": "after_posting"
   }
 }
