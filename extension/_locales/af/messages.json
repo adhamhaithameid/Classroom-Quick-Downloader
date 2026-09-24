@@ -72,7 +72,7 @@
     "description": "commError"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "Dae tussen plasings en die laaste wysiging",
     "description": "editedTooltip"
   },
   "comment_singular": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Kanselleer alles",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Gewysig",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "na plaasing",
+    "description": "after_posting"
   }
 }
