@@ -82,5 +82,21 @@
   "cancel_all": {
     "message": "全部取消",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "已修改",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "發布後",
+    "description": "after_posting"
+  },
+  "comment_singular": {
+    "message": "則留言",
+    "description": "commentSingular"
+  },
+  "edited_tooltip": {
+    "message": "張貼到最後一次編輯的天數",
+    "description": "editedTooltip"
   }
 }

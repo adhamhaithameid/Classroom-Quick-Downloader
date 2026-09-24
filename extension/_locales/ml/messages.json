@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "എല്ലാം റദ്ദാക്കുക",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "പരിഷ്കരിച്ചു",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "പോസ്റ്റ് ചെയ്ത ശേഷം",
+    "description": "after_posting"
   }
 }

@@ -52,23 +52,23 @@
     "description": "files"
   },
   "comments_tooltip": {
-    "message": "Number of comments on this post",
+    "message": "Nombre de comentaris en aquesta publicació",
     "description": "commentsTooltip"
   },
   "download_interrupted": {
-    "message": "Download interrupted.",
+    "message": "Baixada interrompuda.",
     "description": "downloadInterrupted"
   },
   "runtime_error": {
-    "message": "Runtime not available",
+    "message": "Temps d’execució no disponible",
     "description": "runtimeError"
   },
   "start_error": {
-    "message": "Could not start.",
+    "message": "No s’ha pogut iniciar.",
     "description": "startError"
   },
   "comm_error": {
-    "message": "Communication error.",
+    "message": "Error de comunicació.",
     "description": "commError"
   },
   "edited_tooltip": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Cancel·la-ho tot",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Modificat",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "després de la publicació",
+    "description": "after_posting"
   }
 }

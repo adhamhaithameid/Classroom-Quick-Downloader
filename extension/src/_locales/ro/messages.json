@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "Anulează tot",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Modificat",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "după publicare",
+    "description": "after_posting"
   }
 }

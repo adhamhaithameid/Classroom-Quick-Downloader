@@ -1,0 +1,21 @@
+{
+  "caseId": "syn-en-position-count-in-description",
+  "viewKind": "stream",
+  "lang": "en",
+  "note": "Positional accuracy: the post DESCRIPTION narrates comment counts ('has 3 comments from the reviewers', 'see the 12 comments in the shared doc'). Those are prose about comments elsewhere — no comment chip exists, so nothing may be flagged and no count invented from prose numbers.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-pos-desc-a",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    },
+    {
+      "postId": "synth-pos-desc-b",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    }
+  ]
+}

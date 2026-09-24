@@ -1,0 +1,21 @@
+{
+  "caseId": "syn-hi-position-edited",
+  "viewKind": "stream",
+  "lang": "hi",
+  "note": "Hindi edited-signal position: \"(बदलाव किया गया 3:50 am)\" inside the date/meta parentheses sets the flag; body prose \"मैंने कल फ़ाइल संपादित की थी\" must never flag.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-pos-multiedit-hi",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": true
+    },
+    {
+      "postId": "synth-pos-multiedit-hi-body",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    }
+  ]
+}

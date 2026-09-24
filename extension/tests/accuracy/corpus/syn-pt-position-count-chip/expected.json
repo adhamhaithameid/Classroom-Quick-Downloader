@@ -1,0 +1,21 @@
+{
+  "caseId": "syn-pt-position-count-chip",
+  "viewKind": "stream",
+  "lang": "pt",
+  "note": "Positional accuracy in Brazilian Portuguese: chip phrase \"2 comentários de turma\" believed with the exact count; the same phrase in the body (\"O rascunho tem 2 comentários de turma\") is prose and must neither flag nor leak a count. Inflection (टिप्पणी vs टिप्पणियाँ, comentário vs comentários) must not change the outcome.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-pos-pt-chip",
+      "commentPresent": true,
+      "commentCount": 2,
+      "editedPresent": false
+    },
+    {
+      "postId": "synth-pos-pt-body",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "caseId": "syn-en-position-title-says-comments",
+  "viewKind": "stream",
+  "lang": "en",
+  "note": "Positional accuracy: the post TITLE/heading itself contains the words '3 comments needed' and a bare 'Comments' heading. A human sees no comment UI on either card — keyword hits in the title/description position must never fabricate a count or a comment flag. Only the comment chip position may score.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-pos-title-a",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    },
+    {
+      "postId": "synth-pos-title-b",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    }
+  ]
+}

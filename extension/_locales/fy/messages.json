@@ -60,7 +60,7 @@
     "description": "commentsTooltip"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "Dei tusken it pleatsen en de lêste bewurking",
     "description": "editedTooltip"
   },
   "download_interrupted": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Alles annulearje",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Wizige",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "nei it pleatsen",
+    "description": "after_posting"
   }
 }

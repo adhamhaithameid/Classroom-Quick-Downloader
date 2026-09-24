@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "Annuller alle",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Ændret",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "efter opslag",
+    "description": "after_posting"
   }
 }

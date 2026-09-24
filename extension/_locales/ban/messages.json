@@ -60,7 +60,7 @@
     "description": "commentsTooltip"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "Rahina riantara kakaostokin miwah uahan pungkuran",
     "description": "editedTooltip"
   },
   "download_interrupted": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Weweh batal makasami",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Kaubah",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "sasampun kakaostokin",
+    "description": "after_posting"
   }
 }

@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "सर्व रद्द करा",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "बदलले",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "पोस्ट केल्यानंतर",
+    "description": "after_posting"
   }
 }

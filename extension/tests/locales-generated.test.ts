@@ -174,10 +174,18 @@ describe('t() behavior unchanged (TRANSLATIONS remains the runtime source)', () 
     }
   });
 
-  it('falls back to en when the detected language lacks a key (unchanged)', async () => {
-    document.documentElement.lang = 'sr-Latn'; // sr-latn table lacks cancel/cancelled/cancelAll
+  it('resolves a region locale onto its own strings instead of en (sr-latn used to lack cancel)', async () => {
+    document.documentElement.lang = 'sr-Latn'; // completeness patch added cancel/cancelled/cancelAll
     const mod = await import('../entrypoints/content/i18n');
     expect(mod.getCurrentCachedLanguage()).toBe('sr-latn');
+    expect(mod.t('cancel')).toBe(TRANSLATIONS['sr-latn'].cancel);
+    expect(mod.t('cancel')).not.toBe(TRANSLATIONS.en.cancel);
+  });
+
+  it('falls back to en when the page language matches no table entry', async () => {
+    document.documentElement.lang = 'xx-Unknown';
+    const mod = await import('../entrypoints/content/i18n');
+    expect(mod.getCurrentCachedLanguage()).toBe('en');
     expect(mod.t('cancel')).toBe(TRANSLATIONS.en.cancel);
   });
 });

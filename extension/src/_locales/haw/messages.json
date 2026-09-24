@@ -60,7 +60,7 @@
     "description": "commentsTooltip"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "Ka lā ma waena o ka paʻi ʻana a me ka hoʻoponopono hope",
     "description": "editedTooltip"
   },
   "download_interrupted": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Hoʻōki i nā mea a pau",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Ua ho'ololi ʻia",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "ma hope o ka paʻi ʻana",
+    "description": "after_posting"
   }
 }

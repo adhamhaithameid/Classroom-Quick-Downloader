@@ -72,7 +72,7 @@
     "description": "commError"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "Matsatsi pakeng tsa ho phatlalatsa le hlophiso ea ho qetela",
     "description": "editedTooltip"
   },
   "comment_singular": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Hlakola tsohle",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "E fetotsoe",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "kamora ho phatlalatsoa",
+    "description": "after_posting"
   }
 }

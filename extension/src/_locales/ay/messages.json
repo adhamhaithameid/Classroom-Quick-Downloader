@@ -60,7 +60,7 @@
     "description": "commentsTooltip"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "Qillqt'añataki ukat askichañataki jak'äwi",
     "description": "editedTooltip"
   },
   "download_interrupted": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Taqpach jan sa",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Mayjt'ayata",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "qalltaña ukat pusi",
+    "description": "after_posting"
   }
 }

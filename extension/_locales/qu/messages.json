@@ -60,7 +60,7 @@
     "description": "commentsTooltip"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "Wiñachiy wan qhipa tikray chawpim dma",
     "description": "editedTooltip"
   },
   "download_interrupted": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Llapanmanta saqichiy",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Tikrasqa",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "wiñachiy qhipa",
+    "description": "after_posting"
   }
 }

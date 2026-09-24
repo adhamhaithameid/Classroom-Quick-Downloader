@@ -1,0 +1,27 @@
+{
+  "caseId": "syn-en-position-edited-meta-vs-body",
+  "viewKind": "stream",
+  "lang": "en",
+  "note": "Positional accuracy for the edited signal: '(Edited 3:50 PM)' in the date/meta line is the real marker (post also carries a comment chip — both flags must co-exist on one card); the first-person 'I edited the doc' in the body and the heading 'Edited schedule for next week' are prose positions and must never set the edited flag.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-pos-edit-meta",
+      "commentPresent": true,
+      "commentCount": 4,
+      "editedPresent": true
+    },
+    {
+      "postId": "synth-pos-edit-body",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    },
+    {
+      "postId": "synth-pos-edit-title",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    }
+  ]
+}

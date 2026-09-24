@@ -1,0 +1,21 @@
+{
+  "caseId": "syn-ja-position-count-chip",
+  "viewKind": "stream",
+  "lang": "ja",
+  "note": "Positional accuracy in Japanese: the chip phrase \"コメント3件\" (count after the keyword, mixed script) is believed with the exact count; the same words narrated in the body (\"この資料にはコメント3件が付いています\") are prose and must neither flag nor leak a count.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-pos-ja-chip",
+      "commentPresent": true,
+      "commentCount": 3,
+      "editedPresent": false
+    },
+    {
+      "postId": "synth-pos-ja-body",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    }
+  ]
+}

@@ -72,7 +72,7 @@
     "description": "commError"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "ပို့စ်တင်ခြင်းနှင့် နောက်ဆုံး တည်းဖြတ်ခြင်းကြား ရက်များ",
     "description": "editedTooltip"
   },
   "comment_singular": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "အားလုံး ပယ်ဖျက်",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "ပြောင်းလဲပြီး",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "ပို့စ်တင်ပြီးနောက်",
+    "description": "after_posting"
   }
 }

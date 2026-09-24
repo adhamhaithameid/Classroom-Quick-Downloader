@@ -72,7 +72,7 @@
     "description": "commError"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "Andro eo anelanelan'ny famoahana sy ny fanavaozana farany",
     "description": "editedTooltip"
   },
   "comment_singular": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Foano ny rehetra",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Novaina",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "taorian'ny famoahana",
+    "description": "after_posting"
   }
 }

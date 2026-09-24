@@ -60,7 +60,7 @@
     "description": "commentsTooltip"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "'Aho 'i he vaha'a tukutu mo e faka'osi fakatonutonu",
     "description": "editedTooltip"
   },
   "download_interrupted": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Kaniseli kotoa",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Kuo liliu",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "hili 'o e tukutu",
+    "description": "after_posting"
   }
 }

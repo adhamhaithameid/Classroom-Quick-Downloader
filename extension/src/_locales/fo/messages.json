@@ -60,7 +60,7 @@
     "description": "commentsTooltip"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "Dagar millum atgongd og seinasta rætting",
     "description": "editedTooltip"
   },
   "download_interrupted": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Angra alt",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Broytt",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "eftir atgongd",
+    "description": "after_posting"
   }
 }

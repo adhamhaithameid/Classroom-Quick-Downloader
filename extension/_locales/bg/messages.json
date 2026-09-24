@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Откажи све",
+    "message": "Откажи всички",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Променено",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "след публикуване",
+    "description": "after_posting"
   }
 }

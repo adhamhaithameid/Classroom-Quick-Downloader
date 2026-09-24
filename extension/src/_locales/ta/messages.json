@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "அனைத்தையும் ரத்து செய்",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "மாற்றப்பட்டது",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "இடுகையிட்ட பிறகு",
+    "description": "after_posting"
   }
 }

@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "Peruuta kaikki",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Muutettu",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "julkaisun jälkeen",
+    "description": "after_posting"
   }
 }

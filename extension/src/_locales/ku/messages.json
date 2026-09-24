@@ -60,7 +60,7 @@
     "description": "commentsTooltip"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "Rojên di navbera weşandinê û guhertina dawî de",
     "description": "editedTooltip"
   },
   "download_interrupted": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Hemûyan betal bike",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Guherî",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "piştî weşandinê",
+    "description": "after_posting"
   }
 }

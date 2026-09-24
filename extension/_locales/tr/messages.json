@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "Tümünü iptal et",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Değiştirildi",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "gönderiden sonra",
+    "description": "after_posting"
   }
 }

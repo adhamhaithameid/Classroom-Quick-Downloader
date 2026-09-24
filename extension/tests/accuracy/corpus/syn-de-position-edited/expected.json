@@ -1,0 +1,21 @@
+{
+  "caseId": "syn-de-position-edited",
+  "viewKind": "stream",
+  "lang": "de",
+  "note": "German edited-signal position: \"(Bearbeitet: 10:15)\" inside the date/meta parentheses sets the flag; first-person prose (\"Ich habe den Plan editiert\") in the body must never flag.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-pos-multiedit-de",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": true
+    },
+    {
+      "postId": "synth-pos-multiedit-de-body",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    }
+  ]
+}

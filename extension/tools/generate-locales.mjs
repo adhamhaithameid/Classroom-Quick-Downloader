@@ -174,10 +174,14 @@ export function buildAllLocales(translations) {
 
 /**
  * Load TRANSLATIONS from i18n.ts without fragile source parsing:
- * transpile to CommonJS with the `typescript` package (direct devDependency,
- * version-stable across CI/dev) and load the result via createRequire.
- * Native require cannot be intercepted by bundler/test-runners, so this path
- * behaves identically under plain node and under vitest.
+ * transpile the whole relative-TypeScript import graph (i18n.ts ->
+ * src/core/i18n/resolve.ts -> src/core/i18n/completeness.ts) to CommonJS
+ * with the `typescript` package (direct devDependency, version-stable across
+ * CI/dev), rewrite the internal require() paths onto a flat temp directory,
+ * and load the entry module via createRequire. Native require cannot be
+ * intercepted by bundler/test-runners, so this path behaves identically
+ * under plain node and under vitest. A require() that does not resolve to a
+ * TypeScript file under the extension root fails loudly, never silently.
  */
 export function loadTranslationsFromSource(sourcePath = I18N_SOURCE) {
   const require = createRequire(import.meta.url);
@@ -187,24 +191,60 @@ export function loadTranslationsFromSource(sourcePath = I18N_SOURCE) {
   } catch {
     throw new Error('The `typescript` package is required to transpile i18n.ts (run from the extension workspace).');
   }
-  const source = readFileSync(sourcePath, 'utf8');
-  const transpiled = typescript.transpileModule(source, {
-    compilerOptions: {
-      module: typescript.ModuleKind.CommonJS,
-      target: typescript.ScriptTarget.ES2020,
-    },
-    fileName: path.basename(sourcePath),
-  });
-  const tempPath = path.join(os.tmpdir(), `cqd-generate-locales-${process.pid}-${Math.random().toString(36).slice(2)}.cjs`);
-  writeFileSync(tempPath, transpiled.outputText, 'utf8');
+
+  // Pass 1: walk the relative-.ts require graph, assign flat .cjs names.
+  const rootDir = EXTENSION_ROOT;
+  const names = new Map(); // abs .ts path -> flat .cjs name
+  const pending = new Map(); // abs .ts path -> transpiled output
+  const queue = [path.resolve(sourcePath)];
+  while (queue.length > 0) {
+    const abs = queue.shift();
+    if (names.has(abs)) continue;
+    const name = `${path.basename(abs, '.ts')}_${names.size}.cjs`;
+    names.set(abs, name);
+    const source = readFileSync(abs, 'utf8');
+    const transpiled = typescript.transpileModule(source, {
+      compilerOptions: {
+        module: typescript.ModuleKind.CommonJS,
+        target: typescript.ScriptTarget.ES2020,
+      },
+      fileName: path.basename(abs),
+    });
+    const requires = [...transpiled.outputText.matchAll(/require\("([^"]+)"\)/g)].map((m) => m[1]);
+    for (const spec of requires) {
+      if (!spec.startsWith('.')) continue; // bare package spec: leave untouched
+      const depAbs = path.resolve(path.dirname(abs), spec);
+      const depTs = `${depAbs}.ts`;
+      if (!existsSync(depTs)) {
+        throw new Error(
+          `generate-locales: ${path.relative(rootDir, abs)} requires "${spec}", which does not resolve to a TypeScript file. ` +
+          'Extend the loader mapping if i18n.ts grows a non-relative dependency.',
+        );
+      }
+      queue.push(depTs);
+    }
+    names.set(abs, name);
+    pending.set(abs, transpiled.outputText);
+  }
+
+  // Pass 2: rewrite internal require paths onto the flat temp dir and write.
+  const tempDir = mkdirSync(path.join(os.tmpdir(), `cqd-generate-locales-${process.pid}-${Math.random().toString(36).slice(2)}`), { recursive: true });
   try {
-    const mod = require(tempPath);
+    for (const [abs, outputText] of pending) {
+      const rewritten = outputText.replace(/require\("([^"]+)"\)/g, (whole, spec) => {
+        if (!spec.startsWith('.')) return whole;
+        const depAbs = path.resolve(path.dirname(abs), `${spec}.ts`);
+        return `require("./${names.get(depAbs)}")`;
+      });
+      writeFileSync(path.join(tempDir, names.get(abs)), rewritten, 'utf8');
+    }
+    const mod = require(path.join(tempDir, names.get(path.resolve(sourcePath))));
     if (!mod.TRANSLATIONS || typeof mod.TRANSLATIONS !== 'object') {
       throw new Error(`No TRANSLATIONS export found in ${sourcePath}.`);
     }
     return mod.TRANSLATIONS;
   } finally {
-    rmSync(tempPath, { force: true });
+    rmSync(tempDir, { force: true, recursive: true });
   }
 }
 

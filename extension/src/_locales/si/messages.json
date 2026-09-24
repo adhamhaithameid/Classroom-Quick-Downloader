@@ -52,27 +52,27 @@
     "description": "files"
   },
   "comments_tooltip": {
-    "message": "Number of comments on this post",
+    "message": "මෙම සටහනේ අදහස් ගණන",
     "description": "commentsTooltip"
   },
   "download_interrupted": {
-    "message": "Download interrupted.",
+    "message": "බාගැනීම බාධා විය.",
     "description": "downloadInterrupted"
   },
   "runtime_error": {
-    "message": "Runtime not available",
+    "message": "ධාවන කාලය ලබාගත නොහැක",
     "description": "runtimeError"
   },
   "start_error": {
-    "message": "Could not start.",
+    "message": "ආරම්භ කළ නොහැක.",
     "description": "startError"
   },
   "comm_error": {
-    "message": "Communication error.",
+    "message": "සන්නිවේදන දෝෂයකි.",
     "description": "commError"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "පළ කිරීම සහ අවසන් සංස්කරණය අතර දින",
     "description": "editedTooltip"
   },
   "comment_singular": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "සියල්ල අවලංගු කරන්න",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "වෙනස් කරන ලදී",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "පළ කිරීමෙන් පසු",
+    "description": "after_posting"
   }
 }

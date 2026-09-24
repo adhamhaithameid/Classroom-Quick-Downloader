@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "Zrušit vše",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Změněno",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "po zveřejnění",
+    "description": "after_posting"
   }
 }

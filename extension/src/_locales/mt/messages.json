@@ -72,7 +72,7 @@
     "description": "commError"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "Jiem bejn l-ippubblikar u l-aħħar editja",
     "description": "editedTooltip"
   },
   "comment_singular": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Ikkanċella kollox",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Modifikat",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "wara l-ippubblikar",
+    "description": "after_posting"
   }
 }

@@ -1,0 +1,21 @@
+{
+  "caseId": "syn-hi-position-count-chip",
+  "viewKind": "stream",
+  "lang": "hi",
+  "note": "Positional accuracy in Hindi: chip phrase \"1 कक्षा टिप्पणी\" believed with the exact count; the same phrase in the body (\"ड्राफ़्ट में अभी 3 कक्षा टिप्पणियाँ आई हैं\") is prose and must neither flag nor leak a count. Inflection (टिप्पणी vs टिप्पणियाँ, comentário vs comentários) must not change the outcome.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-pos-hi-chip",
+      "commentPresent": true,
+      "commentCount": 1,
+      "editedPresent": false
+    },
+    {
+      "postId": "synth-pos-hi-body",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    }
+  ]
+}

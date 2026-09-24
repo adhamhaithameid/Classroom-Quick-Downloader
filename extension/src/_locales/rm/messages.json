@@ -60,7 +60,7 @@
     "description": "commentsTooltip"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "Dis tranter la publicaziun e l’ultima midada",
     "description": "editedTooltip"
   },
   "download_interrupted": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Annullar tut",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Modifitgà",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "suenter la publicaziun",
+    "description": "after_posting"
   }
 }

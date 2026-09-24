@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "Mind törlése",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Módosítva",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "közzététel után",
+    "description": "after_posting"
   }
 }

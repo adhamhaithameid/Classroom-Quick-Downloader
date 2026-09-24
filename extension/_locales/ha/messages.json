@@ -72,7 +72,7 @@
     "description": "commError"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "Kwanakin da suka wuce tsakanin bugawa da gyara na ƙarshe",
     "description": "editedTooltip"
   },
   "comment_singular": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Soke duka",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "An canza",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "bayan an buga",
+    "description": "after_posting"
   }
 }

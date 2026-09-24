@@ -72,7 +72,7 @@
     "description": "commError"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "Aso i le va o le fa'apipi'i ma le toe fa'afouga mulimuli",
     "description": "editedTooltip"
   },
   "comment_singular": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Fa'aleaogaina uma",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Na suia",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "pea fa'apipi'i",
+    "description": "after_posting"
   }
 }

@@ -2,6 +2,18 @@
 
 This directory stores sanitized Classroom HTML fixtures generated from live snapshots.
 
+Beyond protecting button placement and card ownership, these fixtures double
+as the **English + Arabic language ground-truth corpus**: they are sanitized
+captures of what Google actually rendered, so
+`tests/e2e/live/language-reconcile.spec.ts` audits the detection engine's
+comment/edited keyword lists against real strings on every run (see
+`docs/TWO_LANGUAGE_SIGNALS.md` § Keyword verification). Verified from these
+fixtures today: English `5 class comments`, `No class comments`,
+`Edited Mar 10`, `Due Dec 18, 2025, 11:59 PM`; Arabic `٥ تعليقات صفية`,
+`تم التعديل في ١٠ مارس`. Capturing a new fixture in another language extends
+that ground truth for free — prefer a real capture in the target language
+over adding keyword guesses.
+
 Fixtures currently committed:
 
 1. `classwork-material-post-en.html`

@@ -72,7 +72,7 @@
     "description": "commError"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "Ọnọdụ ụbọchị dị n'etiti mbipụta na ndozi ikpeazụ",
     "description": "editedTooltip"
   },
   "comment_singular": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Kagbuo ihe niile",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Agbanwere",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "mgbe e bipụtara ya",
+    "description": "after_posting"
   }
 }

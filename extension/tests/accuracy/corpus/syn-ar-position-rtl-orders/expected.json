@@ -1,0 +1,27 @@
+{
+  "caseId": "syn-ar-position-rtl-orders",
+  "viewKind": "stream",
+  "lang": "ar",
+  "note": "Positional accuracy in RTL Arabic with Arabic-Indic digits: the chip phrase 'تعليقات الصف ٣' and its mirrored bidi order '٣ تعليقات الصف' are both the real comment-chip position and must yield count 3 regardless of bidi run order; the same words narrated in the post body must stay unflagged. BiDi control stripping must not relocate the number.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-pos-ar-chip-rtl",
+      "commentPresent": true,
+      "commentCount": 3,
+      "editedPresent": false
+    },
+    {
+      "postId": "synth-pos-ar-chip-rtl-swap",
+      "commentPresent": true,
+      "commentCount": 3,
+      "editedPresent": false
+    },
+    {
+      "postId": "synth-pos-ar-body",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    }
+  ]
+}

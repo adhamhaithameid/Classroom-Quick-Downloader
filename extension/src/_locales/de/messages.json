@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "Alle abbrechen",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Geändert",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "nach dem Veröffentlichen",
+    "description": "after_posting"
   }
 }

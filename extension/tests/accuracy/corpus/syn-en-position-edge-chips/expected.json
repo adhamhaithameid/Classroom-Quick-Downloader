@@ -1,0 +1,33 @@
+{
+  "caseId": "syn-en-position-edge-chips",
+  "viewKind": "stream",
+  "lang": "en",
+  "note": "Chip edge cases: the empty state 'No class comments' and a literal '0 comments' are NOT a visible comment count (count stays null — humans see an empty thread, not a zero); filename tokens like 'comments.md'/'old-comments.txt' in the body are prose, not chips; and an aria-label-only chip ('7 comments' with no text content) must still be believed with count 7 because screen-reader users see it.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-pos-zero-a",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    },
+    {
+      "postId": "synth-pos-zero-b",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    },
+    {
+      "postId": "synth-pos-file-a",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    },
+    {
+      "postId": "synth-pos-aria-a",
+      "commentPresent": true,
+      "commentCount": 7,
+      "editedPresent": false
+    }
+  ]
+}
