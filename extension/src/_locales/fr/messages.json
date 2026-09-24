@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "Tout annuler",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Modifié",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "après la publication",
+    "description": "after_posting"
   }
 }
