@@ -60,7 +60,7 @@
     "description": "commentsTooltip"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "Ghjorni trà a publicazione è l'ultima mudificazione",
     "description": "editedTooltip"
   },
   "download_interrupted": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Annullà tuttu",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Mudificatu",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "dopu a publicazione",
+    "description": "after_posting"
   }
 }
