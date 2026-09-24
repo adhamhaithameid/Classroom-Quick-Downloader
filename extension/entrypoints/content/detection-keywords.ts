@@ -1,12 +1,23 @@
 // filepath: entrypoints/content/detection-keywords.ts
 /**
  * DETECTION KEYWORDS - Universal Tier Architecture
- * 
+ *
  * KEY UPGRADES:
  * 1. Unicode Property Escapes (\p{Nd}) for any script's decimal digits
  * 2. 100+ languages including joke languages (Pirate, Hacker, Bork, etc.)
  * 3. Script-based keyword grouping for efficiency
  * 4. BiDi control character stripping
+ *
+ * GROUND-TRUTH STATUS (docs/TWO_LANGUAGE_SIGNALS.md § Keyword verification):
+ * the per-language lists below are audited against REAL Classroom renderings
+ * by tests/e2e/live/language-reconcile.spec.ts — English + Arabic from the
+ * committed fixtures on every CI run, every capturable language after
+ * `pnpm test:live:langs` (corpus under qa-artifacts/live-languages/).
+ * Verified so far: en {class comments, no class comments, class comment,
+ * edited}, ar {تعليقات صفية, تعليق(ات), تم التعديل}. Unverified lists are
+ * superset guesses that may contain phrases Classroom never renders — add
+ * keywords from captured corpus evidence, not memory, and record codes
+ * Google refuses as rejected rather than inventing entries for them.
  */
 
 // ============================================================================
@@ -29,6 +40,7 @@ export const UNIVERSAL_DIGIT_REGEX = new RegExp(`[${D}]`, 'gu');
 // new code should import from core directly.
 import { normalizeText, normalizeForComparison } from '../../src/core/detect/normalize';
 import { matchesNormalizedKeyword } from '../../src/core/detect/matching';
+import { LIVE_COMPOSER_PROMPTS } from '../../src/core/detect/composer-prompts-live';
 
 export { normalizeText, normalizeForComparison };
 
@@ -342,15 +354,16 @@ const COMMENT_KEYWORDS_LATIN: Record<string, CommentKeywords> = {
   en: { singular: ['comment'], plural: ['comments'], classComment: ['class comment', 'class comments'] },
   es: { singular: ['comentario'], plural: ['comentarios'], classComment: ['comentario de clase'] },
   fr: { singular: ['commentaire'], plural: ['commentaires'], classComment: ['commentaire de classe'] },
-  de: { singular: ['kommentar'], plural: ['kommentare'], classComment: ['klassenkommentar'] },
+  de: { singular: ['kommentar', 'kurskommentar'], plural: ['kommentare', 'kurskommentare'], classComment: ['klassenkommentar', 'kurskommentar'] },
   pt: { singular: ['comentário'], plural: ['comentários'], classComment: ['comentário da turma'] },
-  it: { singular: ['commento'], plural: ['commenti'], classComment: ['commento della classe'] },
-  nl: { singular: ['opmerking'], plural: ['opmerkingen'], classComment: ['klasopmerking'] },
-  pl: { singular: ['komentarz'], plural: ['komentarze', 'komentarzy'], classComment: ['komentarz klasy'] },
-  cs: { singular: ['komentář'], plural: ['komentáře', 'komentářů'], classComment: ['komentář třídy'] },
-  ro: { singular: ['comentariu'], plural: ['comentarii'], classComment: ['comentariu lecție'] },
-  tr: { singular: ['yorum'], plural: ['yorum'], classComment: ['sınıf yorumu'] },
-  vi: { singular: ['bình luận'], plural: ['bình luận'], classComment: ['bình luận lớp học'] },
+  it: { singular: ['commento'], plural: ['commenti'], classComment: ['commento della classe', 'commento sul corso'] },
+  nl: { singular: ['opmerking', 'lesgroepreactie', 'reactie'], plural: ['opmerkingen', 'lesgroepreacties', 'reacties'], classComment: ['klasopmerking', 'lesgroepreactie'] },
+  fi: { singular: ['kommentti', 'kommenttia'], plural: ['kommentit', 'kommentteja'], classComment: ['kommentti', 'ryhmän kommentti'] },
+  pl: { singular: ['komentarz'], plural: ['komentarze', 'komentarzy'], classComment: ['komentarz klasy', 'komentarz do zajęć'] },
+  cs: { singular: ['komentář'], plural: ['komentáře', 'komentářů'], classComment: ['komentář třídy', 'komentář ke kurzu'] },
+  ro: { singular: ['comentariu'], plural: ['comentarii'], classComment: ['comentariu lecție', 'comentariu'] },
+  tr: { singular: ['yorum'], plural: ['yorum'], classComment: ['sınıf yorumu', 'yorum'] },
+  vi: { singular: ['bình luận', 'nhận xét'], plural: ['bình luận', 'nhận xét'], classComment: ['bình luận lớp học', 'nhận xét trong lớp học', 'nhận xét về lớp học'] },
   id: { singular: ['komentar'], plural: ['komentar'], classComment: ['komentar kelas'] },
   ms: { singular: ['komen'], plural: ['komen'], classComment: ['komen kelas'] },
   tl: { singular: ['komento'], plural: ['mga komento'], classComment: ['komento ng klase'] },
@@ -359,16 +372,37 @@ const COMMENT_KEYWORDS_LATIN: Record<string, CommentKeywords> = {
   'xx-bork': { singular: ['kumment', 'bork'], plural: ['kumments'], classComment: ['cless kumment'] },
   'xx-elmer': { singular: ['comment', 'commentw'], plural: ['commentws'], classComment: ['cwass comment'] },
   'xx-hacker': { singular: ['c0mm3nt', 'comm3nt'], plural: ['c0mm3nt5'], classComment: ['c14ss c0mm3nt'] },
+  // === REAL-CAPTURED FORMS (live Classroom sweep 2026-09-19, "Add class
+  // comment…" placeholders; see tests/fixtures/classroom/post-strings-captured.json) ===
+  af: { singular: ['klasopmerking', 'opmerking', 'kommentaar'], plural: ['opmerkings', 'kommentare'], classComment: ['klasopmerking'] },
+  az: { singular: ['şərh'], plural: ['şərhlər'], classComment: ['sinif şərhi'] },
+  ca: { singular: ['comentari'], plural: ['comentaris'], classComment: ['comentari de la classe', 'comentari de classe'] },
+  cy: { singular: ['sylw'], plural: ['sylwadau'], classComment: ['sylw dosbarth'] },
+  da: { singular: ['kommentar', 'holdkommentar'], plural: ['kommentarer'], classComment: ['kommentar til holdet', 'holdkommentar'] },
+  no: { singular: ['kommentar', 'kurskommentar'], plural: ['kommentarer'], classComment: ['kurskommentar'] },
+  et: { singular: ['kommentaar', 'kommentaari'], plural: ['kommentaarid'], classComment: ['kursuse kommentaar'] },
+  eu: { singular: ['iruzkin'], plural: ['iruzkinak'], classComment: ['iruzkina ikasgelan', 'iruzkin dago ikasgelan'] },
+  fil: { singular: ['komento'], plural: ['mga komento'], classComment: ['komento sa klase'] },
+  ga: { singular: ['nóta tráchta', 'trácht'], plural: ['nótaí tráchta'], classComment: ['nóta tráchta ranga'] },
+  hr: { singular: ['komentar'], plural: ['komentari', 'komentara'], classComment: ['komentar predmeta', 'komentar za predmet'] },
+  hu: { singular: ['kurzusmegjegyzés', 'megjegyzés'], plural: ['megjegyzések'], classComment: ['kurzusmegjegyzés'] },
+  is: { singular: ['athugasemd', 'ummæli'], plural: ['athugasemdir'], classComment: ['athugasemd til bekkjar'] },
+  lt: { singular: ['komentaras'], plural: ['komentarai', 'komentarą'], classComment: ['kurso komentarą', 'kurso komentaras'] },
+  lv: { singular: ['komentārs', 'komentāru'], plural: ['komentāri'], classComment: ['komentāru', 'klases komentārs'] },
+  sk: { singular: ['komentár'], plural: ['komentáre', 'komentárov'], classComment: ['komentár triedy', 'komentár kurzu'] },
+  sl: { singular: ['komentar'], plural: ['komentarji', 'komentarjev'], classComment: ['komentar predavanja'] },
+  sq: { singular: ['koment'], plural: ['komente'], classComment: ['koment për orën'] },
+  sv: { singular: ['kommentar'], plural: ['kommentarer'], classComment: ['klasskommentar'] },
 };
 
 const COMMENT_KEYWORDS_CYRILLIC: Record<string, CommentKeywords> = {
-  ru: { singular: ['комментарий'], plural: ['комментария', 'комментариев', 'комментарии'], classComment: ['комментарий класса'] },
-  uk: { singular: ['коментар'], plural: ['коментарі', 'коментарів'], classComment: ['коментар класу'] },
+  ru: { singular: ['комментарий'], plural: ['комментария', 'комментариев', 'комментарии'], classComment: ['комментарий класса', 'комментарий от класса'] },
+  uk: { singular: ['коментар'], plural: ['коментарі', 'коментарів'], classComment: ['коментар класу', 'коментар до курсу'] },
   be: { singular: ['каментарый'], plural: ['каментарыі', 'каментарыяў'], classComment: ['каментарый класа'] },
-  bg: { singular: ['коментар'], plural: ['коментара', 'коментари'], classComment: ['коментар на клас'] },
-  sr: { singular: ['коментар'], plural: ['коментара', 'коментари'], classComment: ['коментар одељења'] },
-  mk: { singular: ['коментар'], plural: ['коментари'], classComment: ['коментар на класот'] },
-  kk: { singular: ['пікір'], plural: ['пікірлер'], classComment: ['сынып пікірі'] },
+  bg: { singular: ['коментар'], plural: ['коментара', 'коментари'], classComment: ['коментар на клас', 'коментар за курса'] },
+  sr: { singular: ['коментар'], plural: ['коментара', 'коментари'], classComment: ['коментар одељења', 'коментар разредa'] },
+  mk: { singular: ['коментар'], plural: ['коментари'], classComment: ['коментар на класот', 'коментар во класот'] },
+  kk: { singular: ['пікір'], plural: ['пікірлер'], classComment: ['сынып пікірі', 'ашық пікір'] },
   ky: { singular: ['комментарий'], plural: ['комментарийлер'], classComment: ['класс комментарийи'] },
   mn: { singular: ['сэтгэгдэл'], plural: ['сэтгэгдлүүд'], classComment: ['ангийн сэтгэгдэл'] },
   tg: { singular: ['шарҳ'], plural: ['шарҳҳо'], classComment: ['шарҳи синф'] },
@@ -388,7 +422,7 @@ const COMMENT_KEYWORDS_ARABIC: Record<string, CommentKeywords> = {
     ] 
   },
   fa: { singular: ['نظر'], plural: ['نظرات'], classComment: ['نظر کلاس'] },
-  ur: { singular: ['تبصرہ'], plural: ['تبصرے'], classComment: ['کلاس تبصرہ'] },
+  ur: { singular: ['تبصرہ', 'تبصرا'], plural: ['تبصرے'], classComment: ['کلاس تبصرہ', 'کلاس کا تبصرہ'] },
   ps: { singular: ['تبصره'], plural: ['تبصرې'], classComment: ['ټولګي تبصره'] },
   ug: { singular: ['ئىنكاس'], plural: ['ئىنكاسلار'], classComment: ['سىنىپ ئىنكاسى'] },
   ckb: { singular: ['لێدوان'], plural: ['لێدوانەکان'], classComment: ['لێدوانی پۆل'] },
@@ -402,7 +436,9 @@ const COMMENT_KEYWORDS_DEVANAGARI: Record<string, CommentKeywords> = {
 };
 
 const COMMENT_KEYWORDS_CJK: Record<string, CommentKeywords> = {
-  zh: { singular: ['评论', '留言'], plural: ['评论', '条评论'], classComment: ['课堂评论', '班级评论'] },
+  zh: { singular: ['评论', '留言'], plural: ['评论', '条评论'], classComment: ['课堂评论', '班级评论', '课程评论'] },
+  'zh-cn': { singular: ['评论', '留言'], plural: ['评论', '条评论'], classComment: ['课堂评论', '班级评论', '课程评论'] },
+  'zh-tw': { singular: ['評論', '留言', '課程留言'], plural: ['則評論'], classComment: ['課堂評論', '課程留言'] },
   'zh-TW': { singular: ['評論', '留言'], plural: ['則評論'], classComment: ['課堂評論'] },
   ja: { singular: ['コメント'], plural: ['コメント'], classComment: ['クラスのコメント'] },
   ko: { singular: ['댓글'], plural: ['댓글'], classComment: ['수업 댓글'] },
@@ -411,20 +447,31 @@ const COMMENT_KEYWORDS_CJK: Record<string, CommentKeywords> = {
 const COMMENT_KEYWORDS_OTHER: Record<string, CommentKeywords> = {
   he: { singular: ['תגובה'], plural: ['תגובות'], classComment: ['תגובת כיתה'] },
   th: { singular: ['ความคิดเห็น'], plural: ['ความคิดเห็น'], classComment: ['ความคิดเห็นของชั้นเรียน'] },
-  el: { singular: ['σχόλιο'], plural: ['σχόλια'], classComment: ['σχόλιο τάξης'] },
-  ka: { singular: ['კომენტარი'], plural: ['კომენტარები'], classComment: ['კლასის კომენტარი'] },
-  hy: { singular: ['մեկնաբանություն'], plural: ['մեկնաբանություններ'], classComment: ['դասարանի մեկնաբանություն'] },
+  el: { singular: ['σχόλιο', 'σχολίου'], plural: ['σχόλια'], classComment: ['σχόλιο τάξης', 'σχολίου τάξης'] },
+  ka: { singular: ['კომენტარი', 'კომენტარის'], plural: ['კომენტარები'], classComment: ['კლასის კომენტარი'] },
+  hy: { singular: ['մեկնաբանություն'], plural: ['մեկնաբանություններ'], classComment: ['դասարանի մեկնաբանություն', 'հրապարակային մեկնաբանություն'] },
   am: { singular: ['አስተያየት'], plural: ['አስተያየቶች'], classComment: ['የክፍል አስተያየት'] },
-  bn: { singular: ['মন্তব্য'], plural: ['মন্তव्यগুলি'], classComment: ['ক্লাس মন্তব্য'] },
-  ta: { singular: ['கருத்து'], plural: ['கருத்துகள்'], classComment: ['வகுப்பு கருத்து'] },
-  te: { singular: ['వ్యాఖ్య'], plural: ['వ్యాఖ్యలు'], classComment: ['తరಗತಿ వ్యాఖ్య'] },
-  kn: { singular: ['ಕಾಮೆಂಟ್'], plural: ['ಕಾಮೆಂಟ್‌ಗಳು'], classComment: ['ತರಗತಿ ಕಾಮೆಂಟ್'] },
-  ml: { singular: ['അഭിപ്രായം'], plural: ['അഭിപ്രായങ್ങൾ'], classComment: ['ക്ലാസ് അഭിപ്രായം'] },
-  si: { singular: ['අදහස'], plural: ['අදහස්'], classComment: ['පන්ති අදහස'] },
+  bn: { singular: ['মন্তব্য', 'কমেন্ট'], plural: ['মন্তব্যগুলি', 'কমেন্ট'], classComment: ['ক্লাস মন্তব্য', 'ক্লাসে কমেন্ট'] },
+  ta: { singular: ['கருத்து', 'கருத்துரை', 'கருத்துரையைச்'], plural: ['கருத்துகள்', 'கருத்துரைகள்'], classComment: ['வகுப்பு கருத்து', 'வகுப்புக் கருத்துரை'] },
+  te: { singular: ['వ్యాఖ్య', 'కామెంట్', 'కామెంట్‌ను'], plural: ['వ్యాఖ్యలు', 'కామెంట్‌లు'], classComment: ['తరగతి వ్యాఖ్య', 'తరగతి కామెంట్'] },
+  kn: { singular: ['ಕಾಮೆಂಟ್'], plural: ['ಕಾಮೆಂಟ್‌ಗಳು'], classComment: ['ತರಗತಿ ಕಾಮೆಂಟ್', 'ತರಗತಿಯ ಕಾಮೆಂಟ್'] },
+  ml: { singular: ['അഭിപ്രായം', 'കമന്റ്'], plural: ['അഭിപ്രായങ്ങൾ', 'കമന്റുകൾ'], classComment: ['ക്ലാസ് അഭിപ്രായം', 'ക്ലാസ് കമന്റ്'] },
+  si: { singular: ['අදහස', 'අදහසක්'], plural: ['අදහස්'], classComment: ['පන්ති අදහස', 'පන්ති අදහසක්'] },
   my: { singular: ['မှတ်ချက်'], plural: ['မှတ်ချက်များ'], classComment: ['အတန်းမှတ်ချက်'] },
   km: { singular: ['មតិយោបល់'], plural: ['មតិយោបល់'], classComment: ['មតិយោបល់ថ្នាក់'] },
   lo: { singular: ['ຄຳເຫັນ'], plural: ['ຄຳເຫັນ'], classComment: ['ຄຳເຫັນຂອງຫ້ອງຮຽນ'] },
   tlh: { singular: ['QIn'], plural: ['QInmey'], classComment: ['ghom QIn'] }, // Klingon
+  // === REAL-CAPTURED FORMS (live Classroom sweep 2026-09-19) ===
+  as: { singular: ['মন্তব্য'], plural: ['মন্তব্য'], classComment: ['শ্ৰেণীৰ মন্তব্য'] },
+  gu: { singular: ['કૉમેન્ટ', 'ટિપ્પણી', 'ટિપ્પણીઓ'], plural: ['કૉમેન્ટ', 'ટિપ્પણીઓ'], classComment: ['વર્ગની કૉમેન્ટ'] },
+  mr: { singular: ['प्रतिक्रिया', 'टिप्पणी'], plural: ['प्रतिक्रिया', 'टिप्पण्या'], classComment: ['वर्ग प्रतिक्रिया', 'वर्गासंबंधी टिप्पणी'] },
+  ms: { singular: ['komen', 'ulasan'], plural: ['komen', 'ulasan'], classComment: ['komen kelas', 'ulasan kelas'] },
+  ne: { singular: ['टिप्पणी', 'कमेन्ट'], plural: ['टिप्पणीहरू', 'कमेन्ट'], classComment: ['कक्षा टिप्पणी', 'कक्षामा कमेन्ट'] },
+  or: { singular: ['ମନ୍ତବ୍ୟ'], plural: ['ମନ୍ତବ୍ୟ'], classComment: ['କ୍ଲାସ୍ ମନ୍ତବ୍ୟ'] },
+  pa: { singular: ['ਟਿੱਪਣੀ'], plural: ['ਟਿੱਪਣੀਆਂ'], classComment: ['ਕਲਾਸ ਟਿੱਪਣੀ'] },
+  sw: { singular: ['maoni'], plural: ['maoni'], classComment: ['maoni ya darasa', 'maoni kwa darasa'] },
+  uz: { singular: ['fikr', 'sharh', 'sharhlar'], plural: ['sharhlar'], classComment: ['fikr'] },
+  vi: { singular: ['nhận xét'], plural: ['nhận xét'], classComment: ['nhận xét trong lớp học'] },
 };
 
 // Merge all keyword groups
@@ -456,17 +503,41 @@ const EDITED_KEYWORDS_LATIN: Record<string, string[]> = {
   // silently fell back to English, so Hungarian edited posts went unseen.
   hu: ['szerkesztve', 'szerkesztett', 'módosítva', 'utolsó szerkesztés'],
   ro: ['editat', 'modificat', 'modificare', 'ultima modificare'],
-  tr: ['düzenlendi', 'değiştirildi', 'düzenleme', 'değişiklik'],
+  tr: ['düzenlendi', 'değiştirildi', 'düzenlenme', 'düzenleme', 'değişiklik'],
   vi: ['đã chỉnh sửa', 'sửa đổi', 'chỉnh sửa'],
   id: ['diedit', 'diubah', 'perubahan', 'pengeditan'],
-  ms: ['disunting', 'diubah', 'suntingan'],
+  ms: ['disunting', 'diubah', 'suntingan', 'diedit'],
   tl: ['na-edit', 'binago', 'pagbabago'],
-  sw: ['imehaririwa', 'imebadilishwa', 'mabadiliko'],
+  // Live sweep 2026-09-19: real marker "(Na-edit noong <time>)". The served
+  // docLang is `fil`, so the table needs the modern key (tl aliased to fil).
+  fil: ['na-edit', 'binago', 'pagbabago'],
+  sw: ['imehaririwa', 'imebadilishwa', 'mabadiliko', 'kilibadilishwa'],
   // JOKE LANGUAGES
   'xx-pirate': ['altered', 'be changed', 'yarr update', 'modified by the crew'],
   'xx-bork': ['Bork', 'Editee-a', 'Zee-a', 'moodeefied'],
   'xx-elmer': ['editewd', 'modifiewd', 'changed by wabbit'],
   'xx-hacker': ['3d1t3d', 'm0d1f13d', 'upd4t3d', 'ch4ng3d', 'h4x0r3d'],
+  // === REAL-CAPTURED FORMS (live Classroom sweep 2026-09-19, "(Edited <time>)"
+  // markers; see tests/fixtures/classroom/post-strings-captured.json) ===
+  af: ['gewysig'],
+  az: ['redaktə edildi', 'redaktə'],
+  ca: ['darrera modificació', 'modificació'],
+  cy: ['golygwyd'],
+  da: ['redigeret'],
+  et: ['muudeti'],
+  eu: ['edizio-data', 'edizio'],
+  fi: ['muokattu'],
+  ga: ['curtha in eagar', 'in eagar'],
+  hr: ['uređeno'],
+  is: ['breytt'],
+  lt: ['redaguota'],
+  lv: ['rediģēts'],
+  no: ['endret'],
+  sk: ['upravené'],
+  sl: ['urejeno'],
+  sq: ['modifikuar'],
+  sv: ['redigerad'],
+  uz: ['tahrirlandi'],
 };
 
 const EDITED_KEYWORDS_CYRILLIC: Record<string, string[]> = {
@@ -476,9 +547,14 @@ const EDITED_KEYWORDS_CYRILLIC: Record<string, string[]> = {
   bg: ['редактирано', 'променено', 'промяна', 'редакция'],
   sr: ['измењено', 'уређено', 'измена', 'уређивање'],
   mk: ['уредено', 'изменето', 'измена', 'уредување'],
-  kk: ['өңделді', 'өзгертілді', 'өзгеріс', 'өңдеу'],
+  kk: ['өңделді', 'өзгертілді', 'өзгеріс', 'өңдеу',
+    // Live sweep: real marker "(Өзгертілген күні: <time>)".
+    'өзгертілген'],
   ky: ['оңдолду', 'өзгөртүлдү', 'өзгөртүү'],
-  mn: ['засварласан', 'өөрчилсөн', 'өөрчлөлт', 'засвар'],
+  mn: ['засварласан', 'өөрчилсөн', 'өөрчлөлт', 'засвар',
+    // Live sweep 2026-09-19: Google renders the ENGLISH "(Edited <time>)"
+    // marker on Mongolian pages — keep 'edited' so it still matches.
+    'edited'],
   tg: ['таҳрир шуд', 'тағйир ёфт', 'тағйирот'],
 };
 
@@ -492,35 +568,64 @@ const EDITED_KEYWORDS_ARABIC: Record<string, string[]> = {
 };
 
 const EDITED_KEYWORDS_DEVANAGARI: Record<string, string[]> = {
-  hi: ['संपादित', 'बदला गया', 'संपादन', 'परिवर्तन', 'अंतिम संपादन'],
+  hi: ['संपादित', 'बदला गया', 'संपादन', 'परिवर्तन', 'अंतिम संपादन',
+    // Live sweep 2026-09-19: real marker "(बदलाव किया गया <time>)".
+    'बदलाव किया गया', 'बदलाव'],
   mr: ['संपादित', 'बदललेले', 'संपादन', 'बदल'],
-  ne: ['सम्पादन गरियो', 'परिवर्तन', 'सम्पादन'],
+  ne: ['सम्पादन गरियो', 'परिवर्तन', 'सम्पादन',
+    // Live sweep: real marker "(संशोधन गरिएको मिति <time>)".
+    'संशोधन गरिएको', 'संशोधन'],
   sa: ['संपादितम्', 'परिवर्तितम्', 'संपादनम्'],
 };
 
 const EDITED_KEYWORDS_CJK: Record<string, string[]> = {
-  zh: ['已编辑', '已修改', '编辑', '修改', '更改', '最后编辑'],
-  'zh-TW': ['已編輯', '已修改', '編輯', '修改', '最後編輯'],
+  zh: ['已编辑', '已修改', '编辑', '修改', '更改', '最后编辑',
+    // Live sweep 2026-09-19: real marker "（上次修改时间：<time>）".
+    // zh-cn/zh-tw keys mirror the served docLang tags (the alias resolver
+    // emits them; the original table predates that convention).
+    '上次修改时间'],
+  'zh-cn': ['已编辑', '已修改', '编辑', '修改', '更改', '最后编辑', '上次修改时间'],
+  'zh-TW': ['已編輯', '已修改', '編輯', '修改', '最後編輯',
+    // Live sweep: real marker "(上次編輯時間：<time>)".
+    '上次編輯時間', '上次編輯'],
+  'zh-tw': ['已編輯', '已修改', '編輯', '修改', '最後編輯', '上次編輯時間', '上次編輯'],
   ja: ['編集済み', '編集しました', '編集', '変更', '最終編集'],
   ko: ['수정됨', '수정함', '수정', '편집', '마지막 수정'],
 };
 
 const EDITED_KEYWORDS_OTHER: Record<string, string[]> = {
   he: ['נערך', 'עריכה אחרונה', 'עריכה', 'שינוי'],
-  th: ['แก้ไขแล้ว', 'แก้ไขล่าสุด', 'การแก้ไข'],
+  th: ['แก้ไขแล้ว', 'แก้ไขล่าสุด', 'การแก้ไข',
+    // Live sweep: real marker "(แก้ไข <time>)".
+    'แก้ไข'],
   el: ['επεξεργάστηκε', 'τροποποιήθηκε', 'τροποποίηση', 'επεξεργασία'],
-  ka: ['რედაქტირებულია', 'შეცვლილია', 'რედაქტირება', 'ცვლილება'],
-  hy: ['խմբագրված', 'վերջին խմբագրումը', 'փոփոխված'],
+  ka: ['რედაქტირებულია', 'შეცვლილია', 'რედაქტირება', 'ცვლილება',
+    // Live sweep: real marker "(რედაქტირების დრო: <time>)".
+    'რედაქტირების'],
+  hy: ['խմբագրված', 'վերջին խմբագրումը', 'փոփոխված',
+    // Live sweep: real marker "(խմբագրվել է <time>)".
+    'խմբագրվել'],
   am: ['ተስተካክል', 'ተቀይሮ', 'አርትዕ', 'ለውጥ'],
-  bn: ['সম্পাদিত', 'পরিবর্তিত', 'সম্পাদনা'],
+  bn: ['সম্পাদিত', 'পরিবর্তিত', 'সম্পাদনা',
+    // Live sweep: real marker "(<time>-এ এডিট করা হয়েছে)".
+    'এডিট করা হয়েছে', 'এডিট'],
   ta: ['திருத்தப்பட்டது', 'மாற்றப்பட்டது', 'திருத்தம்'],
-  te: ['సవరించబడింది', 'మార్చబడింది', 'సవరణ'],
-  kn: ['ಸಂಪಾದಿಸಲಾಗಿದೆ', 'ಬದಲಾಯಿಸಲಾಗಿದೆ', 'ಸಂಪಾದನೆ'],
+  te: ['సవరించబడింది', 'మార్చబడింది', 'సవరణ',
+    // Live sweep: real marker "(<time>కు ఎడిట్ చేయబడింది)".
+    'ఎడిట్ చేయబడింది', 'ఎడిట్'],
+  kn: ['ಸಂಪಾದಿಸಲಾಗಿದೆ', 'ಬದಲಾಯಿಸಲಾಗಿದೆ', 'ಸಂಪಾದನೆ',
+    // Live sweep: real marker "(<time> ಸಮಯಕ್ಕೆ ಎಡಿಟ್ ಮಾಡಲಾಗಿದೆ)".
+    'ಎಡಿಟ್ ಮಾಡಲಾಗಿದೆ', 'ಎಡಿಟ್'],
   ml: ['എഡിറ്റ് ചെയ്തു', 'മാറ്റി', 'എഡിറ്റ്'],
   si: ['සංස්කරණය කළා', 'වෙනස් කළා', 'සංස්කරණය'],
   my: ['တည်းဖြတ်ပြီး', 'ပြင်ဆင်ပြီး', 'တည်းဖြတ်'],
   km: ['បានកែសម្រួល', 'បានកែប្រែ', 'កែសម្រួល'],
   lo: ['ແກ້ໄຂແລ້ວ', 'ປ່ຽນແປງແລ້ວ', 'ການແກ້ໄຂ'],
+  // Live sweep additions for languages with no prior entry.
+  as: ['সম্পাদনা কৰা হৈছে', 'সম্পাদনা'],
+  gu: ['ફેરફાર કર્યાનો', 'ફેરફાર'],
+  or: ['ଏଡିଟ୍ କରାଯାଇଛି', 'ଏଡିଟ୍'],
+  pa: ['ਸੰਪਾਦਿਤ ਕੀਤਾ', 'ਸੰਪਾਦਿਤ'],
   tlh: ['choHta\'', 'mughta\'', 'choH'], // Klingon
 };
 
@@ -544,6 +649,9 @@ export const COMMENT_EXCLUSION_PATTERNS: string[] = [
   'اضافة تعليق', 'إضافة تعليق', 'أضف تعليق',
   'ajouter un commentaire', 'kommentar hinzufügen', 'добавить комментарий',
   'コメントを追加', '댓글 추가', '添加评论', 'הוסף תגובה',
+  // Live-captured localized composer prompts (66 languages, sweep 2026-09-19).
+  // Generated from tests/fixtures/classroom/post-strings-captured.json.
+  ...LIVE_COMPOSER_PROMPTS.map((prompt) => prompt.base.toLowerCase()),
 ];
 
 export const EDITED_EXCLUSION_PATTERNS: string[] = [
@@ -658,18 +766,30 @@ export const CONFIDENCE_WEIGHTS = {
 // HELPER FUNCTIONS
 // ============================================================================
 
+import { expandLanguageCandidates } from '../../src/core/i18n/resolve';
+
+/**
+ * Resolve the keyword table for a language tag through the shared alias
+ * expansion (iw->he, tl->fil, nb->no, zh-HK->zh-tw, ...). Real Classroom
+ * serves legacy tags — Hebrew pages report `iw`, so a plain table lookup
+ * never found the Hebrew keywords. Every candidate step is tried before
+ * falling back to en.
+ */
+function keywordTableFor<T>(table: Record<string, T>, lang: string): T {
+  for (const candidate of expandLanguageCandidates(lang)) {
+    if (table[candidate]) return table[candidate];
+  }
+  return table['en']!;
+}
+
 export function getCommentKeywords(lang: string): CommentKeywords {
-  const shortLang = (lang.split('-')[0] ?? lang).toLowerCase();
-  const fullLang = lang.toLowerCase();
   // 'en' is statically present in COMMENT_KEYWORDS, so the final fallback always resolves.
-  return COMMENT_KEYWORDS[fullLang] || COMMENT_KEYWORDS[shortLang] || COMMENT_KEYWORDS['en']!;
+  return keywordTableFor(COMMENT_KEYWORDS, lang);
 }
 
 export function getEditedKeywords(lang: string): string[] {
-  const shortLang = (lang.split('-')[0] ?? lang).toLowerCase();
-  const fullLang = lang.toLowerCase();
   // 'en' is statically present in EDITED_KEYWORDS, so the final fallback always resolves.
-  return EDITED_KEYWORDS[fullLang] || EDITED_KEYWORDS[shortLang] || EDITED_KEYWORDS['en']!;
+  return keywordTableFor(EDITED_KEYWORDS, lang);
 }
 
 export function getAllEditedKeywords(): string[] {
