@@ -1,7 +1,6 @@
 // filepath: cloudflare-worker/src/dashboard/main.ts
 import type { StatsResponse, QuotaDescriptor, ChangelogEntry, ChangelogConfig } from "../types";
 import { FAVICON_PNG_DATA_URI } from "../assets";
-import { resolveOracleEndpoint } from "../oracle-endpoint";
 
 function escapeHtml(unsafe: string): string {
   return unsafe
@@ -20,6 +19,8 @@ const DASHBOARD_LINKS = {
   workerBaseUrl: "https://cqd-analytics.adhamhaithameid.workers.dev",
   websitePublicUrl: "https://classroom-quick-downloader.adhamhaithameid.is-a.dev/",
   githubRepoUrl: "https://github.com/adhamhaithameid/Classroom-Quick-Downloader",
+  backupsRepoUrl:
+    "https://github.com/adhamhaithameid/Classroom-Quick-Downloader/tree/main/backups/latest",
   googleSheetsUrl:
     "https://docs.google.com/spreadsheets/d/1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI/edit?gid=0#gid=0",
   userChangelogSourceUrl:
@@ -640,7 +641,6 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
   const ageLastFlush = formatAge(stats.lastFlushAt);
 
   const maxBatchEvents = stats.envSnapshot?.maxBatchEvents || "n/a";
-  const oracleEndpoint = stats.envSnapshot?.oracleEndpoint || "unknown";
   const nextAutoFlush =
     maxBatchEvents !== "n/a"
       ? `when buffer ≥ ${maxBatchEvents} events`
@@ -674,13 +674,7 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
   const cfgAllowLegacy = remoteConfig.allowLegacyEvents ?? true;
   const cfgRemoteReason = remoteConfig.remoteEnabledReason ?? "ok";
   const pipelineHealthUrl = `${workerUrl}/pipeline-health`;
-  const oracleDashboardUrl = (() => {
-    const resolved = resolveOracleEndpoint(oracleEndpoint);
-    if (resolved.ok && resolved.protocol === "https:") {
-      return `${resolved.baseUrl}/`;
-    }
-    return `${workerUrl}/api/public/website/overview`;
-  })();
+  const overviewDashboardUrl = `${workerUrl}/api/public/website/overview`;
   const uptimeStatusUrl = pipelineHealthUrl;
   const cfgHealth = remoteConfig.healthThresholds || {
     warnPendingBatches: 10,
@@ -3210,11 +3204,7 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
         GitHub
       </a>
-      <a href="${escapeHtml(oracleDashboardUrl)}" target="_blank" class="btn-external oracle" data-tooltip="View Oracle analytics source">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-        Oracle
-      </a>
-      <a href="${escapeHtml(DASHBOARD_LINKS.googleSheetsUrl)}" target="_blank" class="btn-external sheets" data-tooltip="View historical analytics data and trends">
+      <a href="${escapeHtml(DASHBOARD_LINKS.backupsRepoUrl)}" target="_blank" class="btn-external sheets" data-tooltip="Daily analytics backups (CSV sheet + JSON dumps) committed to the repo">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
         Sheets
       </a>
@@ -3518,12 +3508,8 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
               MAX_BATCH_EVENTS: <code>${maxBatchEvents}</code>
             </div>
             <div class="metric-sub">
-              ORACLE_ENDPOINT:
-              <code>${
-                oracleEndpoint.startsWith("http")
-                  ? "configured"
-                  : oracleEndpoint
-              }</code>
+              ARCHIVE_MODE:
+              <code>d1 (event_archive)</code>
             </div>
           </div>
         </div>
@@ -3707,12 +3693,12 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
             <input class="rc-input" type="number" id="cfg-health-pending-critical" min="0" max="2000" value="${cfgHealthCritPending}">
             <div class="rc-hint">Critical when pending batches ≥ this value.</div>
           </div>
-          <div class="rc-field" data-tooltip="Warn when consecutive Oracle failures reach this number.">
+          <div class="rc-field" data-tooltip="Warn when consecutive archive failures reach this number.">
             <label>Failures (Warn)</label>
             <input class="rc-input" type="number" id="cfg-health-fail-warn" min="0" max="100" value="${cfgHealthWarnFailures}">
             <div class="rc-hint">Warn when failures ≥ this value.</div>
           </div>
-          <div class="rc-field" data-tooltip="Critical when consecutive Oracle failures reach this number.">
+          <div class="rc-field" data-tooltip="Critical when consecutive archive failures reach this number.">
             <label>Failures (Critical)</label>
             <input class="rc-input" type="number" id="cfg-health-fail-critical" min="0" max="100" value="${cfgHealthCritFailures}">
             <div class="rc-hint">Critical when failures ≥ this value.</div>
@@ -3841,7 +3827,7 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
         </div>
         <div class="metric-sub">
           Manage extension changelog entries and changelog pill rules in the
-          Oracle Dashboard under <code>Extension Changelog</code>.
+          analytics dashboard under <code>Extension Changelog</code>.
         </div>
       </section>
 
@@ -4013,7 +3999,7 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
           Data Hub
         </h2>
         <div class="section-subtitle" style="margin-bottom: 20px; color: var(--text-muted); font-size: 0.85rem;">
-          Manage analytics data synchronization with Oracle backend.
+          Manage analytics data archival to the edge D1 store.
         </div>
         
         <!-- Data Hub Cards Grid -->
@@ -4037,14 +4023,14 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
             </div>
           </div>
           
-          <!-- Oracle Sync Card -->
+          <!-- Archive Sync Card -->
           <div class="info-card" style="padding: 20px; background: var(--bg-surface); border-radius: var(--radius); border: 1px solid var(--border);">
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
               <span style="font-size: 1.2rem;">☁️</span>
-              <div style="font-weight: 600; color: var(--text-primary);">Oracle Sync</div>
+              <div style="font-weight: 600; color: var(--text-primary);">Archive Sync</div>
             </div>
             <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px;">
-              Export all analytics data to Oracle backend.
+              Archive all analytics data to the D1 event archive.
             </div>
             <div style="display: flex; gap: 10px; margin-bottom: 12px;">
               <button id="btn-datahub-flush" class="btn" style="flex: 1; justify-content: center; padding: 10px; background: var(--accent); color: white; border: none; font-weight: 500; font-size: 0.8rem;">
@@ -4160,18 +4146,18 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
           </div>
         </div>
 
-        <!-- Oracle Sync Section -->
+        <!-- Archive Sync Section -->
         <div class="danger-section">
           <div class="danger-section-title">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
-            Oracle Sync
+            Archive Sync
           </div>
           <div
             class="danger-row"
-            data-tooltip="Immediately pushes all pending analytics events from the Durable Object buffer to ORACLE_ENDPOINT, even if the batch threshold is not reached."
+            data-tooltip="Immediately archives all pending analytics events from the Durable Object buffer, even if the batch threshold is not reached."
           >
             <div>
-              <div class="danger-desc">Flush Buffer to Oracle</div>
+              <div class="danger-desc">Flush Buffer to Archive</div>
               <div class="danger-sub">Force pushes all pending events immediately.</div>
             </div>
             <button class="btn-danger" id="btn-force-flush" type="button">Flush now</button>
@@ -4224,7 +4210,7 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
           </div>
           <div
             class="danger-row"
-            data-tooltip="Clears all buffered events from the Durable Object. Does NOT sync to Oracle first - events will be lost."
+            data-tooltip="Clears all buffered events from the Durable Object. Events will be lost."
           >
             <div>
               <div class="danger-desc">Clear Buffer Only</div>
@@ -4295,8 +4281,8 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
             <span>Threshold for auto-flush</span>
           </div>
           <div class="modal-item">
-            <span>ORACLE_ENDPOINT</span>
-            <span>Backend ingestion URL</span>
+            <span>SITE_CACHE_DB</span>
+            <span>D1 archive for flushed analytics batches</span>
           </div>
           <div class="modal-item">
             <span>Batch Size</span>
@@ -6362,7 +6348,7 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
         "btn-force-flush",
         "/admin/force-flush",
         "Force Flush Buffer",
-        "Flush all currently buffered analytics to your ORACLE endpoint immediately.",
+        "Archive all currently buffered analytics to the D1 event archive immediately.",
       );
       bindDangerButton(
         "btn-cut-power",
@@ -6409,7 +6395,7 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
           .then((r) => r.json())
           .then((d) => {
             if (d.ok) {
-              showToast("Data exported to Oracle successfully!", "success");
+              showToast("Analytics data archived successfully!", "success");
               refreshStats();
             } else {
               showToast("Export failed: " + (d.error || "Unknown error"), "error");
@@ -6481,7 +6467,7 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
 
       // ===== DATA MANAGEMENT HANDLERS =====
       bind("btn-clear-buffer", () => {
-        if (!confirm("Clear all buffered events? This will NOT sync to Oracle first.")) return;
+        if (!confirm("Clear all buffered events? Archived batches are kept, buffered ones will be lost.")) return;
         const btn = document.getElementById("btn-clear-buffer");
         if (btn) { btn.disabled = true; btn.textContent = "Clearing..."; }
         
