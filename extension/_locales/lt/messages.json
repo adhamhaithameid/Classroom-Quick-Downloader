@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "Atšaukti viską",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Pakeista",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "po paskelbimo",
+    "description": "after_posting"
   }
 }
