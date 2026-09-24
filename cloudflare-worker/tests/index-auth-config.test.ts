@@ -35,7 +35,6 @@ function mockEnv(overrides: Partial<Env> = {}): Env {
     DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace,
     DO_SHARED_SECRET: TEST_DO_SHARED_SECRET,
     DANGER_PASSWORD: TEST_DANGER_PASSWORD,
-    ORACLE_ENDPOINT: "https://oracle.local/ingest-batch",
     MAX_BATCH_EVENTS: "10000",
     DASHBOARD_PASSWORD: TEST_DASHBOARD_PASSWORD,
     CORS_ALLOWED_ORIGINS: "https://classroom-quick-downloader-website.pages.dev,https://stats.example.com",
@@ -578,30 +577,39 @@ describe("Worker auth config hardening", () => {
     expect(payload.ok).toBe(true);
   });
 
-  it("proxies Oracle public website overview through the Worker with wildcard CORS", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+  it("serves public website overview from the edge self-serve snapshot with wildcard CORS", async () => {
+    const doFetch = vi.fn(async (input: RequestInfo | URL) => {
       const url =
         typeof input === "string"
           ? input
-          : input instanceof URL
-            ? input.toString()
-            : input.url;
-      if (url === "https://oracle.local/api/public/website/overview") {
+          : input instanceof Request
+            ? input.url
+            : String(input);
+      if (url.includes("/public/site-metrics")) {
         return new Response(
           JSON.stringify({
             ok: true,
-            generatedAt: 1771700000000,
-            totals: { downloads: 42, success: 40, fail: 2 },
+            source: "cloudflare-worker",
+            generatedAt: Date.now(),
+            totals: { downloads: 42, success: 40, fail: 2, cancelled: 0, countries: 1 },
+            countries: [{ countryCode: "US", count: 42 }],
           }),
           {
             status: 200,
-            headers: {
-              "content-type": "application/json; charset=utf-8",
-              "cache-control": "public, max-age=120",
-            },
+            headers: { "content-type": "application/json; charset=utf-8" },
           },
         );
       }
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+    });
+    const namespace = {
+      idFromName: (_name: string) => "downloads-id",
+      get: (_id: string) => ({ fetch: doFetch }),
+    };
+    const fetchMock = vi.fn(async () => {
       return new Response(JSON.stringify({ ok: false, error: "not_found" }), {
         status: 404,
         headers: { "content-type": "application/json; charset=utf-8" },
@@ -609,7 +617,9 @@ describe("Worker auth config hardening", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const env = mockEnv({ ORACLE_ENDPOINT: "https://oracle.local" });
+    const env = mockEnv({
+      DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace,
+    });
     const request = new Request("https://example.com/api/public/website/overview", {
       method: "GET",
       headers: { Origin: "https://any-origin.example" },
@@ -621,42 +631,46 @@ describe("Worker auth config hardening", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
     expect(res.headers.get("Cache-Control")).toContain("max-age=120");
+    expect(res.headers.get("x-site-source")).toBe("cloudflare-selfserve");
     expect(payload.ok).toBe(true);
     expect(payload.totals?.downloads).toBe(42);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const calledUrls = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(calledUrls.some((url) => url.includes("oracle.local"))).toBe(false);
 
     vi.unstubAllGlobals();
   });
 
-  it("proxies uninstall feedback POST with x-requested-with header", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url =
-        typeof input === "string"
-          ? input
-          : input instanceof URL
-            ? input.toString()
-            : input.url;
-      if (url === "https://oracle.local/api/public/website/uninstall") {
-        const headers = new Headers(init?.headers as HeadersInit);
-        expect(headers.get("content-type")).toContain("application/json");
-        expect(headers.get("x-requested-with")).toBe("XMLHttpRequest");
-        expect(headers.get("origin")).toBe("https://website.example");
+  it("routes uninstall feedback POST through the DO gateway with forwarded headers", async () => {
+    const doFetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const req = input as Request;
+      if (new URL(req.url).pathname === "/api/public/website/uninstall") {
+        expect(req.method).toBe("POST");
+        expect(req.headers.get("content-type")).toContain("application/json");
+        expect(req.headers.get("x-requested-with")).toBe("XMLHttpRequest");
+        expect(req.headers.get("origin")).toBe("https://website.example");
+        const payload = await req.json() as { reason?: string };
+        expect(payload.reason).toBe("test");
         return new Response(
-          JSON.stringify({ ok: true, generatedAt: 1771700000000, submissionId: 5, message: "recorded" }),
+          JSON.stringify({ ok: true, schemaVersion: "1", generatedAt: 1771700000000, submissionId: 5, message: "recorded" }),
           {
             status: 200,
             headers: { "content-type": "application/json; charset=utf-8" },
           },
         );
       }
-      return new Response(JSON.stringify({ ok: false, error: "not_found" }), {
-        status: 404,
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
         headers: { "content-type": "application/json; charset=utf-8" },
       });
     });
-    vi.stubGlobal("fetch", fetchMock);
+    const namespace = {
+      idFromName: (_name: string) => "downloads-id",
+      get: (_id: string) => ({ fetch: doFetchMock }),
+    };
 
-    const env = mockEnv({ ORACLE_ENDPOINT: "https://oracle.local" });
+    const env = mockEnv({
+      DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace,
+    });
     const request = new Request("https://example.com/api/public/website/uninstall", {
       method: "POST",
       headers: {
@@ -673,7 +687,7 @@ describe("Worker auth config hardening", () => {
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
     expect(payload.ok).toBe(true);
     expect(payload.submissionId).toBe(5);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(doFetchMock).toHaveBeenCalledTimes(1);
 
     const preflight = await worker.fetch(
       new Request("https://example.com/api/public/website/uninstall", {
@@ -747,7 +761,6 @@ describe("Worker auth config hardening", () => {
       get: (_id: string) => ({ fetch: doFetchMock }),
     };
     const env = mockEnv({
-      ORACLE_ENDPOINT: "https://oracle.local",
       DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace,
       CORS_ALLOWED_ORIGINS: "https://website.example",
     });
@@ -834,28 +847,35 @@ describe("Worker auth config hardening", () => {
         kvValue = value;
       }),
     };
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const doFetch = vi.fn(async (input: RequestInfo | URL) => {
       const url =
         typeof input === "string"
           ? input
-          : input instanceof URL
-            ? input.toString()
-            : input.url;
-      if (url === "https://oracle.local/api/public/website/snapshot") {
+          : input instanceof Request
+            ? input.url
+            : String(input);
+      if (url.includes("/public/site-metrics")) {
         return new Response(
           JSON.stringify({
             ok: true,
-            generatedAtUtc: 1771700000000,
-            changelog: {
-              entries: [{ version: "1.5.0" }],
-            },
+            source: "cloudflare-worker",
+            generatedAt: Date.now(),
+            totals: { downloads: 77, success: 70, fail: 7, cancelled: 0, countries: 1 },
+            countries: [{ countryCode: "US", count: 77 }],
           }),
-          {
-            status: 200,
-            headers: { "content-type": "application/json; charset=utf-8" },
-          },
+          { status: 200, headers: { "content-type": "application/json; charset=utf-8" } },
         );
       }
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+    });
+    const namespace = {
+      idFromName: (_name: string) => "downloads-id",
+      get: (_id: string) => ({ fetch: doFetch }),
+    };
+    const fetchMock = vi.fn(async () => {
       return new Response(JSON.stringify({ ok: false, error: "not_found" }), {
         status: 404,
         headers: { "content-type": "application/json; charset=utf-8" },
@@ -864,8 +884,8 @@ describe("Worker auth config hardening", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const env = mockEnv({
-      ORACLE_ENDPOINT: "https://oracle.local",
       SITE_SNAPSHOT_KV: kv as unknown as KVNamespace,
+      DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace,
     });
     const request = new Request("https://example.com/admin/website/snapshot/refresh", {
       method: "POST",
@@ -880,10 +900,14 @@ describe("Worker auth config hardening", () => {
     expect(res.status).toBe(200);
     expect(payload.ok).toBe(true);
     expect(payload.refreshed).toBe(true);
-    expect(payload.latestVersion).toBe("1.5.0");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(kv.put).toHaveBeenCalledTimes(1);
-    expect(kvValue).not.toBeNull();
+    // Release notes live in the website's source-controlled manual changelog;
+    // the edge snapshot carries no changelog entries anymore.
+    expect(payload.latestVersion).toBeNull();
+    const snapshotPuts = kv.put.mock.calls.filter((call) => call[0] === "site:v1:snapshot");
+    expect(snapshotPuts).toHaveLength(1);
+    expect(kvValue).toContain("ws-cf-selfserve-");
+    const calledUrls = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(calledUrls.some((url) => url.includes("oracle.local"))).toBe(false);
 
     vi.unstubAllGlobals();
   });
@@ -1043,8 +1067,51 @@ describe("Worker auth config hardening", () => {
     expect(payload.message).toContain("Danger step-up");
   });
 
-  it("returns 503 for proxied Oracle public routes when ORACLE_ENDPOINT is missing", async () => {
-    const env = mockEnv({ ORACLE_ENDPOINT: "" });
+  it("serves public changelog from the edge snapshot even when ORACLE_ENDPOINT is missing", async () => {
+    const doFetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof Request
+            ? input.url
+            : String(input);
+      if (url.includes("/public/site-metrics")) {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            source: "cloudflare-worker",
+            generatedAt: Date.now(),
+            totals: { downloads: 42, success: 40, fail: 2, cancelled: 0, countries: 1 },
+            countries: [{ countryCode: "US", count: 42 }],
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json; charset=utf-8" },
+          },
+        );
+      }
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+    });
+    const namespace = {
+      idFromName: (_name: string) => "downloads-id",
+      get: (_id: string) => ({ fetch: doFetch }),
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        return new Response(JSON.stringify({ ok: false, error: "not_found" }), {
+          status: 404,
+          headers: { "content-type": "application/json; charset=utf-8" },
+        });
+      }),
+    );
+
+    const env = mockEnv({
+      DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace,
+    });
     const request = new Request("https://example.com/api/public/website/changelog", {
       method: "GET",
       headers: {
@@ -1053,45 +1120,33 @@ describe("Worker auth config hardening", () => {
     });
 
     const res = await worker.fetch(request, env, {} as ExecutionContext);
-    const payload = await res.json() as { ok?: boolean; error?: string };
+    const payload = await res.json() as { ok?: boolean; entries?: unknown[] };
 
-    expect(res.status).toBe(503);
+    expect(res.status).toBe(200);
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
-    expect(payload.ok).toBe(false);
-    expect(payload.error).toBe("oracle_endpoint_missing");
+    expect(res.headers.get("x-site-source")).toBe("cloudflare-selfserve");
+    expect(payload.ok).toBe(true);
+    expect(Array.isArray(payload.entries)).toBe(true);
+
+    vi.unstubAllGlobals();
   });
 
-  it("rejects insecure non-loopback ORACLE_ENDPOINT without explicit override", async () => {
-    const env = mockEnv({ ORACLE_ENDPOINT: "http://oracle.local" });
-    const request = new Request("https://example.com/api/public/website/overview", {
-      method: "GET",
-      headers: {
-        Origin: "https://website.example",
-      },
-    });
-
-    const res = await worker.fetch(request, env, {} as ExecutionContext);
-    const payload = await res.json() as { ok?: boolean; error?: string };
-
-    expect(res.status).toBe(503);
-    expect(payload.ok).toBe(false);
-    expect(payload.error).toBe("oracle_endpoint_insecure");
-  });
-
-  it("allows insecure non-loopback ORACLE_ENDPOINT only when explicit override is enabled", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+  it("ignores insecure ORACLE_ENDPOINT for public routes and serves from the edge", async () => {
+    const doFetch = vi.fn(async (input: RequestInfo | URL) => {
       const url =
         typeof input === "string"
           ? input
-          : input instanceof URL
-            ? input.toString()
-            : input.url;
-      if (url === "http://oracle.local:8080/api/public/website/overview") {
+          : input instanceof Request
+            ? input.url
+            : String(input);
+      if (url.includes("/public/site-metrics")) {
         return new Response(
           JSON.stringify({
             ok: true,
-            generatedAt: 1771700000000,
-            totals: { downloads: 11, success: 10, fail: 1 },
+            source: "cloudflare-worker",
+            generatedAt: Date.now(),
+            totals: { downloads: 42, success: 40, fail: 2, cancelled: 0, countries: 1 },
+            countries: [{ countryCode: "US", count: 42 }],
           }),
           {
             status: 200,
@@ -1099,6 +1154,16 @@ describe("Worker auth config hardening", () => {
           },
         );
       }
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+    });
+    const namespace = {
+      idFromName: (_name: string) => "downloads-id",
+      get: (_id: string) => ({ fetch: doFetch }),
+    };
+    const fetchMock = vi.fn(async () => {
       return new Response(JSON.stringify({ ok: false, error: "not_found" }), {
         status: 404,
         headers: { "content-type": "application/json; charset=utf-8" },
@@ -1107,8 +1172,7 @@ describe("Worker auth config hardening", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const env = mockEnv({
-      ORACLE_ENDPOINT: "http://oracle.local:8080",
-      ALLOW_INSECURE_ORACLE_ENDPOINT: "true",
+      DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace,
     });
     const request = new Request("https://example.com/api/public/website/overview", {
       method: "GET",
@@ -1122,10 +1186,28 @@ describe("Worker auth config hardening", () => {
 
     expect(res.status).toBe(200);
     expect(payload.ok).toBe(true);
-    expect(payload.totals?.downloads).toBe(11);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(payload.totals?.downloads).toBe(42);
+    const calledUrls = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(calledUrls.some((url) => url.includes("oracle.local"))).toBe(false);
 
     vi.unstubAllGlobals();
+  });
+
+  it("returns 502 for public website routes when the self-serve build fails with no cache", async () => {
+    const env = mockEnv();
+    const request = new Request("https://example.com/api/public/website/map", {
+      method: "GET",
+      headers: {
+        Origin: "https://website.example",
+      },
+    });
+
+    const res = await worker.fetch(request, env, {} as ExecutionContext);
+    const payload = await res.json() as { ok?: boolean; error?: string };
+
+    expect(res.status).toBe(502);
+    expect(payload.ok).toBe(false);
+    expect(payload.error).toBe("upstream_unavailable");
   });
 
   it("does not emit CORS origin for protected requests without Origin header", async () => {

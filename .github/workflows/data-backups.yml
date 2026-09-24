@@ -1,0 +1,113 @@
+name: Daily Data Backups
+
+# Rolling off-Cloudflare backups of the analytics data plane:
+#   backups/latest/event-archive.{json,csv}  — D1 event archive (the "sheet")
+#   backups/latest/backup-summary.csv        — per-kind totals
+#   backups/latest/do-storage.json           — full Durable Object state dump
+#   backups/latest/public-snapshot.json      — last public website snapshot
+# Git history keeps every day's copy. The Google Sheets push is ACTIVE
+# (GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON + GOOGLE_SHEETS_ID are configured as
+# Actions secrets; the sheet is shared with the service-account client_email).
+# Full details: docs/BACKUPS.md.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Daily at 04:17 UTC.
+    - cron: "17 4 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-data-backups
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Export and commit backup sheet
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+
+      - name: Export D1 event archive
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          mkdir -p backups/latest
+          # The event_archive table appears once the new worker code has flushed
+          # its first batch; until then fall back to an empty sheet.
+          if ! npx --yes wrangler@latest d1 execute SITE_CACHE_DB --remote --json \
+            "SELECT batch_id, kind, created_at_utc, event_count, weighted_count, archived_at_utc FROM event_archive ORDER BY created_at_utc ASC" \
+            > backups/latest/event-archive.json 2>/tmp/d1-export-error.txt; then
+            if grep -qi "no such table" /tmp/d1-export-error.txt; then
+              echo "::notice::event_archive table not created yet (new worker not deployed); writing empty sheet."
+              echo '{"results":[]}' > backups/latest/event-archive.json
+            else
+              echo "::error::D1 export failed:"; cat /tmp/d1-export-error.txt
+              exit 1
+            fi
+          fi
+          node -e "const d=require('./backups/latest/event-archive.json'); const rows=Array.isArray(d)?(d[0]&&d[0].results):d.results; if(!Array.isArray(rows)) throw new Error('unexpected d1 execute output'); console.log('archived batches:', rows.length);"
+
+      - name: Build backup sheet (CSV)
+        run: node tools/backup-to-sheet.mjs backups/latest/event-archive.json backups/latest
+
+      - name: Export Durable Object state
+        env:
+          WORKER_BASE_URL: ${{ vars.PUBLIC_WORKER_BASE_URL }}
+          DO_SHARED_SECRET: ${{ secrets.DO_SHARED_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DO_SHARED_SECRET:-}" ]; then
+            echo "::warning::DO_SHARED_SECRET secret not configured; skipping DO storage dump (D1 backup still valid). Add the secret to enable full-state backups."
+            echo '{"skipped": "DO_SHARED_SECRET not configured"}' > backups/latest/do-storage.json
+            exit 0
+          fi
+          code="$(curl -sS -o backups/latest/do-storage.json -w "%{http_code}" \
+            -H "X-Admin-Secret: ${DO_SHARED_SECRET}" \
+            "${WORKER_BASE_URL%/}/admin/storage-export" || true)"
+          if [ "${code}" != "200" ]; then
+            echo "::warning::DO storage export returned HTTP ${code}; keeping previous dump."
+          fi
+
+      - name: Snapshot public website snapshot
+        env:
+          WORKER_BASE_URL: ${{ vars.PUBLIC_WORKER_BASE_URL }}
+        run: |
+          set -euo pipefail
+          code="$(curl -sS -o backups/latest/public-snapshot.json -w "%{http_code}" \
+            -H "accept: application/json" \
+            "${WORKER_BASE_URL%/}/api/public/website/snapshot" || true)"
+          if [ "${code}" != "200" ]; then
+            echo "::warning::public snapshot fetch returned HTTP ${code}; keeping previous copy."
+          fi
+
+      - name: Commit backup sheet
+        run: |
+          set -euo pipefail
+          git config user.name "cqd-backups-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add backups/latest
+          if git diff --cached --quiet; then
+            echo "No backup changes to commit."
+            exit 0
+          fi
+          git commit -m "chore(backups): daily data backup $(date -u +%Y-%m-%d) [skip ci]"
+          git push
+
+      - name: Push to Google Sheet (optional)
+        env:
+          GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_SHEETS_ID: ${{ secrets.GOOGLE_SHEETS_ID }}
+          GOOGLE_SHEETS_RANGE: ${{ vars.GOOGLE_SHEETS_RANGE }}
+        run: node tools/backup-to-sheet.mjs backups/latest/event-archive.json backups/latest

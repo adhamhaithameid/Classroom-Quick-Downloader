@@ -145,6 +145,10 @@ class MockStorage {
   async deleteAlarm(): Promise<void> {
     this.alarm = null;
   }
+
+  async list(): Promise<Map<string, unknown>> {
+    return new Map(this.map);
+  }
 }
 
 class MockState {
@@ -164,7 +168,7 @@ class MockState {
 function makeDO() {
   const state = new MockState();
   const env: Env = {
-    ORACLE_ENDPOINT: "https://example.com",
+    DO_SHARED_SECRET: "secret",
     DO_SHARED_SECRET: "secret",
     MAX_BATCH_EVENTS: "10000",
   } as Env;
@@ -176,7 +180,6 @@ function makeDOWithStored(stored: StoredState) {
   const state = new MockState();
   state.storage.seed(STORAGE_KEY, stored);
   const env: Env = {
-    ORACLE_ENDPOINT: "https://example.com",
     DO_SHARED_SECRET: "secret",
     MAX_BATCH_EVENTS: "10000",
   } as Env;
@@ -190,13 +193,49 @@ function makeDOWithEnv(envOverride: Partial<Env>, stored?: StoredState) {
     state.storage.seed(STORAGE_KEY, stored);
   }
   const env: Env = {
-    ORACLE_ENDPOINT: "https://example.com",
     DO_SHARED_SECRET: "secret",
     MAX_BATCH_EVENTS: "10000",
     ...envOverride,
   } as Env;
   const obj = new DownloadsDurable(state as unknown as DurableObjectState, env);
   return { obj, state };
+}
+
+/**
+ * Fake D1 binding for archive tests. Records every event_archive row write
+ * (batchId, kind, payload JSON) so tests can assert what the flush pipeline
+ * archived. `setFail(true)` makes writes throw to exercise retry/DLQ paths.
+ */
+function makeFakeD1(opts: { fail?: boolean } = {}) {
+  const writes: Array<{ batchId: unknown; kind: unknown; payload: string }> = [];
+  let fail = opts.fail === true;
+  const db = {
+    prepare(sql: string) {
+      return {
+        bind(...values: unknown[]) {
+          return {
+            run: async () => {
+              if (sql.includes("INSERT INTO event_archive")) {
+                if (fail) throw new Error("d1 unavailable");
+                writes.push({ batchId: values[0], kind: values[1], payload: String(values[5]) });
+              }
+              return { success: true };
+            },
+          };
+        },
+      };
+    },
+    async batch() {
+      return [];
+    },
+  };
+  return {
+    db: db as unknown as D1Database,
+    writes,
+    setFail: (value: boolean) => {
+      fail = value;
+    },
+  };
 }
 
 function makeEvent(overrides: Partial<TestEvent> = {}): TestEvent {
@@ -494,7 +533,7 @@ describe("public site metrics snapshot endpoint", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const { obj, state } = makeDOWithEnv({ ORACLE_ENDPOINT: "" });
+    const { obj, state } = makeDOWithEnv({ SITE_CACHE_DB: undefined });
     const ingestRes = await callDOWithoutAdmin(
       obj,
       "/api/public/website/events",
@@ -530,8 +569,9 @@ describe("public site metrics snapshot endpoint", () => {
     vi.unstubAllGlobals();
   });
 
-  it("flushes queued website telemetry to Oracle internal endpoint and carries correlation id", async () => {
-    const { obj } = makeDOWithEnv({ ORACLE_ENDPOINT: "https://oracle.example.com/ingest-batch" });
+  it("archives queued website telemetry to the D1 event archive", async () => {
+    const fakeD1 = makeFakeD1();
+    const { obj } = makeDOWithEnv({ SITE_CACHE_DB: fakeD1.db });
 
     const ingestRes = await callDOWithoutAdmin(
       obj,
@@ -555,27 +595,8 @@ describe("public site metrics snapshot endpoint", () => {
     );
     expect(ingestRes.status).toBe(200);
 
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const requestUrl = String(input);
-      expect(requestUrl).toContain("/api/internal/website/events/batch");
-      const headerSource = new Headers(init?.headers);
-      const corr = headerSource.get("x-correlation-id");
-      expect(typeof corr).toBe("string");
-      expect((corr || "").startsWith("wscorr-")).toBe(true);
-      const payload = JSON.parse(String(init?.body || "{}")) as { batchId?: string };
-      return new Response(
-        JSON.stringify({
-          ok: true,
-          batchId: payload.batchId,
-          generatedAt: Date.now(),
-          acceptedCount: 1,
-          rejectedCount: 0,
-        }),
-        {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        },
-      );
+    const fetchMock = vi.fn(async () => {
+      throw new Error("no upstream allowed");
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -587,7 +608,13 @@ describe("public site metrics snapshot endpoint", () => {
     expect(flushPayload.telemetry?.ok).toBe(true);
     expect(flushPayload.telemetry?.sentEvents).toBe(1);
     expect(flushPayload.telemetry?.deadLetteredBatches).toBe(0);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // The archive is local: no network calls anywhere in the flush path.
+    expect(fetchMock).toHaveBeenCalledTimes(0);
+    expect(fakeD1.writes).toHaveLength(1);
+    expect(fakeD1.writes[0].kind).toBe("website-events");
+    const archivedPayload = JSON.parse(fakeD1.writes[0].payload) as { sessionId?: string; events?: unknown[] };
+    expect(archivedPayload.sessionId).toBe("session-flush-test");
+    expect(archivedPayload.events).toHaveLength(1);
 
     const statusRes = await callDOGetWithAdmin(obj, "/admin/website/status");
     expect(statusRes.status).toBe(200);
@@ -611,10 +638,11 @@ describe("public site metrics snapshot endpoint", () => {
     vi.unstubAllGlobals();
   });
 
-  it("replays website DLQ batches and flushes them successfully", async () => {
+  it("replays website DLQ batches and archives them successfully", async () => {
     const now = Date.now();
+    const fakeD1 = makeFakeD1();
     const { obj } = makeDOWithEnv(
-      { ORACLE_ENDPOINT: "https://oracle.example.com/ingest-batch" },
+      { SITE_CACHE_DB: fakeD1.db },
       {
         websiteTelemetryQueue: [],
         websiteTelemetryDeadLetter: [
@@ -636,7 +664,7 @@ describe("public site metrics snapshot endpoint", () => {
             ],
             attempt: 6,
             nextRetryAtUtc: now + 60_000,
-            lastError: "upstream timeout",
+            lastError: "archive timeout",
           },
         ],
       },
@@ -655,26 +683,6 @@ describe("public site metrics snapshot endpoint", () => {
     expect(replayPayload.pendingBatches).toBe(1);
     expect(replayPayload.deadLetterBatches).toBe(0);
 
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-      const payload = JSON.parse(String(init?.body || "{}")) as { batchId?: string; expectedEventCount?: number };
-      expect(payload.batchId).toBe("ws-dead-letter-1");
-      expect(payload.expectedEventCount).toBe(1);
-      return new Response(
-        JSON.stringify({
-          ok: true,
-          batchId: payload.batchId,
-          generatedAt: Date.now(),
-          acceptedCount: 1,
-          rejectedCount: 0,
-        }),
-        {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        },
-      );
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
     const flushRes = await callDO(obj, "/admin/website/flush-now", {}, { "X-Admin-Secret": "secret" });
     expect(flushRes.status).toBe(200);
     const flushPayload = await flushRes.json() as {
@@ -687,7 +695,9 @@ describe("public site metrics snapshot endpoint", () => {
     expect(flushPayload.telemetry?.ok).toBe(true);
     expect(flushPayload.telemetry?.sentEvents).toBe(1);
     expect(flushPayload.telemetry?.deadLetteredBatches).toBe(0);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fakeD1.writes).toHaveLength(1);
+    expect(fakeD1.writes[0].batchId).toBe("ws-dead-letter-1");
+    expect(fakeD1.writes[0].kind).toBe("website-events");
 
     vi.unstubAllGlobals();
   });
@@ -822,60 +832,196 @@ describe("Durable Object security behaviors", () => {
     expect(res.status).toBe(413);
   });
 
-  it("requires oracle ack with matching batchId", async () => {
-    const { obj, state } = makeDO();
+  it("archives extension batches with the aggregated envelope and no raw events", async () => {
+    const fakeD1 = makeFakeD1();
+    const { obj, state } = makeDOWithEnv({ SITE_CACHE_DB: fakeD1.db });
     await callDO(obj, "/track", { events: [makeEvent()] });
-    const expectedBatchId = "do-seq0-1ev";
 
-    const fetchSpy = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => {
-      const parsed = JSON.parse(String(_init?.body || '{}'));
-      expect(parsed.summary).toBeTruthy();
-      expect(parsed.timeBuckets).toBeTruthy();
-      expect(parsed.events).toBeUndefined();
-      return new Response(
-        JSON.stringify({ ok: true, batchId: expectedBatchId, ingestedAt: Date.now() }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      );
-    });
-    vi.stubGlobal("fetch", fetchSpy);
+    const res = await callDO(obj, "/admin/force-flush", {});
+    expect(res.status).toBe(200);
+
+    expect(fakeD1.writes).toHaveLength(1);
+    expect(String(fakeD1.writes[0].batchId)).toMatch(/^do-seq/);
+    expect(fakeD1.writes[0].kind).toBe("extension-batch");
+    const archived = JSON.parse(fakeD1.writes[0].payload) as {
+      summary?: unknown;
+      timeBuckets?: unknown;
+      events?: unknown;
+    };
+    expect(archived.summary).toBeTruthy();
+    expect(archived.timeBuckets).toBeTruthy();
+    expect(archived.events).toBeUndefined();
+
+    const stored = await readFullState(state);
+    expect(stored.buffer?.length ?? 0).toBe(0);
+    vi.unstubAllGlobals();
+  });
+
+  it("marks archived batches with their pipeline batch id", async () => {
+    const fakeD1 = makeFakeD1();
+    const { obj, state } = makeDOWithEnv({ SITE_CACHE_DB: fakeD1.db });
+    await callDO(obj, "/track", { events: [makeEvent()] });
 
     const res = await callDO(obj, "/admin/force-flush", {});
     expect(res.status).toBe(200);
 
     const stored = await readFullState(state);
     expect(stored.buffer?.length ?? 0).toBe(0);
+    expect(stored.pendingBatches?.length ?? 0).toBe(0);
+    // The archived row id must equal the batch id the delivery pipeline tracks.
+    expect(fakeD1.writes).toHaveLength(1);
+    const archivedEnvelope = JSON.parse(fakeD1.writes[0].payload) as { batchId?: string };
+    expect(String(fakeD1.writes[0].batchId)).toBe(archivedEnvelope.batchId);
     vi.unstubAllGlobals();
   });
 
-  it("rejects oracle ack with mismatched batchId", async () => {
-    const { obj, state } = makeDO();
+  it("mirrors archived batches to a configured Oracle endpoint without blocking", async () => {
+    const fakeD1 = makeFakeD1();
+    const { obj, state } = makeDOWithEnv({
+      SITE_CACHE_DB: fakeD1.db,
+      ORACLE_ENDPOINT: "https://mirror.example",
+    });
     await callDO(obj, "/track", { events: [makeEvent()] });
 
-    const fetchSpy = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => {
-      return new Response(
-        JSON.stringify({ ok: true, batchId: "wrong-batch", ingestedAt: Date.now() }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      );
+    const fetchSpy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      expect(url).toBe("https://mirror.example/ingest-batch");
+      expect(new Headers(init?.headers).get("x-do-secret")).toBe("secret");
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
     });
     vi.stubGlobal("fetch", fetchSpy);
 
     const res = await callDO(obj, "/admin/force-flush", {});
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(200);
 
+    // The archive write is authoritative; the mirror is additive.
+    expect(fakeD1.writes).toHaveLength(1);
     const stored = await readFullState(state);
     expect(stored.buffer?.length ?? 0).toBe(0);
-    expect(stored.pendingBatches?.length ?? 0).toBe(1);
+    // Mirror counters are tracked for the admin console.
+    expect(stored.oracleMirrorForwards).toBe(1);
+    expect(stored.oracleMirrorFailures).toBe(0);
+    expect(typeof stored.oracleMirrorLastOkAtUtc).toBe("number");
     vi.unstubAllGlobals();
   });
 
-  it("moves failed oracle batches into the pending replay queue", async () => {
-    const { obj, state } = makeDO();
-    await callDO(obj, "/track", { events: [makeEvent(), makeEvent()] });
-
-    const fetchSpy = vi.fn(async () => {
-      return new Response("oracle down", { status: 503 });
+  it("keeps the archive committed when the Oracle mirror is unreachable", async () => {
+    const fakeD1 = makeFakeD1();
+    const { obj, state } = makeDOWithEnv({
+      SITE_CACHE_DB: fakeD1.db,
+      ORACLE_ENDPOINT: "https://mirror-down.example",
     });
-    vi.stubGlobal("fetch", fetchSpy);
+    await callDO(obj, "/track", { events: [makeEvent()] });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("mirror down");
+      }),
+    );
+
+    const res = await callDO(obj, "/admin/force-flush", {});
+    expect(res.status).toBe(200);
+
+    const stored = await readFullState(state);
+    expect(stored.buffer?.length ?? 0).toBe(0);
+    expect(stored.pendingBatches?.length ?? 0).toBe(0);
+    expect(fakeD1.writes).toHaveLength(1);
+    vi.unstubAllGlobals();
+  });
+
+  it("exports the full DO storage for admins", async () => {
+    const { obj } = makeDO();
+    // Trigger a persist so the export has content.
+    await callDO(obj, "/track", { events: [makeEvent()] });
+    const res = await callDOGetWithAdmin(obj, "/admin/storage-export");
+    expect(res.status).toBe(200);
+    const payload = await res.json() as {
+      ok?: boolean;
+      keyCount?: number;
+      truncated?: boolean;
+      storage?: Record<string, unknown>;
+    };
+    expect(payload.ok).toBe(true);
+    expect(payload.truncated).toBe(false);
+    expect(payload.storage?.analytics_buffer).toBeDefined();
+  });
+
+  it("accepts page_error website events and rejects type/action mismatches", async () => {
+    const { obj } = makeDO();
+
+    const okRes = await callDOWithoutAdmin(
+      obj,
+      "/api/public/website/events",
+      {
+        schemaVersion: "1",
+        sessionId: "session-page-error",
+        pagePath: "/overview",
+        events: [
+          {
+            eventId: "evt-page-error-1",
+            eventType: "content",
+            action: "page_error",
+            placement: "global_error",
+            meta: { msg: "TypeError: x is not a function" },
+          },
+        ],
+      },
+      { "X-Requested-With": "XMLHttpRequest" },
+    );
+    expect(okRes.status).toBe(200);
+    const okPayload = await okRes.json() as { acceptedCount?: number; rejectedCount?: number };
+    expect(okPayload.acceptedCount).toBe(1);
+    expect(okPayload.rejectedCount).toBe(0);
+
+    // action/type mapping is enforced: page_error must be eventType content.
+    const badRes = await callDOWithoutAdmin(
+      obj,
+      "/api/public/website/events",
+      {
+        schemaVersion: "1",
+        sessionId: "session-page-error-2",
+        pagePath: "/overview",
+        events: [
+          {
+            eventId: "evt-page-error-2",
+            eventType: "cta",
+            action: "page_error",
+            placement: "global_error",
+          },
+        ],
+      },
+      { "X-Requested-With": "XMLHttpRequest" },
+    );
+    // Malformed events reject the whole request (request-level contract),
+    // unlike per-event partial acceptance.
+    expect(badRes.status).toBe(400);
+    const badPayload = await badRes.json() as { error?: { code?: string } };
+    expect(badPayload.error?.code).toBe('event_action_type_mismatch');
+  });
+
+  it("accepts extension runtime_error events and counts them as failures", async () => {
+    const { obj, state } = makeDO();
+    const res = await callDO(obj, "/track", {
+      events: [
+        makeEvent({
+          status: "fail",
+          file_type: "runtime_error",
+          error_type: "typeerror_unhandled_rejection",
+          source: "background",
+        }),
+      ],
+    });
+    expect(res.status).toBe(202);
+    const stored = await readFullState(state);
+    expect(stored.totalFail).toBe(1);
+    expect(stored.counters?.byType?.runtime_error ?? stored.counters?.byType?.["runtime_error"]).toBeDefined();
+  });
+
+  it("moves failed archive batches into the pending replay queue", async () => {
+    const fakeD1 = makeFakeD1({ fail: true });
+    const { obj, state } = makeDOWithEnv({ SITE_CACHE_DB: fakeD1.db });
+    await callDO(obj, "/track", { events: [makeEvent(), makeEvent()] });
 
     const res = await callDO(obj, "/admin/force-flush", {});
     expect(res.status).toBe(500);
@@ -883,7 +1029,6 @@ describe("Durable Object security behaviors", () => {
     const stored = await readFullState(state);
     expect(stored.buffer?.length ?? 0).toBe(0);
     expect(stored.pendingBatches?.length ?? 0).toBe(1);
-    vi.unstubAllGlobals();
   });
 
   it("rejects invalid config updates", async () => {
@@ -1381,7 +1526,8 @@ describe("Durable Object security behaviors", () => {
   });
 
   it("tracks delivery metrics chain and exports failure rollups on flush success", async () => {
-    const { obj, state } = makeDO();
+    const fakeD1 = makeFakeD1();
+    const { obj, state } = makeDOWithEnv({ SITE_CACHE_DB: fakeD1.db });
 
     const invalid = await callDO(obj, "/track", { events: "invalid" });
     expect(invalid.status).toBe(400);
@@ -1391,28 +1537,24 @@ describe("Durable Object security behaviors", () => {
     });
     expect(accepted.status).toBe(202);
 
-    const fetchSpy = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-      const body = JSON.parse(String(init?.body ?? "{}")) as {
-        batchId?: string;
-        delivery?: { acceptedCount?: number; forwardedCount?: number; committedCount?: number };
-        failureLogs?: Array<{ errorCode?: string; sampleCount?: number }>;
-      };
-      expect(body.delivery?.acceptedCount).toBe(3);
-      expect(body.delivery?.forwardedCount).toBe(3);
-      expect(body.delivery?.committedCount).toBe(0);
-      expect(body.failureLogs?.some((row) => row.errorCode === "invalid_payload")).toBe(true);
-      return new Response(
-        JSON.stringify({ ok: true, batchId: body.batchId, ingestedAt: Date.now() }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      );
-    });
-    vi.stubGlobal("fetch", fetchSpy);
-
     const flush = await callDO(obj, "/admin/force-flush", {});
     expect(flush.status).toBe(200);
     const flushPayload = await flush.json() as { ok?: boolean; sent?: number };
     expect(flushPayload.ok).toBe(true);
     expect(flushPayload.sent).toBe(3);
+
+    // The archived envelope carries the delivery chain and the failure rollups.
+    // committedCount is still 0 in the payload: the commit stage is recorded
+    // locally right after the archive write succeeds.
+    expect(fakeD1.writes).toHaveLength(1);
+    const archived = JSON.parse(fakeD1.writes[0].payload) as {
+      delivery?: { acceptedCount?: number; forwardedCount?: number; committedCount?: number };
+      failureLogs?: Array<{ errorCode?: string; sampleCount?: number }>;
+    };
+    expect(archived.delivery?.acceptedCount).toBe(3);
+    expect(archived.delivery?.forwardedCount).toBe(3);
+    expect(archived.delivery?.committedCount).toBe(0);
+    expect(archived.failureLogs?.some((row) => row.errorCode === "invalid_payload")).toBe(true);
 
     const stats = await callDOGet(obj, "/stats");
     expect(stats.status).toBe(200);
@@ -1433,21 +1575,18 @@ describe("Durable Object security behaviors", () => {
 
     const stored = await readFullState(state);
     expect(stored?.failureRollups?.every((entry) => Number((entry as { unsentCount?: number }).unsentCount ?? 0) === 0)).toBe(true);
-    vi.unstubAllGlobals();
   });
 
   it("preserves rollup weighted counts in pending replay queue and commits exact sent value", async () => {
-    const { obj, state } = makeDO();
+    const fakeD1 = makeFakeD1({ fail: true });
+    const { obj, state } = makeDOWithEnv({ SITE_CACHE_DB: fakeD1.db });
     const tracked = await callDO(obj, "/track", {
       events: [makeEvent({ count: 4 })],
     });
     expect(tracked.status).toBe(202);
 
-    const failFetch = vi.fn(async () => new Response("oracle down", { status: 503 }));
-    vi.stubGlobal("fetch", failFetch);
     const firstFlush = await callDO(obj, "/admin/force-flush", {});
     expect(firstFlush.status).toBe(500);
-    vi.unstubAllGlobals();
 
     const storedAfterFail = await readFullState(state);
     const pending = storedAfterFail?.pendingBatches?.[0] as { weightedCount?: number; batch?: { batchId?: string } } | undefined;
@@ -1455,17 +1594,14 @@ describe("Durable Object security behaviors", () => {
     const pendingBatchId = pending?.batch?.batchId;
     expect(typeof pendingBatchId).toBe("string");
 
-    const okFetch = vi.fn(async () =>
-      new Response(
-        JSON.stringify({ ok: true, batchId: pendingBatchId, ingestedAt: Date.now() }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      ));
-    vi.stubGlobal("fetch", okFetch);
+    fakeD1.setFail(false);
     const secondFlush = await callDO(obj, "/admin/force-flush", {});
     expect(secondFlush.status).toBe(200);
     const secondPayload = await secondFlush.json() as { sent?: number };
     expect(secondPayload.sent).toBe(4);
-    vi.unstubAllGlobals();
+
+    expect(fakeD1.writes).toHaveLength(1);
+    expect(fakeD1.writes[0].batchId).toBe(pendingBatchId);
 
     const storedAfterSuccess = await readFullState(state);
     expect(storedAfterSuccess?.pendingBatches?.length ?? 0).toBe(0);
@@ -1473,15 +1609,13 @@ describe("Durable Object security behaviors", () => {
   });
 
   it("exports new failure rollups while replaying an existing pending batch", async () => {
-    const { obj, state } = makeDO();
+    const fakeD1 = makeFakeD1({ fail: true });
+    const { obj, state } = makeDOWithEnv({ SITE_CACHE_DB: fakeD1.db });
     const tracked = await callDO(obj, "/track", { events: [makeEvent()] });
     expect(tracked.status).toBe(202);
 
-    const failFetch = vi.fn(async () => new Response("oracle down", { status: 503 }));
-    vi.stubGlobal("fetch", failFetch);
     const firstFlush = await callDO(obj, "/admin/force-flush", {});
     expect(firstFlush.status).toBe(500);
-    vi.unstubAllGlobals();
 
     // Record a new structured failure after the batch has already moved to pending queue.
     const invalid = await callDO(obj, "/track", { events: "invalid" });
@@ -1493,22 +1627,17 @@ describe("Durable Object security behaviors", () => {
     )?.batch?.batchId;
     expect(typeof pendingBatchId).toBe("string");
 
-    const okFetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-      const body = JSON.parse(String(init?.body ?? "{}")) as {
-        batchId?: string;
-        failureLogs?: Array<{ errorCode?: string; sampleCount?: number }>;
-      };
-      expect(body.batchId).toBe(pendingBatchId);
-      expect(body.failureLogs?.some((row) => row.errorCode === "invalid_payload")).toBe(true);
-      return new Response(
-        JSON.stringify({ ok: true, batchId: pendingBatchId, ingestedAt: Date.now() }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      );
-    });
-    vi.stubGlobal("fetch", okFetch);
+    fakeD1.setFail(false);
     const secondFlush = await callDO(obj, "/admin/force-flush", {});
     expect(secondFlush.status).toBe(200);
-    vi.unstubAllGlobals();
+
+    expect(fakeD1.writes).toHaveLength(1);
+    const archived = JSON.parse(fakeD1.writes[0].payload) as {
+      batchId?: string;
+      failureLogs?: Array<{ errorCode?: string; sampleCount?: number }>;
+    };
+    expect(archived.batchId).toBe(pendingBatchId);
+    expect(archived.failureLogs?.some((row) => row.errorCode === "invalid_payload")).toBe(true);
 
     const storedAfter = await readFullState(state);
     expect(storedAfter?.failureRollups?.every((entry) => Number((entry as { unsentCount?: number }).unsentCount ?? 0) === 0)).toBe(true);

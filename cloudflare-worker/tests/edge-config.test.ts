@@ -31,7 +31,6 @@ function makeWorkerEnv(kv: unknown, doFetch: (input: RequestInfo | URL) => Promi
     SITE_SNAPSHOT_KV: kv as unknown as WorkerEnv["SITE_SNAPSHOT_KV"],
     DO_SHARED_SECRET: TEST_DO_SHARED_SECRET,
     DANGER_PASSWORD: TEST_DANGER_PASSWORD,
-    ORACLE_ENDPOINT: "https://oracle.example.com/ingest-batch",
     MAX_BATCH_EVENTS: "10000",
   };
 }
@@ -227,7 +226,6 @@ class MockState {
 function makeDOWithKv(kv: unknown) {
   const state = new MockState();
   const env = {
-    ORACLE_ENDPOINT: "https://example.com",
     DO_SHARED_SECRET: "secret",
     MAX_BATCH_EVENTS: "10000",
     SITE_SNAPSHOT_KV: kv,

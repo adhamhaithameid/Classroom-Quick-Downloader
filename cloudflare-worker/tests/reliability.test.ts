@@ -26,7 +26,6 @@ function env(
     DO_SHARED_SECRET: TEST_SHARED_SECRET,
     DASHBOARD_PASSWORD: TEST_DASHBOARD_PASSWORD,
     DANGER_PASSWORD: TEST_DANGER_PASSWORD,
-    ORACLE_ENDPOINT: 'https://oracle.example.com/ingest-batch',
     MAX_BATCH_EVENTS: '10000',
     CORS_ALLOWED_ORIGINS: 'https://classroom-quick-downloader-website.pages.dev',
     ...overrides
@@ -66,60 +65,82 @@ describe('cloudflare worker reliability behavior', () => {
     expect(payload.error?.code).toBe('upstream_unavailable');
   });
 
-  it('fails safely when ORACLE_ENDPOINT is missing or insecure', async () => {
-    const missingResponse = await worker.fetch(
-      new Request('https://worker.example.com/api/public/website/overview'),
-      env({ ORACLE_ENDPOINT: '' }),
-      {} as ExecutionContext
-    );
-    expect(missingResponse.status).toBe(503);
-    expect((await missingResponse.json() as { error?: string }).error).toBe('oracle_endpoint_missing');
-
-    const insecureResponse = await worker.fetch(
-      new Request('https://worker.example.com/api/public/website/overview'),
-      env({ ORACLE_ENDPOINT: 'http://oracle.example.com/ingest-batch' }),
-      {} as ExecutionContext
-    );
-    expect(insecureResponse.status).toBe(503);
-    expect((await insecureResponse.json() as { error?: string }).error).toBe('oracle_endpoint_insecure');
-  });
-
-  it('keeps legacy insecure override behavior when explicitly enabled', async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url =
-        typeof input === 'string'
-          ? input
-          : input instanceof URL
-            ? input.toString()
-            : input.url;
-      if (url === 'http://oracle.example.com:8080/api/public/website/overview') {
+  it('serves the public overview without any ORACLE_ENDPOINT configured', async () => {
+    const doFetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
+      if (url.includes('/public/site-metrics')) {
         return new Response(
-          JSON.stringify({ ok: true, totals: { downloads: 7 } }),
-          {
-            status: 200,
-            headers: { 'content-type': 'application/json; charset=utf-8' }
-          }
+          JSON.stringify({
+            ok: true,
+            source: 'cloudflare-worker',
+            generatedAt: Date.now(),
+            totals: { downloads: 320, success: 300, fail: 20, cancelled: 0, countries: 1 },
+            countries: [{ countryCode: 'US', count: 320 }]
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
         );
       }
-      return new Response(JSON.stringify({ ok: false, error: 'not_found' }), {
-        status: 404,
-        headers: { 'content-type': 'application/json; charset=utf-8' }
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
       });
+    });
+    const namespace = {
+      idFromName: (_name: string) => 'downloads-id',
+      get: (_id: string) => ({ fetch: doFetch })
+    };
+    const fetchMock = vi.fn(async () => {
+      return new Response(JSON.stringify({ ok: false, error: 'not_found' }), { status: 404 });
     });
     vi.stubGlobal('fetch', fetchMock);
 
     const response = await worker.fetch(
       new Request('https://worker.example.com/api/public/website/overview'),
-      env({
-        ORACLE_ENDPOINT: 'http://oracle.example.com:8080',
-        ALLOW_INSECURE_ORACLE_ENDPOINT: 'true'
-      }),
+      env({ ORACLE_ENDPOINT: '', DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace }),
       {} as ExecutionContext
     );
 
     expect(response.status).toBe(200);
-    expect((await response.json() as { ok?: boolean; totals?: { downloads?: number } }).ok).toBe(true);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const payload = await response.json() as { ok?: boolean; totals?: { downloads?: number } };
+    expect(payload.ok).toBe(true);
+    expect(payload.totals?.downloads).toBe(320);
+    const calledUrls = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(calledUrls.some((url) => url.includes('oracle'))).toBe(false);
     vi.unstubAllGlobals();
+  });
+
+  it('falls back to the last-good KV snapshot when the DO metrics are unavailable', async () => {
+    const cachedSnapshot = {
+      schemaVersion: '1',
+      ok: true,
+      snapshotId: 'last-good-cache',
+      generatedAtUtc: Date.now() - 30 * 60 * 1000,
+      cacheWrittenAtUtc: Date.now() - 30 * 60 * 1000,
+      overview: {
+        schemaVersion: '1',
+        ok: true,
+        generatedAt: Date.now() - 30 * 60 * 1000,
+        totals: { downloads: 42, success: 40, fail: 2 }
+      },
+      map: { countries: [] },
+      changelog: { entries: [] }
+    };
+    const kv = {
+      get: vi.fn(async (key: string) =>
+        key === 'site:v1:snapshot' ? JSON.stringify(cachedSnapshot) : null
+      ),
+      put: vi.fn(async () => undefined)
+    };
+    const response = await worker.fetch(
+      new Request('https://worker.example.com/api/public/website/overview'),
+      env({ SITE_SNAPSHOT_KV: kv as unknown as KVNamespace }),
+      {} as ExecutionContext
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-site-fallback')).toBe('snapshot-cache');
+    const payload = await response.json() as { ok?: boolean; totals?: { downloads?: number } };
+    expect(payload.ok).toBe(true);
+    expect(payload.totals?.downloads).toBe(42);
   });
 });

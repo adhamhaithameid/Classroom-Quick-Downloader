@@ -159,7 +159,7 @@ describe("Dashboard website console CTA", () => {
     expect(html).toContain('href="https://classroom-quick-downloader.adhamhaithameid.is-a.dev/"');
     expect(html).toContain('href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader"');
     expect(html).toContain(
-      'href="https://docs.google.com/spreadsheets/d/1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI/edit?gid=0#gid=0"',
+      'href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/tree/main/backups/latest"',
     );
   });
 });

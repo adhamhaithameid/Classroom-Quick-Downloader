@@ -3,16 +3,13 @@ main = "src/index.ts"
 compatibility_date = "2024-12-01"
 
 [vars]
-  # Production Oracle endpoint.
-  # The worker appends "/ingest-batch" for flushes and "/api/public/website/*" for public reads.
-  # Keep this HTTPS-only in committed config.
-  # Current stable ingress uses :8080 because upstream OCI rules block :443.
-  ORACLE_ENDPOINT = "https://129.151.233.229.nip.io:8080"
-  # Temporary compatibility flag (keep false while HTTPS endpoint is healthy).
-  # Set to "true" only for emergency HTTP fallback, then revert immediately.
-  ALLOW_INSECURE_ORACLE_ENDPOINT = "false"
-  # The worker appends "/ingest-batch" for flushes and "/api/public/website/*" for public reads.
-  # Use DNS host (not raw IP) so Cloudflare fetch does not hit direct-IP egress restrictions.
+  # Analytics flushes archive to the SITE_CACHE_DB D1 database (edge-local);
+  # no external analytics backend is required.
+  # Optional mirror: to re-enable forwarding of archived batches to an external
+  # analytics backend (e.g. a restored Oracle server), set this to its https://
+  # base URL (or inject it via `wrangler secret`/CI var). Leave unset to stay
+  # fully Cloudflare-only — everything works without it.
+  # ORACLE_ENDPOINT = "https://your-server.example"
   MAX_BATCH_EVENTS = "10000"
   # Website writes (telemetry + uninstall feedback) are origin-gated.
   # Keep this synced with your active website domains.

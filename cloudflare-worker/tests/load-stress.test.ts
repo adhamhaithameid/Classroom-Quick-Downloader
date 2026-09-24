@@ -26,7 +26,6 @@ function env(
     DO_SHARED_SECRET: TEST_SHARED_SECRET,
     DASHBOARD_PASSWORD: TEST_DASHBOARD_PASSWORD,
     DANGER_PASSWORD: TEST_DANGER_PASSWORD,
-    ORACLE_ENDPOINT: 'https://oracle.example.com/ingest-batch',
     MAX_BATCH_EVENTS: '10000',
     CORS_ALLOWED_ORIGINS: 'https://classroom-quick-downloader-website.pages.dev',
     ...overrides

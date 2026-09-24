@@ -1,13 +1,16 @@
 # ⚡ CQD Analytics Worker
 
-> Update (2026-02-28): Worker remains the public ingress/proxy for website telemetry and Oracle public website APIs; latest scan confirms clean dependency audit and passing strict suite in isolated runs.
+> Update (2026-09-20): **The pipeline is fully Oracle-free.** The Worker serves the
+> website's public data itself (edge snapshot + live store scraping), and flushed
+> analytics batches are archived to the `SITE_CACHE_DB` D1 database instead of an
+> external backend. See "Data pipeline (Oracle-free)" below.
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
 ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?logo=cloudflare&logoColor=white)
 ![Durable Objects](https://img.shields.io/badge/Durable_Objects-Enabled-blueviolet)
 ![Version](https://img.shields.io/badge/v3.0.0-success)
 
-The **CQD Analytics Worker** is a high-performance, edge-deployed analytics ingestion service for the Classroom Quick Downloader browser extension. Built on **Cloudflare Workers** and **Durable Objects**, it captures download events from thousands of users worldwide and intelligently batches them before forwarding to an Oracle backend.
+The **CQD Analytics Worker** is a high-performance, edge-deployed analytics ingestion service for the Classroom Quick Downloader browser extension. Built on **Cloudflare Workers**, **Durable Objects**, and **D1**, it captures download events from thousands of users worldwide, aggregates them at the edge, and archives them to the edge D1 store — no external backend involved.
 
 ---
 
@@ -19,7 +22,7 @@ The **CQD Analytics Worker** is a high-performance, edge-deployed analytics inge
 | **Edge Computing**        | Requests are handled at the closest datacenter to each user (~50ms global latency).                                           |
 | **Low Latency Ingestion** | Fire-and-forget`POST /track` accepts events instantly; processing happens asynchronously.                                     |
 | **Intelligent Batching**  | Events are buffered in a Durable Object and flushed in optimized batches, preventing database saturation.                     |
-| **Pre-Aggregation**       | Calculates "Top Browser", "Top Country", and detailed breakdowns*before* sending to Oracle, saving bandwidth and backend CPU. |
+| **Pre-Aggregation**       | Calculates "Top Browser", "Top Country", and detailed breakdowns*before* archiving, keeping the archive small and cheap. |
 | **Built-in Retry**        | Failed flushes trigger exponential backoff (1m → 5m → 15m → ... → 24h), ensuring no data is lost.                         |
 
 ---
@@ -68,16 +71,16 @@ The **CQD Analytics Worker** is a high-performance, edge-deployed analytics inge
 │     • counters         - Live aggregated stats (by browser, OS, country...)   │
 │     • batchSeq         - Monotonic batch ID for idempotency                   │
 │     • eventSeq         - Monotonic event sequence for end-to-end ACK          │
-│     • committedSeq     - Highest sequence confirmed flushed to Oracle         │
+│     • committedSeq     - Highest sequence confirmed archived                   │
 │     • retryState       - Backoff tracking for failed flushes                  │
 │     • reqCountToday    - Daily request quota tracking                         │
-│     • pendingBatches   - Compacted batches waiting on Oracle                  │
+│     • pendingBatches   - Compacted batches waiting to be archived             │
 │                                                                               │
 │   BUFFERING:                                                                  │
 │     • Events accumulate in `buffer[]`                                         │
 │     • When buffer.length >= MAX_BATCH_EVENTS, flush triggers                  │
 │                                                                               │
-│   AGGREGATION (before sending to Oracle):                                     │
+│   AGGREGATION (before archiving):                                             │
 │     • Groups events by hour (TimeBuckets)                                     │
 │     • Calculates: topBrowser, topOs, topCountry, topType                      │
 │     • Builds full breakdown maps (browsers, countries, languages, etc.)       │
@@ -88,11 +91,11 @@ The **CQD Analytics Worker** is a high-performance, edge-deployed analytics inge
                                         │ Header: X-DO-SECRET
                                         ▼
 ┌───────────────────────────────────────────────────────────────────────────────┐
-│                         ORACLE BACKEND (VM)                                   │
-│                         ───────────────────                                   │
-│   • Receives pre-aggregated batch                                             │
-│   • Stores in SQLite (downloads_hourly, downloads_totals, batches...)         │
-│   • Serves dashboard UI with historical charts                                │
+│                         D1 ARCHIVE (SITE_CACHE_DB)                            │
+│                         ──────────────────────────                            │
+│   • Aggregated batch envelope persisted to `event_archive`                    │
+│   • Same batchId/delivery chain as the pipeline (auditable, replayable)       │
+│   • No external system: storage, serving, and archival all live at the edge   │
 └───────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -100,8 +103,70 @@ The **CQD Analytics Worker** is a high-performance, edge-deployed analytics inge
 
 1. **Strong Consistency**: All analytics requests for a given name ("downloads") are routed to the *same* DO instance globally. No split-brain, no race conditions.
 2. **Persistent State**: The buffer survives Worker restarts. Events are never lost.
-3. **Rate Limiting**: Batching prevents overwhelming the Oracle backend with high-frequency individual writes.
+3. **Rate Limiting**: Batching keeps archive writes infrequent and cheap.
 4. **Alarms**: Durable Objects have built-in scheduled alarms for retry logic with exponential backoff.
+
+---
+
+## 🔁 Data pipeline (Oracle-free)
+
+The legacy `oracle-backend/` Go service (VM + SQLite) was retired as a data
+path. Every data acquisition app it ran is now replicated on Cloudflare, and
+every consumer reads edge-owned data:
+
+| Legacy Oracle app                             | Cloudflare replacement                                                                 |
+| --------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `store_batch` (extension ingest `/ingest-batch`) | DO ingest (`/track`) + aggregated batch archive to D1 `event_archive` (`event-archive.ts`) |
+| `public_website` (snapshot/overview/map/changelog/uninstall) | Worker self-serve snapshot (`buildSelfServeSiteSnapshot`) + DO uninstall store |
+| `browser_store_sync` (CWS/AMO/Edge scraping)  | `store-stats.ts` — live scraping, KV-cached (`site:v1:store-stats`), cron-refreshed    |
+| `website_traffic_sync` (pulled traffic FROM Cloudflare) | Obsolete — the traffic data already originates at Cloudflare; Oracle was only a mirror |
+| `public_website_internal_batch` (website events receiver) | DO telemetry queue archived to D1 (no external receiver)                     |
+| `sheets_flush` (Google Sheets export)         | Replicated: the daily `data-backups.yml` workflow commits the archive sheet to `backups/latest/` and pushes it to the project Google Sheet — see `docs/BACKUPS.md` |
+| `relay` (SQLite → Postgres HA)                | Not needed — D1 provides durable replicated storage                                     |
+| `extension_changelog`                         | Obsolete — changelog auto-syncs from GitHub (`auto_github`) and the website uses its repo-owned manual changelog |
+
+Snapshot caching: KV `site:v1:snapshot` (6h freshness window, one-year KV
+retention — last-good data survives long outages), store stats: KV
+`site:v1:store-stats` (same one-year retention, refreshed whenever scraping
+works). The website reads nothing but the Worker; the Worker consults nothing
+but its own DO, KV, D1, and the public store APIs.
+
+### Restoring the Oracle backend (optional mirror)
+
+Getting the old server back does NOT require rewiring the website. The pipeline
+is mirror-ready:
+
+1. Set the server's https:// base URL as the `ORACLE_ENDPOINT` variable
+   (GitHub Actions var, or `wrangler.toml` `[vars]`, or `.dev.vars` locally)
+   and redeploy. That is the entire change.
+2. From then on, every archived batch (extension analytics and website events)
+   is also forwarded best-effort to `<ORACLE_ENDPOINT>/ingest-batch` and
+   `/api/internal/website/events/batch`. The D1 archive stays authoritative —
+   mirror outages never lose edge data or block flushes.
+3. Optional backfill: the full history since the switch lives in the D1
+   `event_archive` table (one row per batch, aggregated envelopes). Export with
+   `wrangler d1 execute SITE_CACHE_DB --command "SELECT * FROM event_archive
+   ORDER BY created_at_utc"` and replay rows into the server if it needs the
+   gap filled.
+
+While `ORACLE_ENDPOINT` is unset, nothing in the pipeline references it and
+nothing is forwarded.
+
+### Longevity & portability (leave-it-alone guarantees)
+
+- **KV retention**: last-good snapshot and store-stats entries are kept for a
+  year regardless of freshness — the website shows real (possibly slightly
+  stale) data even if the DO or store scraping breaks for months.
+- **Data export**: `GET /admin/storage-export` (admin secret) dumps the entire
+  DO state as JSON; `wrangler d1 export` dumps the archive. Nothing is locked
+  into Cloudflare-only formats (D1 is SQLite).
+- **Daily off-Cloudflare backups**: the `data-backups.yml` workflow commits
+  the archive sheet, DO-state dump, and public snapshot to `backups/latest/`
+  and pushes them to the project Google Sheet. Full details, restore
+  procedures, and the Google integration live in **`docs/BACKUPS.md`**.
+- **Static site**: `website/` builds to plain static files (`build/`), so the
+  site itself can be re-hosted anywhere; `bootstrap-snapshot.json` baked into
+  the build keeps the landing page populated with zero backend.
 
 ---
 
@@ -111,7 +176,10 @@ The **CQD Analytics Worker** is a high-performance, edge-deployed analytics inge
 cloudflare-worker/
 ├── src/
 │   ├── index.ts          # Main Worker entrypoint: routing, CORS, DO proxy
-│   ├── downloads_do.ts   # Durable Object: buffering, aggregation, Oracle flush
+│   ├── downloads_do.ts   # Durable Object: buffering, aggregation, D1 archive flush
+│   ├── store-stats.ts    # Live store scraping (CWS / AMO / Edge / GitHub)
+│   ├── event-archive.ts  # D1 event archive (batch persistence)
+│   ├── oracle-endpoint   # (removed 2026-09-20)
 │   ├── types.ts          # TypeScript interfaces for all payloads
 │   ├── dashboard.ts      # HTML rendering for the admin dashboard
 │   └── assets.ts         # Base64-encoded logo/favicon for dashboard
@@ -125,8 +193,8 @@ cloudflare-worker/
 | File              | Responsibility                                                                   |
 | ----------------- | -------------------------------------------------------------------------------- |
 | `index.ts`        | Routes requests, handles CORS preflight, extracts geo headers, proxies to DO.    |
-| `downloads_do.ts` | The brain. Buffers events, aggregates stats, flushes to Oracle with retry logic. |
-| `types.ts`        | Defines exact shapes for`StoredEvent`, `OracleBatch`, `StatsResponse`, etc.      |
+| `downloads_do.ts` | The brain. Buffers events, aggregates stats, archives to D1 with retry logic. |
+| `types.ts`        | Defines exact shapes for `StoredEvent`, `AnalyticsArchiveBatch`, `StatsResponse`, etc. |
 | `dashboard.ts`    | Renders the live admin dashboard UI (inline CSS/JS, no external dependencies).   |
 | `assets.ts`       | Contains base64 SVG/PNG for favicon and logo.                                    |
 
@@ -140,10 +208,8 @@ values should be injected outside the committed file:
 
 | Variable              | Type                           | Description                                                                                         | Example                       |
 | --------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------- | ----------------------------- |
-| `ORACLE_ENDPOINT`     | local `.dev.vars` / CI variable | Base URL of the Oracle backend. Do not include `/ingest-batch`. The committed `wrangler.toml` keeps a placeholder value; inject the real value in local dev or CI. Use HTTPS in production; only local loopback/debug flows should ever use insecure HTTP overrides. | `https://your-server.com` |
-| `ALLOW_INSECURE_ORACLE_ENDPOINT` | local `.dev.vars` / CI variable (optional) | Legacy compatibility override for temporary migration windows. Only literal `"true"` enables non-loopback HTTP Oracle endpoints. Keep unset in production and remove after HTTPS cutover is complete. | `true` |
 | `MAX_BATCH_EVENTS`    | `[vars]`                       | Maximum events per flush. When buffer reaches this size, a flush is triggered.                      | `10000`                       |
-| `DO_SHARED_SECRET`    | **Secret**                     | Shared secret for admin endpoints + Oracle communication. **Do NOT put in `[vars]`**.              | —                            |
+| `DO_SHARED_SECRET`    | **Secret**                     | Shared secret for admin endpoints and DO authorization. **Do NOT put in `[vars]`**.               | —                            |
 | `DASHBOARD_PASSWORD`  | **Secret**                     | Password for the Worker dashboard login/session tokens (separate from `DO_SHARED_SECRET`).         | —                            |
 | `DANGER_PASSWORD`     | **Secret**                     | Password for Danger Zone actions.                                                                   | —                            |
 | `SESSION_BINDING_MODE`| `[vars]` (optional)            | Session replay hardening mode: `off`, `optional`, or `strict` (coarse IP-prefix + UA fingerprint). | `strict`                     |
@@ -163,7 +229,7 @@ pnpm exec wrangler secret put DO_SHARED_SECRET
 # Enter your strong, random secret (e.g., from `openssl rand -hex 32`)
 ```
 
-This secret must match the `DO_SHARED_SECRET` environment variable on your Oracle backend.
+This secret is used only inside Cloudflare (Worker ↔ DO authorization); there is no external backend to sync with.
 
 **Dashboard Login:** Use `DASHBOARD_PASSWORD` (separate secret) for Worker dashboard access.
 
@@ -244,7 +310,7 @@ curl -X POST https://cqd-analytics.your-subdomain.workers.dev/track \
 ```
 
 `acceptedSeqs` lets the extension mark which events were accepted by the DO.
-`committedSeq` indicates the latest sequence the Worker has safely flushed to Oracle.
+`committedSeq` indicates the latest sequence the Worker has safely archived to D1.
 `clientBatchId` echoes the extension's request ID so the client can verify the ACK.
 
 **Event Schema (`StoredEvent`):**
@@ -306,7 +372,7 @@ curl https://cqd-analytics.your-subdomain.workers.dev/stats
   },
   "envSnapshot": {
     "maxBatchEvents": "10000",
-    "oracleEndpoint": "https://..."
+    "archiveMode": "d1"
   },
   "deliveryMetrics": {
     "totals": {
@@ -337,7 +403,7 @@ curl https://cqd-analytics.your-subdomain.workers.dev/stats
 ```
 
 `deliveryMetrics` provides stage-chain observability (`accepted → stored → forwarded → committed`) for end-to-end verification.  
-`failureSink` exposes structured Cloudflare DO failure rollups that are also forwarded to Oracle on successful flush.
+`failureSink` exposes structured Cloudflare DO failure rollups that are also exported into the archived batch envelope on successful flush.
 
 ---
 
@@ -447,7 +513,7 @@ curl https://cqd-analytics.your-subdomain.workers.dev/pipeline-health
 
 ### `POST /admin/force-flush` — Force Buffer Flush 🔒
 
-Immediately flushes the event buffer to Oracle, bypassing the batch size threshold.
+Immediately archives the event buffer, bypassing the batch size threshold.
 
 **Requires `X-Admin-Secret` header.**
 
@@ -460,7 +526,7 @@ curl -X POST https://cqd-analytics.your-subdomain.workers.dev/admin/force-flush 
 
 ### `POST /admin/cut-power` — Disable Remote Analytics 🔒
 
-Stops sending data to Oracle (useful for emergencies or maintenance).
+Pauses archive flushes (useful for emergencies or maintenance).
 
 ```bash
 curl -X POST https://cqd-analytics.your-subdomain.workers.dev/admin/cut-power \
@@ -471,7 +537,7 @@ curl -X POST https://cqd-analytics.your-subdomain.workers.dev/admin/cut-power \
 
 ### `POST /admin/restore-power` — Re-enable Remote Analytics 🔒
 
-Resumes sending data to Oracle.
+Resumes archive flushes.
 
 ```bash
 curl -X POST https://cqd-analytics.your-subdomain.workers.dev/admin/restore-power \
@@ -493,7 +559,7 @@ curl -X POST https://cqd-analytics.your-subdomain.workers.dev/admin/full-sync \
 
 ## 📊 The "Big JSON" Aggregation
 
-Before sending data to Oracle, the Durable Object performs significant pre-aggregation to minimize payload size and backend processing:
+Before archiving, the Durable Object performs significant pre-aggregation to keep the archived envelope small:
 
 **What Gets Calculated:**
 
@@ -506,7 +572,7 @@ Before sending data to Oracle, the Durable Object performs significant pre-aggre
    * `languages`, `versions`, `types`, `errorReasons`
    * **`topBrowser`, `topOs`, `topCountry`, `topType`**: Pre-computed "winners".
 
-**Example Final Payload to Oracle (`OracleBatch`):**
+**Example archived envelope (`AnalyticsArchiveBatch`):**
 
 ```json
 {
@@ -535,7 +601,7 @@ Before sending data to Oracle, the Durable Object performs significant pre-aggre
 }
 ```
 
-This design means Oracle receives an already-analyzed summary, drastically reducing database writes and query complexity.
+This design means the archive receives an already-analyzed summary, drastically reducing storage writes and query complexity.
 
 ---
 
@@ -612,15 +678,15 @@ The Worker will be deployed to `https://cqd-analytics.<your-subdomain>.workers.d
 
 ---
 
-### Oracle Flush Failing (`ORACLE_ENDPOINT or DO_SHARED_SECRET not configured`)
+### Archive Flush Failing (`SITE_CACHE_DB is not configured`)
 
-**Symptom:** Stats show `retryState.lastError: "ORACLE_ENDPOINT or DO_SHARED_SECRET not configured"`.
+**Symptom:** Stats show `retryState.lastError: "SITE_CACHE_DB is not configured"`.
 
-**Cause:** Environment variables are missing or incorrectly set.
+**Cause:** The D1 archive binding is missing from the deployment.
 
 **Solution:**
 
-1. Check the effective `ORACLE_ENDPOINT` in local `.dev.vars` or in your CI variables.
+1. Ensure the `[[d1_databases]]` binding for `SITE_CACHE_DB` exists in `wrangler.toml`.
 2. Ensure `DO_SHARED_SECRET` was set via `wrangler secret put`.
 3. Redeploy after making changes: `pnpm run deploy`.
 

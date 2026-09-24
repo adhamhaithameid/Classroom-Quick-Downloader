@@ -1,0 +1,62 @@
+name: Monthly Bootstrap Snapshot Refresh
+
+# Keeps website/static/data/bootstrap-snapshot.json (the baked first-paint
+# fallback) in step with live data. Uses only public endpoints — no Cloudflare
+# credentials required. Opens a PR when the data changed; a human merges.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Monthly on the 17th at 05:23 UTC.
+    - cron: "23 5 17 * *"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: bootstrap-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: Regenerate bootstrap snapshot and open PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+
+      - name: Regenerate bootstrap snapshot
+        env:
+          WORKER_BASE_URL: ${{ vars.PUBLIC_WORKER_BASE_URL }}
+        run: node website/scripts/generate-bootstrap-snapshot.mjs
+
+      - name: Open PR when data changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- website/static/data/bootstrap-snapshot.json; then
+            echo "Bootstrap snapshot already up to date."
+            exit 0
+          fi
+
+          BRANCH="chore/bootstrap-snapshot-refresh"
+          git config user.name "cqd-bootstrap-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add website/static/data/bootstrap-snapshot.json
+          git commit -m "chore(website): refresh bootstrap snapshot with live data"
+          git push --force origin "$BRANCH"
+
+          gh pr create \
+            --title "chore(website): monthly bootstrap snapshot refresh" \
+            --body "Automated refresh of \`website/static/data/bootstrap-snapshot.json\` from live worker metrics and store stats. See [generator docs](../blob/main/website/scripts/generate-bootstrap-snapshot.mjs). Merging is safe: the script refuses to shrink headline numbers." \
+            --base main \
+            --head "$BRANCH"

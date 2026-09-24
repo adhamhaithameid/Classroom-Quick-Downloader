@@ -52,7 +52,6 @@ function makeEnv(overrides: Partial<Env> = {}): Env {
     DO_SHARED_SECRET: TEST_DO_SHARED_SECRET,
     DASHBOARD_PASSWORD: TEST_DASHBOARD_PASSWORD,
     DANGER_PASSWORD: TEST_DANGER_PASSWORD,
-    ORACLE_ENDPOINT: "https://oracle.example.com/ingest-batch",
     MAX_BATCH_EVENTS: "10000",
     SITE_CACHE_DB: d1,
     ...overrides,

@@ -69,7 +69,7 @@ export interface Counters {
 }
 
 /**
- * Retry/backoff state for Oracle flushing.
+ * Retry/backoff state for archive flushing.
  */
 export interface RetryState {
   consecutiveFailures: number;
@@ -115,11 +115,11 @@ export interface QuotaDescriptor {
 }
 
 /**
- * Snapshot of environment variables for the dashboard to display.
+ * Snapshot of environment configuration for the dashboard to display.
  */
 export interface EnvSnapshot {
   maxBatchEvents: string;
-  oracleEndpoint: string;
+  archiveMode: string;
 }
 
 /**
@@ -377,13 +377,12 @@ export interface Env {
   DO_SHARED_SECRET: string;
   DASHBOARD_PASSWORD?: string;
   DANGER_PASSWORD: string;
-  ORACLE_ENDPOINT: string;
   /**
-   * Optional legacy compatibility override to allow non-loopback HTTP Oracle endpoints.
-   * This is intentionally strict: only the literal string "true" enables it.
-   * Keep unset in production once HTTPS Oracle endpoint is available.
+   * Optional external analytics mirror (e.g. a restored Oracle server).
+   * Unset = fully Cloudflare-only. When set, archived batches are mirrored
+   * best-effort; the D1 archive stays authoritative. Never required.
    */
-  ALLOW_INSECURE_ORACLE_ENDPOINT?: string;
+  ORACLE_ENDPOINT?: string;
   MAX_BATCH_EVENTS: string;
   ALERT_WEBHOOK_URL?: string;
   /**
@@ -398,7 +397,7 @@ export interface Env {
   SESSION_BINDING_MODE?: string;
   /**
    * Optional comma-separated origin allowlist for protected CORS routes.
-   * Example: "https://oracle.example.com,https://admin.example.com"
+   * Example: "https://classroom-quick-downloader-website.pages.dev,https://admin.example.com"
    */
   CORS_ALLOWED_ORIGINS?: string;
   /**
@@ -426,7 +425,7 @@ export interface WebsiteConsoleSummaryResponse {
   runtime: {
     kvConfigured: boolean;
     d1Configured: boolean;
-    oracleReachable: boolean;
+    d1ArchiveConfigured: boolean;
   };
   snapshot: {
     snapshotId: string | null;
@@ -557,7 +556,7 @@ export interface ChangelogConfig {
 // Duplicate interfaces removed for type safety - see definitions above
 
 // ---------------------------------------------------------------------------
-// OracleBatch types (sent to Oracle backend)
+// AnalyticsArchiveBatch types (edge archive envelope)
 // ---------------------------------------------------------------------------
 
 /**
@@ -654,9 +653,9 @@ export interface BatchFailureLogEntry {
 }
 
 /**
- * The aggregated payload sent to Oracle backend.
+ * The aggregated payload persisted to the D1 archive.
  */
-export interface OracleBatch {
+export interface AnalyticsArchiveBatch {
   batchId: string;
   generatedAt: number; // Unix ms
   timeZone: string;

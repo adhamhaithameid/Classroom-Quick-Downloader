@@ -22,7 +22,6 @@ function makeWorkerEnv(kv: unknown, doFetch: (input: RequestInfo | URL) => Promi
     SITE_SNAPSHOT_KV: kv as unknown as WorkerEnv["SITE_SNAPSHOT_KV"],
     DO_SHARED_SECRET: TEST_DO_SHARED_SECRET,
     DANGER_PASSWORD: TEST_DO_SHARED_SECRET,
-    ORACLE_ENDPOINT: "https://oracle.example.com/ingest-batch",
     MAX_BATCH_EVENTS: "10000",
   };
 }
@@ -89,14 +88,14 @@ describe("stale snapshot self-heal", () => {
     changelog: { entries: [] },
   });
 
-  it("re-puts the stale KV snapshot when the Oracle refresh fails", async () => {
+  it("re-puts the stale KV snapshot when the self-serve rebuild fails", async () => {
     const { kv, put, store } = makeKvMock({ "site:v1:snapshot": STALE_SNAPSHOT });
     const doFetch = vi.fn(async () => new Response("{}", { status: 200 }));
     const env = makeWorkerEnv(kv, doFetch);
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
-        throw new Error("oracle down");
+        throw new Error("stores down");
       }),
     );
 
@@ -109,29 +108,33 @@ describe("stale snapshot self-heal", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("x-site-cache")).toBe("stale");
     // Self-heal: the stale payload is re-put verbatim so its KV TTL extends
-    // and the fallback survives long Oracle outages.
+    // and the fallback survives long outages of the self-serve pipeline.
     expect(put).toHaveBeenCalledWith("site:v1:snapshot", STALE_SNAPSHOT, expect.anything());
     expect(store.get("site:v1:snapshot")).toBe(STALE_SNAPSHOT);
   });
 
-  it("does not double-write when the Oracle refresh succeeds", async () => {
+  it("rebuilds the stale snapshot from the self-serve pipeline without double-writing", async () => {
     const { kv, put } = makeKvMock({ "site:v1:snapshot": STALE_SNAPSHOT });
-    const doFetch = vi.fn(async () => new Response("{}", { status: 200 }));
+    const doFetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
+      if (url.includes("/public/site-metrics")) {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            source: "cloudflare-worker",
+            generatedAt: Date.now(),
+            totals: { downloads: 500, success: 480, fail: 20, cancelled: 0, countries: 1 },
+            countries: [{ countryCode: "US", count: 500 }],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    });
     const env = makeWorkerEnv(kv, doFetch);
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            snapshotId: "ws-public-website-snapshot-fresh-1",
-            generatedAtUtc: Date.now(),
-            overview: { totals: { downloads: 2 } },
-            map: { countries: [] },
-            changelog: { entries: [] },
-          }),
-          { status: 200, headers: { "content-type": "application/json" } },
-        ),
-      ),
+      vi.fn(async () => new Response(JSON.stringify({ ok: false, error: "not_found" }), { status: 404 })),
     );
 
     const res = await worker.fetch(
@@ -142,10 +145,13 @@ describe("stale snapshot self-heal", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get("x-site-cache")).toBe("revalidated");
-    // Exactly one write: the refreshed envelope, not the stale self-heal.
-    expect(put).toHaveBeenCalledTimes(1);
-    const [key, value] = put.mock.calls[0];
+    // Exactly one SNAPSHOT write: the refreshed envelope, not the stale
+    // self-heal. (Scrape-health bookkeeping writes its own key.)
+    const snapshotPuts = put.mock.calls.filter((call) => call[0] === "site:v1:snapshot");
+    expect(snapshotPuts).toHaveLength(1);
+    const [key, value] = snapshotPuts[0];
     expect(key).toBe("site:v1:snapshot");
-    expect(String(value)).toContain("ws-public-website-snapshot-fresh-1");
+    expect(String(value)).toContain("ws-cf-selfserve-");
+    expect(String(value)).toContain('"downloads":500');
   });
 });

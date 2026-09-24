@@ -6,7 +6,7 @@ import type {
   QuotaDescriptor,
   StoredEvent,
   EnvSnapshot,
-  OracleBatch,
+  AnalyticsArchiveBatch,
   TimeBucket,
   BucketTotals,
   BucketCounters,
@@ -19,29 +19,30 @@ import type {
   ChangelogSyncStatus,
   KVNamespaceBinding,
 } from "./types";
-import {
-  isAllowInsecureOracleEndpointEnabled,
-  resolveOracleEndpoint,
-  shouldWarnOnInsecureOracleEndpoint,
-} from "./oracle-endpoint";
+import { archiveBatch, readArchiveStats } from "./event-archive";
 import { generateSecureRandomString, secureRandom } from "./downloads_do/helpers";
 import { timingSafeStringEqual } from "./timing";
 
 export interface Env {
-  ORACLE_ENDPOINT: string;
-  /**
-   * Legacy compatibility override for Oracle HTTP endpoints during HTTPS migration.
-   * Only the literal "true" is treated as enabled.
-   */
-  ALLOW_INSECURE_ORACLE_ENDPOINT?: string;
   DO_SHARED_SECRET: string;
   MAX_BATCH_EVENTS: string;
   ALERT_WEBHOOK_URL?: string;
+  /**
+   * Optional external analytics mirror (e.g. a restored Oracle server).
+   * Unset = fully Cloudflare-only. When set, archived batches are forwarded
+   * best-effort; the D1 archive stays authoritative either way.
+   */
+  ORACLE_ENDPOINT?: string;
   /**
    * Optional KV binding used to publish the analytics config snapshot so the
    * worker can serve GET /config from the edge without a DO request.
    */
   SITE_SNAPSHOT_KV?: KVNamespaceBinding;
+  /**
+   * D1 archive for flushed analytics batches. Replaces the legacy external
+   * analytics backend as the flush destination.
+   */
+  SITE_CACHE_DB?: D1Database;
 }
 
 // KV key + TTL for the edge /config snapshot. Shared with index.ts (the worker
@@ -71,30 +72,32 @@ type DurableStateShape = {
   // admin switch: when true, remote analytics is forced OFF
   hardRemoteOff: boolean;
 
-  // Buffered events waiting to be flushed to Oracle
+  // Buffered events waiting to be archived
   buffer: StoredEvent[];
   
   // Monotonically increasing batch sequence number for stable batchId across retries
-  // Only incremented after successful flush to Oracle
+  // Only incremented after a batch is successfully archived
   batchSeq: number;
 
   // Monotonic sequence for event commit tracking
   eventSeq: number;
 
-  // Highest event sequence confirmed committed to Oracle
+  // Highest event sequence confirmed archived
   committedSeq: number;
 
-  // Durable queue of aggregated batches waiting for Oracle
-  pendingBatches: PendingOracleBatch[];
+  // Durable queue of aggregated batches waiting to be archived
+  pendingBatches: PendingArchiveBatch[];
 
   // Bounded forensic summaries of batches that exhausted their retry budget
-  oracleDeadLetters: OracleDeadLetterSummary[];
+  // Legacy field name kept for stored-state compatibility; holds dead-lettered
+  // archive flush summaries (no external system involved).
+  oracleDeadLetters: ArchiveDeadLetterSummary[];
   deadLetteredBatchesTotal: number;
 
   // End-to-end delivery metrics chain (accepted -> stored -> forwarded -> committed)
   deliveryMetrics: DeliveryMetricsState;
 
-  // Structured failure sink rollups (persisted in DO, forwarded to Oracle on successful flush)
+  // Structured failure sink rollups (persisted in DO, exported on successful flush)
   failureRollups: FailureRollupState[];
 
   // --- Privacy / Anti-Abuse ---
@@ -154,6 +157,19 @@ type DurableStateShape = {
   websiteTelemetryLastBatchID: string | null;
   websiteTelemetryLastCorrelationID: string | null;
   websiteTelemetryLastError: string | null;
+
+  // Public uninstall feedback (buffered on the edge; no upstream required).
+  uninstallSubmissions: UninstallSubmissionRecord[];
+  uninstallSubmissionsTotal: number;
+  uninstallSeq: number;
+  uninstallSubmissionsDate: string | null;
+  uninstallSubmissionsToday: number;
+
+  // Optional external analytics mirror counters (best-effort forwarding).
+  oracleMirrorForwards: number;
+  oracleMirrorFailures: number;
+  oracleMirrorLastOkAtUtc: number | null;
+  oracleMirrorLastError: string | null;
 
   // =========================================================================
   // REMOTE CONFIG - Controllable from Cloudflare Dashboard
@@ -229,8 +245,8 @@ type ChangelogDraftState = {
   source: "manual" | "github" | "import";
 };
 
-type PendingOracleBatch = {
-  batch: OracleBatch;
+type PendingArchiveBatch = {
+  batch: AnalyticsArchiveBatch;
   weightedCount: number;
   maxSeq: number;
   attempts: number;
@@ -239,7 +255,7 @@ type PendingOracleBatch = {
 
 // Forensic summary kept when a pending batch exhausts its retry budget and is
 // dead-lettered. Payloads are intentionally NOT retained (bounded state).
-type OracleDeadLetterSummary = {
+type ArchiveDeadLetterSummary = {
   batchId: string;
   eventCount: number;
   weightedCount: number;
@@ -317,6 +333,16 @@ type WebsiteTelemetryQueuedBatch = {
   lastError: string | null;
 };
 
+type UninstallSubmissionRecord = {
+  submissionId: number;
+  submittedAtUtc: number;
+  reason: string;
+  browser: string;
+  version: string;
+  source: string;
+  notes: string | null;
+};
+
 type DangerActionAuditRecord = {
   id: string;
   tsUtc: number;
@@ -337,6 +363,11 @@ const MAX_FAILURE_ROLLUPS = 500;
 const MAX_FAILURE_EXPORT_PER_BATCH = 100;
 const FAILURE_DETAIL_MAX_LEN = 240;
 const FAILURE_ROLLUP_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+// Uninstall feedback (public website form) retention and abuse guards.
+const UNINSTALL_MAX_RETAINED = 120;
+const UNINSTALL_DAILY_SUBMIT_CAP = 200;
+const UNINSTALL_MAX_PAYLOAD_BYTES = 4096;
 
 function createEmptyDeliveryMetrics(): DeliveryMetricsState {
   return {
@@ -391,6 +422,7 @@ const WEBSITE_EVENT_ACTION_VALUES = [
   "faq_expand",
   "guide_engaged",
   "uninstall_view",
+  "page_error",
 ] as const;
 const WEBSITE_EVENT_ACTION_TO_TYPE: Record<(typeof WEBSITE_EVENT_ACTION_VALUES)[number], (typeof WEBSITE_EVENT_TYPE_VALUES)[number]> = {
   install_click: "cta",
@@ -401,6 +433,7 @@ const WEBSITE_EVENT_ACTION_TO_TYPE: Record<(typeof WEBSITE_EVENT_ACTION_VALUES)[
   faq_expand: "content",
   guide_engaged: "content",
   uninstall_view: "content",
+  page_error: "content",
 };
 const WEBSITE_EVENT_ROOT_KEYS = new Set(["schemaVersion", "sessionId", "pagePath", "events"]);
 const WEBSITE_EVENT_KEYS = new Set(["eventId", "eventType", "action", "placement", "tsUtc", "meta"]);
@@ -891,6 +924,7 @@ const STORAGE_KEY_BATCHES = "analytics_pending_batches";
 const STORAGE_KEY_IDS = "analytics_processed_ids";
 const STORAGE_KEY_TELEMETRY = "analytics_website_telemetry";
 const STORAGE_KEY_CHANGELOG = "analytics_changelog";
+const STORAGE_KEY_UNINSTALL = "analytics_uninstall";
 
 function todayUtcDate(): string {
   return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
@@ -1430,6 +1464,30 @@ function sanitizeLoadedWebsiteTelemetryBatch(raw: unknown): WebsiteTelemetryQueu
   };
 }
 
+function sanitizeLoadedUninstallSubmissions(raw: unknown): UninstallSubmissionRecord[] {
+  if (!Array.isArray(raw)) return [];
+  const normalized: UninstallSubmissionRecord[] = [];
+  for (const row of raw) {
+    if (!isPlainObject(row)) continue;
+    const source = row as Record<string, unknown>;
+    const submissionId = clampInt(source.submissionId, 1, Number.MAX_SAFE_INTEGER, 0);
+    const submittedAtUtc = clampInt(source.submittedAtUtc, 1, Number.MAX_SAFE_INTEGER, 0);
+    const reason = trimAndLimitString(source.reason, 200);
+    if (submissionId <= 0 || submittedAtUtc <= 0 || !reason) continue;
+    normalized.push({
+      submissionId,
+      submittedAtUtc,
+      reason,
+      browser: trimAndLimitString(source.browser, 80),
+      version: trimAndLimitString(source.version, 80),
+      source: trimAndLimitString(source.source, 80),
+      notes: trimAndLimitString(source.notes ?? "", 400) || null,
+    });
+    if (normalized.length >= UNINSTALL_MAX_RETAINED) break;
+  }
+  return normalized;
+}
+
 function sanitizeString(
   value: unknown,
   maxLen: number,
@@ -1743,7 +1801,7 @@ function computeRemoteEnabled(
     return { enabled: false, reason: "buffer_high" };
   }
   if (retryState && retryState.consecutiveFailures >= REMOTE_DISABLE_FAILURES) {
-    return { enabled: false, reason: "oracle_failures" };
+    return { enabled: false, reason: "archive_failures" };
   }
   return { enabled: true, reason: "ok" };
 }
@@ -1924,6 +1982,15 @@ export class DownloadsDurable {
       websiteTelemetryLastBatchID: null,
       websiteTelemetryLastCorrelationID: null,
       websiteTelemetryLastError: null,
+      uninstallSubmissions: [],
+      uninstallSubmissionsTotal: 0,
+      uninstallSeq: 0,
+      uninstallSubmissionsDate: null,
+      uninstallSubmissionsToday: 0,
+      oracleMirrorForwards: 0,
+      oracleMirrorFailures: 0,
+      oracleMirrorLastOkAtUtc: null,
+      oracleMirrorLastError: null,
 
       lastHealthStatus: "ok",
       lastHealthNotifyAt: null,
@@ -2332,6 +2399,63 @@ export class DownloadsDurable {
         return value || null;
       })(),
 
+      uninstallSubmissions: sanitizeLoadedUninstallSubmissions(
+        (stored as unknown as Record<string, unknown>).uninstallSubmissions,
+      ),
+      uninstallSubmissionsTotal: clampInt(
+        (stored as unknown as Record<string, unknown>).uninstallSubmissionsTotal,
+        0,
+        Number.MAX_SAFE_INTEGER,
+        0,
+      ),
+      uninstallSeq: clampInt(
+        (stored as unknown as Record<string, unknown>).uninstallSeq,
+        0,
+        Number.MAX_SAFE_INTEGER,
+        0,
+      ),
+      uninstallSubmissionsDate: (() => {
+        const value = trimAndLimitString(
+          (stored as unknown as Record<string, unknown>).uninstallSubmissionsDate,
+          20,
+        );
+        return value || null;
+      })(),
+      uninstallSubmissionsToday: clampInt(
+        (stored as unknown as Record<string, unknown>).uninstallSubmissionsToday,
+        0,
+        UNINSTALL_DAILY_SUBMIT_CAP,
+        0,
+      ),
+      oracleMirrorForwards: clampInt(
+        (stored as unknown as Record<string, unknown>).oracleMirrorForwards,
+        0,
+        Number.MAX_SAFE_INTEGER,
+        0,
+      ),
+      oracleMirrorFailures: clampInt(
+        (stored as unknown as Record<string, unknown>).oracleMirrorFailures,
+        0,
+        Number.MAX_SAFE_INTEGER,
+        0,
+      ),
+      oracleMirrorLastOkAtUtc: (() => {
+        const value = clampInt(
+          (stored as unknown as Record<string, unknown>).oracleMirrorLastOkAtUtc,
+          0,
+          Number.MAX_SAFE_INTEGER,
+          0,
+        );
+        return value > 0 ? value : null;
+      })(),
+      oracleMirrorLastError: (() => {
+        const value = trimAndLimitString(
+          (stored as unknown as Record<string, unknown>).oracleMirrorLastError,
+          240,
+        );
+        return value || null;
+      })(),
+
       lastHealthStatus: stored.lastHealthStatus ?? base.lastHealthStatus,
       lastHealthNotifyAt: stored.lastHealthNotifyAt ?? base.lastHealthNotifyAt,
     };
@@ -2341,7 +2465,7 @@ export class DownloadsDurable {
     // because its whales were already merged from STORAGE_KEY above and the
     // next persist() writes them out under their own keys.
     try {
-      const [buffer, pendingBatches, processedIds, telemetry, changelogShard] = await Promise.all([
+      const [buffer, pendingBatches, processedIds, telemetry, changelogShard, uninstallShard] = await Promise.all([
         this.state.storage.get<DurableStateShape["buffer"]>(STORAGE_KEY_BUFFER),
         this.state.storage.get<DurableStateShape["pendingBatches"]>(STORAGE_KEY_BATCHES),
         this.state.storage.get<DurableStateShape["processedIds"]>(STORAGE_KEY_IDS),
@@ -2354,10 +2478,18 @@ export class DownloadsDurable {
           changelog: DurableStateShape["changelog"];
           changelogRevisions: DurableStateShape["changelogRevisions"];
         }>(STORAGE_KEY_CHANGELOG),
+        this.state.storage.get<{
+          uninstallSubmissions: DurableStateShape["uninstallSubmissions"];
+        }>(STORAGE_KEY_UNINSTALL),
       ]);
       if (Array.isArray(buffer)) this.data.buffer = buffer;
       if (Array.isArray(pendingBatches)) this.data.pendingBatches = pendingBatches;
       if (Array.isArray(processedIds)) this.data.processedIds = processedIds;
+      if (uninstallShard && Array.isArray(uninstallShard.uninstallSubmissions)) {
+        this.data.uninstallSubmissions = sanitizeLoadedUninstallSubmissions(
+          uninstallShard.uninstallSubmissions,
+        );
+      }
       if (telemetry) {
         if (Array.isArray(telemetry.websiteTelemetryQueue)) {
           this.data.websiteTelemetryQueue = telemetry.websiteTelemetryQueue;
@@ -2396,8 +2528,8 @@ export class DownloadsDurable {
         .map((b) => ({
           ...b,
           weightedCount:
-            typeof (b as Partial<PendingOracleBatch>).weightedCount === "number"
-              ? Math.max(0, Math.floor((b as Partial<PendingOracleBatch>).weightedCount || 0))
+            typeof (b as Partial<PendingArchiveBatch>).weightedCount === "number"
+              ? Math.max(0, Math.floor((b as Partial<PendingArchiveBatch>).weightedCount || 0))
               : typeof (b as unknown as { eventCount?: number }).eventCount === "number"
                 ? Math.max(0, Math.floor((b as unknown as { eventCount?: number }).eventCount || 0))
                 : Math.max(0, Math.floor((b.batch?.summary?.totals?.totalDownloads as number) || 0)),
@@ -2654,7 +2786,7 @@ export class DownloadsDurable {
       await this.persist();
     }
 
-    // Ensure daily Oracle flush alarm is scheduled.
+    // Ensure daily flush alarm is scheduled.
     await this.scheduleNextMidnightAlarm();
     const changelogAlarmDirty = await this.ensureChangelogAutoSyncAlarm(Date.now());
     if (changelogAlarmDirty) {
@@ -2676,6 +2808,7 @@ export class DownloadsDurable {
       websiteTelemetrySeenEventIds,
       changelog,
       changelogRevisions,
+      uninstallSubmissions,
       ...core
     } = d;
     await this.state.storage.put(STORAGE_KEY, core);
@@ -2688,6 +2821,7 @@ export class DownloadsDurable {
       websiteTelemetrySeenEventIds,
     });
     await this.state.storage.put(STORAGE_KEY_CHANGELOG, { changelog, changelogRevisions });
+    await this.state.storage.put(STORAGE_KEY_UNINSTALL, { uninstallSubmissions });
   }
 
   private get d(): DurableStateShape {
@@ -2890,6 +3024,13 @@ export class DownloadsDurable {
       return this.handlePipelineHealth(request);
     }
 
+    if (pathname === "/admin/storage-export" && request.method === "GET") {
+      if (!this.isAuthorizedAdmin(request)) {
+        return json({ ok: false, error: "unauthorized" }, { status: 401 });
+      }
+      return this.handleAdminStorageExport();
+    }
+
     if (pathname === "/debug/flush" && request.method === "POST") {
       // Require admin auth for debug endpoints
       if (!this.isAuthorizedAdmin(request)) {
@@ -2958,6 +3099,13 @@ export class DownloadsDurable {
 
     if (pathname === "/api/public/website/events" && request.method === "POST") {
       return this.handlePublicWebsiteEvents(request);
+    }
+
+    if (pathname === "/api/public/website/uninstall" && request.method === "POST") {
+      return this.handlePublicUninstallSubmit(request);
+    }
+    if (pathname === "/api/public/website/uninstall" && request.method === "GET") {
+      return this.handlePublicUninstallStats();
     }
 
     // Admin Changelog Update
@@ -3029,7 +3177,7 @@ export class DownloadsDurable {
         bufferedEvents: this.d.buffer.length,
         pendingBatches: this.d.pendingBatches.length,
       });
-      await this.flushToOracle(true);
+      await this.flushBufferToArchive(true);
     }
 
     // Flush website telemetry queue once daily at 23:00 UTC.
@@ -3067,9 +3215,9 @@ export class DownloadsDurable {
       }
     }
 
-    // Retry failed extension Oracle flushes.
+    // Retry failed extension archive flushes.
     if (this.d.retryState && this.d.retryState.nextRetryAt && now >= this.d.retryState.nextRetryAt) {
-      await this.flushToOracle(false);
+      await this.flushBufferToArchive(false);
     }
 
     // Retry failed website telemetry batches.
@@ -3212,21 +3360,10 @@ export class DownloadsDurable {
       };
     }
 
-    // Compatibility bridge for migration: preserve explicit insecure override
-    // semantics while keeping HTTPS as the default transport expectation.
-    const resolvedOracleEndpoint = resolveOracleEndpoint(this.env.ORACLE_ENDPOINT, {
-      allowInsecureHttp: isAllowInsecureOracleEndpointEnabled(this.env.ALLOW_INSECURE_ORACLE_ENDPOINT),
-    });
-    if (shouldWarnOnInsecureOracleEndpoint("do.flushWebsiteTelemetryQueue", resolvedOracleEndpoint)) {
-      logEvent("warn", "oracle_insecure_endpoint_override_in_use", {
-        context: "do.flushWebsiteTelemetryQueue",
-        oracleEndpoint: resolvedOracleEndpoint.ok ? resolvedOracleEndpoint.baseUrl : this.env.ORACLE_ENDPOINT,
-      });
-    }
-    if (!resolvedOracleEndpoint.ok || !this.env.DO_SHARED_SECRET) {
-      const msg = !resolvedOracleEndpoint.ok
-        ? resolvedOracleEndpoint.message
-        : "DO_SHARED_SECRET is not configured";
+    // Archive target: batches persist to D1 (edge-local); no external upstream.
+    const archiveDb = this.env.SITE_CACHE_DB ?? null;
+    if (!archiveDb) {
+      const msg = "SITE_CACHE_DB is not configured";
       this.d.websiteTelemetryLastError = msg;
       const head = this.d.websiteTelemetryQueue[0];
       if (head) {
@@ -3288,7 +3425,7 @@ export class DownloadsDurable {
       this.d.websiteTelemetryLastBatchID = batch.batchId;
       this.d.websiteTelemetryLastCorrelationID = batch.correlationId;
 
-      logEvent("info", "website_telemetry_flush_attempt", {
+      logEvent("info", "website_telemetry_archive_attempt", {
         trigger: options.trigger,
         batchId: batch.batchId,
         correlationId: batch.correlationId,
@@ -3297,32 +3434,23 @@ export class DownloadsDurable {
       });
 
       try {
-        const response = await fetch(resolvedOracleEndpoint.websiteEventsBatchUrl, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json; charset=utf-8",
-            "x-do-secret": this.env.DO_SHARED_SECRET,
-            "x-correlation-id": batch.correlationId,
-            "x-requested-with": "XMLHttpRequest",
-          },
-          body: JSON.stringify(payload),
+        const archiveResult = await archiveBatch(archiveDb, {
+          batchId: batch.batchId,
+          kind: "website-events",
+          createdAtUtc: batch.generatedAtUtc,
+          eventCount: batch.events.length,
+          weightedCount: batch.events.length,
+          payload: JSON.stringify(payload),
         });
-
-        if (!response.ok) {
-          const body = await response.text().catch(() => "");
-          throw new Error(
-            trimAndLimitString(
-              `oracle_http_${response.status}: ${body || response.statusText || "upstream_rejected"}`,
-              280,
-            ),
-          );
+        if (!archiveResult.ok) {
+          throw new Error(archiveResult.error || "archive_write_failed");
         }
 
-        const ack = (await response.json().catch(() => null)) as
-          | { ok?: boolean; batchId?: string }
-          | null;
-        if (!ack || ack.ok !== true || ack.batchId !== batch.batchId) {
-          throw new Error("oracle_ack_invalid");
+        if (this.oracleMirrorBaseUrl()) {
+          const envelopeText = JSON.stringify(payload);
+          this.state.waitUntil(
+            this.forwardArchivedBatchToOracle(envelopeText, "website-events").catch(() => {}),
+          );
         }
 
         this.d.websiteTelemetryQueue.shift();
@@ -3332,7 +3460,7 @@ export class DownloadsDurable {
         processedBatches += 1;
         continue;
       } catch (error) {
-        const message = trimAndLimitString(String(error), 280) || "website_telemetry_flush_failed";
+        const message = trimAndLimitString(String(error), 280) || "website_telemetry_archive_failed";
         batch.attempt = attempt;
         batch.lastError = message;
         this.d.websiteTelemetryLastError = message;
@@ -3819,12 +3947,12 @@ export class DownloadsDurable {
     this.maybeCompactBuffer();
     await this.persist();
 
-    // Size-based flush to Oracle
+    // Size-based flush to the archive
     const maxBatch =
       parseInt(this.env.MAX_BATCH_EVENTS || "10000", 10) || 10000;
 
     if (this.d.buffer.length >= maxBatch) {
-      await this.flushToOracle(false);
+      await this.flushBufferToArchive(false);
     }
 
     const acceptedSeqRange = acceptedSeqs.length
@@ -3927,6 +4055,9 @@ export class DownloadsDurable {
       snapshotAtUtc: effectiveSnapshot.snapshotAtUtc,
       totals: {
         downloads: effectiveSnapshot.downloads,
+        success: clampInt(this.d.totalSuccess, 0, Number.MAX_SAFE_INTEGER, 0),
+        fail: clampInt(this.d.totalFail, 0, Number.MAX_SAFE_INTEGER, 0),
+        cancelled: clampInt(this.d.totalCancelled, 0, Number.MAX_SAFE_INTEGER, 0),
         countries: effectiveSnapshot.countries.length,
       },
       countries: effectiveSnapshot.countries,
@@ -3938,6 +4069,96 @@ export class DownloadsDurable {
         overrideEnabled: this.d.websiteOverrideEnabled,
         lastRefreshAtUtc: snapshot.snapshotAtUtc,
         nextRefreshAtUtc: this.computeNextPublicMetricsRefreshAt(now),
+      },
+    });
+  }
+
+  /**
+   * Public uninstall-feedback submit. Buffered on the edge so the website's
+   * uninstall page works without the legacy upstream; responses match the
+   * website's UninstallFeedbackResponse contract.
+   */
+  private async handlePublicUninstallSubmit(request: Request): Promise<Response> {
+    const now = Date.now();
+
+    let raw: unknown = null;
+    try {
+      const text = await request.text();
+      if (text.length > UNINSTALL_MAX_PAYLOAD_BYTES) {
+        return json({ ok: false, error: "payload_too_large" }, { status: 413 });
+      }
+      raw = JSON.parse(text) as unknown;
+    } catch {
+      return json({ ok: false, error: "invalid_json" }, { status: 400 });
+    }
+    if (!isPlainObject(raw)) {
+      return json({ ok: false, error: "invalid_payload" }, { status: 400 });
+    }
+
+    const reason = trimAndLimitString(raw.reason, 200);
+    if (!reason) {
+      return json({ ok: false, error: "reason_required" }, { status: 400 });
+    }
+
+    const today = todayUtcDate();
+    if (this.d.uninstallSubmissionsDate !== today) {
+      this.d.uninstallSubmissionsDate = today;
+      this.d.uninstallSubmissionsToday = 0;
+    }
+    if (this.d.uninstallSubmissionsToday >= UNINSTALL_DAILY_SUBMIT_CAP) {
+      return json({ ok: false, error: "rate_limited" }, { status: 429 });
+    }
+
+    this.d.uninstallSeq = this.d.uninstallSeq + 1;
+    const record: UninstallSubmissionRecord = {
+      submissionId: this.d.uninstallSeq,
+      submittedAtUtc: now,
+      reason,
+      browser: trimAndLimitString(raw.browser, 80),
+      version: trimAndLimitString(raw.version, 80),
+      source: trimAndLimitString(raw.source, 80),
+      notes: trimAndLimitString(raw.notes ?? "", 400) || null,
+    };
+    this.d.uninstallSubmissions.push(record);
+    if (this.d.uninstallSubmissions.length > UNINSTALL_MAX_RETAINED) {
+      this.d.uninstallSubmissions.splice(
+        0,
+        this.d.uninstallSubmissions.length - UNINSTALL_MAX_RETAINED,
+      );
+    }
+    this.d.uninstallSubmissionsTotal += 1;
+    this.d.uninstallSubmissionsToday += 1;
+    await this.persist();
+
+    return json({
+      ok: true,
+      schemaVersion: WEBSITE_EVENTS_SCHEMA_VERSION,
+      generatedAt: now,
+      submissionId: record.submissionId,
+      message: "Thanks — your feedback was received.",
+    });
+  }
+
+  /** Aggregate uninstall-feedback stats served to the website's stats panel. */
+  private async handlePublicUninstallStats(): Promise<Response> {    const reasonCounts = new Map<string, number>();
+    for (const row of this.d.uninstallSubmissions) {
+      if (!row.reason) continue;
+      reasonCounts.set(row.reason, (reasonCounts.get(row.reason) ?? 0) + 1);
+    }
+    const topReasons = [...reasonCounts.entries()]
+      .map(([reason, count]) => ({ reason, count }))
+      .sort((a, b) => b.count - a.count || a.reason.localeCompare(b.reason))
+      .slice(0, 8);
+    const last = this.d.uninstallSubmissions[this.d.uninstallSubmissions.length - 1];
+
+    return json({
+      ok: true,
+      schemaVersion: WEBSITE_EVENTS_SCHEMA_VERSION,
+      generatedAt: Date.now(),
+      stats: {
+        totalSubmissions: this.d.uninstallSubmissionsTotal,
+        lastSubmittedAtUtc: last ? last.submittedAtUtc : null,
+        topReasons,
       },
     });
   }
@@ -3993,6 +4214,7 @@ export class DownloadsDurable {
         },
         countries: effectiveSnapshot.countries,
       },
+      archive: await this.buildArchiveStatus(),
       security: {
         ipAllowlistEnabled: this.d.ipAllowlistEnabled,
         stepUpBypassEnabled: this.d.ipAllowlistStepUpBypassEnabled,
@@ -4210,7 +4432,7 @@ export class DownloadsDurable {
 
     const envSnapshot: EnvSnapshot = {
       maxBatchEvents: this.env.MAX_BATCH_EVENTS || "n/a",
-      oracleEndpoint: this.env.ORACLE_ENDPOINT || "unknown",
+      archiveMode: this.env.SITE_CACHE_DB ? "d1" : "unconfigured",
     };
 
     // Get next scheduled alarm time
@@ -4513,9 +4735,9 @@ export class DownloadsDurable {
     }
 
     if (failures >= critFailures) {
-      addCritical("oracle_failures_high");
+      addCritical("archive_failures_high");
     } else if (failures >= warnFailures) {
-      addWarn("oracle_failures_elevated");
+      addWarn("archive_failures_elevated");
     }
 
     if (sinceFlushMs != null) {
@@ -4573,6 +4795,69 @@ export class DownloadsDurable {
         nextRetryAtUtc: this.d.websiteTelemetryQueue[0]?.nextRetryAtUtc ?? null,
       },
     };
+  }
+
+  /** D1 archive + optional mirror status for admin consoles. Best-effort. */
+  private async buildArchiveStatus(): Promise<{
+    mirrorConfigured: boolean;
+    mirrorForwards: number;
+    mirrorFailures: number;
+    mirrorLastOkAtUtc: number | null;
+    mirrorLastError: string | null;
+    totalBatches: number;
+    lastArchivedAtUtc: number | null;
+  }> {
+    let totalBatches = 0;
+    let lastArchivedAtUtc: number | null = null;
+    if (this.env.SITE_CACHE_DB) {
+      const stats = await readArchiveStats(this.env.SITE_CACHE_DB);
+      if (stats) {
+        totalBatches = stats.totalBatches;
+        lastArchivedAtUtc = stats.lastArchivedAtUtc;
+      }
+    }
+    return {
+      mirrorConfigured: Boolean(this.oracleMirrorBaseUrl()),
+      mirrorForwards: this.d.oracleMirrorForwards,
+      mirrorFailures: this.d.oracleMirrorFailures,
+      mirrorLastOkAtUtc: this.d.oracleMirrorLastOkAtUtc,
+      mirrorLastError: this.d.oracleMirrorLastError,
+      totalBatches,
+      lastArchivedAtUtc,
+    };
+  }
+
+  /**
+   * Full DO-storage export (admin only). Portability insurance: everything the
+   * DO persists (counters, queues, config, audits, archive bookkeeping) in one
+   * authenticated JSON dump, so the data can leave Cloudflare anytime.
+   */
+  private async handleAdminStorageExport(): Promise<Response> {
+    const exported: Record<string, unknown> = {};
+    const MAX_BYTES = 8 * 1024 * 1024;
+    let totalBytes = 0;
+    let truncated = false;
+    const entries = await this.state.storage.list();
+    for (const [key, value] of entries) {
+      const text = JSON.stringify(value ?? null);
+      if (totalBytes + text.length > MAX_BYTES) {
+        truncated = true;
+        break;
+      }
+      exported[key] = value;
+      totalBytes += text.length;
+    }
+    return json(
+      {
+        ok: true,
+        generatedAtUtc: Date.now(),
+        keyCount: Object.keys(exported).length,
+        totalBytes,
+        truncated,
+        storage: exported,
+      },
+      { headers: { "cache-control": "no-store" } },
+    );
   }
 
   private async handlePipelineHealth(request: Request): Promise<Response> {
@@ -4745,6 +5030,15 @@ export class DownloadsDurable {
       ipAllowlist: [],
       ipAllowlistStepUpBypassEnabled: true,
       trackRates: {},
+      uninstallSubmissions: [],
+      uninstallSubmissionsTotal: 0,
+      uninstallSeq: 0,
+      uninstallSubmissionsDate: null,
+      uninstallSubmissionsToday: 0,
+      oracleMirrorForwards: 0,
+      oracleMirrorFailures: 0,
+      oracleMirrorLastOkAtUtc: null,
+      oracleMirrorLastError: null,
       ...preservedConfig,
     };
     await this.state.storage.delete(STORAGE_KEY);
@@ -4753,6 +5047,7 @@ export class DownloadsDurable {
     await this.state.storage.delete(STORAGE_KEY_IDS);
     await this.state.storage.delete(STORAGE_KEY_TELEMETRY);
     await this.state.storage.delete(STORAGE_KEY_CHANGELOG);
+    await this.state.storage.delete(STORAGE_KEY_UNINSTALL);
     await this.state.storage.deleteAlarm();
     this.appendDangerAudit(request, "full_reset", "/debug/reset", "ok", "full_state_reset");
     await this.persist();
@@ -4764,7 +5059,7 @@ export class DownloadsDurable {
       return json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
 
-    const result = await this.flushToOracle(true);
+    const result = await this.flushBufferToArchive(true);
     if (!result.ok) {
       this.appendDangerAudit(
         request,
@@ -5158,7 +5453,7 @@ export class DownloadsDurable {
     let lastError: string | undefined;
 
     while ((this.d.buffer.length > 0 || this.d.pendingBatches.length > 0) && iterations < 20) {
-      const result = await this.flushToOracle(true);
+      const result = await this.flushBufferToArchive(true);
       if (!result.ok) {
         lastError = result.error;
         break;
@@ -5186,13 +5481,13 @@ export class DownloadsDurable {
   }
 
   // ---------------------------------------------------------------------------
-  // Oracle flush + retry/backoff
+  // Archive flush + retry/backoff
   // ---------------------------------------------------------------------------
 
   /**
    * Quarantine the head pending batch when it has exhausted its retry budget.
    * Keeps only a bounded forensic summary so a permanently-poisoned batch
-   * (e.g. schema drift tripping Oracle's strict decoder) cannot head-of-line
+   * (e.g. a structurally invalid batch) cannot head-of-line
    * block every newer batch forever. Returns true when a batch was moved.
    */
   private deadLetterHeadBatchIfExhausted(
@@ -5554,7 +5849,7 @@ export class DownloadsDurable {
         }> | undefined,
       );
 
-      const mergedBatch: OracleBatch = {
+      const mergedBatch: AnalyticsArchiveBatch = {
         batchId: `do-merge-${now}`,
         generatedAt: now,
         timeZone: "UTC",
@@ -5594,7 +5889,7 @@ export class DownloadsDurable {
         },
         failureLogs: mergedFailureLogs,
       };
-      const merged: PendingOracleBatch = {
+      const merged: PendingArchiveBatch = {
         batch: mergedBatch,
         weightedCount: mergedWeightedCount,
         maxSeq: Math.max(first.maxSeq, second.maxSeq),
@@ -5620,7 +5915,7 @@ export class DownloadsDurable {
     if (events.length === 0) return;
 
     const batchId = `do-compact-${Date.now()}-${events.length}ev`;
-    const batch = this.buildOracleBatch(events, batchId);
+    const batch = this.buildAnalyticsArchiveBatch(events, batchId);
     const maxSeq = events.reduce((m, ev) => Math.max(m, ev.seq || 0), this.d.committedSeq || 0);
     const weightedCount = this.sumWeightedEventCount(events);
     if (batch.delivery) {
@@ -5640,10 +5935,10 @@ export class DownloadsDurable {
   }
 
   /**
-   * Build an aggregated OracleBatch from raw events in buffer.
+   * Build an aggregated AnalyticsArchiveBatch from raw events in buffer.
    * Groups events by hour and aggregates counters.
    */
-  private buildOracleBatch(events: StoredEvent[], batchIdOverride?: string): OracleBatch {
+  private buildAnalyticsArchiveBatch(events: StoredEvent[], batchIdOverride?: string): AnalyticsArchiveBatch {
     const now = Date.now();
     
     // 1. Group events by hour bucket (Keep logic for historical data)
@@ -5743,7 +6038,7 @@ export class DownloadsDurable {
       quota,
       envSnapshot: {
         maxBatchEvents: this.env.MAX_BATCH_EVENTS || "n/a",
-        oracleEndpoint: this.env.ORACLE_ENDPOINT || "unknown",
+        archiveMode: this.env.SITE_CACHE_DB ? "d1" : "unconfigured",
       },
     };
 
@@ -5856,7 +6151,60 @@ export class DownloadsDurable {
     };
   }
 
-  private async flushToOracle(
+  /**
+   * Optional external analytics mirror (e.g. a restored Oracle server).
+   * Empty/unset stays fully Cloudflare-only. HTTPS required except loopback.
+   */
+  private oracleMirrorBaseUrl(): string {
+    const raw = (this.env.ORACLE_ENDPOINT || "").trim().replace(/\/+$/, "");
+    if (!raw) return "";
+    if (raw.startsWith("https://")) return raw;
+    if (/^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/.test(raw)) return raw;
+    logEvent("warn", "oracle_mirror_endpoint_rejected", { reason: "insecure_scheme" });
+    return "";
+  }
+
+  /**
+   * Best-effort mirror of an archived batch to the external backend. Single
+   * attempt, time-boxed; any failure is logged and rolled up but never blocks
+   * the pipeline (the D1 archive already holds the data).
+   */
+  private async forwardArchivedBatchToOracle(payloadText: string, kind: "extension-batch" | "website-events"): Promise<void> {
+    const base = this.oracleMirrorBaseUrl();
+    if (!base) return;
+    const path = kind === "website-events" ? "/api/internal/website/events/batch" : "/ingest-batch";
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort("oracle_mirror_timeout"), 5000);
+    try {
+      const res = await fetch(`${base}${path}`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-do-secret": this.env.DO_SHARED_SECRET || "",
+        },
+        body: payloadText,
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        throw new Error(`oracle_http_${res.status}`);
+      }
+      this.d.oracleMirrorForwards += 1;
+      this.d.oracleMirrorLastOkAtUtc = Date.now();
+      this.d.oracleMirrorLastError = null;
+      await this.persist();
+    } catch (error) {
+      const msg = trimAndLimitString(String(error), 240) || "oracle_mirror_forward_failed";
+      this.d.oracleMirrorFailures += 1;
+      this.d.oracleMirrorLastError = msg;
+      logEvent("warn", "oracle_mirror_forward_failed", { kind, error: msg });
+      this.recordFailure("oracle_mirror", "forward_error", msg, 1, Date.now());
+      await this.persist();
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  private async flushBufferToArchive(
     _force: boolean,
   ): Promise<{ ok: boolean; sent: number; error?: string }> {
     const now = Date.now();
@@ -5870,30 +6218,20 @@ export class DownloadsDurable {
       return { ok: true, sent: 0 };
     }
 
-    // Compatibility bridge for migration: preserve explicit insecure override
-    // semantics while keeping HTTPS as the default transport expectation.
-    const resolvedOracleEndpoint = resolveOracleEndpoint(this.env.ORACLE_ENDPOINT, {
-      allowInsecureHttp: isAllowInsecureOracleEndpointEnabled(this.env.ALLOW_INSECURE_ORACLE_ENDPOINT),
-    });
-    if (shouldWarnOnInsecureOracleEndpoint("do.flushToOracle", resolvedOracleEndpoint)) {
-      logEvent("warn", "oracle_insecure_endpoint_override_in_use", {
-        context: "do.flushToOracle",
-        oracleEndpoint: resolvedOracleEndpoint.ok ? resolvedOracleEndpoint.baseUrl : this.env.ORACLE_ENDPOINT,
-      });
-    }
-    if (!resolvedOracleEndpoint.ok || !this.env.DO_SHARED_SECRET) {
-      const msg = !resolvedOracleEndpoint.ok
-        ? resolvedOracleEndpoint.message
-        : "DO_SHARED_SECRET is not configured";
+    // Archive target: aggregated batches persist to D1 (edge-local); the
+    // legacy external analytics backend is no longer part of the pipeline.
+    const archiveDb = this.env.SITE_CACHE_DB ?? null;
+    if (!archiveDb) {
+      const msg = "SITE_CACHE_DB is not configured";
       if (!this.d.retryState) this.d.retryState = { ...DEFAULT_RETRY_STATE };
       this.d.retryState.lastError = msg;
       this.d.retryState.lastFlushAttemptAt = now;
-      logEvent("error", "oracle_flush_misconfigured", {
+      logEvent("error", "archive_misconfigured", {
         error: msg,
-        reason: !resolvedOracleEndpoint.ok ? resolvedOracleEndpoint.error : "do_shared_secret_missing",
+        reason: "d1_binding_missing",
       });
-      this.recordFailure("oracle_forward", "misconfigured", msg, 1, now);
-      // Don't schedule retries if endpoint is missing - just report error
+      this.recordFailure("archive_forward", "misconfigured", msg, 1, now);
+      // Don't schedule retries if the archive is missing - just report error
       await this.state.storage.deleteAlarm();
       await this.persist();
       return { ok: false, sent: 0, error: msg };
@@ -5903,8 +6241,8 @@ export class DownloadsDurable {
       parseInt(this.env.MAX_BATCH_EVENTS || "10000", 10) || 10000;
     // FIX: even "force" should chunk; force just means "try now / bypass gating"
     let eventsToFlush: StoredEvent[] = [];
-    let oracleBatch: OracleBatch | null = null;
-    let pendingMeta: PendingOracleBatch | null = null;
+    let oracleBatch: AnalyticsArchiveBatch | null = null;
+    let pendingMeta: PendingArchiveBatch | null = null;
 
     if (this.d.pendingBatches.length > 0) {
       pendingMeta = this.d.pendingBatches[0];
@@ -5912,7 +6250,7 @@ export class DownloadsDurable {
       pendingMeta.attempts = (pendingMeta.attempts ?? 0) + 1;
     } else {
       eventsToFlush = this.d.buffer.slice(0, maxBatchEnv);
-      oracleBatch = this.buildOracleBatch(eventsToFlush);
+      oracleBatch = this.buildAnalyticsArchiveBatch(eventsToFlush);
     }
     if (!oracleBatch) {
       return { ok: false, sent: 0, error: "no_oracle_batch" };
@@ -5968,15 +6306,8 @@ export class DownloadsDurable {
       this.mergePendingBatchesIfNeeded();
     };
 
-    const targetUrl = resolvedOracleEndpoint.ingestBatchUrl;
-    const targetPath = (() => {
-      try {
-        return new URL(targetUrl).pathname;
-      } catch {
-        return targetUrl;
-      }
-    })();
-    logEvent("info", "oracle_flush_attempt", {
+    const targetPath = "d1://event_archive";
+    logEvent("info", "archive_flush_attempt", {
       target: targetPath,
       fromPendingBatch: !!pendingMeta,
       eventCount: eventsToFlush.length,
@@ -6000,57 +6331,36 @@ export class DownloadsDurable {
     }
 
     try {
-      // Send to Oracle internal website events batch endpoint.
-      const res = await fetch(targetUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-DO-SECRET": this.env.DO_SHARED_SECRET,
-        },
-        body: JSON.stringify(oracleBatch),
+      // Archive the aggregated batch envelope to D1 (edge-local storage).
+      const archiveResult = await archiveBatch(archiveDb, {
+        batchId: oracleBatch.batchId,
+        kind: "extension-batch",
+        createdAtUtc: oracleBatch.generatedAt,
+        eventCount: eventsToFlush.length,
+        weightedCount: flushWeightedCount,
+        payload: JSON.stringify(oracleBatch),
       });
-
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        const msg = `Oracle responded ${res.status} ${res.statusText} ${text}`;
+      if (!archiveResult.ok) {
+        const msg = archiveResult.error || "archive_write_failed";
         this.d.retryState.lastError = msg;
         this.d.retryState.consecutiveFailures += 1;
-        logEvent("warn", "oracle_flush_failed", { status: res.status, statusText: res.statusText });
-        this.recordFailure("oracle_forward", "http_error", msg, 1, now);
-        this.deadLetterHeadBatchIfExhausted(res.status, msg);
+        logEvent("warn", "archive_flush_failed", { error: msg });
+        this.recordFailure("archive_forward", "write_error", msg, 1, now);
         this.deadLetterHeadBatchIfExhausted(null, msg);
-stashFailedBatch();
+        stashFailedBatch();
         await this.scheduleRetry();
         await this.persist();
         return { ok: false, sent: 0, error: msg };
       }
 
-      const ack = await res
-        .json()
-        .catch(() => null) as { ok?: boolean; batchId?: string; ingestedAt?: number } | null;
-      if (!ack || ack.ok !== true) {
-        const msg = "Oracle ACK invalid or missing ok=true";
-        this.d.retryState.lastError = msg;
-        this.d.retryState.consecutiveFailures += 1;
-        logEvent("warn", "oracle_flush_ack_invalid", { error: msg });
-        this.recordFailure("oracle_ack", "invalid_ack", msg, 1, now);
-        this.deadLetterHeadBatchIfExhausted(null, msg);
-stashFailedBatch();
-        await this.scheduleRetry();
-        await this.persist();
-        return { ok: false, sent: 0, error: msg };
-      }
-      if (!ack.batchId || ack.batchId !== oracleBatch.batchId) {
-        const msg = `Oracle ACK batchId mismatch (expected ${oracleBatch.batchId}, got ${ack.batchId || "missing"})`;
-        this.d.retryState.lastError = msg;
-        this.d.retryState.consecutiveFailures += 1;
-        logEvent("warn", "oracle_flush_ack_mismatch", { error: msg });
-        this.recordFailure("oracle_ack", "batch_mismatch", msg, 1, now);
-        this.deadLetterHeadBatchIfExhausted(null, msg);
-stashFailedBatch();
-        await this.scheduleRetry();
-        await this.persist();
-        return { ok: false, sent: 0, error: msg };
+      // Optional mirror: when ORACLE_ENDPOINT is configured, forward the exact
+      // archived envelope best-effort. The D1 archive stays authoritative —
+      // mirror failures never block the commit or trigger the retry ladder.
+      if (this.oracleMirrorBaseUrl()) {
+        const envelopeText = JSON.stringify(oracleBatch);
+        this.state.waitUntil(
+          this.forwardArchivedBatchToOracle(envelopeText, "extension-batch").catch(() => {}),
+        );
       }
 
       // Success: drop the sent events or pending batch and increment batch sequence
@@ -6096,12 +6406,12 @@ stashFailedBatch();
         sent: flushWeightedCount,
       };
     } catch (err: unknown) {
-      const msg = `Oracle flush error: ${String(err)}`;
+      const msg = `Archive flush error: ${String(err)}`;
       if (!this.d.retryState) this.d.retryState = { ...DEFAULT_RETRY_STATE };
       this.d.retryState.lastError = msg;
       this.d.retryState.consecutiveFailures += 1;
-      logEvent("error", "oracle_flush_exception", { error: String(err) });
-      this.recordFailure("oracle_forward", "exception", msg, 1, now);
+      logEvent("error", "archive_flush_exception", { error: String(err) });
+      this.recordFailure("archive_forward", "exception", msg, 1, now);
       stashFailedBatch();
       await this.scheduleRetry();
       await this.persist();
