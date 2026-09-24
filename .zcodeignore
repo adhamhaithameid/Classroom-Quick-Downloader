@@ -1,0 +1,110 @@
+.DS_Store
+node_modules/
+.wxt/
+.output/
+output/
+.env
+pnpm-debug.log
+*.log
+extension/.output/
+extension/dev/.output/
+extension/.wxt/
+extension/coverage/
+cloudflare-worker/coverage/
+**/.vite/
+.wrangler/
+.dev.vars
+AI/
+ai/
+.jules/
+.playwright-cli/
+test-results/
+verification/*.png
+**/security_best_practices_report.md
+ownership-sensitive-rules.csv
+oracle-backend/data/
+oracle-backend/docker_data/
+oracle-backend/app
+oracle-backend/coverage.out
+oracle-backend/coverage.project.out
+oracle-backend/coverage_all.out
+oracle-backend/coverage_all.func.txt
+oracle-backend/handler_cover.out
+*.db
+*.db-shm
+*.db-wal
+google-credentials.json
+oracle-backend/google-credentials*.json
+# Auto-generated files from build processes
+*.manual.generated.json
+*.manual.generated.ts
+
+ownership-map-out/
+ownership-map-out-sensitive/
+.qoder/settings.local.json
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+.beads-credential-key
+.beads/proxieddb/
+
+# Graphify knowledge-graph output (kept local/offline)
+graphify-out/
+
+.workflow-state/
+workflows/briefs/
+__pycache__/
+
+# Claude Code local config
+CLAUDE.md
+.claude/
+tests/e2e/.firefox-profile/
+# e2e global-setup build stamp (source hash of the last Chrome build)
+tests/e2e/.build-stamp
+# Live real-Classroom tests: dedicated signed-in browser profile + login state
+# (real Google session — never commit, never reuse the daily profile)
+tests/e2e/.live-profile/
+
+# Stryker mutation testing (extension)
+extension/.stryker-tmp/
+extension/reports/
+
+# Scanner/QA tool state (collapsed to "noise" in the commit planner)
+.mimosa/
+qa-artifacts/
+gui-test-screenshots/
+.superpowers/tmp/
+.zcode/
+
+# Commit planner generated artifacts
+tools/commit-planner/data.js
+tools/commit-planner/data.json
+
+# ===== ↑ 以上同步自 .gitignore（「从 .gitignore 同步」只重写以上部分）=====
+.git/
+.hg/
+.svn/
+bower_components/
+jspm_packages/
+site-packages/
+venv/
+coverage/
+htmlcov/
+lcov-report/
+cmakefiles/
+cmake-build-*/
+bazel-*/
+pods/
+deriveddata/
+storybook-static/
+playwright-report/
+allure-results/
+allure-report/
+cdk.out/
+*.egg-info/
+*.dist-info/
+eggs/
+pip-wheel-metadata/
+wheels/
+# ----- ↑ 以上为 ZCode 默认排除规则（自定义规则请写在本行下方，不会被同步/恢复改动）-----
+# 自定义规则写在下方（本行提示可删除）
