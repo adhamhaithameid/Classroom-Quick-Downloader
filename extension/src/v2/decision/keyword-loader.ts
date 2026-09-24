@@ -84,6 +84,11 @@ const UNLOAD_DELAY_MS = 60_000; // 60 seconds
  * 2. navigator.language (browser default)
  * 3. 'en' fallback
  *
+ * This is the page-language signal from docs/TWO_LANGUAGE_SIGNALS.md — the
+ * raw html-lang tag (no alias expansion; the keyword tables' getters apply
+ * their own short-code fallback). The keyword lists this feeds are audited
+ * against real Classroom renderings by tests/e2e/live/language-reconcile.spec.ts.
+ *
  * @returns ISO language code (e.g., 'en', 'ar', 'es', 'zh-TW')
  */
 export function detectPageLanguage(): string {

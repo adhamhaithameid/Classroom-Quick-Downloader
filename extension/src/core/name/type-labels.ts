@@ -15,6 +15,11 @@
  * (a label is only stripped when a real file extension precedes it), so a
  * wrong or over-eager label can never mutilate a genuine filename.
  *
+ * This is a page-language consumer (docs/TWO_LANGUAGE_SIGNALS.md): the label
+ * locale follows the Classroom page, not the browser. Regression guards:
+ * tests/download-language-purity.test.ts (filename purity) and
+ * tests/content-file-meta.test.ts (label stripping).
+ *
  * Pure data. No imports, no DOM.
  */
 

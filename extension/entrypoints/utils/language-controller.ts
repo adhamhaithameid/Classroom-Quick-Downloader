@@ -2,9 +2,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare const chrome: any;
 
+import { expandLanguageCandidates } from '../../src/core/i18n/resolve';
+
 /**
  * Language Controller
- * 
+ *
  * Central management for extension language state with 3 core functions:
  * 1. Detect page language reliably
  * 2. Manage user mode (Auto vs English-only)
@@ -74,16 +76,22 @@ class LanguageController {
     }
   }
 
+  /**
+   * Best language tag for the current page: the first candidate from the
+   * shared resolver — alias-normalized, full tag preserved (`zh-CN` stays
+   * `zh-cn`, never truncates to an unresolvable base `zh`). The TRANSLATIONS
+   * consumer (content/i18n.ts) resolves this tag against its table and guards
+   * the final fallback, so this module stays table-agnostic.
+   */
   private detectPageLanguage(): string {
-    if (typeof document !== 'undefined' && document.documentElement?.lang) {
-      const pageLang = document.documentElement.lang.toLowerCase().trim();
-      if (pageLang) {
-        return pageLang.split('-')[0];
-      }
+    const pageLang =
+      typeof document !== 'undefined' ? document.documentElement?.lang || '' : '';
+    if (pageLang) {
+      return expandLanguageCandidates(pageLang)[0];
     }
 
     if (typeof navigator !== 'undefined' && navigator.language) {
-      return navigator.language.toLowerCase().split('-')[0];
+      return expandLanguageCandidates(navigator.language)[0];
     }
 
     return 'en';
