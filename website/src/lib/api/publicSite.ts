@@ -1,10 +1,12 @@
-import { ORACLE_API_BASE_URL, SITE_BACKEND_BASE_URL, SITE_URL, STORE_LINKS, WORKER_BASE_URL } from '$lib/config';
+import { PUBLIC_API_BASE_URL, SITE_BACKEND_BASE_URL, SITE_URL, STORE_LINKS, WORKER_BASE_URL } from '$lib/config';
 import type {
   InstallBrowser,
   MapResponse,
   OverviewResponse,
   PublicSchemaVersion,
   SnapshotResponse,
+  StoreLiveReview,
+  TestimonialsResponse,
   UserChangelogResponse,
   UninstallFeedbackRequest,
   UninstallFeedbackResponse,
@@ -14,12 +16,16 @@ import type {
   WebsiteSnapshotFetchResult,
   WebsiteSnapshotFetchSource,
   WebsiteSnapshot,
+  WebsiteTrendDay,
+  WebsiteTrendsSeries,
   WorkerHealth
 } from '$lib/types/public';
 import { WEBSITE_MANUAL_CHANGELOG } from '$lib/content/changelog.manual.generated';
 
 const REQUEST_TIMEOUT_MS = 8000;
-export const ORACLE_SNAPSHOT_REFRESH_MS = 6 * 60 * 60 * 1000;
+export const SNAPSHOT_REFRESH_MS = 6 * 60 * 60 * 1000;
+/** @deprecated Use {@link SNAPSHOT_REFRESH_MS} — kept for backward compatibility. */
+export const ORACLE_SNAPSHOT_REFRESH_MS = SNAPSHOT_REFRESH_MS;
 const SNAPSHOT_STORAGE_KEY = 'cqd.website.snapshot.lastgood.v1';
 const SNAPSHOT_SESSION_KEY = 'cqd.website.snapshot.session.v1';
 const SNAPSHOT_NEXT_KEY = 'cqd.website.snapshot.next.v1';
@@ -87,7 +93,9 @@ function readRawStorageSnapshot(storageKey: string, useSession = false): Website
       map: coerceMapPayload(parsed.map),
       changelog: coerceUserChangelogPayload(parsed.changelog),
       userChangelogSummary: normalizeUserChangelogSummary((parsed as Partial<SnapshotResponse>)?.userChangelogSummary),
-      privacy: normalizePrivacyPointers((parsed as Partial<SnapshotResponse>)?.privacy)
+      privacy: normalizePrivacyPointers((parsed as Partial<SnapshotResponse>)?.privacy),
+      testimonials: coerceTestimonialsPayload((parsed as Partial<SnapshotResponse>)?.testimonials),
+      trends: coerceTrendsPayload((parsed as Partial<SnapshotResponse>)?.trends)
     };
     if (isPlaceholderSnapshot(snapshot)) return null;
     return snapshot;
@@ -154,7 +162,7 @@ async function fetchBootstrapSnapshot(): Promise<WebsiteSnapshot | null> {
     if (!response.ok) return null;
     const payload = await response.json();
     const snapshotPayload = coerceSnapshotPayload(payload);
-    const snapshot = buildSnapshot(snapshotPayload);
+    const snapshot = await buildSnapshot(snapshotPayload);
     snapshot.source = 'edge-backend';
     if (!isTrustedBootstrapSnapshot(snapshot)) return null;
     return snapshot;
@@ -251,8 +259,8 @@ async function fetchJSONFromBase(baseUrl: string, pathname: string, requestLabel
   return response.json();
 }
 
-async function fetchOracleJSON(pathname: string): Promise<unknown> {
-  return fetchJSONFromBase(ORACLE_API_BASE_URL, pathname, 'Public data');
+async function fetchPublicApiJSON(pathname: string): Promise<unknown> {
+  return fetchJSONFromBase(PUBLIC_API_BASE_URL, pathname, 'Public data');
 }
 
 async function fetchSiteBackendJSON(pathname: string): Promise<unknown> {
@@ -505,7 +513,102 @@ function coerceSnapshotPayload(input: unknown): SnapshotResponse {
     map,
     changelog,
     userChangelogSummary: normalizeUserChangelogSummary(source?.userChangelogSummary),
-    privacy: normalizePrivacyPointers(source?.privacy)
+    privacy: normalizePrivacyPointers(source?.privacy),
+    testimonials: coerceTestimonialsPayload(source?.testimonials),
+    trends: coerceTrendsPayload(source?.trends)
+  };
+}
+
+/**
+ * Sanitizing coercion for the downloads-over-time series arriving from the
+ * worker snapshot. Fixed window, clamped numbers, ISO-shaped dates only.
+ */
+export function coerceTrendsPayload(input: unknown): WebsiteTrendsSeries | undefined {
+  const source = input as Partial<WebsiteTrendsSeries> | null | undefined;
+  if (!source || typeof source !== 'object') return undefined;
+  if (!Array.isArray(source.daily) || source.daily.length === 0 || source.daily.length > 90) return undefined;
+
+  const seenDates = new Set<string>();
+  const daily: WebsiteTrendDay[] = [];
+  for (const day of source.daily) {
+    if (!day || typeof day !== 'object') continue;
+    const date = typeof day.date === 'string' ? day.date : '';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || seenDates.has(date)) continue;
+    const downloads = Number(day.downloads);
+    seenDates.add(date);
+    daily.push({
+      date,
+      downloads: Number.isFinite(downloads) && downloads >= 0 ? Math.floor(downloads) : 0
+    });
+  }
+  if (daily.length === 0) return undefined;
+
+  const weekOverWeek =
+    typeof source.weekOverWeekPercent === 'number' && Number.isFinite(source.weekOverWeekPercent)
+      ? Math.max(-99, Math.min(999, Math.round(source.weekOverWeekPercent)))
+      : null;
+
+  return {
+    daily,
+    weekOverWeekPercent: weekOverWeek,
+    computedAtUtc:
+      typeof source.computedAtUtc === 'number' && source.computedAtUtc > 0 ? source.computedAtUtc : Date.now()
+  };
+}
+
+const TESTIMONIAL_STORE_KEYS = new Set(['chrome', 'firefox', 'edge']);
+
+/**
+ * Sanitizing coercion for live store reviews arriving from the worker
+ * snapshot. Field-by-field validation, text clamping, and store allow-list
+ * so anything unexpected in the payload is dropped rather than rendered.
+ */
+export function coerceTestimonialsPayload(input: unknown): TestimonialsResponse | undefined {
+  const source = input as Partial<TestimonialsResponse> | null | undefined;
+  if (!source || typeof source !== 'object') return undefined;
+  const rawReviews = Array.isArray(source.reviews) ? source.reviews : [];
+  const seen = new Set<string>();
+  const reviews: StoreLiveReview[] = [];
+  for (const raw of rawReviews) {
+    if (reviews.length >= 60) break;
+    const item = raw as Partial<StoreLiveReview> | null;
+    if (!item || typeof item !== 'object') continue;
+    const store = typeof item.store === 'string' && TESTIMONIAL_STORE_KEYS.has(item.store)
+      ? (item.store as StoreLiveReview['store'])
+      : null;
+    const reviewer = typeof item.reviewer === 'string' ? item.reviewer.replace(/<[^>]*>/g, '').trim().slice(0, 80) : '';
+    const text = typeof item.text === 'string' ? item.text.replace(/<[^>]*>/g, '').trim().slice(0, 600) : '';
+    const rating = typeof item.rating === 'number' && Number.isInteger(item.rating) && item.rating >= 1 && item.rating <= 5
+      ? item.rating
+      : null;
+    const reviewUrl =
+      typeof item.reviewUrl === 'string' && /^https:\/\//.test(item.reviewUrl) ? item.reviewUrl : '';
+    if (!store || !reviewer || rating === null || !reviewUrl) continue;
+    const id = typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 64 ? item.id : `${store}:${reviewer}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    reviews.push({
+      id,
+      store,
+      reviewer,
+      rating,
+      text,
+      reviewUrl,
+      avatarUrl:
+        typeof item.avatarUrl === 'string' && /^https:\/\/lh3\.googleusercontent\.com\//.test(item.avatarUrl)
+          ? item.avatarUrl
+          : null,
+      dateText: typeof item.dateText === 'string' ? item.dateText.slice(0, 40) : '',
+      dateUtc: typeof item.dateUtc === 'number' && Number.isFinite(item.dateUtc) ? item.dateUtc : null,
+      helpful: typeof item.helpful === 'string' ? item.helpful.slice(0, 80) : null
+    });
+  }
+  return {
+    schemaVersion: asSchemaVersion(source.schemaVersion),
+    ok: source.ok === true,
+    generatedAt: asNumber(source.generatedAt),
+    fetchedAtUtc: asNumber(source.fetchedAtUtc),
+    reviews
   };
 }
 
@@ -540,8 +643,8 @@ function buildFallbackPrivacy(): SnapshotResponse['privacy'] {
 
 async function fetchCompositeSnapshotFromPublicEndpoints(): Promise<SnapshotResponse> {
   const [overviewRaw, mapRaw] = await Promise.all([
-    fetchOracleJSON('/api/public/website/overview'),
-    fetchOracleJSON('/api/public/website/map')
+    fetchPublicApiJSON('/api/public/website/overview'),
+    fetchPublicApiJSON('/api/public/website/map')
   ]);
   const overview = coerceOverviewPayload(overviewRaw);
   const map = coerceMapPayload(mapRaw);
@@ -571,7 +674,7 @@ async function fetchCompositeSnapshotFromPublicEndpoints(): Promise<SnapshotResp
 async function fetchEdgeSnapshot(): Promise<SnapshotResponse> {
   const errors: string[] = [];
   try {
-    const payload = await fetchOracleJSON('/api/public/website/snapshot');
+    const payload = await fetchPublicApiJSON('/api/public/website/snapshot');
     return assertSnapshotPayloadUsable(coerceSnapshotPayload(payload), 'Public snapshot route');
   } catch (error) {
     errors.push(toErrorMessage(error));
@@ -596,9 +699,29 @@ async function fetchEdgeSnapshot(): Promise<SnapshotResponse> {
   throw new Error(`Failed to load website snapshot from all public routes.${reason}`);
 }
 
-function buildSnapshot(snapshotPayload: SnapshotResponse, source: WebsiteSnapshot['source'] = 'edge-backend'): WebsiteSnapshot {
+async function buildSnapshot(
+  snapshotPayload: SnapshotResponse,
+  source: WebsiteSnapshot['source'] = 'edge-backend'
+): Promise<WebsiteSnapshot> {
   const overview = snapshotPayload.overview;
   const map = snapshotPayload.map;
+  // The edge snapshot ships no changelog entries (release notes live in this
+  // repo) — merge the source-controlled manual changelog so highlights keep
+  // rendering.
+  const changelog =
+    snapshotPayload.changelog.entries.length > 0
+      ? snapshotPayload.changelog
+      : await fetchUserChangelog();
+  const summary =
+    snapshotPayload.userChangelogSummary.headline || snapshotPayload.userChangelogSummary.entriesCount > 0
+      ? snapshotPayload.userChangelogSummary
+      : {
+          headline: changelog.headline,
+          description: changelog.description,
+          entriesCount: changelog.entries.length,
+          lastUpdatedAtUtc: changelog.lastUpdatedAtUtc,
+          fullChangelogUrl: changelog.fullChangelogUrl
+        };
   const browsersTotal = overview.installs.browsers.reduce((sum, item) => sum + (item.usersCount || 0), 0);
   const normalizedUsersTotal = Math.max(overview.installs.usersTotal, browsersTotal);
   const normalizedOverview: OverviewResponse = {
@@ -615,18 +738,20 @@ function buildSnapshot(snapshotPayload: SnapshotResponse, source: WebsiteSnapsho
     snapshotId: snapshotPayload.snapshotId || `snapshot-${snapshotPayload.generatedAt || now}`,
     generatedAt: snapshotPayload.generatedAt || now,
     fetchedAtUtc: now,
-    nextRefreshAtUtc: now + ORACLE_SNAPSHOT_REFRESH_MS,
+    nextRefreshAtUtc: now + SNAPSHOT_REFRESH_MS,
     overview: normalizedOverview,
     map,
-    changelog: snapshotPayload.changelog,
-    userChangelogSummary: snapshotPayload.userChangelogSummary,
-    privacy: snapshotPayload.privacy
+    changelog,
+    userChangelogSummary: summary,
+    privacy: snapshotPayload.privacy,
+    ...(snapshotPayload.testimonials ? { testimonials: snapshotPayload.testimonials } : {}),
+    ...(snapshotPayload.trends ? { trends: snapshotPayload.trends } : {})
   };
 }
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) return error.message.trim();
-  return 'Failed to fetch live Oracle snapshot.';
+  return 'Failed to fetch live site snapshot.';
 }
 
 function buildSnapshotFetchResult(
@@ -673,7 +798,7 @@ export async function fetchWebsiteSnapshotResult(options: { force?: boolean; app
     }
 
     const canonicalPayload = await fetchEdgeSnapshot();
-    const snapshot = buildSnapshot(canonicalPayload, 'edge-backend');
+    const snapshot = await buildSnapshot(canonicalPayload, 'edge-backend');
 
     if (!cachedSnapshot || options.applyToCurrentSession === true) {
       cachedSnapshot = snapshot;
@@ -774,7 +899,7 @@ export async function fetchUserChangelog(): Promise<UserChangelogResponse> {
 
 export async function fetchUninstallStats(): Promise<UninstallStatsResponse> {
   try {
-    const payload = await fetchOracleJSON('/api/public/website/uninstall');
+    const payload = await fetchPublicApiJSON('/api/public/website/uninstall');
     return coerceUninstallStatsPayload(payload);
   } catch {
     return {
