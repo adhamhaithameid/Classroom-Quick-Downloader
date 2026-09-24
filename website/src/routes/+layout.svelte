@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { browser } from '$app/environment';
   import { base } from '$app/paths';
-  import { page } from '$app/stores';
+  import { navigating, page } from '$app/stores';
   import logo from '$lib/assets/cqd-logo.svg';
   import { APP_VERSION, BING_SITE_VERIFICATION, GOOGLE_SITE_VERIFICATION, STORE_LINKS } from '$lib/config';
   import { browserDisplayName, detectBrowserFromNavigator, type BrowserKey } from '$lib/browser/detect';
@@ -13,6 +13,8 @@
   import BrowserIcon from '$lib/components/BrowserIcon.svelte';
   import BrowserIconSprite from '$lib/components/BrowserIconSprite.svelte';
   import AmbientBackground from '$lib/components/AmbientBackground.svelte';
+  import CursorLayer from '$lib/cursor/CursorLayer.svelte';
+  import { initMagneticPin } from '$lib/scroll/magneticPin';
   import '../app.css';
 
   type MenuIconKey =
@@ -180,12 +182,26 @@
   let navDark = false;
   let navBarEl: HTMLElement | undefined;
   let panelEl: HTMLElement | undefined;
+  let mainEl: HTMLElement | undefined;
+  let sheetCleanups: Array<() => void> = [];
+  /* Reveal-driven ambient gating: each AmbientBackground freezes its orbs
+     and lens canvas while its surface cannot be seen. footerRevealActive
+     mirrors the reveal hysteresis; sheetGone means the sheet has fully
+     lifted off (its own ambient can no longer paint anything visible). */
+  let revealShell: HTMLElement | undefined;
+  let footerRevealActive = false;
+  let sheetGone = false;
+  let magnetDispose: (() => void) | undefined;
   let route = '/';
   let isOverviewStyleRoute = false;
   let hideChrome = false;
   let snapshotLinks: { chrome: string; firefox: string; edge: string; github: string } | null = null;
   $: snapshotLinks = $websiteSnapshotStore.snapshot?.overview.links ?? null;
   $: githubHref = snapshotLinks?.github || STORE_LINKS.github;
+
+  // Buy Me a Coffee (owner-confirmed 2026-09-22). Official button art lives
+  // in /static/bmc-button.svg and shows in the desktop hover panels.
+  const BUY_COFFEE_URL = 'https://www.buymeacoffee.com/adhamhaithameid';
 
   function browserLink(key: BrowserKey): string {
     return snapshotLinks?.[key] || STORE_LINKS[key];
@@ -429,16 +445,15 @@
       const brand = inner.querySelector<HTMLElement>(':scope > .l2-nav-brand');
       const links = inner.querySelector<HTMLElement>(':scope > .l2-nav-links');
       const actions = inner.querySelector<HTMLElement>(':scope > .l2-nav-actions');
-      // The links row is absolutely centered only above 1120px; below that
-      // it is a flex child. Read the layout before .l2-measure forces the
-      // row into flow for measurement.
-      const linksCentered = links ? getComputedStyle(links).position === 'absolute' : false;
       const prevTransition = bar.style.transition;
       bar.style.transition = 'none';
       bar.classList.add('l2-measure');
       // Measure with the pill's own padding: the is-scrolled class may not
       // have reached the DOM yet when this runs inside the reactive flush,
       // and rest-state padding would inflate the target width by 24px.
+      // is-scrolled also swaps in the pill's Install button + store
+      // bubbles, so actionsW is measured in the exact layout the pill
+      // will use.
       bar.closest('.l2-nav-shell')?.classList.add('is-scrolled');
       bar.style.width = 'max-content';
       const brandW = brand?.offsetWidth ?? 0;
@@ -453,18 +468,12 @@
       const cs = getComputedStyle(bar);
       const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
       const borderX = parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
-      // Geometry: the links cluster keeps the exact screen position it has
-      // in the full-width bar (left: 50% of a centered container), so it
-      // never travels horizontally during the morph. The install CTA is
-      // ~100px wider than the logo, so a pill centered on the screen
-      // cannot give the stationary links equal gaps — the spare width
-      // would reappear as dead glass inside the pill. Instead the pill
-      // settles half that width difference to the right and the links
-      // ride half of it via --nav-links-shift (.l2-nav-links): the gaps
-      // come out equal, the slack lives in the empty page margins, and
-      // because the margins, width, and transform all transition with the
-      // same duration and easing, their drift cancels frame by frame and
-      // the links stay put.
+      // Geometry: the install cluster (compact "Install" button + browser
+      // bubbles) is wider than the 42px logo, so a page-centered pill
+      // cannot also pin the links to the page's absolute center. The pill
+      // centers on the page (equal margins) and the links cluster rides
+      // half the width difference, which keeps it centered inside the pill
+      // with equal 24px gaps on both sides.
       const gap = 24;
       const cap = Math.round(document.documentElement.clientWidth * 0.92);
       const target = Math.max(
@@ -477,15 +486,9 @@
       const centerDelta = Math.round((actionsW - brandW) / 2);
       const inset = Math.max(0, Math.round((available - target) / 2));
       bar.style.width = `${target}px`;
-      if (linksCentered) {
-        bar.style.setProperty('--nav-links-shift', `${-centerDelta}px`);
-        bar.style.marginLeft = `${inset + centerDelta}px`;
-        bar.style.marginRight = `${Math.max(0, inset - centerDelta)}px`;
-      } else {
-        bar.style.removeProperty('--nav-links-shift');
-        bar.style.marginLeft = `${inset}px`;
-        bar.style.marginRight = `${inset}px`;
-      }
+      bar.style.marginLeft = `${inset}px`;
+      bar.style.marginRight = `${inset}px`;
+      bar.style.setProperty('--nav-links-shift', `${-centerDelta}px`);
     } else {
       if (!bar.style.width) return;
       // Returning: width animates px -> 100% while margins animate px -> 0.
@@ -515,6 +518,155 @@
       syncBarMode(scrolled);
       if (openMenu) applyPanelSize(openMenu);
     }, 120);
+  }
+
+  /* ------------------------------------------------------------------
+     Sticky sheet reveal: the page scrolls normally, pins once its end
+     reaches the viewport bottom (acting as the end of the page), then
+     lifts away — rounded edge + shadow onto the footer beneath — while
+     the footer window's own content scrolls on through the rest of the
+     reveal. Mechanics: pure sticky on <main> plus two scroll-linked CSS
+     vars (--lift drives the sheet's departure, --ft-travel drives the
+     footer window's inner travel). Fails open to the plain in-flow
+     footer without JS, under reduced motion, in embed mode, or on pages
+     shorter than the viewport.
+     ------------------------------------------------------------------ */
+  function initSheetReveal(): void {
+    const main = mainEl;
+    if (!main) return;
+    const shell = main.closest<HTMLElement>('.site-shell');
+    /* The travel budget is derived from the sliding content wrapper — the
+       window itself is a fixed 100vh viewport, so measuring it would
+       always yield a zero budget. */
+    const footer = document.querySelector<HTMLElement>('.reveal-footer-content');
+    /* The window's own ambient grid twin — it consumes --ft-grid-y so its
+       CSS pattern stays on the document grid the lens canvas paints. */
+    const footerGrid = document.querySelector<HTMLElement>('.reveal-footer .l2-page-grid');
+    if (!shell || !footer) return;
+    revealShell = shell;
+    /* Reduced motion decides immediately: the footer stays plain in flow
+       (reveal-off keeps the first-paint guard from hiding it forever). */
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      shell.classList.add('reveal-off');
+      return;
+    }
+
+    const apply = (): void => {
+      // While live the footer window keeps its natural height (auto), so
+      // offsetHeight measures the real footer reliably — the travel budget
+      // is simply (natural height − viewport). Deriving it from a clipped
+      // 100vh window's scrollHeight instead made the budget drift and let
+      // the window slide out of the viewport at max scroll.
+      const footerH = footer.offsetHeight;
+      const sheetH = main.offsetHeight;
+      const pin = sheetH - window.innerHeight;
+      const budget = footerH - window.innerHeight;
+      if (pin <= 0 || budget <= 0) {
+        shell.classList.remove('reveal-live');
+        shell.classList.add('reveal-off');
+        shell.style.removeProperty('--sheet-pin');
+        shell.style.removeProperty('--reveal-pad');
+        return;
+      }
+      shell.classList.add('reveal-live');
+      shell.classList.remove('reveal-off');
+      shell.style.setProperty('--sheet-pin', `${Math.round(pin)}px`);
+      /* The sheet's departure consumes one viewport of scroll; the rest of
+         the footer's height becomes the footer's own scroll. */
+      shell.style.setProperty('--reveal-pad', `${Math.round(footerH)}px`);
+      shell.style.setProperty('--reveal-budget', `${Math.round(budget)}px`);
+    };
+    apply();
+
+    const ro = new ResizeObserver(apply);
+    ro.observe(main);
+    ro.observe(footer);
+    window.addEventListener('resize', apply, { passive: true });
+
+    let ticking = false;
+    let revealing = false;
+    let lastLift = -1;
+    let lastTravel = -1;
+    let lastGridY = -1;
+    const writeVars = (): void => {
+      ticking = false;
+      if (!shell.classList.contains('reveal-live')) return;
+      const budget = parseFloat(shell.style.getPropertyValue('--reveal-budget')) || 1;
+      /* Live geometry, scroll-relative: the reveal progress e is the scroll
+         distance past the pin. The pin is derived every frame from
+         untainted quantities — document height minus the footer window's
+         natural height (the runway's exact height) minus the viewport —
+         because every direct measure of main goes stale or circular once
+         it sticks: getBoundingClientRect freezes at the stick (the sheet
+         honestly no longer moves) and offsetTop grows by the stick
+         displacement, which cancels the progress term exactly. Recomputing
+         per frame (instead of caching) keeps the reveal immune to async
+         content growth — map components, metrics, fonts — that would
+         otherwise make the pin stale and flash the footer in and out. */
+      const e =
+        window.scrollY -
+        (document.documentElement.scrollHeight - footer.offsetHeight - window.innerHeight);
+      /* Change-guards: identical setProperty calls still invalidate style,
+         and this runs every scroll frame. Each var is written on its
+         consumer (main / the footer content wrapper) — both are registered
+         non-inheriting @property, so the write re-styles only that element
+         instead of the whole shell subtree. */
+      const lift = Math.round(Math.max(0, Math.min(e, window.innerHeight)));
+      const travel = Math.round(Math.max(0, Math.min(e - window.innerHeight, budget)));
+      if (lift !== lastLift) {
+        lastLift = lift;
+        main.style.setProperty('--lift', `${lift}px`);
+      }
+      if (travel !== lastTravel) {
+        lastTravel = travel;
+        footer.style.setProperty('--ft-travel', `${travel}px`);
+      }
+      /* Same change-guard pattern as the two vars above: the scroll offset
+         behind the footer window's grid twin, keeping its CSS pattern
+         phase-true with the document grid (and the lens canvas). */
+      const gridY = Math.round(window.scrollY);
+      if (gridY !== lastGridY) {
+        lastGridY = gridY;
+        footerGrid?.style.setProperty('--ft-grid-y', `${gridY}px`);
+      }
+      /* Arming, not revealing: the sheet surface and the footer window swap
+         in ~150px ABOVE the pin, while the sheet still fully covers the
+         viewport. Both surfaces are the same canvas color, so the flip is
+         pixel-invisible — but it moves the window's first paint, the
+         sheet's layer promotion and the surface swap OFF the reveal moment.
+         Flipping (or fading) them at the reveal itself read as a flash of
+         the footer as it started appearing: the window snapped in at full
+         strength while the sheet's background was still fading in over it,
+         so the footer bled through the page for the fade's duration.
+         Disarm 50px deeper for hysteresis — every flip is seamless, so the
+         gap only bounds wasted work, not visuals. */
+      if (!revealing && e >= -150) revealing = true;
+      else if (revealing && e < -200) revealing = false;
+      shell.classList.toggle('is-revealing', revealing);
+      /* Ambient gating: these only invalidate on flips (twice per reveal
+         pass), never per frame. */
+      if (footerRevealActive !== revealing) footerRevealActive = revealing;
+      const gone = e >= window.innerHeight - 2;
+      if (sheetGone !== gone) sheetGone = gone;
+    };
+    const onScroll = (): void => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(writeVars);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    /* bfcache restores the frozen heap with whatever geometry was live at
+       hide time; a restore can land on a different scroll offset (or after
+       a resize while hidden), so re-sync once the page is shown again. */
+    window.addEventListener('pageshow', onScroll, { passive: true });
+
+    sheetCleanups.push(() => {
+      ro.disconnect();
+      window.removeEventListener('resize', apply);
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('pageshow', onScroll);
+    });
   }
 
   /* ------------------------------------------------------------------
@@ -629,6 +781,30 @@
     window.addEventListener('scroll', handleWindowScroll, { passive: true });
     window.addEventListener('resize', handleWindowResize);
     if (!hideChrome) initThemeObserver();
+    if (!hideChrome) initSheetReveal();
+    if (!hideChrome) {
+      /* The pre-footer magnetic stop: catches a scroll gesture that comes
+         to rest just before the sheet pins, holds it exactly at the page's
+         end (nothing of the footer shows — the last section IS the end),
+         and releases on deliberate extra scroll. Never engages without the
+         reveal or under reduced motion; native scrolling is never fought
+         (no preventDefault anywhere). */
+      magnetDispose = initMagneticPin({
+        isEligible: () => !!revealShell?.classList.contains('reveal-live'),
+        /* The pin in scroll space, from the same untainted arithmetic
+           writeVars uses (scrollHeight − footer runway − viewport);
+           offsetTop goes stale the moment main sticks. */
+        getPinY: () => {
+          const footerContent = document.querySelector<HTMLElement>('.reveal-footer-content');
+          if (!footerContent) return Number.POSITIVE_INFINITY;
+          return (
+            document.documentElement.scrollHeight -
+            footerContent.offsetHeight -
+            window.innerHeight
+          );
+        }
+      });
+    }
     let disposeWebsiteEvents: (() => void) | undefined;
     let disposeSnapshotStore: (() => void) | undefined;
     try {
@@ -646,6 +822,8 @@
       window.removeEventListener('scroll', handleWindowScroll);
       window.removeEventListener('resize', handleWindowResize);
       themeObserver?.disconnect();
+      for (const fn of sheetCleanups) fn();
+      if (magnetDispose) magnetDispose();
       if (resizeTimer) clearTimeout(resizeTimer);
       if (menuCloseTimer) clearTimeout(menuCloseTimer);
       if (typeof disposeWebsiteEvents === 'function') disposeWebsiteEvents();
@@ -674,9 +852,9 @@
 
 <LoadingScreen />
 <BrowserIconSprite />
+<CursorLayer />
 
 <div class="site-shell" class:o2-fullscreen={hideChrome}>
-  <AmbientBackground />
   <a class="skip-link" href="#main-content">Skip to content</a>
   {#if !hideChrome}
   <header class="l2-nav-shell" class:is-scrolled={scrolled} class:menu-open={openMenu !== null} class:nav-dark={navDark}>
@@ -745,6 +923,7 @@
                 href={browserLink(detectedBrowser)}
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label={`Install for ${browserDisplayName(detectedBrowser)}`}
                 aria-haspopup="true"
                 aria-expanded={openMenu === 'install' ? 'true' : 'false'}
                 aria-controls="nav-menu-install"
@@ -755,7 +934,17 @@
                   trackInstallClick('nav_install');
                 }}
               >
-                Install for {browserDisplayName(detectedBrowser)}
+                <span class="l2-nav-cta-label">Install for {browserDisplayName(detectedBrowser)}</span>
+                <!-- Pill mode swaps the long label for this compact one and
+                     rides the three store marks inside the button as a
+                     decorative avatar stack; per-store links live in the
+                     hover dropdown. -->
+                <span class="l2-nav-cta-label-short" aria-hidden="true">Install</span>
+                <span class="l2-nav-store-stack" aria-hidden="true">
+                  <span class="l2-nav-store-bubble"><BrowserIcon browser="chrome" /></span>
+                  <span class="l2-nav-store-bubble"><BrowserIcon browser="firefox" /></span>
+                  <span class="l2-nav-store-bubble"><BrowserIcon browser="edge" /></span>
+                </span>
               </a>
               <div
                 class="l2-nav-alt-browsers"
@@ -766,14 +955,40 @@
                 on:mouseleave={scheduleMenuClose}
                 aria-label="Install for another browser"
               >
-                <p class="l2-nav-menu-title">Other browsers</p>
+                <p class="l2-nav-menu-title">
+                  <span class="l2-nav-menu-title-rest">Other browsers</span>
+                  <span class="l2-nav-menu-title-pill">Install options</span>
+                </p>
+                <!-- The Chrome Web Store row is the pill mode's extra hover
+                     option: the compact button no longer names a browser, so
+                     the store for Chrome & all Chromium browsers gets a row. -->
+                <a
+                  class="l2-nav-alt l2-nav-alt-chrome"
+                  href={browserLink('chrome')}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Chrome Web Store"
+                  style="--alt-i: 0"
+                  on:click={() => {
+                    closeMenus();
+                    trackInstallClick('nav_menu_install');
+                  }}
+                >
+                  <span class="l2-nav-menu-glyph l2-nav-menu-glyph-brand" aria-hidden="true">
+                    <BrowserIcon browser="chrome" />
+                  </span>
+                  <span class="l2-nav-menu-copy">
+                    <span class="l2-nav-menu-label">Chrome Web Store</span>
+                    <span class="l2-nav-menu-desc">For Chrome, Brave, Arc & all Chromium browsers.</span>
+                  </span>
+                </a>
                 <a
                   class="l2-nav-alt"
                   href={browserLink('firefox')}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Install for Firefox"
-                  style="--alt-i: 0"
+                  style="--alt-i: 1"
                   on:click={() => {
                     closeMenus();
                     trackInstallClick('nav_install_firefox');
@@ -793,7 +1008,7 @@
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Install for Microsoft Edge"
-                  style="--alt-i: 1"
+                  style="--alt-i: 2"
                   on:click={() => {
                     closeMenus();
                     trackInstallClick('nav_install_edge');
@@ -880,39 +1095,51 @@
                 </div>
               {/each}
 
-              {#if menu.featured.kind === 'install'}
+              <div class="l2-nav-menu-featured-col">
+                {#if menu.featured.kind === 'install'}
+                  <a
+                    class="l2-nav-menu-featured"
+                    href={browserLink(detectedBrowser)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    tabindex={openMenu === menu.key ? undefined : -1}
+                    on:click={handleFeaturedInstallClick}
+                  >
+                    <span class="l2-nav-menu-featured-title">{menu.featured.title}</span>
+                    <span class="l2-nav-menu-featured-desc">{menu.featured.desc}</span>
+                    <span class="l2-nav-menu-featured-cta">
+                      Install for {browserDisplayName(detectedBrowser)}
+                      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 17 17 7" /><path d="M9 7h8v8" /></svg>
+                    </span>
+                  </a>
+                {:else}
+                  <a
+                    class="l2-nav-menu-featured"
+                    href={resolveMenuHref(menu.featured.href)}
+                    target={menu.featured.external ? '_blank' : undefined}
+                    rel={menu.featured.external ? 'noopener noreferrer' : undefined}
+                    tabindex={openMenu === menu.key ? undefined : -1}
+                    on:click={closeMenus}
+                  >
+                    <span class="l2-nav-menu-featured-title">{menu.featured.title}</span>
+                    <span class="l2-nav-menu-featured-desc">{menu.featured.desc}</span>
+                    <span class="l2-nav-menu-featured-cta">
+                      {menu.featured.cta}
+                      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 17 17 7" /><path d="M9 7h8v8" /></svg>
+                    </span>
+                  </a>
+                {/if}
+                <span class="l2-nav-bmc-label">Support the maker</span>
                 <a
-                  class="l2-nav-menu-featured"
-                  href={browserLink(detectedBrowser)}
+                  class="l2-nav-bmc"
+                  href={BUY_COFFEE_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                   tabindex={openMenu === menu.key ? undefined : -1}
-                  on:click={handleFeaturedInstallClick}
                 >
-                  <span class="l2-nav-menu-featured-title">{menu.featured.title}</span>
-                  <span class="l2-nav-menu-featured-desc">{menu.featured.desc}</span>
-                  <span class="l2-nav-menu-featured-cta">
-                    Install for {browserDisplayName(detectedBrowser)}
-                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 17 17 7" /><path d="M9 7h8v8" /></svg>
-                  </span>
+                  <img src="/bmc-button.svg" alt="Buy me a coffee" loading="lazy" />
                 </a>
-              {:else}
-                <a
-                  class="l2-nav-menu-featured"
-                  href={resolveMenuHref(menu.featured.href)}
-                  target={menu.featured.external ? '_blank' : undefined}
-                  rel={menu.featured.external ? 'noopener noreferrer' : undefined}
-                  tabindex={openMenu === menu.key ? undefined : -1}
-                  on:click={closeMenus}
-                >
-                  <span class="l2-nav-menu-featured-title">{menu.featured.title}</span>
-                  <span class="l2-nav-menu-featured-desc">{menu.featured.desc}</span>
-                  <span class="l2-nav-menu-featured-cta">
-                    {menu.featured.cta}
-                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 17 17 7" /><path d="M9 7h8v8" /></svg>
-                  </span>
-                </a>
-              {/if}
+              </div>
             </div>
           </div>
         {/each}
@@ -925,6 +1152,7 @@
           class:active={openMenu === 'github'}
           inert={openMenu === null || openMenu !== 'github'}
         >
+          <div class="l2-gh-wrap">
           <div class="l2-gh-card">
             <div class="l2-gh-chrome" aria-hidden="true">
               <span></span><span></span><span></span>
@@ -968,6 +1196,17 @@
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3.6 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 17l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9Z"/></svg>
               </a>
             </div>
+          </div>
+          <span class="l2-nav-bmc-label l2-nav-bmc-label-center">Support the maker</span>
+          <a
+            class="l2-nav-bmc"
+            href={BUY_COFFEE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            tabindex={openMenu === 'github' ? undefined : -1}
+          >
+            <img src="/bmc-button.svg" alt="Buy me a coffee" loading="lazy" />
+          </a>
           </div>
         </div>
       </div>
@@ -1046,17 +1285,39 @@
 
   <main
     id="main-content"
+    bind:this={mainEl}
     class:site-main={!isOverviewStyleRoute && !hideChrome}
     class:site-main-overview-style={isOverviewStyleRoute && !hideChrome}
     class:l2-wrap={!isOverviewStyleRoute && !hideChrome}
   >
-    <div class="site-route-shell">
+    <!-- The page's ambient world lives inside the sheet: it paints above the
+         sheet's opaque reveal surface and travels with it when the sheet
+         lifts away, so the grid and orbs never flatten out of view. It
+         sleeps once the sheet has fully left the viewport. -->
+    <AmbientBackground paused={sheetGone} />
+    <div class="site-route-shell" class:route-dim={$navigating}>
       <slot />
     </div>
   </main>
 
+  <!-- Sticky-sheet runway: the scroll distance past the pin (the reveal).
+       Empty on purpose — see the reveal CSS for why it cannot be main's
+       margin. Height arrives only under .reveal-live. -->
+  <div class="reveal-runway" aria-hidden="true"></div>
+
   {#if !hideChrome}
-  <SiteFooter />
+  <div class="reveal-footer">
+    <!-- The footer window's own copy of the page's ambient — same orbs and
+         the same interactive cursor-lens grid. The window itself never
+         transforms: only the content wrapper inside it travels, so the
+         lens canvas stays viewport-anchored and bends exactly under the
+         cursor, just like the page. It sleeps whenever the window is
+         hidden (pre-reveal), so nothing paints behind the sheet. -->
+    <AmbientBackground paused={!footerRevealActive} />
+    <div class="reveal-footer-content">
+      <SiteFooter />
+    </div>
+  </div>
   {/if}
 </div>
 
@@ -1102,6 +1363,13 @@
 
   .site-route-shell {
     min-height: 0;
+    /* K2: while a route loads, the current content softens and the loading
+       screen's icon carries the motion — no new loader, no content slide. */
+    transition: opacity 0.25s ease;
+  }
+
+  .site-route-shell.route-dim {
+    opacity: 0.35;
   }
 
   .site-main-overview-style .site-route-shell {
@@ -1120,6 +1388,145 @@
     max-width: 1280px;
     margin: 0 auto;
     padding: 0 24px;
+  }
+
+  /* ── Sticky sheet reveal (driven by initSheetReveal) ────────
+     main becomes the sheet: it scrolls normally, pins at
+     top: -(mainH - 100vh) once its end reaches the viewport bottom, and
+     at that stick point gains its sheet surface — opaque background,
+     rounded bottom, shadow cast onto the footer window — then departs
+     via --lift. The footer is a fixed window beneath the sheet (z 0),
+     hidden until the stick, its inner content travelling through the
+     reveal via --ft-travel so the footer scrolls on after the sheet has
+     gone. Ambient background stays a shell sibling: the sheet only
+     turns opaque at the stick, so the orbs/grid show through the page
+     for its whole length.
+
+     The scroll runway past the pin is a spacer sibling after main, not
+     main's margin-bottom: a sticky element constrained by its own margin
+     box can never travel past the pin — main un-stuck there and the
+     --lift feedback loop ran the sheet away at double speed (measured:
+     lift 150px at pin+120). Shell padding doesn't work either — the
+     sticky constraint rectangle is the shell's CONTENT box, which ends
+     before any padding. The spacer lives inside the content box, so main
+     can stick through the whole reveal while the document height stays
+     identical. */
+  :global(.site-shell.reveal-live) .reveal-runway {
+    height: var(--reveal-pad, 0px);
+  }
+
+  :global(.site-shell.reveal-live) main {
+    position: sticky;
+    top: calc(-1 * var(--sheet-pin, 0px));
+    z-index: 1;
+    /* No transition on the surface — ever. The sheet's background is the
+       same color as the footer window behind it, so an instant swap is
+       pixel-seamless; a fade instead showed the footer through the
+       semi-transparent sheet (the entry flash). The class flip also happens
+       ~150px above the pin, behind full viewport coverage, where even the
+       instant swap is invisible. */
+  }
+
+  :global(.site-shell.reveal-live.is-revealing) main {
+    /* Flat occluding base — the ambient child paints the world texture
+       (orbs + grid + lens) above it, so the sheet never flattens. Applies
+       from arming (band entry), entirely behind full viewport coverage. */
+    background: var(--bg);
+    border-radius: 0 0 28px 28px;
+    box-shadow: 0 26px 60px rgba(15, 20, 25, 0.16);
+    translate: 0 calc(-1 * var(--lift, 0px));
+    /* Layer promotion also lands at arming, off the reveal moment: the
+       sheet re-composites every scroll frame of the reveal — keep that on
+       the compositor instead of repainting the shadowed surface. */
+    will-change: translate;
+  }
+
+  :global(.site-shell.reveal-live) :global(.reveal-footer) {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 100vh;
+    z-index: 0;
+    overflow: hidden;
+    background: var(--bg);
+    /* The window is a fixed-size 100vh box whose subtree never paints
+       outside it — scope layout/paint to the box so hidden-phase style
+       work stays local (its absolutes are already window-relative; the
+       sticky lens canvas does not need a scroll container). */
+    contain: layout paint;
+    visibility: hidden;
+    /* No opacity and no transition here on purpose. The reveal is pure
+       occlusion: the window is simply behind the sheet, and the sheet
+       physically slides off it. (1) A fade on the way in exposed the CTA
+       block at partial opacity while the sheet lifted — read as a flash.
+       (2) This state is also the EXIT state; fading here ghosted the
+       footer through the page, because dropping .is-revealing fades the
+       sheet's own opaque background back to transparent at the same time.
+       Instant hide is invisible in both directions: hidden-phase pixels
+       equal the html canvas while the sheet covers the viewport. */
+    transition: none;
+  }
+
+  /* The footer content slides within the static window — the window and
+     its ambient never transform, so the lens grid stays cursor-true. */
+  :global(.site-shell.reveal-live) :global(.reveal-footer-content) {
+    translate: 0 calc(-1 * var(--ft-travel, 0px));
+  }
+
+  /* Doc-align the footer window's CSS grid twin with the lens canvas's
+     document-anchored lines (see --ft-grid-y in app.css), so the canvas
+     standing up or sleeping can never shift the grid phase mid-reveal. */
+  :global(.site-shell.reveal-live) :global(.reveal-footer .l2-page-grid) {
+    background-position: 0 calc(-1 * var(--ft-grid-y, 0px));
+  }
+
+  :global(.site-shell.reveal-live.is-revealing) :global(.reveal-footer) {
+    /* Visibility flip only — no fade. The footer is occluded content, not
+       an overlay: it appears exactly as fast as the sheet uncovers it. */
+    visibility: visible;
+  }
+
+  /* First-paint guard (html.js is set inline in app.html): the footer window
+     stays hidden until initSheetReveal decides the mode, killing the load
+     flash where the in-flow SSR footer appeared for a beat and vanished.
+     Plain modes surface it via .reveal-off; no-JS visitors never get html.js. */
+  :global(html.js) :global(.reveal-footer) {
+    visibility: hidden;
+  }
+
+  :global(html.js) :global(.site-shell.reveal-off) :global(.reveal-footer),
+  :global(html.js) :global(.site-shell.reveal-live.is-revealing) :global(.reveal-footer) {
+    visibility: visible;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :global(.site-shell.reveal-live) .reveal-runway {
+      height: 0;
+    }
+
+    :global(.site-shell.reveal-live) main {
+      position: static;
+    }
+
+    :global(.site-shell.reveal-live.is-revealing) main {
+      background: transparent;
+      border-radius: 0;
+      box-shadow: none;
+      translate: none;
+    }
+
+    :global(.site-shell.reveal-live) :global(.reveal-footer),
+    :global(html.js) :global(.reveal-footer) {
+      position: static;
+      height: auto;
+      overflow: visible;
+      visibility: visible;
+    }
+
+    :global(.site-shell.reveal-live) :global(.reveal-footer-content) {
+      translate: none;
+    }
   }
 
   /* ============================================================
@@ -1275,9 +1682,10 @@
   }
 
   /* Cloudflare-style center cluster: the links sit in the exact middle of
-     the bar regardless of brand/CTA widths. In pill mode syncBarMode sets
-     --nav-links-shift to re-center the cluster between the logo and the
-     install CTA with equal gaps. */
+     the bar regardless of brand/CTA widths, at every desktop width. In
+     pill mode syncBarMode shifts the cluster by --nav-links-shift so it
+     stays centered inside the pill with equal 24px gaps while the pill
+     itself centers on the page. */
   .l2-nav-links {
     position: absolute;
     left: 50%;
@@ -1579,6 +1987,16 @@
     line-height: 1.45;
   }
 
+  /* Featured column: the green tile plus the Buy Me a Coffee support
+     button underneath. Same width as the tile so nothing shifts. */
+  .l2-nav-menu-featured-col {
+    flex: none;
+    width: 216px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
   .l2-nav-menu-featured {
     flex: none;
     align-self: flex-start;
@@ -1680,8 +2098,70 @@
      GitHub hover preview card — a mini "browser window" showing the
      repo identity, live stats, and a star CTA.
      ============================================================ */
+  /* ---- Buy Me a Coffee (official bmc-button.svg art, 545×153) ----
+     40px tall keeps official proportions (~142px wide). fit-content pins
+     pill + glow to the art — a flex column would otherwise stretch the
+     anchor box and widen the highlight. Hover: lift + warm glow, matching
+     the featured tile's own hover language (no more, no less). */
+  .l2-nav-bmc {
+    display: inline-block;
+    width: fit-content;
+    border-radius: 999px;
+    text-decoration: none;
+    box-shadow: 0 2px 10px -3px rgba(13, 12, 34, 0.18);
+    transition:
+      transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+      filter 0.3s ease,
+      box-shadow 0.3s ease;
+  }
+
+  .l2-nav-bmc img {
+    display: block;
+    width: auto;
+    height: 40px;
+    border-radius: 999px;
+  }
+
+  .l2-nav-bmc:hover,
+  .l2-nav-bmc:focus-visible {
+    transform: translateY(-2px);
+    filter: saturate(1.08) brightness(1.03);
+    box-shadow:
+      0 8px 22px -6px rgba(255, 221, 0, 0.85),
+      0 3px 8px -2px rgba(13, 12, 34, 0.15);
+  }
+
+  .l2-nav-bmc:focus-visible {
+    outline: 2px solid var(--text, #0d0c22);
+    outline-offset: 2px;
+  }
+
+  .l2-nav-bmc-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+
+  .l2-nav-bmc-label-center {
+    text-align: center;
+  }
+
   .l2-nav-menu-block-github {
     width: 380px;
+  }
+
+  /* GitHub support column: mirror card + BMC button underneath. */
+  .l2-gh-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .l2-gh-wrap .l2-nav-bmc,
+  .l2-gh-wrap .l2-nav-bmc-label {
+    align-self: center;
   }
 
   .l2-gh-card {
@@ -2244,6 +2724,97 @@
     transform: translateY(0) scale(0.98);
   }
 
+  /* Pill mode swaps the full label for a compact "Install" and shows the
+     store-bubble stack beside it. The anchor's aria-label keeps the
+     browser-specific accessible name in both states. */
+  .l2-nav-cta-label-short {
+    display: none;
+  }
+
+  .l2-nav-shell.is-scrolled .l2-nav-cta-desktop {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px 6px 14px;
+  }
+
+  .l2-nav-shell.is-scrolled .l2-nav-cta-desktop .l2-nav-cta-label {
+    display: none;
+  }
+
+  .l2-nav-shell.is-scrolled .l2-nav-cta-desktop .l2-nav-cta-label-short {
+    display: inline;
+  }
+
+  /* The three store marks ride inside the compact Install button as an
+     avatar stack — decorative only (the whole button is the link); the
+     hover dropdown carries the per-store links. Hidden at rest, where the
+     full-text CTA and the hover dropdown carry the same job. */
+  .l2-nav-store-stack {
+    display: none;
+  }
+
+  .l2-nav-shell.is-scrolled .l2-nav-cta-desktop .l2-nav-store-stack {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .l2-nav-store-bubble {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: #fff;
+    box-shadow:
+      0 0 0 1.5px rgba(255, 255, 255, 0.9),
+      0 1px 3px rgba(15, 20, 25, 0.22);
+  }
+
+  /* Avatar-stack overlap; the left bubble sits above its right neighbor,
+     like the reference image. */
+  .l2-nav-store-bubble + .l2-nav-store-bubble {
+    margin-left: -9px;
+  }
+
+  .l2-nav-store-bubble:nth-child(1) {
+    z-index: 3;
+  }
+
+  .l2-nav-store-bubble:nth-child(2) {
+    z-index: 2;
+  }
+
+  .l2-nav-store-bubble :global(svg) {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* Dropdown header + Chrome Web Store row swap with the pill: at rest the
+     button already names the detected browser, so the panel lists only the
+     other two; in pill mode the button is a generic "Install", so the
+     panel becomes "Install options" with the Chrome Web Store on top. */
+  .l2-nav-menu-title-pill {
+    display: none;
+  }
+
+  .l2-nav-shell.is-scrolled .l2-nav-menu-title-rest {
+    display: none;
+  }
+
+  .l2-nav-shell.is-scrolled .l2-nav-menu-title-pill {
+    display: inline;
+  }
+
+  .l2-nav-alt-chrome {
+    display: none;
+  }
+
+  .l2-nav-shell.is-scrolled .l2-nav-alt-chrome {
+    display: flex;
+  }
+
   .l2-nav-link:focus-visible,
   .l2-nav-github:focus-visible,
   .l2-nav-menu-link:focus-visible,
@@ -2265,19 +2836,9 @@
     }
   }
 
-  /* Below the comfortable centered width, the links rejoin the flex row. */
-  @media (max-width: 1120px) {
-    .l2-nav-links {
-      position: static;
-      transform: none;
-      flex: 1;
-      justify-content: center;
-    }
-
-    .l2-nav-inner {
-      gap: 14px;
-    }
-  }
+  /* The links keep their absolute centering at every desktop width —
+     down to 861px there is still ~24px clearance to the install CTA —
+     and below 860px they are hidden for the mobile layout. */
 
   @media (max-width: 860px) {
     .l2-nav-bar {
@@ -2314,6 +2875,11 @@
     .l2-nav-alt-browsers,
     .l2-nav-dropdown {
       display: none;
+    }
+
+    /* The pill's store bubbles are desktop-scrolled-state chrome only. */
+    .l2-nav-store-stack {
+      display: none !important;
     }
 
     .l2-nav-menu-btn {
@@ -2408,6 +2974,10 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
+    .site-route-shell {
+      transition: none;
+    }
+
     .l2-nav-shell,
     .l2-nav-float,
     .l2-nav-bar,
