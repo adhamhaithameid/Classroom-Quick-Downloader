@@ -36,6 +36,7 @@ import {
   startSingleAttempt,
 } from './download-handler';
 import { Analytics, refreshRemoteAnalyticsConfig, recordDownloadEvent } from '../utils/analytics';
+import { installRuntimeErrorReporting } from '../utils/analytics/runtime-errors';
 import { buildUninstallUrl } from '../utils/analytics/flush';
 import { loadStats } from '../utils/analytics/storage';
 import { createWorkerRuntimeBridge } from '../../src/adapters/bridge/runtime-bridge';
@@ -122,6 +123,9 @@ function isStudentWorkResolvePublishMessage(value: unknown): value is StudentWor
 export default defineBackground(() => {
   // Initialize analytics alarms
   ensureAnalyticsAlarm();
+  // Report unhandled background errors as runtime_error analytics events
+  // (rate-capped, signature-only; see utils/analytics/runtime-errors.ts).
+  installRuntimeErrorReporting();
   refreshRemoteAnalyticsConfig().catch(() => {});
   // Startup catch-up: the flush decision gates everything, so this is safe and
   // idempotent (no-op unless a trigger is due, e.g. weekly slot catch-up).
