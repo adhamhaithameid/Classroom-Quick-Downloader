@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancelar todo",
+    "message": "Cancelar tudo",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Modificado",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "após a publicação",
+    "description": "after_posting"
   }
 }
