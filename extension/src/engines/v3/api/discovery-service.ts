@@ -6,6 +6,7 @@ import type {
 import { ClassroomApiSnapshotCache } from './cache';
 import { GoogleClassroomApiClient } from './classroom-api-client';
 import { ChromeIdentityTokenProvider } from './token-provider';
+import { sharedClassroomRateLimiter } from './rate-limiter';
 
 export interface ApiDiscoveryOptions {
   signal?: AbortSignal;
@@ -59,7 +60,11 @@ export class ClassroomApiDiscoveryService implements ApiDiscoveryService {
 
 export function createDefaultApiDiscoveryService(): ApiDiscoveryService {
   const tokenProvider = new ChromeIdentityTokenProvider();
-  const client = new GoogleClassroomApiClient(tokenProvider);
+  const client = new GoogleClassroomApiClient(tokenProvider, {
+    // csaa.5: the submissions assist and the course inventory share ONE
+    // rolling budget (see rate-limiter.ts).
+    beforeCall: () => sharedClassroomRateLimiter.acquire(),
+  });
   const cache = new ClassroomApiSnapshotCache();
   return new ClassroomApiDiscoveryService(client, cache);
 }
