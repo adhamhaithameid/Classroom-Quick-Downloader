@@ -72,7 +72,7 @@
     "description": "commError"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "Денови меѓу објавувањето и последната измена",
     "description": "editedTooltip"
   },
   "comment_singular": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Откажи сите",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Променето",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "по објавување",
+    "description": "after_posting"
   }
 }
