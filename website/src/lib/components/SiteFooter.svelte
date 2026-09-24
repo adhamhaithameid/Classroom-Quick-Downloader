@@ -13,6 +13,7 @@
 
   const BROWSER_ORDER: BrowserKey[] = ['chrome', 'firefox', 'edge'];
   const CREATOR_URL = 'https://github.com/adhamhaithameid';
+  const BUY_COFFEE_URL = 'https://www.buymeacoffee.com/adhamhaithameid';
 
   const currentYear = new Date().getFullYear();
 
@@ -45,102 +46,187 @@
     });
   }
 
-  /* Reveal-on-scroll is progressive enhancement: without JS (or with
-     prefers-reduced-motion) every section stays fully visible. Only
-     sections below the fold get the hidden state, so nothing flashes.
-     It must fail open — a fast scroll can jump an element from below the
-     viewport to above it without any observer callback, so a passive scroll
-     check and a failsafe timer reveal anything left behind. */
+  /* ── Footer cascade: systematic staggered entrance ──
+     The footer is one rehearsed sequence, not four independent fades. Five
+     zones (CTA → nav grid → principles → legal → wordmark) arm their
+     below-fold steps at mount — always fail-open: no JS or reduced motion
+     leaves everything visible, SSR never ships hidden state, and elements
+     already on screen at load never arm. When a zone scrolls into view its
+     steps run in DOM order, each snapping home with the house overshoot
+     spring (the "click"). A chain cursor keeps zones in sequence when
+     several trigger in the same instant (fast scroll, jump to bottom)
+     instead of letting their cascades overlap. Classes are stripped the
+     moment each animation ends, so a filling keyframe never blocks the
+     hover transforms underneath.
+
+     The sticky sheet reveal itself (content pin, footer window, lift and
+     travel) lives in +layout.svelte. Inside that fixed window the footer's
+     rects are viewport-honest — zones trigger exactly when the rising
+     footer uncovers them. */
   onMount(() => {
     detectedBrowser = detectBrowserFromNavigator();
 
     if (!footerEl || !megaEl) return;
+    const footer = footerEl;
     const mega = megaEl;
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const cleanups: Array<() => void> = [];
 
-    if (!reducedMotion) {
-      /* ── Reveal-on-scroll (fail-open) ──
-         Sections stay visible by default; only below-fold ones get the
-         hidden state, and a passive scroll check plus a failsafe timer
-         guarantee everything resolves. */
-      const pending = new Set<HTMLElement>();
+    const STEP_MS = 55; /* fixed per-step offset: the systematic beat */
+    const CHAIN_GAP = 120; /* breathing room between chained zones */
+    const CHAIN_CAP = 440; /* one zone's max contribution to the chain */
+    const ARM_LINE = 0.92; /* arm only what sits below 92% of the viewport */
+
+    /* The cascade is progressive enhancement only — reduced motion and
+       ancient browsers skip straight to the static wordmark below. */
+    if (!reducedMotion && 'IntersectionObserver' in window) {
+      /* Defer one frame: +layout.svelte's own onMount (which arms the sticky
+         sheet reveal and fixes the footer window in place) runs right after
+         this component's. */
+      const startRaf = requestAnimationFrame(() => requestAnimationFrame(startCascade));
+      cleanups.push(() => cancelAnimationFrame(startRaf));
+    }
+
+    function startCascade(): void {
+      /* Inside the live sheet reveal the footer starts hidden behind the
+         page sheet, so "below the fold" is meaningless at mount — arm every
+         step and let each zone's rect decide when its cascade plays as the
+         window uncovers it. In plain flow only below-fold steps arm. */
+      const liveSheet = getComputedStyle(footer).position === 'fixed';
+
+      const zoneSteps = new Map<HTMLElement, HTMLElement[]>();
+      const pendingZones = new Set<HTMLElement>();
+      let chainUntil = 0;
+
+      function triggerZone(zone: HTMLElement): void {
+        if (!pendingZones.has(zone)) return;
+        pendingZones.delete(zone);
+        const steps = zoneSteps.get(zone) ?? [];
+        const now = performance.now();
+        const start = Math.max(now, chainUntil);
+        chainUntil = start + Math.min(steps.length * STEP_MS, CHAIN_CAP) + CHAIN_GAP;
+        const base = Math.round(start - now);
+        steps.forEach((el, i) => {
+          el.classList.add('ft-go');
+          el.style.animationDelay = `${base + i * STEP_MS}ms`;
+        });
+      }
+
+      /* A zone's steps live inside it — except a zone whose own marker is
+         the step (the wordmark zone IS the step). */
+      function collectSteps(zone: HTMLElement): HTMLElement[] {
+        const inner = Array.from(zone.querySelectorAll<HTMLElement>('[data-ft]'));
+        return zone.matches('[data-ft]') ? [zone, ...inner] : inner;
+      }
+
+      for (const zone of footer.querySelectorAll<HTMLElement>('[data-ft-zone]')) {
+        let steps = collectSteps(zone);
+        if (!liveSheet) {
+          /* Only steps below the fold arm — everything already on screen at
+             load stays exactly as rendered, so nothing flashes. */
+          steps = steps.filter(
+            (el) => el.getBoundingClientRect().top > window.innerHeight * ARM_LINE
+          );
+        }
+        if (steps.length === 0) continue;
+        zoneSteps.set(zone, steps);
+        pendingZones.add(zone);
+        for (const el of steps) el.classList.add('ft-armed');
+      }
+
+      if (pendingZones.size === 0) return;
+
       const observer = new IntersectionObserver(
         (entries) => {
           for (const entry of entries) {
-            if (entry.isIntersecting || entry.boundingClientRect.top < window.innerHeight) {
-              reveal(entry.target as HTMLElement);
-            }
+            if (entry.isIntersecting) triggerZone(entry.target as HTMLElement);
           }
         },
-        { threshold: 0, rootMargin: '0px 0px 120px 0px' }
+        { threshold: 0, rootMargin: '0px 0px -8% 0px' }
       );
+      for (const zone of pendingZones) observer.observe(zone);
 
-      function reveal(el: HTMLElement): void {
-        el.classList.add('cqd-reveal-in');
-        pending.delete(el);
-        observer.unobserve(el);
-        if (pending.size === 0) {
-          window.removeEventListener('scroll', onScroll);
-          clearTimeout(failsafe);
-        }
-      }
-
-      /* rAF-throttled so at most one measurement pass happens per frame. */
+      /* rAF-throttled passive scroll check backstops the observer — a fast
+         scroll can skip an intersection callback entirely. At most one
+         measurement pass happens per frame. */
       let ticking = false;
       function onScroll(): void {
         if (ticking) return;
         ticking = true;
         requestAnimationFrame(() => {
           ticking = false;
-          for (const el of pending) {
-            if (el.getBoundingClientRect().top <= window.innerHeight) reveal(el);
+          for (const zone of Array.from(pendingZones)) {
+            if (zone.getBoundingClientRect().top <= window.innerHeight * ARM_LINE) {
+              triggerZone(zone);
+            }
           }
         });
       }
+      window.addEventListener('scroll', onScroll, { passive: true });
 
-      const failsafe = setTimeout(() => {
-        for (const el of pending) reveal(el);
-      }, 4000);
+      /* A finished or cancelled step drops its classes in the same tick the
+         animation releases, returning it to natural styles. */
+      function settleStep(event: AnimationEvent): void {
+        const el = event.target as HTMLElement;
+        if (!el.hasAttribute?.('data-ft')) return;
+        el.classList.remove('ft-armed', 'ft-go');
+        el.style.animationDelay = '';
+      }
+      footer.addEventListener('animationend', settleStep);
+      footer.addEventListener('animationcancel', settleStep);
 
-      for (const el of Array.from(footerEl.querySelectorAll<HTMLElement>('.cqd-reveal'))) {
-        if (el.getBoundingClientRect().top > window.innerHeight * 0.9) {
-          el.classList.add('cqd-reveal-pending');
-          pending.add(el);
-          observer.observe(el);
+      cleanups.push(() => {
+        observer.disconnect();
+        window.removeEventListener('scroll', onScroll);
+        footer.removeEventListener('animationend', settleStep);
+        footer.removeEventListener('animationcancel', settleStep);
+      });
+
+      /* ── Magnetic CTA buttons ──
+         Fine-pointer devices only: each button wrapper is pulled a few
+         pixels toward the cursor and springs home on leave. The button's
+         own hover lift is untouched — the pull lives on the wrapper. */
+      if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+        for (const wrap of Array.from(footer.querySelectorAll<HTMLElement>('.ft-magnet'))) {
+          let raf = 0;
+          let rect: DOMRect | null = null;
+          const apply = (event: PointerEvent): void => {
+            raf = 0;
+            if (!rect) return;
+            const clamp = (v: number) => Math.max(-5, Math.min(5, v));
+            const dx = event.clientX - (rect.left + rect.width / 2);
+            const dy = event.clientY - (rect.top + rect.height / 2);
+            wrap.style.setProperty('--ft-mx', `${clamp(dx * 0.16).toFixed(1)}px`);
+            wrap.style.setProperty('--ft-my', `${clamp(dy * 0.16).toFixed(1)}px`);
+          };
+          const onEnter = (event: PointerEvent): void => {
+            rect = wrap.getBoundingClientRect();
+            /* Live-follow while inside (no transition lag); removing the
+               class on leave lets the spring transition carry it home. */
+            wrap.classList.add('ft-magnet-live');
+            apply(event);
+          };
+          const onMove = (event: PointerEvent): void => {
+            if (!raf) raf = requestAnimationFrame(() => apply(event));
+          };
+          const onLeave = (): void => {
+            if (raf) cancelAnimationFrame(raf);
+            raf = 0;
+            rect = null;
+            wrap.classList.remove('ft-magnet-live');
+            wrap.style.setProperty('--ft-mx', '0px');
+            wrap.style.setProperty('--ft-my', '0px');
+          };
+          wrap.addEventListener('pointerenter', onEnter);
+          wrap.addEventListener('pointermove', onMove, { passive: true });
+          wrap.addEventListener('pointerleave', onLeave);
+          cleanups.push(() => {
+            wrap.removeEventListener('pointerenter', onEnter);
+            wrap.removeEventListener('pointermove', onMove);
+            wrap.removeEventListener('pointerleave', onLeave);
+          });
         }
       }
-      if (pending.size > 0) {
-        window.addEventListener('scroll', onScroll, { passive: true });
-      }
-
-      cleanups.push(() => {
-        window.removeEventListener('scroll', onScroll);
-        clearTimeout(failsafe);
-        observer.disconnect();
-      });
-
-      /* Gentle entrance for the wordmark, same fail-open pattern. */
-      const entranceObserver = new IntersectionObserver(
-        (entries) => {
-          for (const entry of entries) {
-            if (entry.isIntersecting || entry.boundingClientRect.top < window.innerHeight) {
-              mega.classList.remove('ft-mega-pending');
-              entranceObserver.unobserve(entry.target);
-            }
-          }
-        },
-        { threshold: 0.15 }
-      );
-      const entranceFailsafe = setTimeout(() => mega.classList.remove('ft-mega-pending'), 4000);
-      if (mega.getBoundingClientRect().top > window.innerHeight * 0.9) {
-        mega.classList.add('ft-mega-pending');
-        entranceObserver.observe(mega);
-      }
-      cleanups.push(() => {
-        clearTimeout(entranceFailsafe);
-        entranceObserver.disconnect();
-      });
     }
 
     /* ── Dot-particle wordmark ──
@@ -175,7 +261,9 @@
       const DRAG = 0.9;
       const EASE = 0.085;
       const MAX_SPEED = 13;
-      const SETTLE = 0.08;
+      /* How long a stationary cursor keeps pushing the field before the
+         wordmark is allowed to settle (see lastPointerMoveAt). */
+      const CURSOR_LIVE_MS = 600;
 
       type Dot = {
         hx: number;
@@ -202,6 +290,13 @@
       let megaVisible = false;
       let pointerTicking = false;
       let moveSeq = 0;
+      /* Cursor staleness: a parked cursor's repel force never lets the
+         velocities converge (a static force field has no rest state), so
+         the field treats a cursor idle longer than this as absent — dots
+         ease home, the loop settles, and the next move re-carves the
+         circle. Without this the wordmark canvas redrew at 60fps forever
+         whenever the pointer parked inside it. */
+      let lastPointerMoveAt = 0;
       let rebuildTimer: ReturnType<typeof setTimeout> | null = null;
       const canHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
@@ -249,11 +344,12 @@
         /* dt in frames (clamped) so physics is frame-rate independent. */
         const df = Math.min(2, (now - lastTime) / 16.7 || 1);
         lastTime = now;
+        const cursorLive = pointerInside && now - lastPointerMoveAt < CURSOR_LIVE_MS;
         const maxFront = Math.hypot(cw, ch) + PULSE_BAND;
         pulses = pulses.filter((pulse) => (now - pulse.t0) * PULSE_SPEED < maxFront);
         let energy = false;
         for (const p of dots) {
-          if (pointerInside && ENABLE_CURSOR_CIRCLE) {
+          if (cursorLive && ENABLE_CURSOR_CIRCLE) {
             const dx = p.x - px;
             const dy = p.y - py;
             const d = Math.hypot(dx, dy);
@@ -290,14 +386,15 @@
           }
           p.x += p.vx + (p.hx - p.x) * EASE * df;
           p.y += p.vy + (p.hy - p.y) * EASE * df;
-          if (
-            Math.abs(p.vx) + Math.abs(p.vy) > 0.05 ||
-            Math.abs(p.hx - p.x) + Math.abs(p.hy - p.y) > SETTLE
-          ) {
+          /* Energy is motion only. Displacement-from-home is NOT energy: a
+             parked cursor legitimately holds its circle of dots away from
+             home, and counting that as motion used to keep this loop
+             redrawing the full wordmark canvas at 60fps forever. */
+          if (Math.abs(p.vx) + Math.abs(p.vy) > 0.05) {
             energy = true;
           }
         }
-        return energy || pointerInside;
+        return energy;
       }
 
       function frame(now: number): void {
@@ -305,8 +402,16 @@
         drawAll();
         if (energy && megaVisible) {
           raf = requestAnimationFrame(frame);
-        } else {
+        } else if (!megaVisible || !pointerInside) {
           settle();
+        } else {
+          /* Parked cursor: physics has converged (a stationary cursor stops
+             pushing the field after CURSOR_LIVE_MS), the dots rest home and
+             the frame freezes — zero idle cost until the next move. */
+          if (raf) {
+            cancelAnimationFrame(raf);
+            raf = 0;
+          }
         }
       }
 
@@ -400,6 +505,7 @@
         px = x;
         py = y;
         pointerInside = true;
+        lastPointerMoveAt = performance.now();
         if (ENABLE_WATER_DROP_RIPPLE) firePulse(x, y);
         /* The pulse used to spin the loop up on entry; with the ripple off,
            entry must still start it so the circle can form without a move. */
@@ -421,6 +527,7 @@
           px = x;
           py = y;
           pointerInside = true;
+          lastPointerMoveAt = performance.now();
           startLoop();
         });
       };
@@ -431,6 +538,9 @@
       const onPointerLeave = (): void => {
         moveSeq++; // invalidate any queued pointermove sample
         pointerInside = false; // springs carry every dot home
+        /* If the loop is frozen on a parked-cursor frame, leaving must wake
+           it so the dots actually carry home. */
+        startLoop();
       };
       const onResize = (): void => {
         if (rebuildTimer) clearTimeout(rebuildTimer);
@@ -480,38 +590,41 @@
 </script>
 
 <footer class="cqd-footer" bind:this={footerEl}>
-  <!-- Layer 1 — final installation CTA -->
-  <section class="ft-cta" aria-labelledby="ft-cta-title">
-    <div class="ft-inner ft-cta-inner cqd-reveal">
-      <p class="ft-eyebrow">One last click</p>
-      <h2 id="ft-cta-title" class="ft-cta-title">Ready to save hours?</h2>
-      <p class="ft-cta-desc">
+  <!-- Layer 1 — final installation CTA. data-ft-zone marks a cascade zone;
+       data-ft marks its steps, which run in DOM order on reveal. -->
+  <section class="ft-cta" data-ft-zone aria-labelledby="ft-cta-title">
+    <div class="ft-inner ft-cta-inner">
+      <p class="ft-eyebrow" data-ft>One last click</p>
+      <h2 id="ft-cta-title" class="ft-cta-title" data-ft>Ready to save hours?</h2>
+      <p class="ft-cta-desc" data-ft>
         Install Classroom Quick Downloader in under 10 seconds. Free forever. No account required.
       </p>
       <div class="ft-cta-actions">
         {#each orderedCtas as b (b)}
-          <a
-            class="ft-cta-btn"
-            class:ft-cta-primary={b === detectedBrowser}
-            href={storeLink(b)}
-            target="_blank"
-            rel="noopener noreferrer"
-            on:click={() => trackFooterInstall(b)}
-          >
-            <img src="{base}/images/{b}.svg" alt="" width="18" height="18" loading="lazy" decoding="async" />
-            {#if b === detectedBrowser}Install for {browserDisplayName(b)}{:else}{browserDisplayName(b)}{/if}
-          </a>
+          <span class="ft-magnet" data-ft>
+            <a
+              class="ft-cta-btn"
+              class:ft-cta-primary={b === detectedBrowser}
+              href={storeLink(b)}
+              target="_blank"
+              rel="noopener noreferrer"
+              on:click={() => trackFooterInstall(b)}
+            >
+              <img src="{base}/images/{b}.svg" alt="" width="18" height="18" loading="lazy" decoding="async" />
+              {#if b === detectedBrowser}Install for {browserDisplayName(b)}{:else}{browserDisplayName(b)}{/if}
+            </a>
+          </span>
         {/each}
       </div>
-      <p class="ft-cta-note">Works with Brave, Opera, Vivaldi, Arc and more.</p>
+      <p class="ft-cta-note" data-ft>Works with Brave, Opera, Vivaldi, Arc and more.</p>
     </div>
   </section>
 
   <!-- Layer 2 — product identity + navigation grid -->
-  <div class="ft-grid-wrap">
+  <div class="ft-grid-wrap" data-ft-zone>
     <div class="ft-inner">
-      <div class="ft-grid cqd-reveal">
-        <div class="ft-col-brand">
+      <div class="ft-grid">
+        <div class="ft-col-brand" data-ft>
           <img src={logo} alt="" width="44" height="38" class="ft-brand-logo" loading="lazy" decoding="async" />
           <p class="ft-brand-name">Classroom Quick<br />Downloader</p>
           <p class="ft-brand-desc">Download Classroom files without repetitive clicking.</p>
@@ -521,7 +634,7 @@
           </div>
         </div>
 
-        <nav class="ft-col ft-col-product" aria-label="Product">
+        <nav class="ft-col ft-col-product" data-ft aria-label="Product">
           <h2 class="ft-label">Product</h2>
           <ul class="ft-links">
             <li><a href="{base}/">Overview</a></li>
@@ -531,7 +644,7 @@
           </ul>
         </nav>
 
-        <nav class="ft-col ft-col-support" aria-label="Support">
+        <nav class="ft-col ft-col-support" data-ft aria-label="Support">
           <h2 class="ft-label">Support</h2>
           <ul class="ft-links">
             <li>
@@ -541,10 +654,13 @@
             <li>
               <a href={reportIssueUrl} target="_blank" rel="noopener noreferrer">Report issue</a>
             </li>
+            <li>
+              <a href={BUY_COFFEE_URL} target="_blank" rel="noopener noreferrer">Buy Me a Coffee <span class="ft-arrow" aria-hidden="true">↗</span></a>
+            </li>
           </ul>
         </nav>
 
-        <nav class="ft-col ft-col-install" aria-label="Install">
+        <nav class="ft-col ft-col-install" data-ft aria-label="Install">
           <h2 class="ft-label">Install</h2>
           <ul class="ft-links ft-links-install">
             <li>
@@ -569,35 +685,36 @@
   </div>
 
   <!-- Layer 3 — product principles strip -->
-  <div class="ft-principles-wrap">
+  <div class="ft-principles-wrap" data-ft-zone>
     <div class="ft-inner">
-      <ul class="ft-principles cqd-reveal" aria-label="Product principles">
-        <li>Instant.</li>
-        <li>Private.</li>
-        <li>Transparent.</li>
-        <li>Universal.</li>
+      <ul class="ft-principles" aria-label="Product principles">
+        <li data-ft>Instant.</li>
+        <li data-ft>Private.</li>
+        <li data-ft>Transparent.</li>
+        <li data-ft>Universal.</li>
       </ul>
     </div>
   </div>
 
   <!-- Layer 4 — legal + identity bar -->
-  <div class="ft-legal-wrap">
-    <div class="ft-inner ft-legal cqd-reveal">
-      <p>© {currentYear} Classroom Quick Downloader</p>
-      <p>Not affiliated with Google or Google Classroom</p>
-      <a class="ft-credit" href={CREATOR_URL} target="_blank" rel="noopener noreferrer">
-        Built by Adham Haitham <span aria-hidden="true">↗</span>
+  <div class="ft-legal-wrap" data-ft-zone>
+    <div class="ft-inner ft-legal">
+      <p data-ft>© {currentYear} Classroom Quick Downloader</p>
+      <p data-ft>Not affiliated with Google or Google Classroom</p>
+      <a class="ft-credit" href={CREATOR_URL} target="_blank" rel="noopener noreferrer" data-ft>
+        Built by Adham Haitham <span class="ft-credit-arrow" aria-hidden="true">↗</span>
       </a>
     </div>
   </div>
 
-  <!-- Giant dot-matrix wordmark — final element, full-bleed. The text is
+  <!-- Giant dot-matrix wordmark — final element, full-bleed. It is the last
+       cascade zone: the finale step of the entrance. The text is
        rasterized into a binary mask and sampled into a grid of dots on a
        single canvas. At rest it is one static frame; hovering shatters the
        dots with a local repulsion field plus ripple pulses that travel
        through the glyphs, and on leave every dot springs back home before
        the loop parks. aria-hidden — purely decorative. -->
-  <div class="ft-mega" aria-hidden="true" bind:this={megaEl}>
+  <div class="ft-mega" aria-hidden="true" data-ft data-ft-zone bind:this={megaEl}>
     <canvas class="ft-mega-canvas"></canvas>
   </div>
 </footer>
@@ -614,6 +731,10 @@
     --ft-border: rgba(226, 232, 240, 0.9);
     --ft-surface: #ffffff;
     --ft-green-hover: var(--gc-green-dark);
+    /* Motion: the cascade speaks in the house glass spring — one crisp
+       overshoot per step reads as a magnetic click into its slot. */
+    --ft-click-ease: cubic-bezier(0.32, 1.35, 0.42, 1);
+    --ft-rise: 16px;
 
     position: relative;
     color: var(--ft-text);
@@ -681,6 +802,21 @@
     gap: 14px;
   }
 
+  /* Magnetic wrapper — carries the pointer pull so the button's own hover
+     lift stays untouched. Live-follow while inside (transition dropped),
+     spring home on leave. */
+  .ft-magnet {
+    display: inline-flex;
+    transform: translate(var(--ft-mx, 0px), var(--ft-my, 0px));
+    transition: transform 0.5s var(--ft-click-ease);
+  }
+
+  /* ft-magnet-live is added at runtime, so it must be :global() to survive
+     Svelte pruning. */
+  .ft-magnet:global(.ft-magnet-live) {
+    transition: none;
+  }
+
   .ft-cta-btn {
     display: inline-flex;
     align-items: center;
@@ -714,13 +850,33 @@
   }
 
   .ft-cta-btn:active {
-    transform: translateY(0);
+    transform: translateY(0) scale(var(--mi-press));
   }
 
   .ft-cta-primary {
+    position: relative;
+    overflow: hidden;
     background: var(--gc-green);
     border-color: var(--gc-green);
     color: #fff;
+  }
+
+  /* B1: reflective sweep on hover, same language as the nav CTA. */
+  .ft-cta-primary::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -70%;
+    width: 45%;
+    height: 100%;
+    background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+    transform: skewX(-20deg);
+    transition: left 0.55s var(--mi-sheen);
+    pointer-events: none;
+  }
+
+  .ft-cta-primary:hover::before {
+    left: 130%;
   }
 
   .ft-cta-primary:hover {
@@ -820,25 +976,33 @@
     font-size: 15px;
     font-weight: 500;
     text-decoration: none;
-    transition: color 0.18s ease;
+    /* A1: underline slides in on hover instead of a bare color snap. */
+    background-image: linear-gradient(currentColor, currentColor);
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    background-size: 0% 1.5px;
+    transition: color 0.18s ease, background-size var(--mi-base) var(--mi-ease);
   }
 
   .ft-links a:hover {
     color: var(--ft-green-hover);
+    background-size: 100% 1.5px;
   }
 
   .ft-links-install a:hover {
     color: var(--ft-green-hover);
+    background-size: 100% 1.5px;
   }
 
   .ft-arrow {
     display: inline-block;
     font-size: 12px;
-    transition: transform 0.18s ease;
+    /* A2: playful diagonal nudge on the store links. */
+    transition: transform var(--mi-base) var(--mi-ease);
   }
 
   .ft-links-install a:hover .ft-arrow {
-    transform: translate(2px, -2px);
+    transform: translate(3px, -3px);
   }
 
   /* ── Layer 3: principles strip ────────────────────────────── */
@@ -898,8 +1062,18 @@
     transition: color 0.18s ease;
   }
 
+  /* A2: the credit's arrow reacts like the install arrows. */
+  .ft-credit-arrow {
+    display: inline-block;
+    transition: transform var(--mi-base) var(--mi-ease);
+  }
+
   .ft-credit:hover {
     color: var(--ft-green-hover);
+  }
+
+  .ft-credit:hover .ft-credit-arrow {
+    transform: translate(3px, -3px);
   }
 
   /* ── Giant dot-matrix wordmark ────────────── */
@@ -908,15 +1082,10 @@
     position: relative;
     z-index: 1;
     margin-top: clamp(24px, 3.5vw, 44px);
-    padding: 0 24px 8px;
-    transition:
-      opacity 0.6s ease,
-      transform 0.6s ease;
-  }
-
-  .cqd-footer :global(.ft-mega-pending) {
-    opacity: 0;
-    transform: translateY(20px);
+    /* Generous air under the finale: the dot glyphs are drawn right to the
+       canvas's bottom edge, so without this the last row kisses (and at
+       max scroll, clips against) the viewport bottom. */
+    padding: 0 24px clamp(20px, 3vw, 36px);
   }
 
   .ft-mega-canvas {
@@ -939,21 +1108,31 @@
     border-radius: 10px;
   }
 
-  /* ── Reveal (progressive enhancement only) ────────────────── */
-  /* Classes are added at runtime via IntersectionObserver, so they must
-     be :global() within the scoped footer to survive Svelte pruning. */
-
-  .cqd-footer :global(.cqd-reveal-pending) {
+  /* ── Cascade entrance (progressive enhancement only) ──────── */
+  /* Classes are added at runtime by the zone observers, so they must be
+     :global() within the scoped footer to survive Svelte pruning. Without
+     JS (or before arming) nothing is hidden — SSR ships visible markup and
+     elements already on screen at load never arm. `backwards` fill keeps a
+     delayed step at its hidden from-frame until its turn, and the runtime
+     strips classes on animationend, so no fill state ever blocks hovers. */
+  .cqd-footer :global([data-ft].ft-armed) {
     opacity: 0;
-    transform: translateY(14px);
-    transition:
-      opacity 0.5s ease,
-      transform 0.5s ease;
+    transform: translateY(var(--ft-rise)) scale(0.985);
   }
 
-  .cqd-footer :global(.cqd-reveal-pending.cqd-reveal-in) {
-    opacity: 1;
-    transform: translateY(0);
+  .cqd-footer :global([data-ft].ft-go) {
+    animation: ft-click-in 0.55s var(--ft-click-ease) backwards;
+  }
+
+  @keyframes ft-click-in {
+    from {
+      opacity: 0;
+      transform: translateY(var(--ft-rise)) scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
   }
 
   /* ── Reduced motion ───────────────────────────────────────── */
@@ -966,13 +1145,12 @@
       animation: none !important;
     }
 
-    .cqd-footer :global(.ft-mega-pending) {
+    .cqd-footer :global([data-ft].ft-armed) {
       opacity: 1;
       transform: none;
     }
 
-    .cqd-footer :global(.cqd-reveal-pending) {
-      opacity: 1;
+    .cqd-footer .ft-magnet {
       transform: none;
     }
   }
@@ -1004,6 +1182,10 @@
     }
 
     .ft-cta-btn {
+      width: 100%;
+    }
+
+    .ft-magnet {
       width: 100%;
     }
 
