@@ -7,9 +7,14 @@ const SUBMISSIONS_AUTHUSER_URL = 'https://classroom.google.com/u/1/c/course-1/a/
 const SIDECAR_SELECTOR = 'button.cqd-download-btn[data-cqd-sw-bs="true"]';
 const DOWNLOAD_ALL_SELECTOR = 'button.cqd-download-all-btn';
 
-async function launchWithExtension(): Promise<BrowserContext> {
+async function launchWithExtension(channel?: string): Promise<BrowserContext> {
   return chromium.launchPersistentContext('', {
-    headless: false,
+    // Headless by default (E2E_HEADED=1 opts into a visible window). New
+    // headless builds support extensions; the channel follows the Playwright
+    // project ('chromium' bundled build, 'chrome' or 'msedge' for the
+    // per-browser matrix legs) so the Edge leg is never a fake Chromium pass.
+    channel: channel ?? 'chromium',
+    headless: process.env.E2E_HEADED !== '1',
     args: [
       `--disable-extensions-except=${EXTENSION_PATH}`,
       `--load-extension=${EXTENSION_PATH}`,
@@ -115,8 +120,8 @@ async function installClassroomMock(
 test.describe('Student Work By-Status Real Browser', () => {
   let context: BrowserContext;
 
-  test.beforeAll(async () => {
-    context = await launchWithExtension();
+  test.beforeAll(async ({}, testInfo) => {
+    context = await launchWithExtension(testInfo.project.use.channel);
     await ensureServiceWorkerReady(context);
   });
 
