@@ -276,6 +276,59 @@ export function trackGuideEngaged(pagePath: string): void {
   });
 }
 
+export const MAX_ERRORS_PER_SESSION = 5 as const;
+const MAX_ERROR_MESSAGE_LENGTH = 140;
+const MAX_DISTINCT_ERROR_KEYS = 50;
+
+const reportedErrorKeys = new Set<string>();
+
+/** Strip anything that could carry content/PII (URLs, emails, paths). */
+function sanitizeErrorMessage(raw: unknown): string {
+  const text = String(raw ?? '')
+    .replace(/https?:\/\/\S+/gi, '[url]')
+    .replace(/[\w.+-]+@[\w.-]+\.\w+/g, '[email]')
+    .replace(/file:\S+/gi, '[file]')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return text.slice(0, MAX_ERROR_MESSAGE_LENGTH);
+}
+
+/**
+ * Report one client-side error through the website-events pipeline.
+ * Deduplicated per message and capped per session so a broken deploy
+ * cannot spam the telemetry queue.
+ */
+export function trackPageError(message: unknown, placement: 'global_error' | 'unhandled_rejection', sourceFile?: string): void {
+  const clean = sanitizeErrorMessage(message);
+  if (!clean) return;
+  const key = `${placement}:${clean}`;
+  if (reportedErrorKeys.has(key)) return;
+  if (reportedErrorKeys.size >= Math.min(MAX_ERRORS_PER_SESSION, MAX_DISTINCT_ERROR_KEYS)) return;
+  reportedErrorKeys.add(key);
+
+  trackWebsiteEvent({
+    eventType: 'content',
+    action: 'page_error',
+    placement,
+    meta: {
+      msg: clean,
+      ...(sourceFile ? { src: sanitizeErrorMessage(sourceFile) } : {})
+    }
+  });
+}
+
+function handleGlobalError(event: ErrorEvent): void {
+  trackPageError(event?.message ?? event?.error, 'global_error', event?.filename);
+}
+
+function handleUnhandledRejection(event: PromiseRejectionEvent): void {
+  const reason = event?.reason;
+  trackPageError(
+    reason instanceof Error ? reason.message : typeof reason === 'string' ? reason : 'non-error rejection',
+    'unhandled_rejection'
+  );
+}
+
 function handleVisibilityChange(): void {
   if (typeof document === 'undefined') return;
   if (document.visibilityState === 'hidden') {
@@ -298,6 +351,9 @@ export function initWebsiteEventsClient(): () => void {
     }, FLUSH_INTERVAL_MS);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('pagehide', handlePageHide);
+    // Client-error beacon: page_error events share the queue/batching above.
+    window.addEventListener('error', handleGlobalError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection as EventListener);
   }
 
   return () => {
@@ -307,6 +363,8 @@ export function initWebsiteEventsClient(): () => void {
     }
     document.removeEventListener('visibilitychange', handleVisibilityChange);
     window.removeEventListener('pagehide', handlePageHide);
+    window.removeEventListener('error', handleGlobalError);
+    window.removeEventListener('unhandledrejection', handleUnhandledRejection as EventListener);
     initialized = false;
   };
 }
