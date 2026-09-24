@@ -72,7 +72,7 @@
     "description": "commError"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "Ngā rā i waenga i te whakapāhā me te whakatika whakamutunga",
     "description": "editedTooltip"
   },
   "comment_singular": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Whakakore katoa",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Kua whakarerekētia",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "i muri i te whakapāhā",
+    "description": "after_posting"
   }
 }
