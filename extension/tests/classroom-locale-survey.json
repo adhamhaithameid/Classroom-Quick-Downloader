@@ -1,0 +1,51 @@
+{
+  "capturedOn": "2026-09-19",
+  "method": "Live sweep of classroom.google.com/?hl=<tag> in a logged-in desktop session. For each requested tag, document.documentElement.lang (the value the extension's language resolver sees) plus sidebar/title strings were captured from the real page. Classroom honors ?hl= per request without touching account settings.",
+  "keyFindings": [
+    "Google serves the LEGACY code iw for Hebrew — the iw->he alias is load-bearing on real traffic.",
+    "es-419 is served as its own tag; pt requests are served as pt-BR; region tags (en-US, en-GB, pt-BR, pt-PT, zh-CN, zh-TW, es-419) all appear in real docLang values.",
+    "Google strips script subtags: sr-Latn request is served as sr (Cyrillic only).",
+    "Classroom does NOT ship in 40+ languages the extension translates (am, zu, so, yo, ha, ig, mt, mi, st, sn, sd, ny, yi, eo, haw, to, ia, ak, bem, ee, gaa, kg->fr, ...) — those pages render en-US, or a regional fallback (mg/kg/ln/lua/rw/wo/br/co/oc/crs/ht -> fr, su/jw/jv -> id, tg -> ru, la -> it, rm -> de, fo -> da, fy -> nl, ay/gn/qu/gl -> es, sa/bho -> hi, ku -> tr, ckb -> ar, nn/nb -> no, bs -> hr, ceb -> fil, gd -> en-GB).",
+    "Real Google UI keeps product names English in several fully-served languages (Calendar in es, ko, pa, te, mr, ml, ms) — shared-vocab with English can be the correct localization."
+  ],
+  "requestedToServed": {
+    "en": "en", "ar": "ar", "ja": "ja", "es": "es", "hi": "hi",
+    "pt": "pt-BR", "pt-PT": "pt-PT", "zh-CN": "zh-CN", "zh-TW": "zh-TW",
+    "fr": "fr", "de": "de", "it": "it", "ru": "ru", "ko": "ko", "tr": "tr",
+    "vi": "vi", "id": "id", "th": "th", "pl": "pl", "nl": "nl",
+    "bn": "bn", "pa": "pa", "te": "te", "mr": "mr", "ta": "ta", "ur": "ur",
+    "gu": "gu", "kn": "kn", "ml": "ml", "uk": "uk", "el": "el", "cs": "cs",
+    "ro": "ro", "hu": "hu", "sv": "sv", "da": "da", "fi": "fi", "no": "no",
+    "he": "iw", "fa": "fa", "fil": "fil", "ms": "ms", "sr": "sr", "sk": "sk",
+    "bg": "bg", "hr": "hr", "lt": "lt", "lv": "lv", "et": "et", "sl": "sl",
+    "ca": "ca", "af": "af", "am": "en-US", "hy": "hy", "as": "as", "az": "az",
+    "eu": "eu", "my": "my", "gl": "es", "ka": "ka", "is": "is", "ga": "ga",
+    "kk": "kk", "km": "en-US", "lo": "en-US", "mk": "mk", "mn": "mn",
+    "ne": "ne", "or": "or", "si": "si", "sw": "sw", "uz": "uz", "cy": "cy",
+    "zu": "en-US", "sq": "sq", "so": "en-US", "yo": "en-US", "ceb": "fil",
+    "ny": "en-US", "ha": "en-US", "ig": "en-US", "mg": "fr", "mt": "en-US",
+    "mi": "en-US", "sm": "en", "gd": "en-GB", "st": "en-US", "sn": "en-US",
+    "sd": "en-US", "su": "id", "tg": "ru", "yi": "en-US", "la": "it",
+    "ak": "en-US", "bem": "en-US", "ee": "en-US", "gaa": "en-US", "kg": "fr",
+    "kri": "en-US", "ln": "fr", "lg": "en-US", "loz": "en-US", "lua": "fr",
+    "nso": "en-US", "nyn": "en-US", "om": "en-US", "pcm": "en-US", "rw": "fr",
+    "rn": "en-US", "crs": "fr", "ti": "en-US", "tn": "en-US", "tum": "en-US",
+    "wo": "fr", "bs": "hr", "br": "fr", "co": "fr", "fo": "da", "fy": "nl",
+    "ia": "en-US", "nn": "no", "oc": "fr", "rm": "de", "sr-Latn": "sr",
+    "ay": "es", "ban": "en", "chr": "en", "ckb": "ar", "gn": "es",
+    "haw": "en-US", "ht": "fr", "ku": "tr", "qu": "es", "sa": "hi",
+    "to": "en-US", "bho": "hi", "hmn": "en", "jw": "id",
+    "iw": "iw", "in": "id", "jv": "id", "ji": "en-US", "nb": "no", "tl": "fil",
+    "zh-HK": "zh-TW", "zh-Hant": "zh-TW", "zh-Hans": "zh-CN", "zh-SG": "zh-CN",
+    "es-419": "es-419", "eo": "en-US", "zz-Invalid": "en"
+  },
+  "capturedSamples": {
+    "ja": { "title": "ホーム - Classroom", "nav": ["ホーム", "カレンダー", "アーカイブされたクラス", "設定", "ヘルプとフィードバック"] },
+    "ar": { "title": "الصفحة الرئيسية - Classroom", "nav": ["الصفحة الرئيسية", "تقويم Google", "الصفوف المؤرشفة", "الإعدادات", "المساعدة والملاحظات"] },
+    "uk": { "title": "Головна - Клас", "nav": ["Перейти до основного контенту", "Головне меню", "Довідка й відгук"] },
+    "hi": { "title": "होम पेज - Classroom", "nav": ["होम पेज", "कैलेंडर", "संग्रहित की गई अलग-अलग क्लास", "सेटिंग", "सहायता और सुझाव"] }
+  },
+  "knownGaps": [
+    "Post-level strings (Posted, (Edited), Add class comment, N class comments, Stream/Classwork tabs) could not be captured in the automation browser: Classroom's main content pane fails to render there (blank main region while the sidebar works). Capture those from a regular logged-in Chrome via the existing tests/accuracy corpus workflow."
+  ]
+}
