@@ -59,6 +59,32 @@ export const pendingByDownloadId = new Map<number, PendingDownload>();
 /** Index: URL to the set of pending downloads registered under it (supports concurrent same-URL downloads) */
 export const pendingByUrl = new Map<string, Set<PendingDownload>>();
 
+// --- REGISTRY LISTENER (optional observer, e.g. persistence mirror) ----
+// The registry stays dependency-free: a listener is injected (by index.ts)
+// and is notified AFTER each successful registry mutation. Listener errors
+// are swallowed — an observer must never break download bookkeeping.
+export type RegistryListener = {
+  onRegister?: (pending: PendingDownload) => void;
+  onUnregister?: (requestId: string) => void;
+  onBind?: (pending: PendingDownload) => void;
+};
+let registryListener: RegistryListener | null = null;
+
+export function setRegistryListener(listener: RegistryListener | null): void {
+  registryListener = listener;
+}
+
+function notify(event: 'onRegister' | 'onUnregister' | 'onBind', arg: PendingDownload | string): void {
+  if (!registryListener) return;
+  try {
+    if (event === 'onUnregister') registryListener.onUnregister?.(arg as string);
+    else if (event === 'onBind') registryListener.onBind?.(arg as PendingDownload);
+    else registryListener.onRegister?.(arg as PendingDownload);
+  } catch {
+    // Observer failures are never download-flow failures.
+  }
+}
+
 // --- REGISTRY FUNCTIONS ---
 
 /**
@@ -70,6 +96,7 @@ export function registerPending(pending: PendingDownload): void {
   pendingByRequestId.set(pending.requestId, pending);
   indexUrl(pending.baseUrl, pending);
   scheduleDeadline(pending);
+  notify('onRegister', pending);
 }
 
 /** Does the authoritative registry still track this requestId? */
@@ -101,6 +128,7 @@ export function bindDownloadId(pending: PendingDownload, downloadId: number): bo
 
   pending.currentDownloadId = downloadId;
   pendingByDownloadId.set(downloadId, pending);
+  notify('onBind', pending);
   return true;
 }
 
@@ -128,6 +156,7 @@ export function unregisterPending(pending: PendingDownload): void {
     }
   }
   pendingByUrlRemove(pending);
+  notify('onUnregister', pending.requestId);
 }
 
 // --- LOOKUPS ---

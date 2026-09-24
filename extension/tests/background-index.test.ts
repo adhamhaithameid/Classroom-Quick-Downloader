@@ -27,6 +27,7 @@ function makeStateModule(options: {
   };
   return {
     setPendingExpiredHook: vi.fn(),
+    setRegistryListener: vi.fn(),
     pendingByRequestId,
     pendingByDownloadId,
     pendingByUrl,
