@@ -60,7 +60,7 @@
     "description": "commentsTooltip"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "Deizioù etre an embann hag ar c'hemm diwezhañ",
     "description": "editedTooltip"
   },
   "download_interrupted": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Nullañ pep tra",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Kemmet",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "goude embann",
+    "description": "after_posting"
   }
 }
