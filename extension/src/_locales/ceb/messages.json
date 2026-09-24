@@ -80,7 +80,23 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "Kanselahon tanan",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Giusab",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "human sa pag-post",
+    "description": "after_posting"
+  },
+  "comment_singular": {
+    "message": "komento",
+    "description": "commentSingular"
+  },
+  "edited_tooltip": {
+    "message": "Mga adlaw tali sa pag-post ug katapusang pag-edit",
+    "description": "editedTooltip"
   }
 }
