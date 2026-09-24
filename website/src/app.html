@@ -2,6 +2,13 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
+		<!-- Marks JS as running before first paint: the sticky sheet reveal
+     keeps the footer window hidden until hydration resolves the reveal
+     mode, so a restored scroll position can't flash the in-flow footer.
+     No-JS visitors never get this class and see the plain footer. -->
+		<script>
+			document.documentElement.classList.add('js');
+		</script>
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="application-name" content="Classroom Quick Downloader" />
 		<meta name="publisher" content="Classroom Quick Downloader" />
