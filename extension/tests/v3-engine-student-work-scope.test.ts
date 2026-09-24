@@ -88,6 +88,8 @@ async function loadEngineWithApiMocks(
     }),
     publishStudentWorkApiSnapshot,
     resolveClassroomApiRouteContext,
+    // csaa.5 shared budget — inert under test, resettable via destroy().
+    sharedClassroomRateLimiter: { acquire: vi.fn(() => true), reset: vi.fn() },
   }));
 
   const { EngineV3 } = await import('../src/engines/v3/engine-v3');
