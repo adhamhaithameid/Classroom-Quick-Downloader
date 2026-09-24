@@ -116,6 +116,7 @@ export const privacyContent: ManualPrivacyContent = {
         '"downloads" — Required to save files to your device through your browser\'s normal download flow.',
         '"storage" — Keeps your in-extension preferences and download state on your own device.',
         '"alarms" — Schedules routine cleanup of stale internal download records in the background.',
+        '"identity" — Optional and only active in the opt-in "API (beta)" engine mode: lets CQD get a read-only Google token so the optional Classroom API assist (including the "Download all classroom files" button) can list class files you already have access to. Off by default; never runs in the background.',
         '"Host access to classroom.google.com" — Lets CQD detect attachments and add download buttons inside Classroom.',
         '"Host access to drive.google.com and drive.usercontent.google.com" — Used only when a bulk download has to fetch a file through Drive (including the "can\'t scan for viruses" interstitial), never to browse your Drive.',
         '"Host access to accounts.google.com" — Resolves which of your signed-in accounts can access a file during bulk downloads.',
