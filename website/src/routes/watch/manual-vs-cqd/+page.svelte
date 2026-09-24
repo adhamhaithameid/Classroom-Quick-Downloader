@@ -96,9 +96,9 @@
 
   <h2>What to look for in the video</h2>
   <ul class="watch-checklist">
-    <li>How many discrete clicks the manual flow needs for just a handful of files</li>
-    <li>How much of that work disappears when CQD handles the same class</li>
-    <li>The visual flags that mark edited and commented posts, so changes stand out without opening anything</li>
+    <li style="--li: 0">How many discrete clicks the manual flow needs for just a handful of files</li>
+    <li style="--li: 1">How much of that work disappears when CQD handles the same class</li>
+    <li style="--li: 2">The visual flags that mark edited and commented posts, so changes stand out without opening anything</li>
   </ul>
 
   <h2>When manual downloading still makes sense</h2>
@@ -171,6 +171,13 @@
     overflow: hidden;
     background: #000;
     box-shadow: 0 14px 36px rgba(15, 23, 42, 0.12), inset 0 1px 0 var(--glass-highlight);
+    /* K4: the frame leans in as you arrive at it. */
+    transition: box-shadow 0.45s var(--glass-ease), border-color 0.3s ease;
+  }
+
+  .watch-frame:hover {
+    border-color: rgba(26, 139, 85, 0.25);
+    box-shadow: 0 20px 48px rgba(15, 23, 42, 0.18), 0 8px 24px rgba(26, 139, 85, 0.1), inset 0 1px 0 var(--glass-highlight);
   }
 
   .watch-frame video {
@@ -179,6 +186,24 @@
     display: block;
     aspect-ratio: 16 / 9;
     background: #000;
+  }
+
+  /* K4: step/check lists cascade in once per page load. */
+  .watch-steps li,
+  .watch-checklist li {
+    animation: watch-li-rise 0.5s var(--glass-ease) backwards;
+    animation-delay: calc(0.1s + var(--li, 0) * 0.07s);
+  }
+
+  @keyframes watch-li-rise {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   .watch-links {
@@ -199,5 +224,16 @@
 
   .watch-links a:hover {
     color: var(--gc-green);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .watch-frame {
+      transition: none;
+    }
+
+    .watch-steps li,
+    .watch-checklist li {
+      animation: none;
+    }
   }
 </style>

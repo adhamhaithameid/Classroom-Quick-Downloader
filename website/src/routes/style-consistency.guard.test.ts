@@ -167,13 +167,24 @@ describe('style consistency: one shared ambient background', () => {
 
   it('pins the cursor-bend canvas and its gating in the ambient component', () => {
     const ambient = read('../lib/components/AmbientBackground.svelte');
-    // Full canvas markup, verbatim: aria-hidden AND nested inside the
-    // .l2-page-grid wrapper (the wrapper's opacity composites the canvas).
+    // Full canvas markup, verbatim: aria-hidden, nested inside the
+    // .l2-page-grid wrapper (the wrapper's opacity composites the canvas),
+    // gated behind the `lens` prop — the sticky sheet reveal's footer
+    // window renders a lens-less ambient copy with the static CSS grid —
+    // and carrying the `paused` prop into the action, so a hidden instance
+    // (occluded sheet, hidden footer window) never paints at all.
     expect(ambient).toContain(
-      `<div class="l2-page-grid" aria-hidden="true">
-  <canvas class="l2-grid-canvas" aria-hidden="true" use:gridBend></canvas>
+      `<div class="l2-page-grid" class:ambient-paused={paused} aria-hidden="true">
+  {#if lens}
+    <canvas class="l2-grid-canvas" aria-hidden="true" use:gridBend={{ paused }}></canvas>
+  {/if}
 </div>`
     );
+    expect(ambient).toContain('export let lens = true');
+    expect(ambient).toContain('export let paused = false');
+    // A paused instance freezes its orb drift (visibility:hidden alone does
+    // not stop animation clocks).
+    expect(ambient).toMatch(/\.ambient-paused[^{]*\{[^}]*animation-play-state:\s*paused/);
     // The canvas is display:none until the action activates, and never
     // intercepts pointers.
     expect(ambient).toMatch(/\.l2-grid-canvas\s*\{[^}]*pointer-events:\s*none/);
@@ -183,6 +194,10 @@ describe('style consistency: one shared ambient background', () => {
     const action = read('../lib/actions/gridBend.ts');
     expect(action).toContain('prefers-reduced-motion');
     expect(action).toContain('pointer: fine');
+    // The action accepts the paused param and sleeps a fully relaxed field
+    // (influence ~0 with the pointer gone) back to the CSS grid.
+    expect(action).toContain('applyPaused');
+    expect(action).toMatch(/else if \(!inside && active\)/);
   });
 
   it('keeps the app-level body pseudo-orbs restored as part of the original look', () => {

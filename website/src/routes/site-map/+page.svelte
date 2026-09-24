@@ -222,11 +222,24 @@
     color: var(--text);
     text-decoration: none;
     font-weight: 600;
+    /* A1: underline slides in on hover instead of snapping. */
+    background-image: linear-gradient(currentColor, currentColor);
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    background-size: 0% 1.5px;
+    padding-bottom: 1px;
+    transition: color var(--mi-base) ease, background-size var(--mi-base) var(--mi-ease);
   }
 
   .site-map-card a:hover {
     color: var(--gc-green);
-    text-decoration: underline;
+    background-size: 100% 1.5px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .site-map-card a {
+      transition: none;
+    }
   }
 
   .site-map-card code {

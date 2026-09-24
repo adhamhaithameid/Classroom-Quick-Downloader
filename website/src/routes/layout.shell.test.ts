@@ -16,6 +16,12 @@ vi.mock('$app/paths', () => ({
 }));
 
 vi.mock('$app/stores', () => ({
+  navigating: {
+    subscribe(run: (value: boolean) => void) {
+      run(false);
+      return () => {};
+    }
+  },
   page: {
     subscribe(run: (value: { url: URL; status: number }) => void) {
       run({ url: new URL(`https://example.com${mockState.path}`), status: mockState.status });
@@ -68,6 +74,17 @@ describe('site layout shell', () => {
 
     expect(html).toContain('l2-page-orbs');
     expect(html).toContain('l2-page-grid');
+  });
+
+  it('mounts the branded cursor layer on every route', () => {
+    mockState.path = '/faq';
+    mockState.status = 200;
+    const { body } = render(Layout);
+    const html = squish(body);
+
+    expect(html).toContain('cqd-cursor');
+    expect(html).toContain('data-state="default"');
+    expect(html).toContain('aria-hidden');
   });
 
   it('renders crawlable hover megamenus with described links in server markup', () => {
@@ -169,17 +186,25 @@ describe('site layout shell', () => {
     expect(html).toContain(`href="${STORE_LINKS.edge}"`);
   });
 
-  it('never ships hidden reveal state in server-rendered footer markup', () => {
-    // The reveal system must fail open: content is visible by default and
-    // only hidden client-side when the observer is actually running. If SSR
-    // markup ever ships the hidden state, a missed observer callback (fast
-    // scroll, layout shift, no-JS) leaves the footer permanently blank.
+  it('never ships hidden cascade state in server-rendered footer markup', () => {
+    // The footer cascade must fail open: content is visible by default and
+    // only hidden client-side when the zone observers are actually running.
+    // If SSR markup ever shipped the armed/go states, a missed observer
+    // callback (fast scroll, layout shift, no-JS) would leave the footer
+    // permanently blank. SSR ships the zone/step markers only.
     mockState.path = '/overview';
     mockState.status = 200;
     const { body } = render(Layout);
 
-    expect(body).toContain('cqd-reveal');
-    expect(body).not.toContain('cqd-reveal-pending');
+    expect(body).toContain('data-ft-zone');
+    expect(body).toContain('data-ft');
+    expect(body).not.toContain('ft-armed');
+    expect(body).not.toContain('ft-go');
+    expect(body).not.toContain('ft-under-live');
+    expect(body).not.toContain('reveal-live');
+    expect(body).not.toContain('is-revealing');
+    expect(body).not.toContain('ft-mega-pending');
+    expect(body).not.toContain('cqd-reveal');
   });
 
   it('keeps chrome visible on standard content routes', () => {

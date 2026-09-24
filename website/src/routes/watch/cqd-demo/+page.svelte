@@ -86,9 +86,9 @@
 
   <h2>What the demo shows, step by step</h2>
   <ol class="watch-steps">
-    <li><strong>Open any Google Classroom.</strong> After installing the extension, Classroom Quick Downloader works directly inside the Classroom interface — there is no separate app to launch and nothing to configure.</li>
-    <li><strong>Every attachment is detected automatically.</strong> As soon as a class loads, the extension scans the posts on screen and identifies every downloadable file across assignments and materials.</li>
-    <li><strong>One click downloads everything.</strong> Press the download action once and every detected file is fetched simultaneously — no per-file dialogs, no opening each assignment, no back-and-forth navigation.</li>
+    <li style="--li: 0"><strong>Open any Google Classroom.</strong> After installing the extension, Classroom Quick Downloader works directly inside the Classroom interface — there is no separate app to launch and nothing to configure.</li>
+    <li style="--li: 1"><strong>Every attachment is detected automatically.</strong> As soon as a class loads, the extension scans the posts on screen and identifies every downloadable file across assignments and materials.</li>
+    <li style="--li: 2"><strong>One click downloads everything.</strong> Press the download action once and every detected file is fetched simultaneously — no per-file dialogs, no opening each assignment, no back-and-forth navigation.</li>
   </ol>
 
   <h2>Why one click matters</h2>
@@ -165,6 +165,13 @@
     overflow: hidden;
     background: #000;
     box-shadow: 0 14px 36px rgba(15, 23, 42, 0.12), inset 0 1px 0 var(--glass-highlight);
+    /* K4: the frame leans in as you arrive at it. */
+    transition: box-shadow 0.45s var(--glass-ease), border-color 0.3s ease;
+  }
+
+  .watch-frame:hover {
+    border-color: rgba(26, 139, 85, 0.25);
+    box-shadow: 0 20px 48px rgba(15, 23, 42, 0.18), 0 8px 24px rgba(26, 139, 85, 0.1), inset 0 1px 0 var(--glass-highlight);
   }
 
   .watch-frame video {
@@ -173,6 +180,24 @@
     display: block;
     aspect-ratio: 16 / 9;
     background: #000;
+  }
+
+  /* K4: step/check lists cascade in once per page load. */
+  .watch-steps li,
+  .watch-checklist li {
+    animation: watch-li-rise 0.5s var(--glass-ease) backwards;
+    animation-delay: calc(0.1s + var(--li, 0) * 0.07s);
+  }
+
+  @keyframes watch-li-rise {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   .watch-links {
@@ -193,5 +218,16 @@
 
   .watch-links a:hover {
     color: var(--gc-green);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .watch-frame {
+      transition: none;
+    }
+
+    .watch-steps li,
+    .watch-checklist li {
+      animation: none;
+    }
   }
 </style>

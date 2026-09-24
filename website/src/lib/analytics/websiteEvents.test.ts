@@ -98,6 +98,58 @@ describe('websiteEvents telemetry queue', () => {
     expect(payload.events[0]).toMatchObject({ action: 'install_click', placement: 'hero_install' });
   });
 
+  it('dedupes and caps page_error events, sanitizing sensitive content', async () => {
+    submitWebsiteEventsMock.mockResolvedValue({
+      ok: true,
+      generatedAt: Date.now(),
+      acceptedCount: 5,
+      rejectedCount: 0
+    });
+
+    const module = await import('./websiteEvents');
+    module.trackPageError('TypeError: cannot read property x of undefined', 'global_error', 'app.js');
+    // Identical signature is deduped.
+    module.trackPageError('TypeError: cannot read property x of undefined', 'global_error', 'app.js');
+    // URLs and emails are scrubbed from messages.
+    module.trackPageError('failed loading https://secret.example/private for user@school.edu', 'unhandled_rejection');
+
+    await module.flushWebsiteEvents();
+
+    const payload = submitWebsiteEventsMock.mock.calls[0][0] as {
+      events: Array<{ action: string; placement: string; meta?: Record<string, unknown> }>;
+    };
+    const errors = payload.events.filter((event) => event.action === 'page_error');
+    expect(errors).toHaveLength(2);
+    expect(errors[0].placement).toBe('global_error');
+    expect(String(errors[0].meta?.msg)).toContain('TypeError');
+    expect(String(errors[1].meta?.msg)).not.toContain('secret.example');
+    expect(String(errors[1].meta?.msg)).not.toContain('user@school.edu');
+    expect(String(errors[1].meta?.msg)).toContain('[url]');
+    expect(String(errors[1].meta?.msg)).toContain('[email]');
+  });
+
+  it('stops reporting page_error after the per-session cap', async () => {
+    submitWebsiteEventsMock.mockResolvedValue({
+      ok: true,
+      generatedAt: Date.now(),
+      acceptedCount: 5,
+      rejectedCount: 0
+    });
+
+    const module = await import('./websiteEvents');
+    for (let i = 0; i < 10; i += 1) {
+      module.trackPageError(`unique error number ${i}`, 'global_error');
+    }
+
+    await module.flushWebsiteEvents();
+
+    const payload = submitWebsiteEventsMock.mock.calls[0][0] as {
+      events: Array<{ action: string }>;
+    };
+    const errors = payload.events.filter((event) => event.action === 'page_error');
+    expect(errors).toHaveLength(module.MAX_ERRORS_PER_SESSION);
+  });
+
   it('retains queue on upstream error for retry', async () => {
     submitWebsiteEventsMock.mockRejectedValue(new Error('network down'));
 

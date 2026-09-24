@@ -4,7 +4,7 @@ const publicEnv = publicEnvModule as Record<string, string | undefined>;
 
 const DEFAULT_SITE_URL = 'https://classroom-quick-downloader.adhamhaithameid.is-a.dev';
 const DEFAULT_WORKER_URL = 'https://cqd-analytics.adhamhaithameid.workers.dev';
-const DEFAULT_ORACLE_URL = DEFAULT_WORKER_URL;
+const DEFAULT_PUBLIC_API_URL = DEFAULT_WORKER_URL;
 const DEFAULT_APP_VERSION = 'v1.5.5';
 const DEFAULT_GOOGLE_SITE_VERIFICATION = 'qoyovUKFViRL3vVnI2gPpk0kl_4TiLEdj94Co1JdrvI';
 
@@ -52,7 +52,15 @@ function envText(value: string | undefined, fallback = ''): string {
 }
 
 export const SITE_URL = ensureUrl(publicEnv.PUBLIC_SITE_URL ?? '', resolveDefaultSiteUrl());
-export const ORACLE_API_BASE_URL = ensureUrl(publicEnv.PUBLIC_ORACLE_API_BASE_URL ?? '', DEFAULT_ORACLE_URL);
+// Canonical base for public website data. The Cloudflare Worker serves this
+// data itself (edge snapshot + live store stats); the legacy env name is still
+// honored so existing deployments keep working.
+export const PUBLIC_API_BASE_URL = ensureUrl(
+  publicEnv.PUBLIC_API_BASE_URL ?? publicEnv.PUBLIC_ORACLE_API_BASE_URL ?? '',
+  DEFAULT_PUBLIC_API_URL
+);
+/** @deprecated Use {@link PUBLIC_API_BASE_URL} — kept for backward compatibility. */
+export const ORACLE_API_BASE_URL = PUBLIC_API_BASE_URL;
 export const WORKER_BASE_URL = ensureUrl(publicEnv.PUBLIC_WORKER_BASE_URL ?? '', DEFAULT_WORKER_URL);
 export const SITE_BACKEND_BASE_URL = ensureUrl(publicEnv.PUBLIC_SITE_BACKEND_BASE_URL ?? '', WORKER_BASE_URL);
 export const APP_VERSION = (() => {

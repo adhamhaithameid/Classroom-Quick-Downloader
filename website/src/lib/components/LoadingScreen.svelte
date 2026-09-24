@@ -137,4 +137,14 @@
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
   }
+
+  /* Reduced motion: the overlay still communicates loading (it is a real
+     state change), but without the spin and fade choreography. */
+  @media (prefers-reduced-motion: reduce) {
+    .ld,
+    .ld-out,
+    .ld-spinner {
+      animation: none;
+    }
+  }
 </style>

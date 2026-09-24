@@ -1,8 +1,20 @@
 <script lang="ts">
   import { gridBend } from '../actions/gridBend';
+
+  /* `lens=false` renders only the orbs + static CSS grid — used by copies
+     of the ambient that must not carry a cursor-lens canvas. */
+  export let lens = true;
+
+  /* `paused=true` marks this instance as known-invisible (occluded by the
+     sheet or behind the hidden footer window): the orb drift freezes and
+     the lens canvas switches off entirely. Two instances used to keep
+     painting and compositing all the time — a full-viewport canvas redraw
+     per pointer/scroll frame each, plus 12 blur(120px) layers apiece —
+     even when nothing of the instance was on screen. */
+  export let paused = false;
 </script>
 
-<div class="l2-page-orbs" aria-hidden="true">
+<div class="l2-page-orbs" class:ambient-paused={paused} aria-hidden="true">
   <div class="orb orb-1"></div>
   <div class="orb orb-2"></div>
   <div class="orb orb-3"></div>
@@ -16,8 +28,10 @@
   <div class="orb orb-11"></div>
   <div class="orb orb-12"></div>
 </div>
-<div class="l2-page-grid" aria-hidden="true">
-  <canvas class="l2-grid-canvas" aria-hidden="true" use:gridBend></canvas>
+<div class="l2-page-grid" class:ambient-paused={paused} aria-hidden="true">
+  {#if lens}
+    <canvas class="l2-grid-canvas" aria-hidden="true" use:gridBend={{ paused }}></canvas>
+  {/if}
 </div>
 
 <style>
@@ -75,13 +89,16 @@
 
   /* Cursor-bend twin of the grid, painted by the gridBend action. It lives
      inside the wrapper so the wrapper's opacity: 0.05 composites the whole
-     subtree — the canvas itself carries no opacity. */
+     subtree — the canvas itself carries no opacity. Sticky (not fixed) so
+     it stays inside the container it decorates — when the sticky sheet
+     reveal translates the page, the lens grid travels with the sheet
+     instead of escaping over the footer window. */
   .l2-grid-canvas {
-    position: fixed;
+    position: sticky;
     top: 0;
     left: 0;
     width: 100%;
-    height: 100%;
+    height: 100vh;
     pointer-events: none;
     z-index: 0;
     display: none;
@@ -92,6 +109,14 @@
      :global() to survive Svelte's scoped-CSS pruning. */
   .l2-page-grid:global(.bend-live) {
     background-image: none;
+  }
+
+  /* A paused instance is known-invisible: freeze its orb drift so the
+     blurred layers stop recompositing (visibility:hidden alone does not
+     stop animation clocks). The lens canvas is handled by the action's
+     paused param. */
+  .l2-page-orbs:global(.ambient-paused) .orb {
+    animation-play-state: paused;
   }
 
   @keyframes orb-drift {
