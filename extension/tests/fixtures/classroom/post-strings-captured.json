@@ -1,0 +1,414 @@
+{
+ "capturedOn": "2026-09-19",
+ "source": "Real classroom.google.com stream with one seeded announcement (edited once, one class comment), swept via ?hl= per language with the live login profile. See tools/capture-classroom-post-strings.mjs and tests/classroom-locale-survey.json.",
+ "langs": {
+  "af": {
+   "htmlLang": "af",
+   "editedMarker": "(03:50 gewysig)",
+   "commentPlaceholder": "Voeg klasopmerking by …",
+   "countText": "1 klasopmerking"
+  },
+  "ar": {
+   "htmlLang": "ar",
+   "editedMarker": "(وقت آخر تعديل: 3:50 ص)",
+   "commentPlaceholder": "إضافة تعليق على مستوى الصف..."
+  },
+  "as": {
+   "htmlLang": "as",
+   "editedMarker": "(পূৰ্বাহ্ন ৩.৫০ত সম্পাদনা কৰা হৈছে)",
+   "commentPlaceholder": "শ্ৰেণীৰ মন্তব্য যোগ দিয়ক…"
+  },
+  "az": {
+   "htmlLang": "az",
+   "editedMarker": "(Redaktə edildi: 03:50)",
+   "commentPlaceholder": "Sinif şərhi əlavə edin…",
+   "countText": "1 sinif şərhi"
+  },
+  "bg": {
+   "htmlLang": "bg",
+   "editedMarker": "(Редактирано: 3:50)",
+   "commentPlaceholder": "Добавете коментар за курса…",
+   "countText": "1 коментар за курса"
+  },
+  "bn": {
+   "htmlLang": "bn",
+   "editedMarker": "(৩:৫০ AM-এ এডিট করা হয়েছে)",
+   "commentPlaceholder": "ক্লাসে কমেন্ট যোগ করুন…"
+  },
+  "ca": {
+   "htmlLang": "ca",
+   "editedMarker": "(Darrera modificació: 3:50)",
+   "commentPlaceholder": "Afegiu un comentari de la classe…",
+   "countText": "1 comentari de classe"
+  },
+  "cs": {
+   "htmlLang": "cs",
+   "editedMarker": "(Upraveno 3:50)",
+   "commentPlaceholder": "Přidat komentář ke kurzu…",
+   "countText": "1 komentář ke kurzu"
+  },
+  "cy": {
+   "htmlLang": "cy",
+   "editedMarker": "(Golygwyd 03:50)",
+   "commentPlaceholder": "Ychwanegwch sylw dosbarth…",
+   "countText": "1 sylw dosbarth"
+  },
+  "da": {
+   "htmlLang": "da",
+   "editedMarker": "(Redigeret 03.50)",
+   "commentPlaceholder": "Tilføj en kommentar til holdet...",
+   "countText": "1 holdkommentar"
+  },
+  "de": {
+   "htmlLang": "de",
+   "editedMarker": "(Bearbeitet: 03:50)",
+   "commentPlaceholder": "Kurskommentar hinzufügen…",
+   "countText": "1 Kurskommentar"
+  },
+  "el": {
+   "htmlLang": "el",
+   "editedMarker": "(Υποβλήθηκε σε επεξεργασία 3:50 π.μ.)",
+   "commentPlaceholder": "Προσθήκη σχολίου τάξης…",
+   "countText": "1 σχόλιο τάξης"
+  },
+  "en": {
+   "htmlLang": "en",
+   "editedMarker": "(Edited 3:50 AM)",
+   "commentPlaceholder": "Add class comment…",
+   "countText": "1 class comment"
+  },
+  "es-419": {
+   "htmlLang": "es-419",
+   "editedMarker": "(Editado: 3:50 a.m.)",
+   "commentPlaceholder": "Agrega un comentario de clase…",
+   "countText": "1 comentario de la clase"
+  },
+  "es": {
+   "htmlLang": "es",
+   "editedMarker": "(Última modificación: 3:50)",
+   "commentPlaceholder": "Añade un comentario de clase…",
+   "countText": "1 comentario de clase"
+  },
+  "et": {
+   "htmlLang": "et",
+   "editedMarker": "(Muudeti 03:50)",
+   "commentPlaceholder": "Lisage kursuse kommentaar…",
+   "countText": "1 kursuse kommentaar"
+  },
+  "eu": {
+   "htmlLang": "eu",
+   "editedMarker": "(Azken edizio-data: 03:50)",
+   "commentPlaceholder": "Gehitu iruzkina ikasgelan…",
+   "countText": "1 iruzkin dago ikasgelan"
+  },
+  "fa": {
+   "htmlLang": "fa",
+   "editedMarker": "(ویرایش: ۳:۵۰)",
+   "commentPlaceholder": "افزودن نظر کلاس..."
+  },
+  "fi": {
+   "htmlLang": "fi",
+   "editedMarker": "(Muokattu 3.50)",
+   "commentPlaceholder": "Lisää ryhmälle näkyvä kommentti…",
+   "countText": "1 ryhmän kommentti"
+  },
+  "fil": {
+   "htmlLang": "fil",
+   "editedMarker": "(Na-edit noong 3:50 AM)",
+   "commentPlaceholder": "Magdagdag ng komento sa klase…",
+   "countText": "1 komento sa klase"
+  },
+  "fr": {
+   "htmlLang": "fr",
+   "editedMarker": "(Modification : 03:50)",
+   "commentPlaceholder": "Ajouter un commentaire au cours…",
+   "countText": "1 commentaire ajouté au cours"
+  },
+  "ga": {
+   "htmlLang": "ga",
+   "editedMarker": "(Curtha in eagar 03:50)",
+   "commentPlaceholder": "Cuir nóta tráchta ranga leis…",
+   "countText": "1 nóta tráchta ranga amháin"
+  },
+  "gu": {
+   "htmlLang": "gu",
+   "editedMarker": "(છેલ્લે ફેરફાર કર્યાનો સમય 03:50 AM)",
+   "commentPlaceholder": "વર્ગની કૉમેન્ટ ઉમેરો…",
+   "countText": "1 વર્ગની કૉમેન્ટ"
+  },
+  "hi": {
+   "htmlLang": "hi",
+   "editedMarker": "(बदलाव किया गया 3:50 am)",
+   "commentPlaceholder": "कक्षा टिप्पणी जोड़ें…",
+   "countText": "1 कक्षा टिप्पणी"
+  },
+  "hr": {
+   "htmlLang": "hr",
+   "editedMarker": "(Uređeno 03:50)",
+   "commentPlaceholder": null,
+   "countText": "1 komentar za predmet"
+  },
+  "hu": {
+   "htmlLang": "hu",
+   "editedMarker": "(Szerkesztve: 3:50)",
+   "commentPlaceholder": "Kurzusmegjegyzés hozzáadása…",
+   "countText": "1 kurzusmegjegyzés"
+  },
+  "hy": {
+   "htmlLang": "hy",
+   "editedMarker": "(խմբագրվել է 03:50)",
+   "commentPlaceholder": "Ավելացրեք հրապարակային մեկնաբանություն…",
+   "countText": "1 հրապարակային մեկնաբանություն"
+  },
+  "id": {
+   "htmlLang": "id",
+   "editedMarker": "(Diedit 03.50)",
+   "commentPlaceholder": null,
+   "countText": "1 komentar kelas"
+  },
+  "is": {
+   "htmlLang": "is",
+   "editedMarker": "(Breytt 03:50)",
+   "commentPlaceholder": "Bæta við athugasemd til bekkjar…"
+  },
+  "it": {
+   "htmlLang": "it",
+   "editedMarker": "(Ultima modifica: 03:50)",
+   "commentPlaceholder": "Aggiungi commento sul corso…",
+   "countText": "1 commento sul corso"
+  },
+  "iw": {
+   "htmlLang": "iw",
+   "editedMarker": "(עריכה אחרונה 3:50)",
+   "commentPlaceholder": "הוספת תגובה בכיתה..."
+  },
+  "ja": {
+   "htmlLang": "ja",
+   "editedMarker": "（最終編集: 3:50）",
+   "commentPlaceholder": "クラスのコメントを追加…"
+  },
+  "ka": {
+   "htmlLang": "ka",
+   "editedMarker": "(რედაქტირების დრო: 03:50)",
+   "commentPlaceholder": "კლასზე კომენტარის დამატება…",
+   "countText": "1 საკლასო კომენტარი"
+  },
+  "kk": {
+   "htmlLang": "kk",
+   "editedMarker": "(Өзгертілген күні: 03:50)",
+   "commentPlaceholder": "Ашық пікір қосу…",
+   "countText": "1 ашық пікір"
+  },
+  "kn": {
+   "htmlLang": "kn",
+   "editedMarker": "(03:50 AM ಸಮಯಕ್ಕೆ ಎಡಿಟ್ ಮಾಡಲಾಗಿದೆ)",
+   "commentPlaceholder": "ತರಗತಿ ಕಾಮೆಂಟ್ ಸೇರಿಸಿ…",
+   "countText": "1 ತರಗತಿಯ ಕಾಮೆಂಟ್"
+  },
+  "ko": {
+   "htmlLang": "ko",
+   "editedMarker": "(오전 3:50에 수정됨)",
+   "commentPlaceholder": "수업 댓글 추가..."
+  },
+  "lt": {
+   "htmlLang": "lt",
+   "editedMarker": "(Redaguota 03:50)",
+   "commentPlaceholder": "Pridėkite kurso komentarą…",
+   "countText": "1 kurso komentaras"
+  },
+  "lv": {
+   "htmlLang": "lv",
+   "editedMarker": "(Rediģēts: 03:50)",
+   "commentPlaceholder": "Pievienojiet mācību priekšmeta komentāru...",
+   "countText": "1 klases komentārs"
+  },
+  "mk": {
+   "htmlLang": "mk",
+   "editedMarker": "(Изменето: 03:50)",
+   "commentPlaceholder": "Додајте коментар во класот…",
+   "countText": "1 коментар во класот"
+  },
+  "ml": {
+   "htmlLang": "ml",
+   "editedMarker": "(3:50 AM എഡിറ്റ് ചെയ്‌തത്)",
+   "commentPlaceholder": "ക്ലാസ് കമന്റ് ചേർക്കുക…"
+  },
+  "mn": {
+   "htmlLang": "mn",
+   "editedMarker": "(Edited 03:50)",
+   "commentPlaceholder": "Ангийн сэтгэгдэл нэмэх…"
+  },
+  "mr": {
+   "htmlLang": "mr",
+   "editedMarker": "(संपादित केले ३:५० AM)",
+   "commentPlaceholder": "वर्गासंबंधी टिप्पणी जोडा…"
+  },
+  "ms": {
+   "htmlLang": "ms",
+   "editedMarker": "(Diedit 3:50 PG)",
+   "commentPlaceholder": null,
+   "countText": "1 ulasan kelas"
+  },
+  "my": {
+   "htmlLang": "my",
+   "editedMarker": "(၃:၅၀ က တည်းဖြတ်ထားသည်)",
+   "commentPlaceholder": "အတန်း မှတ်ချက် ထည့်ပါ…"
+  },
+  "ne": {
+   "htmlLang": "ne",
+   "editedMarker": "(संशोधन गरिएको मिति ०३:५०)",
+   "commentPlaceholder": "कक्षामा देखिने गरी कमेन्ट गर्नुहोस्…"
+  },
+  "nl": {
+   "htmlLang": "nl",
+   "editedMarker": "(Bewerkt: 03:50)",
+   "commentPlaceholder": "Lesgroepreactie toevoegen…",
+   "countText": "1 lesgroepreactie"
+  },
+  "no": {
+   "htmlLang": "no",
+   "editedMarker": "(Endret 03:50)",
+   "commentPlaceholder": null,
+   "countText": "1 kurskommentar"
+  },
+  "or": {
+   "htmlLang": "or",
+   "editedMarker": "(3:50 AM ଏଡିଟ୍ କରାଯାଇଛି)",
+   "commentPlaceholder": "କ୍ଲାସ୍ ମନ୍ତବ୍ୟ ଯୋଗ କରନ୍ତୁ…",
+   "countText": "1ଟି କ୍ଲାସ୍ ମନ୍ତବ୍ୟ"
+  },
+  "pa": {
+   "htmlLang": "pa",
+   "editedMarker": "(3:50 AM ਵਜੇ ਸੰਪਾਦਿਤ ਕੀਤਾ)",
+   "commentPlaceholder": "ਕਲਾਸ ਟਿੱਪਣੀ ਸ਼ਾਮਲ ਕਰੋ…",
+   "countText": "1 ਕਲਾਸ ਟਿੱਪਣੀ"
+  },
+  "pl": {
+   "htmlLang": "pl",
+   "editedMarker": "(Edytowano 03:50)",
+   "commentPlaceholder": null,
+   "countText": "1 komentarz do zajęć"
+  },
+  "pt-BR": {
+   "htmlLang": "pt-BR",
+   "editedMarker": "(editado: 03:50)",
+   "commentPlaceholder": "Adicionar comentário para a turma...",
+   "countText": "1 comentário para a turma"
+  },
+  "pt-PT": {
+   "htmlLang": "pt-PT",
+   "editedMarker": "(Editado às 03:50)",
+   "commentPlaceholder": "Adicionar comentário de turma...",
+   "countText": "1 comentário de turma"
+  },
+  "ro": {
+   "htmlLang": "ro",
+   "editedMarker": "(Editat la 03:50)",
+   "commentPlaceholder": "Adaugă un comentariu la curs…"
+  },
+  "ru": {
+   "htmlLang": "ru",
+   "editedMarker": "(Изменено: 03:50)",
+   "commentPlaceholder": "Добавьте комментарий…",
+   "countText": "1 комментарий от класса"
+  },
+  "si": {
+   "htmlLang": "si",
+   "editedMarker": "(සංස්කරණය කළේ 03.50)",
+   "commentPlaceholder": "පන්ති අදහස එක් කරන්න…",
+   "countText": "1 පන්ති අදහසක්"
+  },
+  "sk": {
+   "htmlLang": "sk",
+   "editedMarker": "(Upravené 3:50)",
+   "commentPlaceholder": "Pridajte komentár triedy…",
+   "countText": "1 komentár triedy"
+  },
+  "sl": {
+   "htmlLang": "sl",
+   "editedMarker": "(Urejeno 03:50)",
+   "commentPlaceholder": "Dodajte komentar predavanja …",
+   "countText": "1 komentar predavanja"
+  },
+  "sq": {
+   "htmlLang": "sq",
+   "editedMarker": "(Modifikuar: 3:50 p.d.)",
+   "commentPlaceholder": "Shto një koment për orën e mësimit…",
+   "countText": "1 koment për orën e mësimit"
+  },
+  "sr": {
+   "htmlLang": "sr",
+   "editedMarker": "(Измењено 03:50)",
+   "commentPlaceholder": "Додај коментар предмета...",
+   "countText": "1 коментар разредa"
+  },
+  "sv": {
+   "htmlLang": "sv",
+   "editedMarker": "(Redigerad 03:50)",
+   "commentPlaceholder": "Lägg till klasskommentar ..."
+  },
+  "sw": {
+   "htmlLang": "sw",
+   "editedMarker": "(Kilibadilishwa 03:50)",
+   "commentPlaceholder": "Weka maoni kwa darasa lote…"
+  },
+  "ta": {
+   "htmlLang": "ta",
+   "editedMarker": "(கடைசியாகத் திருத்தப்பட்டது: 3:50 AM)",
+   "commentPlaceholder": "வகுப்புக் கருத்துரையைச் சேருங்கள்…"
+  },
+  "te": {
+   "htmlLang": "te",
+   "editedMarker": "(3:50 AMకు ఎడిట్ చేయబడింది)",
+   "commentPlaceholder": "తరగతి కామెంట్‌ను జోడించండి…",
+   "countText": "1 తరగతి కామెంట్"
+  },
+  "th": {
+   "htmlLang": "th",
+   "editedMarker": "(แก้ไข 03:50)",
+   "commentPlaceholder": "เพิ่มความคิดเห็นในชั้นเรียน…"
+  },
+  "tr": {
+   "htmlLang": "tr",
+   "editedMarker": "(Düzenlenme: 03:50)",
+   "commentPlaceholder": "Sınıf yorumu ekle…",
+   "countText": "1 sınıf yorumu"
+  },
+  "uk": {
+   "htmlLang": "uk",
+   "editedMarker": "(Змінено 03:50)",
+   "commentPlaceholder": "Додайте коментар до курсу…",
+   "countText": "1 коментар до курсу"
+  },
+  "ur": {
+   "htmlLang": "ur",
+   "editedMarker": "(ترمیم کردہ 3:50 AM)",
+   "commentPlaceholder": "کلاس کا تبصرہ شامل کریں…",
+   "countText": "1 کلاس کا تبصرہ"
+  },
+  "uz": {
+   "htmlLang": "uz",
+   "editedMarker": "(Tahrirlandi: 03:50)",
+   "commentPlaceholder": "Fikr kiriting…",
+   "countText": "1 ta fikr"
+  },
+  "vi": {
+   "htmlLang": "vi",
+   "editedMarker": "(Đã chỉnh sửa 03:50)",
+   "commentPlaceholder": "Thêm nhận xét trong lớp học...",
+   "countText": "1 nhận xét về lớp học"
+  },
+  "zh-CN": {
+   "htmlLang": "zh-CN",
+   "editedMarker": "（上次修改时间：03:50）",
+   "commentPlaceholder": "添加课程评论…",
+   "countText": "1 条课程评论"
+  },
+  "zh-TW": {
+   "htmlLang": "zh-TW",
+   "editedMarker": "(上次編輯時間：凌晨3:50)",
+   "commentPlaceholder": "新增課程留言…",
+   "countText": "1 則課程留言"
+  }
+ }
+}
