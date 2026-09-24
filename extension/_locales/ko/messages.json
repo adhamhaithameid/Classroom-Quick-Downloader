@@ -20,7 +20,7 @@
     "description": "error"
   },
   "failed": {
-    "message": "실패함",
+    "message": "다운로드에 실패했습니다.",
     "description": "failed"
   },
   "aria_download": {
@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "모두 취소",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "수정됨",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "게시 후",
+    "description": "after_posting"
   }
 }
