@@ -22,7 +22,7 @@
  * @since v4.0.0
  */
 
-import { spawnSync } from "node:child_process";
+import { spawnSync, execFileSync } from "node:child_process";
 import path from "node:path";
 import fs from "node:fs";
 import { createHash } from "node:crypto";
@@ -56,7 +56,7 @@ const FINGERPRINT_ROOT_FILES = ["pnpm-lock.yaml"];
  * checkouts, unlike mtime comparisons.
  */
 export function computeBuildFingerprint(): string {
-  const hash = createHash("sha1");
+  const hash = createHash("sha256");
   const addFile = (absPath: string, relPath: string): void => {
     hash.update(relPath);
     hash.update("\0");
@@ -162,6 +162,19 @@ function ensureChromeBuild(): void {
  * file is installed instead of the unsigned zip (no firefox build needed —
  * the signed xpi survives Playwright's bundled Firefox startup).
  */
+/** Read browser_specific_settings.gecko.id out of an xpi (zip) manifest. */
+function readXpiAddonId(xpiPath: string): string | null {
+  try {
+    const raw = execFileSync("unzip", ["-p", xpiPath, "manifest.json"], {
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    const mf = JSON.parse(raw.toString());
+    return mf.browser_specific_settings?.gecko?.id ?? mf.applications?.gecko?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function ensureFirefoxProfile(): void {
   const extensionsDir = path.join(FIREFOX_PROFILE_DIR, "extensions");
   const signedXpi = process.env.QA_SIGNED_XPI;
@@ -170,9 +183,13 @@ function ensureFirefoxProfile(): void {
       throw new Error(`QA_SIGNED_XPI is set but the file does not exist: ${signedXpi}`);
     }
     fs.mkdirSync(extensionsDir, { recursive: true });
-    fs.copyFileSync(signedXpi, path.join(extensionsDir, `${FIREFOX_GECKO_ID}.xpi`));
+    // Profile auto-install matches the FILENAME to the add-on's INTERNAL id.
+    // The signed xpi's id can differ from the listed FIREFOX_GECKO_ID (the
+    // QA signing companion uses its own guid), so read it from the package.
+    const xpiId = readXpiAddonId(signedXpi) ?? FIREFOX_GECKO_ID;
+    fs.copyFileSync(signedXpi, path.join(extensionsDir, `${xpiId}.xpi`));
     writeFirefoxUserPrefs();
-    console.log("✅ Firefox profile prepared with the AMO-SIGNED xpi (QA_SIGNED_XPI)\n");
+    console.log(`✅ Firefox profile prepared with the AMO-SIGNED xpi (${xpiId}.xpi)\n`);
     return;
   }
 

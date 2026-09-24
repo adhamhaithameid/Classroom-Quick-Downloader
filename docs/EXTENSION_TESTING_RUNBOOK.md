@@ -164,8 +164,20 @@ Consequences, by design of the failure-classification contract:
 
 The journeys DO exercise the real Firefox MV2 build logic wherever possible at
 the unit seam: `extension/tests/background-bypass-flow.test.ts` toggles the
-Firefox adapter (bypass-tab flow) against the shared state machine. Revisit this
-section if Playwright ships a Firefox build that honors unsigned sideloading.
+Firefox adapter (bypass-tab flow) against the shared state machine.
+
+**RESOLVED 2026-09-19 — the signed-Firefox leg is live and green (gh #617).**
+AMO API keys (owner) + `scripts/set-amo-secrets.sh` set the repo secrets; the
+signer (`extension/tools/sign-extension.mjs`) gained a create flow for
+first-time GUIDs and the JWT `exp` claim; a self-distribution companion add-on
+(`classroom-quick-downloader-qa@adhamhaitham.dev`, unlisted) is
+Mozilla-signed. `QA_SIGNED_XPI=extension/.output/signed.xpi pnpm -C extension
+run test:qa:firefox-signed` runs the whole suite on real signed Firefox:
+**8 passed / 0 failed / 9 skipped** — every skip is a classified HARNESS skip
+(Playwright does not expose Firefox MV2 background pages/service workers and
+has no CDP for extension-world probes; the content-script journeys prove the
+extension itself works) or the env-gated live canary. CI activates the same
+leg automatically now that the secrets exist.
 
 ## Zero-tab Drive downloads (2026-09-13)
 
