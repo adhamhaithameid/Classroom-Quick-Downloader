@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "إلغاء الكل",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "تم التعديل",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "بعد النشر",
+    "description": "after_posting"
   }
 }
