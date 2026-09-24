@@ -93,6 +93,7 @@ export function makeFlowState(options: FlowHarnessOptions = {}) {
       }
     },
     isRegistered: (requestId: string) => pendingByRequestId.has(requestId),
+    setRegistryListener: () => {},
     setPendingExpiredHook: (hook: ((p: PendingDownload) => void) | null) => {
       expiredHook = hook;
     },
