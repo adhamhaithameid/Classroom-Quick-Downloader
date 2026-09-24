@@ -78,5 +78,25 @@
   "comm_error": {
     "message": "Greška u komunikaciji.",
     "description": "commError"
+  },
+  "cancel": {
+    "message": "Otkaži",
+    "description": "cancel"
+  },
+  "cancelled": {
+    "message": "Otkazano",
+    "description": "cancelled"
+  },
+  "cancel_all": {
+    "message": "Otkaži sve",
+    "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Izmenjeno",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "nakon objavljivanja",
+    "description": "after_posting"
   }
 }
