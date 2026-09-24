@@ -72,7 +72,7 @@
     "description": "commError"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "পোষ্ট কৰা আৰু শেষ সম্পাদনাৰ মাজৰ দিন",
     "description": "editedTooltip"
   },
   "comment_singular": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "সকলো বাতিল কৰক",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "পৰিবৰ্তিত",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "পোষ্ট কৰাৰ পিছত",
+    "description": "after_posting"
   }
 }
