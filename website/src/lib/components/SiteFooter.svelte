@@ -625,8 +625,7 @@
     <div class="ft-inner">
       <div class="ft-grid">
         <div class="ft-col-brand" data-ft>
-          <img src={logo} alt="" width="44" height="38" class="ft-brand-logo" loading="lazy" decoding="async" />
-          <p class="ft-brand-name">Classroom Quick<br />Downloader</p>
+          <img src={logo} alt="Classroom Quick Downloader" width="88" height="76" class="ft-brand-logo" loading="lazy" decoding="async" />
           <p class="ft-brand-desc">Download Classroom files without repetitive clicking.</p>
           <div class="ft-version-block">
             <p class="ft-label ft-version-label">Version</p>
@@ -639,24 +638,17 @@
           <ul class="ft-links">
             <li><a href="{base}/">Overview</a></li>
             <li><a href="{base}/#how-it-works">How it works</a></li>
-            <li><a href="{base}/privacy">Privacy</a></li>
-            <li><a href="{base}/faq">FAQ</a></li>
+            <li><a href="{base}/changelog">Changelog</a></li>
+            <li><a href="{base}/featured">Featured</a></li>
           </ul>
         </nav>
 
-        <nav class="ft-col ft-col-support" data-ft aria-label="Support">
-          <h2 class="ft-label">Support</h2>
+        <nav class="ft-col ft-col-compare" data-ft aria-label="Compare">
+          <h2 class="ft-label">Compare</h2>
           <ul class="ft-links">
-            <li>
-              <a href={githubUrl} target="_blank" rel="noopener noreferrer">GitHub</a>
-            </li>
-            <li><a href="{base}/changelog">Changelog</a></li>
-            <li>
-              <a href={reportIssueUrl} target="_blank" rel="noopener noreferrer">Report issue</a>
-            </li>
-            <li>
-              <a href={BUY_COFFEE_URL} target="_blank" rel="noopener noreferrer nofollow">Buy Me a Coffee <span class="ft-arrow" aria-hidden="true">↗</span></a>
-            </li>
+            <li><a href="{base}/compare/classroom-quick-downloader-vs-classfetch">vs ClassFetch</a></li>
+            <li><a href="{base}/compare/classroom-quick-downloader-vs-classmate">vs Classmate</a></li>
+            <li><a href="{base}/compare/classroom-quick-downloader-vs-classroom-one-click-downloader">vs One-Click</a></li>
           </ul>
         </nav>
 
@@ -678,6 +670,37 @@
                 Edge <span class="ft-arrow" aria-hidden="true">↗</span>
               </a>
             </li>
+            <li><a href="{base}/install/chrome">Chrome guide</a></li>
+            <li><a href="{base}/install/firefox">Firefox guide</a></li>
+            <li><a href="{base}/install/edge">Edge guide</a></li>
+          </ul>
+        </nav>
+
+        <nav class="ft-col ft-col-resources" data-ft aria-label="Resources">
+          <h2 class="ft-label">Resources</h2>
+          <ul class="ft-links">
+            <li><a href="{base}/faq">FAQ</a></li>
+            <li><a href="{base}/privacy">Privacy</a></li>
+            <li><a href="{base}/security">Security</a></li>
+            <li><a href="{base}/press-kit">Press kit</a></li>
+            <li><a href="{base}/site-map">Site map</a></li>
+          </ul>
+        </nav>
+
+        <nav class="ft-col ft-col-connect" data-ft aria-label="Connect">
+          <h2 class="ft-label">Connect</h2>
+          <ul class="ft-links">
+            <li>
+              <a href={githubUrl} target="_blank" rel="noopener noreferrer">GitHub</a>
+            </li>
+            <li>
+              <a href={BUY_COFFEE_URL} target="_blank" rel="noopener noreferrer nofollow">Buy Me a Coffee <span class="ft-arrow" aria-hidden="true">↗</span></a>
+            </li>
+            <li>
+              <a href={reportIssueUrl} target="_blank" rel="noopener noreferrer">Report issue</a>
+            </li>
+            <li><a href="{base}/support">Support</a></li>
+            <li><a href="{base}/watch/cqd-demo">Watch demo</a></li>
           </ul>
         </nav>
       </div>
@@ -903,8 +926,8 @@
     position: relative;
     z-index: 1;
     display: grid;
-    grid-template-columns: 1.8fr 1fr 1fr 1fr;
-    column-gap: clamp(36px, 5vw, 64px);
+    grid-template-columns: 1.4fr repeat(5, minmax(0, 1fr));
+    column-gap: clamp(24px, 3.5vw, 44px);
     row-gap: 40px;
     padding-top: clamp(40px, 5vw, 64px);
     padding-bottom: clamp(40px, 5vw, 64px);
@@ -917,15 +940,6 @@
     font-weight: 700;
     letter-spacing: 0.18em;
     text-transform: uppercase;
-  }
-
-  .ft-brand-name {
-    margin: 0 0 18px;
-    font-size: clamp(30px, 3.2vw, 42px);
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    line-height: 1.05;
-    color: var(--ft-text);
   }
 
   .ft-brand-desc {
@@ -957,10 +971,10 @@
 
   .ft-brand-logo {
     display: block;
-    width: 44px;
+    width: 88px;
     height: auto;
-    margin: 0 0 16px;
-    border-radius: 8px;
+    margin: 0 0 20px;
+    border-radius: 12px;
   }
 
   .ft-links {
