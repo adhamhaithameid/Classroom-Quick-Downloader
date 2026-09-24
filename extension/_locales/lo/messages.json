@@ -72,7 +72,7 @@
     "description": "commError"
   },
   "edited_tooltip": {
-    "message": "Days between posting and the last edit",
+    "message": "ຈຳນວນວັນ ລະຫວ່າງການໂພສຕ໌ ແລະ ການແກ້ໄຂຄັ້ງສຸດທ້າຍ",
     "description": "editedTooltip"
   },
   "comment_singular": {
@@ -88,7 +88,15 @@
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Cancel All",
+    "message": "ຍົກເລີກທັງໝົດ",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "ປ່ຽນແປງແລ້ວ",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "ຫຼັງຈາກໂພສຕ໌",
+    "description": "after_posting"
   }
 }
