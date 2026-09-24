@@ -18,7 +18,6 @@ function makeEnv(doFetch: (input: RequestInfo | URL) => Promise<Response>): Work
     DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace,
     DO_SHARED_SECRET: TEST_DO_SHARED_SECRET,
     DANGER_PASSWORD: TEST_DO_SHARED_SECRET,
-    ORACLE_ENDPOINT: "https://oracle.example.com/ingest-batch",
     MAX_BATCH_EVENTS: "10000",
     CORS_ALLOWED_ORIGINS: "https://classroom-quick-downloader-website.pages.dev",
   };
