@@ -45,6 +45,12 @@
   cursor: pointer;
 }
 
+/* C3: genuine controls acknowledge the press. Content cards (plain divs)
+   keep the lift only — no cursor change, no press. */
+.glass-hover:is(a, button):active {
+  transform: translateY(-1px) scale(0.99);
+}
+
 .glass-hover:hover {
   transform: translateY(-2px);
   border-color: rgba(26, 139, 85, 0.16);
