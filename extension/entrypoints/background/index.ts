@@ -18,12 +18,14 @@ import {
   getPendingByDownloadId,
   getUnclaimedPendingByUrl,
   setPendingExpiredHook,
+  setRegistryListener,
   isRegistered,
   cancelledByUs,
   recentDownloads,
   CLEANUP_INTERVAL_MS,
   IS_FIREFOX,
 } from './state';
+import { createStoragePersistence, reconcilePersistedJobs } from './job-persistence';
 import { createIconUpdaters, isClassroomUrl, setActionIcon, GRAY_ICON_PATHS } from './icon-manager';
 import { extractDriveFileId } from './auth-utils';
 import { getFilenameExt, buildUrlWithAuthUser } from './url-helpers';
@@ -142,6 +144,11 @@ export default defineBackground(() => {
   // Memory leak prevention: periodic cleanup
   setInterval(cleanupOrphanedPendingDownloads, CLEANUP_INTERVAL_MS);
   setTimeout(cleanupOrphanedPendingDownloads, 60 * 1000);
+
+  // MV3 restarts wipe the in-memory registry; mirror it into storage and
+  // reconcile persisted job records on every worker boot (bead 0h4d.1.1).
+  setRegistryListener(createStoragePersistence());
+  void reconcilePersistedJobs();
 
   // Create icon update closures
   const { updateTabIcon, updateGlobalIcon } = createIconUpdaters();
