@@ -1,5 +1,24 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare const chrome: any;
+import { resolveLanguage } from '../../src/core/i18n/resolve';
+import { applyCompletenessPatch } from './translations/completeness';
+/**
+ * TRANSLATIONS — the single source of truth for every string the extension
+ * renders on the page (button labels, tooltips, hover frames, status text).
+ *
+ * Resolution (docs/TWO_LANGUAGE_SIGNALS.md): the UI language comes from the
+ * shared resolver (`src/core/i18n/resolve.ts`) with the CLASSROOM PAGE
+ * language first — page full tag → page base tag → browser tags → `en` —
+ * because the buttons sit on Classroom's UI and should speak its language;
+ * the language-controller's manual English mode is the user override, and
+ * `t()` falls back to `en` per key when a translation is missing.
+ *
+ * The completeness patch (`./translations/completeness.ts`) is applied right
+ * after the table literal and repairs missing keys / silent English leakage;
+ * both it and this table are contract-tested by
+ * `tests/i18n-translations.test.ts` — new locales cannot reintroduce English
+ * leakage silently.
+ */
 // i genuinely didn't know there were much languages lol🌍
 export const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
@@ -68,7 +87,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
   },
   ja: {
     download: 'ダウンロード',
-    downloading: 'DL中…',
+    downloading: 'ダウンロード中…',
     trying: '試行中…',
     downloaded: '完了',
     error: 'エラー',
@@ -77,7 +96,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     titleQuick: 'クイックダウンロード',
     comments: '件のコメント',
     edited: '編集済み',
-    downloadAll: 'すべてDL',
+    downloadAll: 'すべてダウンロード',
     file: 'ファイル',
     files: 'ファイル',
     commentsTooltip: 'この投稿へのコメント数',
@@ -164,7 +183,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'comentário',
     cancel: 'Cancelar',
     cancelled: 'Cancelado',
-    cancelAll: 'Cancelar todo',
+    cancelAll: 'Cancelar tudo',
   },
   'pt-pt': {
     download: 'Descarregar',
@@ -187,7 +206,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Erro de comunicação.',
     cancel: 'Cancelar',
     cancelled: 'Cancelado',
-    cancelAll: 'Cancelar todo',
+    cancelAll: 'Cancelar tudo',
   },
   'zh-cn': {
     download: '下载',
@@ -341,7 +360,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     trying: '시도 중…',
     downloaded: '완료',
     error: '오류',
-    failed: '실패함',
+    failed: '다운로드에 실패했습니다.',
     ariaDownload: '다운로드',
     titleQuick: '빠른 다운로드',
     comments: '개 댓글',
@@ -756,9 +775,9 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Помилка зв’язку.',
     editedTooltip: 'Днів між публікацією та останнім редагуванням',
     commentSingular: 'коментарів',
-    cancel: 'Отмена',
-    cancelled: 'Отменено',
-    cancelAll: 'Отменить все',
+    cancel: 'Скасувати',
+    cancelled: 'Скасовано',
+    cancelAll: 'Скасувати всі',
   },
   el: {
     download: 'Λήψη',
@@ -1131,7 +1150,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'коментара',
     cancel: 'Отказ',
     cancelled: 'Отказано',
-    cancelAll: 'Откажи све',
+    cancelAll: 'Откажи всички',
   },
   hr: {
     download: 'Preuzmi',
@@ -1661,7 +1680,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
   mn: {
     download: 'Татах',
     downloading: 'Татаж байна…',
-    trying: 'Орлдож байна…',
+    trying: 'Оролдож байна…',
     downloaded: 'Татсан',
     error: 'Алдаа',
     failed: 'Амжилтгүй.',
@@ -1837,7 +1856,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     download: 'Landa',
     downloading: 'Iyalandwa…',
     trying: 'Iyazama…',
-    downloaded: 'Ilandīwe',
+    downloaded: 'Ilandiwe',
     error: 'Iphutha',
     failed: 'Ihlulekile.',
     ariaDownload: 'Landa',
@@ -3706,6 +3725,11 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
   },
 };
 
+// Completeness & correction pass (see entrypoints/content/translations/completeness.ts):
+// fills keys the table above lacks and replaces byte-identical-English leftovers.
+// Contract is enforced by tests/i18n-translations.test.ts.
+applyCompletenessPatch(TRANSLATIONS);
+
 export type LangKey = keyof typeof TRANSLATIONS.en;
 
 // Cached detected language - set once at startup
@@ -3720,7 +3744,11 @@ if (typeof chrome !== 'undefined') {
       isInitializing = true;
       const { languageController } = await import('../utils/language-controller');
       const lang = await languageController.getCurrentLanguage();
-      if (lang) {
+      // Only adopt the controller's value when the table can actually resolve
+      // it (mode 'english' or a full table key). A truncated/unknown code like
+      // a bare 'zh' must never overwrite the synchronous detection above —
+      // that exact race used to pin Chinese users to English strings.
+      if (lang && TRANSLATIONS[lang]) {
         detectedLanguage = lang;
       }
     } catch (e) {
@@ -3741,29 +3769,7 @@ function _detectLanguageDirectInternal(): string {
     return detectedLanguage;
   }
 
-  // Helper to normalize "en-US" -> "en"
-  const resolve = (l: string) => {
-    const norm = l.toLowerCase().split(';')[0].trim().replace('_', '-');
-    const base = norm.split('-')[0];
-    return { full: norm, base };
-  };
-
-  // candidates to check in order
-  const candidates: string[] = [];
-
-  // 1. Get page language
-  let pageLang = '';
-  if (typeof document !== 'undefined' && document.documentElement && document.documentElement.lang) {
-    pageLang = document.documentElement.lang;
-  }
-
-  // A) If page lang is set, try it first
-  if (pageLang) {
-    const p = resolve(pageLang);
-    candidates.push(p.full, p.base);
-  }
-
-  // 2. Get browser languages
+  // Browser languages in preference order (navigator.language first).
   const browserLangs: string[] = [];
   if (typeof navigator !== 'undefined') {
     if (navigator.language) browserLangs.push(navigator.language);
@@ -3772,27 +3778,12 @@ function _detectLanguageDirectInternal(): string {
     }
   }
 
-  // B) Then try browser languages
-  for (const bl of browserLangs) {
-    const b = resolve(bl);
-    candidates.push(b.full, b.base);
-  }
-
-  // C) Explicit fallback
-  candidates.push('en');
-
-  // 3. Find first match
-  for (const c of candidates) {
-    if (!c) continue;
-    if (TRANSLATIONS[c]) {
-      detectedLanguage = c;
-      return c; // Return immediately once found
-    }
-  }
-
-  // Fallback to English if no match found
-  detectedLanguage = 'en';
-  return 'en';
+  detectedLanguage = resolveLanguage(Object.keys(TRANSLATIONS), {
+    pageLang:
+      typeof document !== 'undefined' ? document.documentElement?.lang || '' : '',
+    browserLanguages: browserLangs,
+  });
+  return detectedLanguage;
 }
 
 /**
