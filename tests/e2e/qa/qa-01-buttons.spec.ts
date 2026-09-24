@@ -91,7 +91,7 @@ test.describe("qa-01 buttons", () => {
 
   test.beforeAll(async ({}, testInfo) => {
     browser = projectBrowser(testInfo.project.name);
-    const session = await launchQaContext(browser, scenario());
+    const session = await launchQaContext(browser, scenario(), { project: testInfo.project.name });
     context = session.context;
     closeQa = session.close;
     // Bail out of UI setup when the extension host never came up (Firefox);
