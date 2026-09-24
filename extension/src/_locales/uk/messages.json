@@ -80,15 +80,23 @@
     "description": "commentSingular"
   },
   "cancel": {
-    "message": "Отмена",
+    "message": "Скасувати",
     "description": "cancel"
   },
   "cancelled": {
-    "message": "Отменено",
+    "message": "Скасовано",
     "description": "cancelled"
   },
   "cancel_all": {
-    "message": "Отменить все",
+    "message": "Скасувати всі",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "Змінено",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "після публікації",
+    "description": "after_posting"
   }
 }
