@@ -1,0 +1,29 @@
+{
+  "duration": 23,
+  "assertions": [
+    {
+      "kind": "appearsBy",
+      "selector": "#hook-copy",
+      "bySec": 0.5
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#all-idle",
+      "bySec": 4.1
+    },
+    {
+      "kind": "appearsBy",
+      "selector": "#all-done",
+      "bySec": 10.3
+    },
+    {
+      "kind": "appearsBy",
+      "selector": ".end-copy",
+      "bySec": 18.1
+    },
+    {
+      "kind": "staysInFrame",
+      "selector": ".end-mark"
+    }
+  ]
+}

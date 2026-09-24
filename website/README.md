@@ -12,6 +12,53 @@ This package is static (`@sveltejs/adapter-static`) and deploys to Cloudflare Pa
 - Uninstall feedback page (`/uninstall`) posting directly to Oracle
 - Global map (`/map`) with country-level aggregate usage
 
+## Magnetic CTA Micro-Interaction
+
+Primary green CTAs subtly follow the cursor when it comes near, then glide
+home (approved "Subtle" feel from `prototype-magnetic.html`: 70px attraction
+radius, max 6px pull, near-critically damped spring, −2px hover lift while
+engaged).
+
+**Where the code lives**
+
+- `src/lib/motion/magneticField.ts` — pure motion math + the locked feel
+  constants (`MAGNETIC_DEFAULTS`, `HOVER_LIFT_PX`, `HOVER_SCALE`). This is
+  the only place the feel is defined; tweak here, never per page.
+- `src/lib/actions/magnetic.ts` — `use:magnetic` Svelte action. One shared
+  passive `pointermove` listener for the whole page, cached rects, and a
+  self-stopping rAF loop (zero idle cost, even when the cursor parks on a
+  button).
+- `src/app.css` — the `.magnetic-live` rule. While the spring drives a
+  button it drops `transform` from the CSS transition list; without it the
+  per-frame writes lag a frame behind.
+- `prototype-magnetic.html` — the approved feel reference. A guard test
+  keeps its numbers in sync with `MAGNETIC_DEFAULTS`.
+
+**Scope rules (enforced by `src/lib/motion/magnetic.guard.test.ts`)**
+
+- Wired only to green primary CTAs: overview hero + playful install buttons
+  (and the editor copy), `SeoContentPage` primary (covers all guide pages),
+  privacy, FAQ, uninstall (detected-browser reinstall + submit), 404, and
+  error page CTAs.
+- Never the navbar, never the footer, never secondary/ghost buttons. Adding
+  `use:magnetic` anywhere else fails the guard suite.
+- Conditional wiring is intentional: hero buttons pass
+  `b === detectedBrowser`, uninstall reinstall passes `isDetected`, and the
+  submit button passes `submitState !== 'sending'` so a disabled button
+  never pulls.
+
+**Behavior contract**
+
+- Fully disabled unless `(pointer: fine)` and not
+  `prefers-reduced-motion: reduce`; reacts live if the user changes either
+  setting. CSS `:hover` states remain the fallback in those cases.
+- While engaged the action owns the button's inline transform (including
+  the −2px lift), so CSS `:hover` transforms are suppressed — the action
+  reproduces them. On release the spring glides home, inline styles clear,
+  and normal CSS hover resumes.
+- Tests: `src/lib/motion/magneticField.test.ts` (math, 14 tests) and
+  `src/lib/motion/magnetic.guard.test.ts` (scope/contract guards, 7 tests).
+
 ## Data Source Schedule (UTC)
 
 - Oracle traffic sync from Cloudflare is scheduler-driven and configurable:

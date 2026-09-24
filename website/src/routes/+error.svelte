@@ -2,6 +2,7 @@
   import { page } from '$app/stores';
   import { base } from '$app/paths';
   import SeoMeta from '$lib/components/SeoMeta.svelte';
+  import { magnetic } from '$lib/actions/magnetic';
 
   $: statusCode = $page.status;
   $: errorTitle = statusCode === 404 ? 'Page not found' : statusCode === 403 ? 'Access restricted' : 'Something went wrong';
@@ -35,7 +36,7 @@
       <p class="err-sub">{errorDescription}</p>
 
       <div class="err-actions">
-        <a class="err-btn err-btn-primary" href="{base}/">
+        <a class="err-btn err-btn-primary" href="{base}/" use:magnetic>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
           Go home
         </a>

@@ -312,3 +312,13 @@ select {
     width: calc(100% - 20px);
   }
 }
+
+/* While the magnetic action (src/lib/actions/magnetic.ts) drives an inline
+   transform on a CTA, `transform` must drop out of the CSS transition list —
+   a transitioning transform lags the per-frame spring writes by a frame. The
+   other hover properties keep their normal transitions. The class is present
+   only while the spring is moving; the gates in the action mean it never
+   appears under prefers-reduced-motion or on coarse pointers. */
+.magnetic-live {
+  transition-property: box-shadow, border-color, background-color, color, opacity !important;
+}

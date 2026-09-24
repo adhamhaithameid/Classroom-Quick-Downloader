@@ -9,6 +9,7 @@
   import { buildUninstallNotesPayload } from '$lib/uninstall/feedback';
   import { browserDisplayName, detectBrowserFromUserAgent, type BrowserKey } from '$lib/browser/detect';
   import SeoMeta from '$lib/components/SeoMeta.svelte';
+  import { magnetic } from '$lib/actions/magnetic';
 
   const reasons: { label: string; icon: string }[] = [
     { label: "Didn't work as expected", icon: '⚙️' },
@@ -260,6 +261,7 @@
             class="un-submit"
             type="button"
             disabled={submitState === 'sending'}
+            use:magnetic={submitState !== 'sending'}
             on:click={submitFeedback}
           >
             {#if submitState === 'sending'}
@@ -306,6 +308,7 @@
               rel="noopener noreferrer"
               class="un-reinstall-btn glass-panel glass-hover"
               class:detected={isDetected}
+              use:magnetic={isDetected}
               on:click={() => trackReinstallClick(browser)}
             >
               <img src="{base}/images/{browser}.svg" alt="" class="un-browser-icon" />

@@ -1,0 +1,1131 @@
+:root {
+      --cqd-transition: 120ms cubic-bezier(0.2, 0, 0, 1);
+
+      /* Spinner */
+      --cqd-spinner-border: rgba(255, 255, 255, 0.22);
+      --cqd-spinner-top: #ffffff;
+
+      /* =================================================================
+       * COLOR PALETTE (Light)
+       * ================================================================= */
+      --cqd-color-normal: #005DD7;
+      --cqd-shadow-normal: 0 8px 22px rgba(0, 93, 215, 0.40);
+      --cqd-shadow-normal-strong: 0 12px 28px rgba(0, 93, 215, 0.70);
+
+      --cqd-color-success: #00A82D;
+      --cqd-shadow-success: 0 12px 28px rgba(0, 168, 45, 0.40);
+      --cqd-shadow-success-strong: 0 12px 28px rgba(0, 168, 45, 0.70);
+
+      --cqd-color-error: #FF4036;
+      --cqd-shadow-error: 0 12px 28px rgba(255, 64, 54, 0.40);
+      --cqd-shadow-error-strong: 0 12px 28px rgba(255, 64, 54, 0.70);
+
+      --cqd-color-trying: #FFD93D;
+      --cqd-shadow-trying: 0 12px 28px rgba(255, 217, 61, 0.40);
+      --cqd-shadow-trying-strong: 0 12px 28px rgba(255, 217, 61, 0.70);
+
+      --cqd-color-cancel: #EC6300;
+      --cqd-shadow-cancel: 0 12px 28px rgba(236, 99, 0, 0.40);
+      --cqd-shadow-cancel-strong: 0 12px 28px rgba(236, 99, 0, 0.70);
+
+      --cqd-color-comment: #9B00FF;
+      --cqd-color-edited: #007F8D;
+
+      --cqd-shadow-base: 0 0px 10px rgba(15, 23, 42, 0.22);
+      --cqd-shadow-hover: 0 10px 24px rgba(15, 23, 42, 0.30);
+    }
+
+    /* =================================================================
+     * DARK MODE
+     * ================================================================= */
+    .cqd-theme-dark {
+      --cqd-color-normal: #006EFF;
+      --cqd-shadow-normal: 0 8px 22px rgba(0, 110, 255, 0.40);
+      --cqd-shadow-normal-strong: 0 12px 28px rgba(0, 110, 255, 0.70);
+
+      --cqd-color-success: #07DA3F;
+      --cqd-shadow-success: 0 12px 28px rgba(7, 218, 63, 0.40);
+      --cqd-shadow-success-strong: 0 12px 28px rgba(7, 218, 63, 0.70);
+
+      --cqd-color-error: #FF4036;
+      --cqd-shadow-error: 0 12px 28px rgba(255, 64, 54, 0.40);
+      --cqd-shadow-error-strong: 0 12px 28px rgba(255, 64, 54, 0.70);
+
+      --cqd-color-trying: #FFD93D;
+      --cqd-shadow-trying: 0 12px 28px rgba(255, 217, 61, 0.40);
+      --cqd-shadow-trying-strong: 0 12px 28px rgba(255, 217, 61, 0.70);
+
+      --cqd-color-cancel: #FF9142;
+      --cqd-shadow-cancel: 0 12px 28px rgba(255, 145, 66, 0.40);
+      --cqd-shadow-cancel-strong: 0 12px 28px rgba(255, 145, 66, 0.70);
+
+      --cqd-color-comment: #9B00FF;
+      --cqd-color-edited: #00D6EE;
+
+      --cqd-spinner-border: rgba(15, 23, 42, 0.22);
+      --cqd-spinner-top: #0f172a;
+    }
+
+    div[data-stream-item-id] {
+      overflow: visible !important;
+      contain: none !important;
+      z-index: 1;
+    }
+
+    /* Classwork tab: li elements with data-stream-item-id */
+    li[data-stream-item-id] {
+      overflow: visible !important;
+      contain: none !important;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Classwork tab: ensure header row has proper flex display for button placement */
+    li[data-stream-item-id] .jWCzBe.gmNu1d {
+      display: flex !important;
+      flex-wrap: wrap !important;
+      align-items: center !important;
+    }
+
+    /* Classwork tab: button styling within header */
+    li[data-stream-item-id] .cqd-download-all-btn {
+      margin-inline-end: 8px;
+    }
+
+    /* Classwork tab: flag badges positioning */
+    li[data-stream-item-id] .cqd-flag,
+    li[data-stream-item-id] .cqd-comment-badge,
+    li[data-stream-item-id] .cqd-edited-badge,
+    li[data-stream-item-id] .cqd-both-badge {
+      z-index: 9999;
+    }
+
+    /* ===============================
+     * 1. DOWNLOAD BUTTON (Single)
+     * =============================== */
+    .cqd-download-btn {
+      position: absolute;
+      top: 50%;
+      right: 8px;
+      z-index: 5;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 40px;
+      width: auto;
+      min-width: 40px;
+      max-width: 40px;
+      padding: 0;
+      border: none;
+      border-radius: 9999px;
+      background-color: var(--cqd-color-normal);
+      color: #ffffff;
+      box-shadow: var(--cqd-shadow-base);
+      cursor: pointer;
+      transform: translateY(-50%) scale(1);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      will-change: transform, box-shadow, width, border-radius, padding-inline;
+      transition:
+        max-width var(--cqd-transition),
+        padding-inline var(--cqd-transition),
+        border-radius var(--cqd-transition),
+        box-shadow var(--cqd-transition),
+        transform var(--cqd-transition),
+        background-color var(--cqd-transition);
+    }
+
+    body[data-cqd-dir="rtl"] .cqd-download-btn {
+      right: auto;
+      left: 8px;
+    }
+
+    .cqd-download-btn:not(.cqd-loading):not(.cqd-trying):not(.cqd-success):not(.cqd-error):hover {
+      width: auto;
+      max-width: 250px;
+      padding-inline: 12px;
+      box-shadow: var(--cqd-shadow-hover);
+      justify-content: flex-start;
+      transform: translateY(-50%) scale(1);
+      border-radius: 20px;
+    }
+
+    .cqd-download-btn:focus-visible {
+      outline: 2px solid #ffffff;
+      outline-offset: 2px;
+      transform: scale(0.97);
+    }
+
+    .cqd-download-btn:active {
+      transform: translateY(-50%) scale(0.97);
+    }
+
+    .cqd-download-btn .cqd-icon-wrapper {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .cqd-download-icon {
+      display: block;
+      width: 24px;
+      height: 24px;
+      background-image: url("data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%3E%0A%20%20%3Cg%20stroke%3D%22%23FFFFFF%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%0A%20%20%20%20%3Cpath%20d%3D%22M6%2021H18%22%20%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M12%203V17%22%20%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M12%2017L17%2012%22%20%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M12%2017L7%2012%22%20%2F%3E%0A%20%20%3C%2Fg%3E%0A%3C%2Fsvg%3E");
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: 24px 24px;
+      flex-shrink: 0;
+      transform-origin: center;
+      transition: width var(--cqd-transition), height var(--cqd-transition);
+    }
+
+    .cqd-icon-small {
+      width: 16px;
+      height: 16px;
+      background-size: 16px 16px;
+    }
+
+    .cqd-icon-medium {
+      width: 24px;
+      height: 24px;
+      background-size: 24px 24px;
+    }
+
+    .cqd-icon-large {
+      width: 32px;
+      height: 32px;
+      background-size: 32px 32px;
+    }
+
+    .cqd-download-btn .cqd-label {
+      opacity: 0;
+      margin-left: 0;
+      max-width: 0;
+      overflow: hidden;
+      transition: opacity var(--cqd-transition), max-width var(--cqd-transition), margin-left var(--cqd-transition);
+    }
+
+    .cqd-download-btn:not(.cqd-loading):not(.cqd-trying):not(.cqd-success):not(.cqd-error):hover .cqd-label {
+      opacity: 1;
+      max-width: 150px;
+      margin-left: 4px;
+    }
+
+    .cqd-download-btn.cqd-loading,
+    .cqd-download-btn.cqd-trying,
+    .cqd-download-btn.cqd-success,
+    .cqd-download-btn.cqd-error {
+      padding-inline: 12px;
+      border-radius: 20px;
+      justify-content: flex-start;
+      box-shadow: var(--cqd-shadow-normal);
+      width: auto;
+      min-width: 140px; /* Consistent width to prevent hover stuttering */
+      max-width: 300px;
+      transform: translateY(-50%) scale(1);
+    }
+
+    .cqd-download-btn.cqd-trying {
+      background-color: var(--cqd-color-trying);
+      box-shadow: var(--cqd-shadow-trying);
+    }
+
+    .cqd-download-btn.cqd-loading:hover {
+      box-shadow: var(--cqd-shadow-normal-strong);
+    }
+
+    .cqd-download-btn.cqd-trying:hover {
+      box-shadow: var(--cqd-shadow-trying-strong);
+    }
+
+    .cqd-download-btn.cqd-cancel,
+    .cqd-download-btn.cqd-cancelled {
+      background-color: var(--cqd-color-cancel);
+      box-shadow: var(--cqd-shadow-cancel);
+      padding-inline: 12px;
+      border-radius: 20px;
+      justify-content: flex-start;
+      width: auto;
+      min-width: 140px;
+      max-width: 300px;
+      transform: translateY(-50%) scale(1);
+      transition: all var(--cqd-transition);
+      cursor: pointer;
+    }
+
+    /* Cancel state - smooth entry animation when hover starts */
+    .cqd-download-btn.cqd-loading:hover,
+    .cqd-download-btn.cqd-trying:hover {
+      transition: background-color 0.2s ease-out, box-shadow 0.2s ease-out;
+    }
+
+    .cqd-download-btn.cqd-cancelled {
+      cursor: not-allowed;
+      filter: saturate(0.85) brightness(0.95); /* No transparency, just subtle desaturation */
+      /* Click animation class applied via JS */
+    }
+
+    /* Click animation: cancel → cancelled */
+    @keyframes cancelClick {
+      0% {
+        transform: translateY(-50%) scale(1);
+      }
+      30% {
+        transform: translateY(-50%) scale(1.08);
+      }
+      60% {
+        transform: translateY(-50%) scale(0.96);
+      }
+      100% {
+        transform: translateY(-50%) scale(1);
+      }
+    }
+
+    .cqd-download-btn.cqd-cancel-click-anim {
+      animation: cancelClick 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .cqd-download-btn.cqd-cancel:hover {
+      transform: translateY(-50%) scale(1.05);
+      box-shadow: var(--cqd-shadow-cancel-strong);
+    }
+
+    .cqd-download-btn.cqd-cancel .cqd-label,
+    .cqd-download-btn.cqd-cancelled .cqd-label {
+      opacity: 1;
+      max-width: 150px;
+      margin-left: 12px;
+    }
+
+    /* Cancel icon pulse animation */
+    .cqd-download-btn.cqd-cancel .cqd-download-icon {
+      animation: cancelPulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes cancelPulse {
+      0%, 100% {
+        transform: scale(1) rotate(0deg);
+      }
+      50% {
+        transform: scale(1.1) rotate(15deg);
+      }
+    }
+
+    .cqd-download-btn.cqd-loading .cqd-label,
+    .cqd-download-btn.cqd-trying .cqd-label {
+      opacity: 1;
+      max-width: 150px;
+      margin-left: 12px;
+    }
+
+    .cqd-download-btn.cqd-success {
+      background-color: var(--cqd-color-success);
+      box-shadow: var(--cqd-shadow-success);
+    }
+
+    .cqd-download-btn.cqd-success:hover {
+      box-shadow: var(--cqd-shadow-success-strong);
+    }
+
+    .cqd-download-btn.cqd-success .cqd-label {
+      opacity: 1;
+      max-width: 150px;
+      margin-left: 8px;
+    }
+
+    .cqd-download-btn.cqd-error {
+      width: auto;
+      min-width: 90px;
+      background-color: var(--cqd-color-error);
+      box-shadow: var(--cqd-shadow-error);
+      height: 40px;
+      max-width: 150px;
+      max-height: 40px;
+      padding: 0 12px;
+      padding-top: 0;
+      padding-bottom: 0;
+      align-items: center;
+      transition: all var(--cqd-transition);
+    }
+
+    .cqd-error-detail {
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      line-height: 1.3;
+      margin: 0;
+      opacity: 0;
+      max-height: 0;
+      overflow: hidden;
+      white-space: normal;
+      transform: translateY(4px);
+      transition: all var(--cqd-transition);
+    }
+
+    .cqd-download-btn.cqd-error:hover {
+      width: 350px;
+      max-width: 360px;
+      height: 60px;
+      max-height: 61px;
+      padding: 8px;
+      border-radius: 18px;
+      align-items: center;
+      gap: 7px;
+      box-shadow: var(--cqd-shadow-error-strong);
+    }
+
+    .cqd-download-btn.cqd-error:hover .cqd-label {
+      opacity: 0;
+      max-width: 0;
+      margin: 0;
+    }
+
+    .cqd-download-btn.cqd-error:hover .cqd-error-detail {
+      opacity: 1;
+      max-height: 60px;
+      margin-top: 4px;
+      transform: translateY(0);
+    }
+
+    .cqd-spinner {
+      background-image: none;
+      border-radius: 9999px;
+      width: 16px;
+      height: 16px;
+      border: 3px solid var(--cqd-spinner-border);
+      border-top-color: var(--cqd-spinner-top);
+      animation: cqd-spin 0.65s linear infinite;
+    }
+
+    @keyframes cqd-spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    /* ===============================
+     * 2. COMMENTS & EDITED (Overlay)
+     * =============================== */
+    .cqd-overlay-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+      z-index: 10;
+      box-sizing: border-box;
+      /* Default squircle border-radius - 16px like Google's Material Design */
+      /* Use inherit when parent has border-radius, fallback to 16px */
+      border-radius: var(--cqd-overlay-radius, 16px);
+      overflow: visible !important; /* Allow pulse to go outside */
+      box-shadow:
+        inset 0 0 0 2px var(--cqd-color-comment),
+        0 0 12px rgba(99, 102, 241, 0.5);
+    }
+
+    /* EDITED OVERLAY (Green/Teal) */
+    .cqd-overlay-container.cqd-edited {
+      box-shadow:
+        inset 0 0 0 2px var(--cqd-color-edited),
+        0 0 12px rgba(0, 214, 238, 0.50);
+    }
+
+    /* BOTH OVERLAY (Red) - Direct Class */
+    .cqd-overlay-container.cqd-both {
+      box-shadow:
+        inset 0 0 0 2px #FF4036,
+        0 0 12px rgba(255, 64, 54, 0.70);
+    }
+
+    /* PERMANENT BOLD styling (always applied to marked elements) */
+    .cqd-permanent-bold-comment,
+    .cqd-permanent-bold-edited {
+      font-weight: 900 !important;
+      transition: color 0.3s ease, text-shadow 0.3s ease;
+    }
+
+    /* COLOR highlight classes (applied on click, temporary) */
+    .cqd-color-comment {
+      color: var(--cqd-color-comment) !important;
+      text-shadow: 0 0 8px rgba(155, 0, 255, 0.4);
+    }
+    .cqd-color-edited {
+      color: var(--cqd-color-edited) !important;
+      text-shadow: 0 0 8px rgba(0, 214, 238, 0.4);
+    }
+    /* Special class for "Both" - applies Red to everything */
+    .cqd-color-both {
+      color: #FF4036 !important;
+      text-shadow: 0 0 8px rgba(255, 64, 54, 0.4);
+    }
+
+    /* Inner element pulse (NO SCALE, just color/shadow transition) */
+    /* BOTH OVERLAY (Red) - Direct Class */
+    .cqd-overlay-container.cqd-both {
+      box-shadow:
+        inset 0 0 0 2px #FF4036,
+        0 0 12px rgba(255, 64, 54, 0.70);
+    }
+
+    /* Inner element pulse (NO SCALE, just color/shadow transition) */
+    .cqd-inner-pulse {
+      /* No animation needed, transition handles color/shadow */
+    }
+
+    /* ===============================
+     * PULSE ANIMATIONS (Shadow fades out, pulse ripples, shadow fades back)
+     * =============================== */
+    @keyframes cqd-pulse-comment-anim {
+      0% {
+        box-shadow: 
+          inset 0 0 0 2px var(--cqd-color-comment),
+          0 0 12px rgba(99, 102, 241, 0.5);
+      }
+      15% {
+        box-shadow: 
+          inset 0 0 0 2px var(--cqd-color-comment),
+          0 0 0 0 rgba(155, 0, 255, 0.6);
+      }
+      50% {
+        box-shadow: 
+          inset 0 0 0 2px var(--cqd-color-comment),
+          0 0 0 14px rgba(155, 0, 255, 0);
+      }
+      85% {
+        box-shadow: 
+          inset 0 0 0 2px var(--cqd-color-comment),
+          0 0 0 0 rgba(155, 0, 255, 0);
+      }
+      100% {
+        box-shadow: 
+          inset 0 0 0 2px var(--cqd-color-comment),
+          0 0 12px rgba(99, 102, 241, 0.5);
+      }
+    }
+
+    @keyframes cqd-pulse-edited-anim {
+      0% {
+        box-shadow: 
+          inset 0 0 0 2px var(--cqd-color-edited),
+          0 0 12px rgba(0, 214, 238, 0.3);
+      }
+      15% {
+        box-shadow: 
+          inset 0 0 0 2px var(--cqd-color-edited),
+          0 0 0 0 rgba(0, 214, 238, 0.6);
+      }
+      50% {
+        box-shadow: 
+          inset 0 0 0 2px var(--cqd-color-edited),
+          0 0 0 14px rgba(0, 214, 238, 0);
+      }
+      85% {
+        box-shadow: 
+          inset 0 0 0 2px var(--cqd-color-edited),
+          0 0 0 0 rgba(0, 214, 238, 0);
+      }
+      100% {
+        box-shadow: 
+          inset 0 0 0 2px var(--cqd-color-edited),
+          0 0 12px rgba(0, 214, 238, 0.3);
+      }
+    }
+
+    @keyframes cqd-pulse-both-anim {
+      0% {
+        box-shadow: 
+          inset 0 0 0 2px #FF4036,
+          0 0 12px rgba(255, 64, 54, 0.7);
+      }
+      15% {
+        box-shadow: 
+          inset 0 0 0 2px #FF4036,
+          0 0 0 0 rgba(255, 64, 54, 0.6);
+      }
+      50% {
+        box-shadow: 
+          inset 0 0 0 2px #FF4036,
+          0 0 0 14px rgba(255, 64, 54, 0);
+      }
+      85% {
+        box-shadow: 
+          inset 0 0 0 2px #FF4036,
+          0 0 0 0 rgba(255, 64, 54, 0);
+      }
+      100% {
+        box-shadow: 
+          inset 0 0 0 2px #FF4036,
+          0 0 12px rgba(255, 64, 54, 0.7);
+      }
+    }
+
+    /* Pulse trigger classes - apply animation when class is added */
+    .cqd-overlay-container.cqd-pulse-comment {
+      animation: cqd-pulse-comment-anim 1.5s ease-out forwards;
+    }
+    .cqd-overlay-container.cqd-pulse-edited {
+      animation: cqd-pulse-edited-anim 1.5s ease-out forwards;
+    }
+    .cqd-overlay-container.cqd-pulse-both {
+      animation: cqd-pulse-both-anim 1.5s ease-out forwards;
+    }
+
+    /* ===============================
+     * 3. HOVER INTELLIGENCE (Expanding Badges)
+     * =============================== */
+    
+    /* Base class for all expanding flags (Comment & Edited pills) */
+    .cqd-flag {
+      position: absolute;
+      top: 7px;
+      z-index: 9999;
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      height: 30px;
+      width: 30px;
+      border-radius: 9999px;
+      border: none;
+      cursor: pointer;
+      overflow: hidden;
+      padding: 0;
+      transition: 
+        height var(--cqd-transition),
+        border-radius var(--cqd-transition),
+        box-shadow var(--cqd-transition);
+      white-space: nowrap;
+    }
+
+    .cqd-flag:hover {
+      height: 60px;
+      border-radius: 15px;
+      z-index: 10000;
+    }
+
+    /* Icon stays FIXED - does NOT move on hover */
+    .cqd-flag-icon {
+      flex-shrink: 0;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      /* NO transform transition - icon is static */
+    }
+
+    /* Text span hidden by default - expands like download button */
+    .cqd-flag-text {
+      opacity: 0;
+      max-height: 0;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      margin-top: 0;
+      text-align: center;
+      transition: 
+        opacity var(--cqd-transition), 
+        max-height var(--cqd-transition);
+    }
+
+    /* Expand text on hover - smooth fade like download button */
+    .cqd-flag:hover .cqd-flag-text {
+      opacity: 1;
+      max-height: 20px;
+    }
+
+    .cqd-comment-badge {
+      /* inherit from .cqd-flag via class list, just add colors */
+      background-color: var(--cqd-color-comment);
+      color: #ffffff;
+      /* Positioning handled by JS direction or body[data-cqd-dir] */
+    }
+
+    /* === EXPAND HOVER COMMENTED OUT ===
+    .cqd-comment-badge:hover {
+      height: 50px;
+      border-radius: 20px;
+      padding-bottom: 8px;
+      z-index: 10000;
+    }
+    === END EXPAND HOVER === */
+
+    body[data-cqd-dir="ltr"] .cqd-comment-badge {
+      left: 0;
+      transform: translateX(-50%);
+    }
+
+    body[data-cqd-dir="rtl"] .cqd-comment-badge {
+      right: 0;
+      transform: translateX(50%);
+    }
+
+    .cqd-badge-icon {
+      /* Now using .cqd-flag-icon structure */
+      width: 18px;
+      height: 18px;
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+      filter: brightness(0) invert(1);
+    }
+
+    .cqd-badge-label {
+      /* Deprecated. Using .cqd-flag-text */
+      display: none; 
+    }
+
+    /* === NUMBER HOVER ANIMATION COMMENTED OUT - Uncomment to restore ===
+    .cqd-comment-badge:hover .cqd-badge-label {
+      opacity: 1;
+      transform: translateY(0);
+      max-height: 20px;
+    }
+    === END NUMBER HOVER ANIMATION === */
+
+    .cqd-edited-badge {
+      /* Inherit .cqd-flag */
+      background-color: var(--cqd-color-edited);
+      color: #ffffff;
+      left: 0;
+      transform: translateX(-50%);
+    }
+
+    body[data-cqd-dir="rtl"] .cqd-edited-badge {
+      right: 0;
+      transform: translateX(50%);
+    }
+
+    body[data-cqd-dir="ltr"] .cqd-edited-badge {
+      left: 0;
+      transform: translateX(-50%);
+    }
+
+    .cqd-edited-icon {
+      flex-shrink: 0;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .cqd-edited-icon svg {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+    }
+
+    /* === NUMBER HOVER ANIMATION COMMENTED OUT - Uncomment to restore ===
+    .cqd-edited-badge:hover {
+      height: 50px;
+      border-radius: 20px;
+      padding-bottom: 8px;
+      z-index: 10000;
+    }
+    === END NUMBER HOVER ANIMATION === */
+
+    .cqd-edited-content {
+      /* Deprecated. Using .cqd-flag-text */
+      display: none;
+    }
+
+    /* === NUMBER HOVER ANIMATION COMMENTED OUT - Uncomment to restore ===
+    .cqd-edited-badge:hover .cqd-edited-content {
+      opacity: 1;
+      transform: translateY(0);
+      max-height: 20px;
+    }
+    === END NUMBER HOVER ANIMATION === */
+
+    .cqd-diff-val {
+      font-family: system-ui, -apple-system, sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .cqd-both-badge {
+      /* BOTH badge: VERTICAL layout - icons stacked, numbers appear under each on hover */
+      position: absolute;
+      top: 7px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column; /* VERTICAL layout for icons */
+      align-items: center;
+      justify-content: flex-start;
+      
+      /* Base size (collapsed) - tall enough for stacked icons */
+      width: 30px;
+      height: 60px; /* Fits: icon + plus + icon */
+      
+      background-color: #FF4036;
+      color: #ffffff;
+      border-radius: 15px;
+      border: none;
+      cursor: pointer;
+      overflow: hidden;
+      padding-top: 5px; /* Minimal padding to maximize space */
+      padding-bottom: 10px; /* Minimal padding to maximize space */
+      transition: 
+        height var(--cqd-transition),
+        border-radius var(--cqd-transition),
+        box-shadow var(--cqd-transition);
+      gap: 0;
+    }
+
+    .cqd-both-badge:hover {
+      height: 100px; /* Expand to show numbers under each icon */
+      border-radius: 15px;
+      z-index: 10000;
+    }
+
+    /* Each section contains icon + number (stacked vertically) */
+    .cqd-both-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+    }
+
+    /* Plus sign between icons */
+    .cqd-both-plus {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+      opacity: 0.8;
+      padding: 2px 0;
+    }
+    
+    /* Values hidden by default - appear on hover */
+    .cqd-both-value {
+      opacity: 0;
+      max-height: 0;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      text-align: center;
+      white-space: nowrap;
+      transition: 
+        opacity var(--cqd-transition), 
+        max-height var(--cqd-transition);
+    }
+
+    .cqd-both-badge:hover .cqd-both-value {
+      opacity: 1;
+      max-height: 20px;
+    }
+
+    body[data-cqd-dir="ltr"] .cqd-both-badge {
+      left: 0;
+      transform: translateX(-50%);
+    }
+
+    body[data-cqd-dir="rtl"] .cqd-both-badge {
+      right: 0;
+      transform: translateX(50%);
+    }
+
+    .cqd-both-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .cqd-both-icon {
+      flex-shrink: 0;
+      width: 30px;
+      height: 24px; /* Reduced to fit in 60px total height */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .cqd-both-icon-edited svg {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+    }
+
+    .cqd-both-plus {
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1;
+      margin: 1px 0; /* Compact spacing */
+      height: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .cqd-both-value,
+    .cqd-both-divider {
+      opacity: 0;
+      max-height: 0;
+      margin-top: 0;
+      overflow: hidden;
+      transition:
+        opacity 0.15s ease 0.05s,
+        max-height 0.15s ease 0.05s,
+        margin-top 0.15s ease 0.05s;
+    }
+
+    .cqd-both-value {
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    /* === NUMBER HOVER ANIMATION COMMENTED OUT - Uncomment to restore ===
+    .cqd-both-badge:hover {
+      height: 120px;
+      border-radius: 20px;
+    }
+
+    .cqd-both-badge:hover .cqd-both-value {
+      opacity: 1;
+      max-height: 20px;
+      margin-top: 2px;
+    }
+
+    .cqd-both-badge:hover .cqd-both-divider {
+      opacity: 1;
+      max-height: 4px;
+      margin-top: 2px;
+    }
+    === END NUMBER HOVER ANIMATION === */
+
+    /* ===============================
+     * 1b. DOWNLOAD ALL BUTTON (Header-aligned)
+     * =============================== */
+    .cqd-download-all-btn {
+      /* Progress control (0% to 100%) */
+      --cqd-progress: 0%;
+      position: absolute;
+      top: 12px;
+      right: 48px;
+      height: 40px;
+      z-index: 6;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 12px;
+      border: none;
+      border-radius: 9999px;
+      background-color: var(--cqd-color-normal);
+      color: #ffffff;
+      box-shadow: var(--cqd-shadow-normal);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      gap: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      opacity: 1;
+      transition:
+        box-shadow 0.2s ease,
+        transform 0.1s ease,
+        background-color 0.3s ease,
+        padding-inline 0.2s ease,
+        opacity 0.25s ease-out;
+      transform: translateZ(0);
+    }
+    
+    /* Hidden state with fade-out transition */
+    .cqd-download-all-btn.cqd-hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* When injected into the header flex structure */
+    .cqd-download-all-btn.cqd-in-header {
+      position: relative;
+      top: auto;
+      right: auto;
+      left: auto;
+      bottom: auto;
+      transform: none;
+      margin-inline-end: 8px;
+      flex-shrink: 0;
+      align-self: center;
+      /* Prevent text overlap on hover */
+      z-index: 100;
+      isolation: isolate;
+      background-clip: padding-box;
+      /* Ensure button doesn't expand beyond its container */
+      max-width: fit-content;
+    }
+
+    /* Classwork header button: ensure proper positioning next to three-dots */
+    .cqd-download-all-btn.cqd-classwork-header {
+      position: relative;
+      transform: none;
+      flex-shrink: 0;
+      z-index: 100;
+      /* Prevent text overlap */
+      isolation: isolate;
+      background-clip: padding-box;
+    }
+
+    /* Ensure button hover doesn't overlap adjacent elements */
+    .cqd-download-all-btn.cqd-in-header:hover,
+    .cqd-download-all-btn.cqd-classwork-header:hover {
+      z-index: 101;
+    }
+
+    /* RTL fallback only for non-header cases (absolute positioned at top corner) */
+    body[data-cqd-dir="rtl"] .cqd-download-all-btn:not(.cqd-in-header) {
+      right: auto;
+      left: 48px;
+    }
+
+    .cqd-download-all-btn:hover {
+      box-shadow: var(--cqd-shadow-normal-strong);
+    }
+
+    .cqd-download-all-btn:active {
+      transform: scale(0.97);
+    }
+
+    /* Keep pointer cursor even while disabled */
+    .cqd-download-all-btn[disabled] {
+      cursor: pointer;
+    }
+
+    /* FULL SUCCESS STATE (Solid Green) */
+    .cqd-download-all-btn.cqd-all-success {
+      background-color: var(--cqd-color-success);
+      box-shadow: var(--cqd-shadow-success);
+    }
+
+    .cqd-download-all-btn.cqd-all-error {
+      background-color: var(--cqd-color-error);
+      box-shadow: var(--cqd-shadow-error);
+    }
+
+    /* CANCEL STATE (Orange - hover to cancel during download) */
+    .cqd-download-all-btn.cqd-all-cancel {
+      background-color: var(--cqd-color-cancel);
+      box-shadow: var(--cqd-shadow-cancel);
+      min-width: 140px; /* Keep same width as downloading state */
+    }
+
+    .cqd-download-all-btn.cqd-all-cancelled {
+      background-color: var(--cqd-color-cancel);
+      box-shadow: var(--cqd-shadow-cancel);
+      min-width: 140px; /* Match cancel state width */
+    }
+
+    /* PROGRESS BAR OVERLAY (Fills up) */
+    .cqd-download-all-btn::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      z-index: 0;
+      background-color: var(--cqd-color-success);
+      /* Width controlled by JS */
+      width: var(--cqd-progress);
+      transition: width 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
+      opacity: 1;
+    }
+
+    .cqd-download-all-btn.cqd-all-success::after {
+      opacity: 0;
+    }
+
+    /* Content layers */
+    .cqd-download-all-btn .cqd-download-all-main,
+    .cqd-download-all-btn .cqd-download-all-sub,
+    .cqd-download-all-btn .cqd-download-all-icon-wrapper {
+      position: relative;
+      z-index: 2;
+    }
+
+    .cqd-download-all-btn .cqd-download-all-icon-wrapper {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .cqd-download-all-btn .cqd-download-all-icon {
+      width: 18px;
+      height: 18px;
+      background-image: url("data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%3E%0A%20%20%3Cg%20stroke%3D%22%23FFFFFF%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%0A%20%20%20%20%3Cpath%20d%3D%22M6%2021H18%22%20%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M12%203V17%22%20%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M12%2017L17%2012%22%20%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M12%2017L7%2012%22%20%2F%3E%0A%20%20%3C%2Fg%3E%0A%3C%2Fsvg%3E");
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: 18px 18px;
+      flex-shrink: 0;
+      /* Smooth icon transitions */
+      transition: background-image 0.2s ease-out, transform 0.2s ease-out;
+    }
+
+    /* Swap icon on success */
+    .cqd-download-all-btn.cqd-all-success .cqd-download-all-icon {
+      background-image: url("data:image/svg+xml;utf8,%3Csvg%20width%3D%22160%22%20height%3D%22160%22%20viewBox%3D%220%200%20160%20160%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20xmlns%3Axlink%3D%22http%3A%2F%2Fwww.w3.org%2F1999%2Fxlink%22%3E%0A%3Crect%20width%3D%22160%22%20height%3D%22160%22%20fill%3D%22url(%23pattern0_1_2484)%22%2F%3E%0A%3Cdefs%3E%0A%3Cpattern%20id%3D%22pattern0_1_2484%22%20patternContentUnits%3D%22objectBoundingBox%22%20width%3D%221%22%20height%3D%221%22%3E%0A%3Cuse%20xlink%3Ahref%3D%22%23image0_1_2484%22%20transform%3D%22scale(0.00625)%22%2F%3E%0A%3C%2Fpattern%3E%0A%3Cimage%20id%3D%22image0_1_2484%22%20width%3D%22160%22%20height%3D%22160%22%20preserveAspectRatio%3D%22none%22%20xlink%3Ahref%3D%22data%3Aimage%2Fpng%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAAKAAAACgCAYAAACLz2ctAAAgAElEQVR4Ae2dCXhV5bX310nISMh4hiSoV2trhcoDaul3awv6VavX1tT2FrVe%2B%2FW297b3Xu0Vej%2B10esU5lEIQxJmEIhlkDlkngdCEiSMAiKzRfBW8GurFWv9f8%2F%2F3ftNNjFIhn1OTsLez7NyjJycvd%2F1%2F%2B213rX2u%2FcRCcSWIeHygu8GyfDdIy95ngzJcGe7MtybXBm%2BSleGd4crw7vTNdbX5MpoY%2Fx%2FjnXfB%2B35lT5XvqcG7k3URF70jJaXvN81tJLwQKDhv308G5cgL3nvC3nZM971sqfAleE96Rrr%2FYtrnA%2Bu8aZN8MI1wQfXxMvYJB9cjnXfB5fzL31PDbQe1Gas92Ol1cueAmpHDYVa9prtxaThQugyPE2usd6LrvGEzAvXRC9ck71wTfHBNdW0aT64tE33waVthg%2Butqb%2FzXlt9dMX%2BaKt%2F%2Fi79f3a73zVelAbakStFJheAnmRWlJTobZBu73ku1syvKtkrPd9Ge%2BFTPRCJnshU7yQaT7IdB9khg%2Fyig8y0weZlQzJTIbM9kFm89W0OckQx%2FznA%2B1n9eozNKAW1ITaUCNqRc2oHTWkltSU2lJjah0024ueWyXDs1zGej%2BUCTxgHrg5gBkcmAYtGTI3GTIvBZKVAslOgeSkQOa3sQUpkLa2MBXiWOd90NaP%2FL2tv6kDjZpQG2pEOBkcqB01VDD6DG2pMbWm5tS%2Bx7YMT4y87HlWxnreMcBjpPMaZxDPJg6CkSwruRW0hSmQRSmQJSmQpbRUyLJUyHKrDYS86phffLB84KW%2Bpu%2BpAbWgJtSGGhFSBgdqRw2pJTVldKTGjIoKRM87ioHfugcElkOSP9ZTKOM9xsEo8LyQWT7IHJ8JXbIRyRabsC1LgbyaClmRClmZAlnpg6z0QFYmQVYmQFbGG7YqAeKY%2F3yg%2FEx%2F0%2Bh7akAtUgxtqBG1IpTUjlEzxwwk1JYazzCDDUEkA2QhYNEww%2F0TGec5ruYFUxnxNHjJkGwTOhXlzKhG4HIHQnKTIbluSG4C5Hdu9Ft3DeI23Yxr8m7HVwu%2FjSHF%2FxvDSr7jWAB8MKT4Lny14FvK99SAWlATpY3SiFoNNIBkdlqSakRHwkiNGRU1iGSAc0QyQTb8uo31PiPjPR%2BqEMyox7Cs0ywPjmcMwzqhWzUQ8juaF%2FK7RMg6Hzxbb8Hw8vvxUOO%2F47%2F2vYxxhzIx8%2B2FmHd8OeafWIWFJ3MdC4AP6Gv6nL6nBtTi4cb%2FUNpQI2qlNFPaDTS0pKbUVkdFnZ7JgE7LZIOM%2BGXLcI%2BVCR6jMmLUy%2FRC5vmM8MyIx5DN8L0q1QBvjQ%2ByJgGRm67HbeXfxb80%2F19MOjIXC0%2BuwvJ31ipbeno1Fp1%2BDQtPrcICxwLqg4WnVynfUwOlx%2Bm1ShtqRK2oGbWjhkItGUyoLTWm1tScqZkMkAUywaqZjJAVW7e28LF1kuWDLEg2Jq%2BvpljAS1EHHbHpOtxR%2FQCePjAW2SdfxdJ3VoODzjq5DHNPLsEc2qklmHtqqWM96ANqQC2oCbWhRtSKmlE7akgtDRBTLCCahQsZIAtkwi8QjnM%2FLRM9EOb6V7yQ2V5jHsBqiZNVTl5fS4WsHQhZ64Ws92BQ2QiM3v%2BiGsTC0yvVAGedXIhWW4RZJxdh1inHgsIH1EJZq0aEktoRRGpJTamt0phaU3NqTwbIAueGZIOMqHkhixP3U90LhBmeUTLR%2FZFM9RgfPMcLyfFBFiVDljPqpUBWp0LWpUJeT0T%2FrdfjwcZ%2FxoxjOcg59SpmnliA6SdyMP1kDmbQTl3GTudghmOB98Hl9DhpaEbtqCG1pKbUlhpTa6U5tScDZIFMkA0yoiD0QLEz1vNQ1yAc5x0qE9ynWuCba8K3OBnyKqskplqClwJZn4iUoiF4fF%2B6CuUzT%2BRgyvG5mHJiLqactNipuZhitdNzMaXF5mHKaccC5wOL762a8L%2BtmlHD43NBTZmmqTG1lvUJhvZkgCyQCbJBCMlKK4SnhSx1amOTeYKnWKa6ITO9BtXzfcYOuKPXUiBrUyEbUiAbE3Fj%2Bf%2FCbw%2BNx6yTCzDpeCYmHJ%2BFCScyMeGkxU5lYkJbO52JCVZr%2B%2B%2FO75%2F3mR0%2Bsfqc%2F93eZ1q1o5bHZyltqfFvD43Dl8q%2FobRXDJAFMqEhJCuMhGSHDJElMtXhbXxSukxxX5p2WyIf53smfJsS8ZWKv8ezhydg2ol5yDg2HRnHpyPjhGknZyBD26kZyHCs9%2FhA68ZXrSe1PTZdaU3Nqb1sSjQCEZnIZZVsiYQ6HZOlCUnPdoy%2Fcb4hMsl9TmZ4zIKjTeTjfG9jKmRTEq4rvx1PHc7AxOOz8PzRyXjh2GS8cHwyXjgxpdVOTsELVjvV5nf9b%2Fz%2FjgXOB9rv1tf2tLFqSW2PTVZaU3NqTwbIgmKCbFgjYTarY7ZoPFBMka0v3DIkRMZ7XpVpHqO3w%2FJaFRzmnI%2BUbxwI2exGYvEg%2FPuBZ9QZkf72eKQfHY%2F0Y6Ydn4B0bScmIF3byQlIp%2Bnfndfg8kV7%2Bmgd%2Bar1pdZvj1fakwGyQCYUGyoSsjBJNtghQ%2BwTkimyRcYuu03wjJQp7o9kpgcyzwtZ4IMs80FWJUPWpEA2pEI2exFecA1%2B3PyvePHtyXjqyEt46u2X8NTRl%2FDUsZcNO%2F4SnnKs7%2FlA60utqfmRlxQDZIFMkA3FCFkhM2SHDJElMkW2yFi7G8mc5F4lM9yQ2R7IfC9kCS9SJ0NWs9JNgWxJgeS58Y0d9%2BOZIxkY89bzGH3kOYx%2B%2BzmMPvrfhh37b4x2rO%2F6QOtMzY88pxggC2SCbChGyAqZITtkiCyRKbJFxtqNghPdt8kU9wWZ5YbM80AW%2BSDLfZDXkiHrUiCbUiBb3fCW34JfvfkbjH7rOTx%2B%2BGk8%2FtYzePzIM3j8bYsdfQaPO9b3fGDVmJpT%2B8NPKxbIBNkgI4oVMkN2yBBZIlNki4yRtc9tk5ImynQ3ZI4HkuOBLGXq5fXcZKPK2eJDSH4y7tk5Cv956Lf45cEx%2BOXh3%2BCXb5l25Df4pWNXjw%2B07mTg4BjFBNkgI7LFZzBDdsgQWSJTZIuMkbVLtslxCTI1sVlmuiFZjH5eyKtcxeKDvJ4M2Wyk3msqh%2BHn%2B3%2BNX7z5n%2FjZwSfws8MWe%2BsJ%2FMyxq8cHVu0PPqGYIBtkRKViMkN2yBBZIlNki4yRNTLXsk1OvFemJ30is92Q%2BYx%2BXsgqr7EKYmMyZKsPrgIfRjalqR09euBXePTgv%2BHRQ6Yd%2Fjc86tjV5wOtP1k48CvFBhkhK2RGyA5X0pAlMkW2yNj0pL8KmWvZpiSNl1eSjDy90HNp9GPhsc2NxPKb8aM9P8MjB%2F4Vow78HKMO%2FsKwQ7%2FAKMeuXh9oDg78XLFBRsgKmVEFiTUKki3OBckamVPbAgmTaUnFkpkEyfZAlnCJto5%2BPkheMiTfjUHbv4WH9v0cD%2B57DA8eoP0UD775Uzx40LGr2gdkgCyQiX2PKUbICplR7GxkHcFuCrsqHoMxskbmyJ5Mj7tBpieekrluyAI3ZJkH8poX8roPsjkZss2L0OJU3NF0P36w959w%2F76Hcf%2F%2BR3D%2FAcd60gffO%2FAI%2FGVdGheZ2PewYoSskBmyoxgiS2SKbJExskbmyJ5MS7xXZiZ%2BIlluyCI3ZIUbspoNReZxI%2FrFld%2BI7%2Bx6EPft%2BTHu2fsj3LPvH3HPfsd60gd3H%2Fgh7jyUZpuNPJSGb7%2F5fdy1%2Fwf4ble0JRN7f6QYIStkRkVBMkSWyBTZImNkjcyRPZmW9KRkJkJykiBL3JBVHsgaL2SjF5LngxQmIbX6Fnyn%2BQe4a3ca7tyThjv3puHOfY71hA%2Fu2peGkfsfwJ17H8AD9Y8greYneKD2EaR1wx6oeRjfq3kIDzX8HD%2Fa938wcv%2F3O68vmdiTphghK2SG7CiGyBKZIltkjKyRObIn05OyZHYiZH4iZBnvjPJAXvdCNnmNEFrkwQ11t2Pkru%2Fhjub7cMfu%2B3DHnvtwx17HesYH%2F4DbDtyFx6p%2BhZzFOchalIPspdnIXsrXzlvWkmzkLFuA1zetR93OevzH%2Fv%2FCrXvv7Ly%2BZIJsNN%2BHO3d9TzEjRR6DIbJEpsgWGSNrZG5GwjyRVxI2ypxEyMJEyHK3cXsel15v8ULyPZBiH26q%2Fwa%2Bueu7GL7rbgxvvhvDd9%2BN4Xsc6wkfDN07EnfsuhcL8hdjZ3kTDuw%2BgMP7DuHQvoNdtEM4%2BfZJfPbB31DwXglu23MXbt19Z%2Bf1JRNkY9fdihUyQ3YUQ2SJTPHWTzJG1sgc2ZOZCRUyLxGyKAmyIgmy2gPZ4IFs9UIKPAgtTcZXd3wDt79xF4btGolhzSMxbLdjPeGDobtH4it7h%2BPXVU%2BhuXYXLrx%2FHnZt5z%2B7gB8e%2FilufOM2DNt9Z9c0Jhu7RipWyAzZIUOKJTJFtsgYWSNzZE9mxtVLFgFMNAF0Qza4IVs9kAI3%2BpWm4Cv1X8eQpm%2Fhazu%2Fia%2B98U18bZdjPeGDG5tvxR077sP60g04c%2FT3%2BPTTT%2B3iDzN%2BPw8DGwdj8K6%2F77q%2BZGPnNxUrZIbskCHFEplazSKXACZCMUf2ZGZik2QlQJYkGo9qWMN1XR5IngdSaAB4w%2FZbcXPjN3BT03DctHM4bnrDsUD74Mtv3I5r3xiC58pexqHGN%2FGnP%2F3JNvh2%2F3kfhjR%2FG9c23dI9bclG03DFCplRABayH%2BgxmCJbfBwIWSNzZE8y45skmwDymSxJkLVJxgpXLq0hgGXJuG77EHy58TZ8qfFWfKnpVnxpp2OB9oF311dxV%2B0DKCkvwbnT5%2FC3v%2F3NFgA%2F%2BewT%2FMuRJxG%2F44bu60o2Gm9VrJAZskOG1LVhrpomW2SMrJE5sqd%2B5CRAliZCcjWAbuNSShEB9CG1bhCu2zEE1zbcgmsbb1FnCs8WxwLjg5SmQUhpHISpJa%2Fg2O6j%2BOijj2yBjx%2By7g%2Bb4W74MpIbb%2B6%2BnmSj4RbFCpkhO1JksrTJbQBIxsgamTMAjGuSnHjIsgRILu%2F3TDQiIK%2FlFSUhtNwLT%2B1NSK0fhJQdNyOl4WakNDoWOB8MQv%2Bma%2FD9yodRX1WP98%2B9j8%2FwmS0AnvvkPdyx9x8QvT0VqY2EvJu6ko0dNytWyAzZIUPqujAjINkiY2SNzGXGMQLGNcl8E8DXEo2bjvlmAlhsAJhUeyO89TfBU%2F8VeBocC6QPYhv%2FDqn1g7GgeDFOHzyFixcv2gIfPyTj1FT0q%2FOoCGjbmOq%2FolghMwrAYguAvKGdjBFAMndZADcnGZdRipMQUuZBXO3fIbH%2BS0iovwEJDY4FygfxDdcjtMGDx8p%2Bib11e3Dh%2FAXb4Gv6U7NK6xHbk%2B3VtP4GxQqZITsMYuqSHJm6PIBxkGXxkNd4t3siZHMiJD9J%2FbGrzI3%2BNdcgtu5aDNh%2BLQbUOxYYH1yH0AY3rq8einUlr%2BPdo2fw10%2F%2FaguALDx%2BfPCfITUxiK2%2Fzl5Nt1%2BrWCEzZMcAMMlgSgGYYLA2P05HwNgmydEAxkPWJUA2JUC2JUKKEuEqS0JkVSqiawciqm4gorY75m8fRG8fiIjtKZDtCXiy%2BGm81XjY1rbLqvfWIaw2EWF1XnBfto6nbqBihcyQHTKkWCJTZOs1TvfioZjLjOUcMLZJSCP%2FZ247AJYmIrzSh4iaZETUJiOizjF%2F%2ByC8LhlSH4NbKr6J4rISvGdj2%2BXMxbMYsusOSHWUgtz2sZCRmmTFjKvUCGKXAEjGyJqKgArAAU0yPxayLA6SGwdZFw%2FZFA%2FZlgApSoCrNAGhlW70q%2FGgX61HTVo5cXXMfz4I2Z6AfrUJGFc0CSf2HLe17fLsibGQqn4IqXP7R0MyUuNRzJAdMqRYIlNki4yRNTKXOYARkAAOgCyLNQGMg2yKg2yLhxTFQ0rj4apMhKs6Ca7aJLjqHPOrD2qTINvDMLLsPtRX7bC17dLwxybE1w9U0S%2FEXzqSEbJSmajYUQyRJTK1zgxyZI3MdRRAqUiAVCVAahIgtY751Qd10Yip8iKnaAHeOfgOPrap7XLxbxeR9ubDkAqB1Cb6T0cyQlbITKkZxK4IYM4XR0AHwECddPGQulCMKn4Me%2Bv24oPzH9hS9fJDVpx7DSHVEary9esJ1FEAyVxLBFQADoDkxkLWxZopOA5SFAcpjYNUxEOq4iE18ZBax%2FzjgwRIXTiSK2%2FEmpJ1OHvsXdvaLmcuvovBb9wOqXSZkc%2BPGpIRskJmyA4Z2mZO68gWGVs2APJ5AGMguQMg6waYAMZCimIhpbGQijhIVRykJg5S65j9PiAQAyC1YXii6Dc40vSWrW2X9OMvGqm3Jtb%2F%2BpERskJmyA4Z2mYGNbJFxpbFWAHs3yQ5MZClJoBrB0A2xkLyYiGFsZCSWEh5HKQyDlJtQsidOGavD2pDMKjsNrPt8p5tq11U4VHng1SFGxnM37qREbJCZsgOGSJLZIpsEUCyRuYy%2B7MKdgDs8ZOpNhqh1f0xtmgCTuw5YVvb5eJnF5F24CFIudh7snwRxF0DsL8ZAWMga2MgGwdA8gZACgeYETAWUhkLqY6FMIw7Zq8PagUjSr%2BLHTa3XVacy0UII191lL3H%2B0X6kxGyUm5mTzJElsgU2co1s21Of2sEdADssZOqNhwxVUnILlqA39vYdlGFx85bzbkfp0wBChydBzC6SXKiIUv7Q3L7Q9b2h2yMgeTFQApjICUDIOUDIJUDINUDIDWO2eeDGEitYFTxo9i73d62S%2FrxF8zU2z%2BwmpERskJmyA4ZIktkimyRMbJG5jKjOQeMapKcKMjSaEhutAlgf0hef0hhf0hJDKQ8BlIZA6mOMfpINc4rV5J0z1j1hiC54nqz7XLWtrZLwx8bEV%2FnhVSFmvB191g78fdkhKyQGbJDhsjSRjO4kTGyRubInmRGmgBGQXKjTACjIXnRkMJoSEl%2FSHl%2FSGV%2FSDXPJse67wMKynmZC08UjcaRnfa1XVThsf%2FHlugXYL3ICFkhM2SHDJGljWZwI2NLo0wAI00As6MgS6Igq6Iga8w3b42GFERDivtDyvpDKvpDqkwIuRPHuueDGsGg0qEoLivGe6fta7usOJuLkMowo%2B3SExqREbJCZsgOGSJLBJBskTGyRuYY%2FNQPB8DuwdRZoWvCEVoVgbFF421tu6jCo2moEf06e0x2vb9rAEZClkSaETAKsjEKsjUKUhAFKY6GlEVDKqIhVdGQase67YMawYiS72BHtb2rXdKPPQ8pE0h1ZM%2FpREbICpkhO2SILJGpNWaWJWvZkdYISAAjHAADcXLVhCKmMh7ZRfNtbbuowqPWDalw9Rx89F%2BHAIxoC2CECWAkZE0kZGMkZGukGQGjIGVRkIooSFWU0dRkY9OxLviAkYltl0dsbbuowmPfj8zo18PakBGyQmaKzSxKlsgU2VplBrvsCDMCzgpvkqxwyOIIyMoIyOoIyIYIyJYISH4kpCgSUhoJKY%2BEVEZCqhzrmg8IhiC57FqsKVmLs8fsa7usOLsSIRX9IJX9el4fMkJWyAzZIUNkiUyRLTJG1sgc2VM%2FHAADIFw4pErwROGTtrZdzlw8g8GNQ4zoFwzBofMAhpkRMByyMhyyOhyyIdyMgBGQoghIaQSkPAJSGQGpcqxLPqhm22WI7W2X9KPPmfCx9RIE2pARskJmyE6%2BmU3JFNkiY4vDzQgYxgjYHoBhDoB2ilkdgtDKMIwtHGdr20UVHjVJxvVeO4%2B3O591WQDDvgjAMMjiMMhKvikMsoEAhkPywyFF4ZDScEh5OKSSacSxzvkgTM39RhTfZetqF6Pw%2BCGkVCBVZuM5GLQhI2SFzJAdMkSWyBTZImNkLSsMKvjJrH5NktUPsrgfZGU%2FyOp%2BJoBhkPwwSFEYpDQMUh4GUR12DtaxDvugWhBTEWu0XQ7Zd5ORUXiEQipDgksPMkJWyAzZIUNbzKBGtsgYWSNzZM8B0J8nUz%2Bj7VL0kK1tF6PwuMUy9%2FPnGDr52Z0GcGZok2SFQBaHQFaEQlaHQtaHQjaHQraFQgpDISWhkLJQSAXPOMc67IMqQXJpKtYU29t2ST%2F6rJF6Gf2CTQ8yQlbIDNkhQ2SJTJEtMkbWyBzZUz8%2BB2AIZHMIZFsIpDAEUhICKQuBVHDAjl3ZBzxJXZBKwRMFv8aRnUdsu8mo4f81IL46wbjeq%2BALMj3ICFkhM2SHDJGl9SEdAZBvMt%2FsANi9k61KMKhksNF2ecee1S7q5vK9P4CUSPeOzZ9B5AsBZJY1s21rBHQ1SZYLstgFWeGCrHZB1rsgm12QbS5IoQtS4oKUuYzrjOrM5tndUaOzeIHcZqvi53b0GAL9PkFoRajtbZcVZ1cgpJyZKIjHzmvRZIXMkB0yRJbIFNkiY2SNzM10MQVLk2QJZLFAVghktUDWC2SzQLYJpFCMM46rLNTATaAIVQcsqioa8WXxCC8KR0RxJCJLohBVEqVe%2Bd%2BdNf5tVAlXXLD90LFj6Mhx2vqeKsGIopG2tl1U4dEw2Jz7Bem4yQN1ISuM0mSHDJElMkW2yBhZI3Nkz68AVgiurb0WS5qWYEneEry8%2FGU8v%2Fh5017A84s7by8segHjFozHfa%2FfZ0TVYIOwShBTFoPswhz83sa2S%2FrR9OCHLxgBDC0LxbMHnwXOQz1sZ9%2BOfWiubcbuLhr%2FtqmoCWvWrcXNRYOMKNiFyGxrxNOZwDyOUYWjbG27GIVHvBFZ9L6C9bXTEfAVaZJ5AlkkkFcF8juBvN4mBRebYZU3OHMHnbEyQXRlNPIv5KsH7fD57n%2F99FN1Aw4fOdtZ47cD%2FfGPf8SRN97GtK3TEcWFj%2FrM68xx%2BeO9lYLkkhRbV7uoKx570yDUwB%2FHbPdnkhGmYB6vNQWTKbJFxsgamSN76oc%2FAeQASwTDGofh7CdnbXva0%2Fk%2FnEdzVTN%2Bsu3R4AGwwv62y4p3VyCEbY2unPx2w9WRzwtKAHlQxYIxb42xDUBGzjPHziCvMA%2BDmIp7OgpWCgYVD0JxeTHes6ntogqPHYONCX1HxA%2BG9wQlgHRMmSCyIhJ5f8izDcIPP%2FoQx5qPYVpez6fi0HL72y6q8OgtqVfDH7QA8gB1Kr5oXyp%2B%2Fw%2Fvt6Zi7YQeeB1RNMLWtosqPPicPa526YHxdHmfXQJwrkAWCmS5QF4TyDqBbBJInkAKBFIkhiM4ueQOumNFfkzFhYMMsbpzfF3425jSGGQX2dd2UYXHnjTD7104nm7p0939kRGeNGSG7JAhskSmyBYZI2tkrqUICSSApYLIcj%2BlYlbFpWaTuruO7MTfjyqwt%2B2iCo9SXlPt5sneiTHYBm3QA0inFAuGNQzDWX%2Bk4rxHAxcFKwTJxSm2rnZRhUf9YKON0RMAdXefvQJAHqS%2FUnFBHgYFMBXbvdol%2Fe10I331xuhHeHsFgDzQEkFkWSTy%2FscPVbFOxdoh3T2rL%2FP3bP%2FY2XZp%2BKAB8ZXxRtvlMvu0LVX66%2FM7DeB0aZI5AllgThBzBbJWIBsFslUg%2BZYFCZxccgd2WaFg6I6h%2FknFWx81iiW7jrXN54SWhmJsgX03GanCY3eacfWgzb5s83cgPpeM6IUIZIcMkSUyRbZYhJA1Mkf21I%2BeApAHWygYc9gPDWqm4oJBfoNwRKG9bRdVeHARp90neSCgs%2B6jVwHIAy8WRJb6MRVz6RbTjdVJ3fzvmBJ7V7uowmP74Na5XzePz86xdvqzeh2AdHYvS8V2t11U4cEL9709%2BlHLXgkgD7qXpGLVdrHx2S6q8OC3CukVR705%2BvVaAHngrIp7QSq2s%2B2i7vHoC4WH9aTplRFQD4CpuN6PVbHeTxdf2V9Uj9S1abXLijMrEFLMO8jsnaN2et7WRX%2B0u58uAzhfIMsEskogawSyQSBbzDX9vKbHFEFHcQf%2BMn5%2BgZ%2BrYjq7C8cfWmK2Xfba801GZz4%2Bg8EsPOjbLhxP0P4NNSQrHBfvByFDZIlMkS0yRtY%2B14YJBgApRJEgssSPVbF65HDnRR9RMMLWR%2BqmH0k3RPL3SR1ouHs9gHRYQQBScSeEiSm2t%2B2iCo9yfplz50%2BEoI182p99AkAOIohS8ah8%2B1a7tFzx6Gupt08ByMH4ORVHF0Ubc68rpMDkQntXu6jCoyjEmCdp0frSa6cj4DRpktnmxHCpQFaaE0Z9czoXFPKaHtOFLkS4k0BYvmDodj9UxdXNeJTXiq80hmLBE%2Fn2PdtFXfGoG2z480r77q3%2FTkbICpkhO%2FqmdBYhZIuMsd4gc2RP%2FQhWADmYfMGYQ364VsybmbYNao2C7QjOa8l2tl1U4UFhAn0itzO2K558Xf2bPgUgnVAoiCz2T1U8fet0XJKKLU4PLQrF2PxxOGFT26Wl8NCPOrHsy28w9MQ%2B%2BhyAdGIPpOIR%2BfatdlGFR3Na3069GvY%2BCSAHtU0w5qB%2FUvFgnYq5nxJBTKG9bRdVePBZeZwbaaH66muXAMwUSI5AlliekMVHKfBuJi4o1E%2FJ0oUIdxJoKxBEFkUi7z37V1BP32KmYkJRLBi1zb62i7riUTvY8GGgfdYT%2ByMj%2BpEcZIcMkSX9ZCwyRtbIXEsR0hsApDO3CYbWDcXZj%2B28r%2Fg8dvERH5t%2FoqKTJ9%2BLNUVrbPsmo%2FS30g34evLkDSSIfRpADs4fqfj4u9iwbQO%2BvPHL%2BOnmn%2BJQ42FbHqmrCo%2ByeOOSWyAh6Ml99WkA6Vh%2FpOIPP8Th%2FYeRW5yLwpoinDvT%2FUfqqsJjV9rVk3o19H0eQA5Up2Kb7iv%2B7LPP8Oc%2F%2Fxnn3z2PC%2F9zAR9f%2FLjbz69RhUeBWXhoca6G104DOFWaZJZAsi1FCJ%2Fjxkcp8G4mLqfRj%2Bjg5JI7CAbbam9VTOI%2BA59e2P2tpfCg34LBV4E8BjLC69wcO9khQ2SJTPHxvCxCyBqZI3vqR28EMF8QWWhvVdx99IxPSD%2BcbggQTCdsoCC8agCkQ%2FPMqtimVGwHgKrwKI03ms6BEj2Y9nNVAcjB%2BiEVdxVEVXi8kWZEv2CCIpDHclUBSMcGUSpe8fsVCMnnNwRdhSX16u0AAAlESURBVHM%2FDXmnAZwiTTLT%2FN4Gfn8DHyKtH8%2FBtfxcTsMJJVdxcHLJHQSbbRUMrbW3Qd3ZKKgKj5rBxpWjYPNPII%2BHjFiXYpEh%2FVgOstX6HSEQsqd%2B9HYAOegtgjFv2netuLMAqsKDVV%2BwnqSBgvCqBJDO3dZzVbEqPErijaZzoIQO1v10C0D9XSG9LQVrMbYIhtbYu4L6SpFQ3Vy%2BM83oeenjuJpfrwQgGTO%2BpstMwZPMOSC%2FK0Q%2FJ1rfG8xl%2BdYVMXoeyJ0Eo%2FH4Ngc2Fa94ZwVC%2BJWkwe6bQOlFP3D1lF4JQ4b0PcH6%2BdBkjdM%2Bsqd%2B8Je%2BACCdnCeIzA9Mg1oVHtWDjegXKIGDfT9XPYAUKECpOP1QutElcKJfa0Z0ADTbAH5OxarwKI43WlTBHpUCeXwOgK0Xw%2F2Vii8pPAIpbm%2FYlwOgpUDaLBhabX%2BDWhUeW0OMyXZvgCKQx9glAF8xv7mGVbB%2BQhbX8HMtv3VJFqsb7qC3GI93k2DMAfsa1KrwqBrcOvfrLb4I1HHS59alWPp%2BEP1krNZvSbJUwX0VQDp9qyByWyTyztlzM5MqPNia6m0nowNgD0ZOm1Jxw4UGxBfFGz2uQAna2%2FbjRMB2QLchFavCoynNSb1XOiEcANsBkE5jKmaDuoup%2BJLC40oiXM3%2F3iUAZ5iPTLU%2BJZVFiL4vhEuy9A3qvdm5mwRDqzpfFavCo9IpPDpUfBJAskJm9P0gZEkXIfrxvGROXYqbKPUy3QKgfkQbbyLhOi6u5%2BKkW9%2BcxB30VmN1tlEwZn%2FnquL0g%2BmGM%2Fn3vXXsgTpuXQGTGb0WkCxZH81mPB8aQvZkklRcAiDvWuKb%2ByKAFGGLIDKv46lYFR6F8cYJGCgRe%2FN%2BvghAsqUjIIMe2ZOJsvFzAPL2ub4KIMXVqfgKNzO1FB5MJb0ZikAe%2B%2BUA1LdkWgEkezJR5sk084mV1gcU8evVmYL1kiymYD0PDOSA%2FLEvOqkDqVgVHltC%2Bs64%2FeHLtp9JRsgKUzDZIUNkSQNIxoynozIFZ4mMlydlqvm0It4wzAWDXLfFRalcx6WvhnBSqeeBFLC322ZB5NZI5J1tv0GtCo%2BKwa1zv94%2B3kAdPxnRBQjZIUP6a1rJFhnjw7DIHNmT8XKvTJVP1J3qXKmqAWTVYr0c19cApCAbBUMr26%2BKVeHBSTTP6ECJ1xf20xZAXQEzqOnV0MZTET5R7Ml4uUGmyqmWO%2BOsq6J1K8ZaCfclQTiWDYLR%2B0dfsvK%2B4XwD4gvijTO5L0ARqDFY0y%2BZYRvPCiDZ0svxyRzZkwUSJpOkWHg9WK%2BKti5I4Ie0nQcGakCB2I%2BZiree3aogVIVHY5rRQgjE%2FvvSPqwAkhkrgGSKAJIxskbmMiRc1DZJxgsbg3PNr1Nv2wvsywASgI2CYZXD8MEnH2D9mfUI2WwWHn0JjkCMpS2ALECsPcAFJmNGE3q8AR9%2FTpZ7Zbr8teX7QnjzMKsWayXMVgTngdxJIAYTyH1wTJsFj%2B16DF%2Bv%2FrpRwQVy%2F31lX6YfeUJ%2FrgImU2zBsAIma2SuZZssCTJVmi9biDCUtp0H9kUQ%2B2KhFQi4yQJNt1%2Fam%2F9dWoA0C5m7ZJskE1VuZhomqexat42C%2FGAtEnemd9xXXvvimAKhDf1GIxtkpL3%2BH5kiW8b8b%2BIl7KlfJsptMk0uqBDJZqH1OTG6H8gP16nYEavvnYBdhVXDRzbIiLX%2Fp58H09qAviBk7XNbhoTIVFnVkoZZsbBysV4XJtl9PQp2VYSr9e8uF%2F108aGrX7ZfjP7fKiFr7W5TZKTMkI%2FUt1m3TcOMgnou6ERBJ%2FrpE65t9CMjZMV6%2BY0scQUM2SJjl91I5jR5td0oqCtihldGQV7rY87Xc0J9QM7r1QGnBo%2F666VXZENf%2B2XmbBv9yNZlo5%2BmcooMkRlyThGr54K8jKIvzekFCoyCOhJaQdQh2Xk1JuZ90Q9ab75qDnThYb3ywTqCDBnR75yQrQ5tUyVdRUF2rdk81I1pRkGdirlD7rxtJOyLDnfGdOnJpAGk9mSALFhTr158SnbIkDH3S%2B8Qe%2BpNGRIj06S4pSJmD6dtQaJTsQPhpeL0dVjbwqerXutVD7JCZlorX152i%2Bk4gHznFBkqM%2BW06t1wEslwqlOxXqxqLUqcSNj3QWwPPjKg4eM0jYzoqx7s%2B5EhstSlbZo8JJnyF7WCQadi%2FQxp5nruuC2EDoh9D0QreDrtMvJp%2BMgC1%2FyRDU7XyArbLmSHDHVrmy7PqFTMhYTsDXIHvELCHWoIrenYScl9C0ArfNSWZk27Gj4yQTbICFnhNd9X5OlusdfyxzNkbIcg1I1qDaETDXsvjFbwrFGPGut2yxfBR2Zs3dqDkCGXeZ9zQlbHTMk8uPZAtMLIwXGyrgfpvPasL9pqQa206YhnBY9aU3Nqr9OuNfLZDp8meaZKxx%2B2zAm5YIGTTpbdbNHwoHRa5vyAB61hZNjWkVG%2F6kE6r62C95QvtCYaOOql9bPO9agxtabm1J4M6DnfbPlQyIhft5nyE5ktx1sgZMXDsptzAJ4RGkQdEXnwOipaYdRAcsCO9awPqIU2DR010%2BDpiEdtqTG1pubUvhW%2B40I2ArK9IrdKphSqJiN7Pez5cALKM6ItiIyIVhg1kFYo9aCd19aoE0hfUAsNnBU6aqcjngaPGlNr3edjo5kskImAblNlgGTKszJX3lFVD88EnhFtQWS1rKOihpFAaig5b9TtHA7escD4QPudr1oPvlqho3ZtwdNRj5UutScDZKHHtllym8yW5TJXPlSdb05GNYgM05ykMipyzsABWYHk2aWNA3cscD7QftevDBJaH2pFzagdNWRQoabUlhmPWlNzah8022y5W%2BbIKpkn77dERIZpTlI5AA2jFUgOlGdYW9OOcF5bobDDF239zN%2BpgRU4K3TUjhoyuzHiUVtqTK2DdsuU4TJHxsscaZRs%2BVidMRyAjow8k6xQck7R1ugEx%2Bz3QVs%2F83cd4agJtdGRjpox2lFDaklNqW2v2WZJvMyRe9WBz5MCmScnJUv%2BogbFa8scoDbCaTWedY7Z7wOrj%2Fnf2v98pSYELks%2BVlpRMyOQ3CvUsldvvAF5rtwgc%2BQemSOjZY5kyxzZJHOlUubJDsmSnZIlTY4F1Ac7le%2BpAbUwNKE29yqtWm4a9y95%2Fx%2BYFT9wd0eh8QAAAABJRU5ErkJggg%3D%3D%22%2F%3E%0A%3C%2Fdefs%3E%0A%3C%2Fsvg%3E");
+    }
+
+    /* Swap icon on cancel/cancelled with smooth transition */
+    .cqd-download-all-btn.cqd-all-cancel .cqd-download-all-icon,
+    .cqd-download-all-btn.cqd-all-cancelled .cqd-download-all-icon {
+      background-image: url("data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%3E%0A%20%20%3Cg%20stroke%3D%22%23FFFFFF%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%0A%20%20%20%20%3Cpath%20d%3D%22M18%206L6%2018%22%20%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M6%206L18%2018%22%20%2F%3E%0A%20%20%3C%2Fg%3E%0A%3C%2Fsvg%3E");
+      animation: none;
+      border: none;
+      width: 18px;
+      height: 18px;
+    }
+
+    /* Spinner when disabled (Loading) but not success/error/cancel */
+    .cqd-download-all-btn[disabled]:not(.cqd-all-success):not(.cqd-all-error):not(.cqd-all-cancel):not(.cqd-all-cancelled) .cqd-download-all-icon {
+      background-image: none;
+      border-radius: 9999px;
+      width: 16px;
+      height: 16px;
+      border: 3px solid var(--cqd-spinner-border);
+      border-top-color: var(--cqd-spinner-top);
+      animation: cqd-spin 0.65s linear infinite;
+    }
+
+    .cqd-download-all-btn .cqd-download-all-main {
+      font-weight: 600;
+    }
+
+    /* Download All Sub-Text Behavior (Hover & Active) */
+    .cqd-download-all-btn .cqd-download-all-sub {
+      font-size: 11px;
+      opacity: 0;
+      max-width: 0;
+      margin-left: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      transition: 
+        opacity 0.2s ease, 
+        max-width 0.2s ease, 
+        margin-left 0.2s ease;
+    }
+
+    /* Hover State: Reveal sub-text */
+    .cqd-download-all-btn:not([disabled]):hover .cqd-download-all-sub {
+      opacity: 0.9;
+      max-width: 100px;
+      margin-left: 4px;
+    }
+
+    /* Active/Disabled State: Always show sub-text (progress) */
+    .cqd-download-all-btn[disabled] .cqd-download-all-sub {
+      opacity: 0.9;
+      max-width: 100px;
+      margin-left: 4px;
+    }
