@@ -1,5 +1,12 @@
 # CQD Deployment Runbook
 
+> ⚠️ **UPDATE (2026-09-21)** — the Oracle backend is retired from the live data
+> path; all Oracle VM deployment/SSH steps below are historical and only
+> needed if you deliberately restore that backend (see the "Restoring the
+> Oracle backend" section of `cloudflare-worker/README.md`). Current deploy
+> surface: Cloudflare Worker + Pages, and the daily
+> `data-backups.yml` backup workflow (`docs/BACKUPS.md`).
+
 This runbook is the single source of truth for deploying all production systems:
 
 - Oracle Dashboard + API (`oracle-backend`)
