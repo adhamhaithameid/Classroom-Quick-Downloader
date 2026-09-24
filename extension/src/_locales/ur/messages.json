@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "سب منسوخ کریں",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "تبدیل شدہ",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "پوسٹنگ کے بعد",
+    "description": "after_posting"
   }
 }
