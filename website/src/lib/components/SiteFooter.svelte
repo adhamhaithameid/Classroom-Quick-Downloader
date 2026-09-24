@@ -694,7 +694,7 @@
               <a href={githubUrl} target="_blank" rel="noopener noreferrer">GitHub</a>
             </li>
             <li>
-              <a href={BUY_COFFEE_URL} target="_blank" rel="noopener noreferrer nofollow">Buy Me a Coffee <span class="ft-arrow" aria-hidden="true">↗</span></a>
+              <a class="ft-link-bmc" href={BUY_COFFEE_URL} target="_blank" rel="noopener noreferrer nofollow">Buy Me a Coffee <span class="ft-arrow" aria-hidden="true">↗</span></a>
             </li>
             <li>
               <a href={reportIssueUrl} target="_blank" rel="noopener noreferrer">Report issue</a>
@@ -996,6 +996,21 @@
     background-position: 0 100%;
     background-size: 0% 1.5px;
     transition: color 0.18s ease, background-size var(--mi-base) var(--mi-ease);
+  }
+
+  /* Buy Me a Coffee: the one emphasized link in the footer — official
+     yellow underline always on, ink text, warm lift on hover. */
+  .ft-links a.ft-link-bmc {
+    color: var(--ft-text);
+    font-weight: 700;
+    background-image: linear-gradient(#ffdd00, #ffdd00);
+    background-size: 100% 2px;
+  }
+
+  .ft-links a.ft-link-bmc:hover,
+  .ft-links a.ft-link-bmc:focus-visible {
+    filter: brightness(1.05) saturate(1.1);
+    text-decoration: none;
   }
 
   .ft-links a:hover {
