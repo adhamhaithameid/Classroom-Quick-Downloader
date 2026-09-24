@@ -39,10 +39,19 @@ export function decideFlags(observation: PostObservation): PostDecision {
         ? 'medium'
         : 'low';
 
+  // A count is an ATTRIBUTE of a comment verdict, not an independent fact.
+  // Surfacing a parsed number without its verdict is the prose leak: body
+  // copy like "your draft has 3 comments from reviewers" parses a count that
+  // then displays even though no comment chip was accepted. D12 keeps real
+  // shell-drift counts alive by promoting the verdict itself; everything
+  // that stays below the verdict keeps its number now too.
+  const commentCount =
+    verdict === 'comment' || verdict === 'both' ? observation.comment.count : null;
+
   return {
     postId: observation.postId,
     verdict,
-    commentCount: observation.comment.count,
+    commentCount,
     confidence,
     score,
     commentScore,
