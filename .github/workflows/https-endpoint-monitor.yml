@@ -19,12 +19,11 @@ jobs:
 
       - name: Validate required endpoint variables
         env:
-          ORACLE_ENDPOINT: ${{ vars.ORACLE_ENDPOINT }}
           PUBLIC_WORKER_BASE_URL: ${{ vars.PUBLIC_WORKER_BASE_URL }}
           PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL }}
         run: |
           set -euo pipefail
-          required=(ORACLE_ENDPOINT PUBLIC_WORKER_BASE_URL PUBLIC_SITE_URL)
+          required=(PUBLIC_WORKER_BASE_URL PUBLIC_SITE_URL)
           for key in "${required[@]}"; do
             if [ -z "${!key:-}" ]; then
               echo "::error::Missing required Actions variable: ${key}"
@@ -41,7 +40,6 @@ jobs:
 
       - name: Run HTTPS smoke matrix
         env:
-          ORACLE_ENDPOINT: ${{ vars.ORACLE_ENDPOINT }}
           PUBLIC_WORKER_BASE_URL: ${{ vars.PUBLIC_WORKER_BASE_URL }}
           PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL }}
           GITHUB_RUN_ID: ${{ github.run_id }}
