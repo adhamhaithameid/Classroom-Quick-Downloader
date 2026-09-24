@@ -1,5 +1,13 @@
 # Data Flow: Website <-> Edge <-> Oracle
 
+> ⚠️ **SUPERSEDED (2026-09-21)** — the Oracle-backed pipeline described here is
+> retired. The website now reads a self-served edge snapshot (Cloudflare
+> Worker + Durable Object + live store scraping), flushed batches archive to
+> D1 (`event_archive`), and daily backups live in `backups/latest/` +
+> the project Google Sheet. Current docs: `docs/BACKUPS.md`,
+> `cloudflare-worker/README.md` ("Data pipeline (Oracle-free)").
+> This document is kept for historical context only.
+
 ## 1. Scope
 Covers production website data movement and telemetry ingestion flow.
 
