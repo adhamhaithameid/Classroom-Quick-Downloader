@@ -20,9 +20,14 @@
  * Pure data. No imports.
  */
 
+import { LIVE_COMPOSER_PROMPTS } from './composer-prompts-live';
+
 /**
  * Canonical action-button patterns. A text chunk matching any of these is a
  * UI button ("Add class comment", "أضف تعليق", …), not a comment indicator.
+ * The tail of the list is GENERATED: the localized composer prompts captured
+ * live from Classroom (composer-prompts-live.ts), so a localized prompt can
+ * never be scored as a comment indicator.
  */
 export const ACTION_BUTTON_PATTERNS: RegExp[] = [
   /add\s+(?:class\s+)?comment/i,
@@ -41,6 +46,9 @@ export const ACTION_BUTTON_PATTERNS: RegExp[] = [
   /post.*comment/i,
   /new\s+comment/i,
   /leave.*comment/i,
+  // Live-captured localized composer prompts (66 languages, sweep 2026-09-19).
+  // Generated data: src/core/detect/composer-prompts-live.ts — see its header.
+  ...LIVE_COMPOSER_PROMPTS.map((prompt) => new RegExp(prompt.patternSource, 'i')),
 ];
 
 const CANONICAL_BY_SOURCE: ReadonlyMap<string, RegExp> = new Map(
