@@ -5,12 +5,13 @@
  * endpoint) and retry logic. Tab-free: no bypass windows, ever.
  */
 
-import type { PendingDownload } from './types';
+import type { FileMetaMsg, PendingDownload } from './types';
 import {
   registerPending,
   bindDownloadId,
   AUTHUSER_CANDIDATES,
 } from './state';
+import { sanitizeFileName } from '../../src/core/name/sanitize';
 import { extractAuthUserFromUrl } from './auth-utils';
 import { normalizeUrl, buildUrlWithAuthUser, getFilenameExt } from './url-helpers';
 import { cleanup } from './cleanup';
@@ -117,6 +118,21 @@ export function startNextDriveAttempt(pending: PendingDownload): void {
 }
 
 /**
+ * S1 boundary (audit docs/SECURITY_AUDIT_EXTENSION_2026-09-24.md): page-
+ * controlled fileMeta.name is path-hardened at the single chokepoint every
+ * download request crosses (the CQD_DOWNLOAD listener AND the bridge both
+ * converge on handleDownloadRequest). Never rely on the browser sink alone.
+ */
+export function sanitizeDownloadName(
+  fileMeta: FileMetaMsg | undefined,
+): FileMetaMsg | undefined {
+  if (!fileMeta?.name) return fileMeta;
+  const name = sanitizeFileName(fileMeta.name);
+  if (name === fileMeta.name) return fileMeta;
+  return { ...fileMeta, name };
+}
+
+/**
  * Handle incoming CQD_DOWNLOAD message.
  * Creates pending download entry and initiates download.
  */
@@ -126,7 +142,7 @@ export function handleDownloadRequest(
   sendResponse: (response?: any) => void
 ): boolean {
   const rawUrl = message.url as string | undefined;
-  const fileMeta = message.fileMeta;
+  const fileMeta = sanitizeDownloadName(message.fileMeta);
   const requestId = message.requestId || `req-${Date.now()}`;
 
   if (!rawUrl) {
