@@ -655,7 +655,7 @@
               <a href={reportIssueUrl} target="_blank" rel="noopener noreferrer">Report issue</a>
             </li>
             <li>
-              <a href={BUY_COFFEE_URL} target="_blank" rel="noopener noreferrer">Buy Me a Coffee <span class="ft-arrow" aria-hidden="true">↗</span></a>
+              <a href={BUY_COFFEE_URL} target="_blank" rel="noopener noreferrer nofollow">Buy Me a Coffee <span class="ft-arrow" aria-hidden="true">↗</span></a>
             </li>
           </ul>
         </nav>

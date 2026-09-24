@@ -1134,10 +1134,10 @@
                   class="l2-nav-bmc"
                   href={BUY_COFFEE_URL}
                   target="_blank"
-                  rel="noopener noreferrer"
+                  rel="noopener noreferrer nofollow"
                   tabindex={openMenu === menu.key ? undefined : -1}
                 >
-                  <img src="/bmc-button.svg" alt="Buy me a coffee" loading="lazy" />
+                  <img src="/bmc-button.svg" alt="Buy Me a Coffee" width="545" height="153" loading="lazy" />
                 </a>
               </div>
             </div>
@@ -1202,10 +1202,10 @@
             class="l2-nav-bmc"
             href={BUY_COFFEE_URL}
             target="_blank"
-            rel="noopener noreferrer"
+            rel="noopener noreferrer nofollow"
             tabindex={openMenu === 'github' ? undefined : -1}
           >
-            <img src="/bmc-button.svg" alt="Buy me a coffee" loading="lazy" />
+            <img src="/bmc-button.svg" alt="Buy Me a Coffee" width="545" height="153" loading="lazy" />
           </a>
           </div>
         </div>
