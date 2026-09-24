@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "બધું રદ કરો",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "બદલાયેલ",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "પોસ્ટ કર્યા પછી",
+    "description": "after_posting"
   }
 }
