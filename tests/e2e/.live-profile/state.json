@@ -1,0 +1,11 @@
+{
+  "checkedAt": "2026-09-19T19:06:30.481Z",
+  "accounts": {
+    "0": {
+      "ok": false,
+      "email": null,
+      "finalUrl": "https://edu.google.com/intl/en-US/workspace-for-education/products/classroom/"
+    }
+  },
+  "channel": "chromium"
+}

@@ -113,12 +113,12 @@ function resolveVersion(xpiPath) {
   );
 }
 
-/** Minimal HS256 JWT per the AMO auth contract (iss + jti + iat). */
+/** Minimal HS256 JWT per the AMO auth contract (iss + jti + iat + exp <= iat+5min). */
 function makeJwt(issuer, secret) {
   const b64url = (value) => Buffer.from(value).toString('base64url');
   const head = b64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
   const body = b64url(
-    JSON.stringify({ iss: issuer, jti: randomUUID(), iat: Math.floor(Date.now() / 1000) }),
+    JSON.stringify({ iss: issuer, jti: randomUUID(), iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 300 }),
   );
   const input = `${head}.${body}`;
   const sig = createHmac('sha256', secret).update(input).digest('base64url');
@@ -143,6 +143,63 @@ function apiError(context, status, bodyText) {
     409: 'This version already exists on AMO — bump extension/package.json version or delete the AMO version.',
   };
   return new Error(`AMO API ${context} failed (HTTP ${status}): ${detail}${hints[status] ? `\nhint: ${hints[status]}` : ''}`);
+}
+
+/**
+ * Create flow for a guid AMO has never seen (addons-server docs: the
+ * version PUT "will either update an existing add-on … or will create a
+ * new add-on if the guid does not exist" only via the addon-resource PUT,
+ * which requires a prior processed+valid upload):
+ *   1. POST /api/v5/addons/upload/   (file + channel)
+ *   2. GET  /api/v5/addons/upload/<uuid>/  until processed && valid
+ *   3. PUT  /api/v5/addons/addon/<guid>/  { upload: uuid }
+ * Returns true when the version now exists (poll of versionUrl will find it).
+ */
+async function createNewAddon(env, jwt, xpiPath, versionUrl, version) {
+  const form = new FormData();
+  form.append(
+    'upload',
+    new Blob([new Uint8Array(fs.readFileSync(xpiPath))], { type: 'application/octet-stream' }),
+    path.basename(xpiPath),
+  );
+  form.append('channel', env.channel);
+  const upRes = await fetch(`${env.baseUrl}/api/v5/addons/upload/`, {
+    method: 'POST',
+    headers: { Authorization: `JWT ${jwt}` },
+    body: form,
+  });
+  if (!upRes.ok) {
+    console.error(`create flow: upload POST failed (${upRes.status}): ${await upRes.text()}`);
+    return false;
+  }
+  const { uuid } = await upRes.json();
+  console.log(`✓ File uploaded (uuid ${uuid}) — waiting for AMO validation…`);
+  const deadline = Date.now() + env.pollTimeoutMs;
+  while (Date.now() < deadline) {
+    const st = await fetch(`${env.baseUrl}/api/v5/addons/upload/${uuid}/`, {
+      headers: { Authorization: `JWT ${jwt}` },
+    });
+    if (st.ok) {
+      const j = await st.json();
+      if (j.processed && j.valid) break;
+      if (j.processed && !j.valid) {
+        console.error(`create flow: AMO validation failed:\n${JSON.stringify(j.validation, null, 2)}`);
+        return false;
+      }
+    }
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+  }
+  const createRes = await fetch(`${env.baseUrl}/api/v5/addons/addon/${encodeURIComponent(env.addonId)}/`, {
+    method: 'PUT',
+    headers: { Authorization: `JWT ${jwt}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ version: { version, upload: uuid, channel: env.channel } }),
+  });
+  if (!createRes.ok) {
+    console.error(`create flow: addon PUT failed (${createRes.status}): ${await createRes.text()}`);
+    return false;
+  }
+  console.log('✓ Add-on created from upload.');
+  return true;
 }
 
 async function main() {
@@ -174,7 +231,18 @@ async function main() {
     headers: { Authorization: `JWT ${jwt}` },
     body: form,
   });
-  if (!putRes.ok) fail((await apiError('upload', putRes.status, await putRes.text())).message);
+  if (putRes.status === 404) {
+    // The version PUT cannot create a NEW add-on (addons-server returns 404).
+    // Fallback: the documented create flow — POST the file to /upload/,
+    // poll validation, then PUT the addon resource with the upload uuid.
+    console.log('ℹ Version endpoint 404 — add-on not on AMO yet; running the create flow…');
+    const created = await createNewAddon(env, jwt, xpiPath, versionUrl, version);
+    if (!created) {
+      fail((await apiError('upload', putRes.status, await putRes.text())).message);
+    }
+  } else if (!putRes.ok) {
+    fail((await apiError('upload', putRes.status, await putRes.text())).message);
+  }
   console.log('✓ Uploaded — AMO is validating/signing the version…');
 
   // 2. Poll until the signed file object exists (validation is async).

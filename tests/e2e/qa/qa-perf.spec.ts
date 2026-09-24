@@ -101,7 +101,9 @@ test.describe("qa-perf fast-pass budget", () => {
   let context: BrowserContext;
   let page: Page;
   let capture: ReturnType<typeof captureConsole>;
-  let closeQa: () => Promise<void>;
+  let closeQa: (() => Promise<void>) | undefined;
+  /** Firefox: extension-world probes need CDP (Chromium-only) — classified skip. */
+  let chromiumOnlyProbes = false;
 
   /** CDP handle + every execution context seen since Runtime.enable. */
   let cdp: CDPSession;
@@ -159,6 +161,10 @@ test.describe("qa-perf fast-pass budget", () => {
 
   test.beforeAll(async ({}, testInfo) => {
     const browser = projectBrowser(testInfo.project.name);
+    // Firefox: the probe reads the extension's isolated world over CDP —
+    // Chromium-only; the checks classify-skip via check.skip below.
+    chromiumOnlyProbes = browser !== "chromium";
+    if (chromiumOnlyProbes) return;
     const session = await launchQaContext(browser, scenario());
     context = session.context;
     closeQa = session.close;
@@ -177,11 +183,15 @@ test.describe("qa-perf fast-pass budget", () => {
   });
 
   test.afterAll(async () => {
-    await closeQa();
+    await closeQa?.();
   });
 
   test("handleMutations p95 stays under the 6ms budget under a mutation burst", async () => {
     await runCheck(test.info(), page, capture, "qa-perf-budget", RUNBOOK_REF, async (check) => {
+    if (chromiumOnlyProbes) {
+      check.skip("HARNESS: extension-world probe uses CDP — Chromium-only; Firefox has no CDP");
+      return;
+    }
       // ---- Drive the burst (main world — plain DOM, no probe needed) ----
       await page.evaluate(
         async ({ rounds, cardsPerRound, cardGapMs, roundGapMs }) => {

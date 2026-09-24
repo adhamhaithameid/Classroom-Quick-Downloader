@@ -52,6 +52,8 @@ test.describe("qa-04 popup", () => {
   let capture: ReturnType<typeof captureConsole>;
   let browser: "chromium" | "firefox";
   let closeQa: () => Promise<void>;
+  /** Firefox MV2: background-seam (seeding/extension-base) is Chromium-only. */
+  let chromiumOnlySeam = false;
   let extensionBase: string;
 
   test.beforeAll(async ({}, testInfo) => {
@@ -79,6 +81,11 @@ test.describe("qa-04 popup", () => {
     if (!session.extensionAvailable) return;
     page = await context.newPage();
     capture = captureConsole(page);
+    // Firefox MV2: Playwright does not expose the background page the
+    // seeding and extension-base lookups need — Chromium-only seam; the
+    // checks classify-skip below.
+    chromiumOnlySeam = browser !== "chromium";
+    if (chromiumOnlySeam) return;
     await seedStorage(context, browser);
     extensionBase = await (await import("./harness")).getExtensionBase(context, browser);
   });
@@ -89,6 +96,10 @@ test.describe("qa-04 popup", () => {
 
   test("popup renders seeded analytics and toggles write through real storage", async () => {
     await runCheck(test.info(), page, capture, "qa-04", RUNBOOK_REF, async (check) => {
+      if (chromiumOnlySeam) {
+        check.skip("HARNESS: popup seeding uses the extension background page — Playwright does not expose it on Firefox (MV2); content-script journeys cover the extension");
+        return;
+      }
       // The production popup opens over a Classroom tab; a popup-as-page has
       // no active Classroom tab, so point tabs.query at the open tab the way
       // the browser would resolve it for a real popup window.
@@ -180,6 +191,10 @@ test.describe("qa-04 popup", () => {
 
   test("popup offers Open Classroom when the current tab is not Classroom", async () => {
     await runCheck(test.info(), page, capture, "qa-04-open", RUNBOOK_REF, async (check) => {
+      if (chromiumOnlySeam) {
+        check.skip("HARNESS: popup URL needs the extension base from the background page — Chromium-only seam on Firefox (MV2)");
+        return;
+      }
       // A non-Classroom active tab: the simulator 204s everything unknown.
       const other = await context.newPage();
       await other.goto("https://example.com/", { waitUntil: "domcontentloaded" }).catch(() => undefined);
