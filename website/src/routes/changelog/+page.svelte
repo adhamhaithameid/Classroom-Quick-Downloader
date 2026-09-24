@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, afterUpdate } from 'svelte';
   import { STORE_LINKS } from '$lib/config';
+  import { trackWebsiteEvent } from '$lib/analytics/websiteEvents';
   import { fetchChangelog } from '$lib/api/changelog';
   import { WEBSITE_MANUAL_CHANGELOG } from '$lib/content/changelog.manual.generated';
   import SeoMeta from '$lib/components/SeoMeta.svelte';
@@ -237,7 +238,7 @@
       <p class="cl-sub">What's new in every release of Classroom Quick Downloader.</p>
 
       <div class="cl-hero-actions">
-        <a class="cl-action-pill glass-panel glass-hover" href={STORE_LINKS.github + '/blob/main/user-friendly-changelog.md'} target="_blank" rel="noopener noreferrer">
+        <a class="cl-action-pill glass-panel glass-hover" href={STORE_LINKS.github + '/blob/main/user-friendly-changelog.md'} target="_blank" rel="noopener noreferrer" on:click={() => trackWebsiteEvent({ eventType: 'content', action: 'guide_cta_click', placement: 'changelog_github' })}>
           Open changelog on GitHub →
         </a>
       </div>
@@ -432,6 +433,8 @@
     color: var(--text-secondary);
     font-weight: 600; font-size: 13px;
     cursor: pointer;
+    /* A1-family: the hover color eases in (it used to snap). */
+    transition: color var(--mi-base) ease;
   }
   .cl-action-pill:hover {
     color: var(--green);
@@ -564,6 +567,21 @@
   .cl-entry-card {
     border-radius: var(--radius);
     padding: 24px;
+    /* K5: entries rise in as a paced cascade — the per-card --card-i delay
+       was already emitted by the markup, now an animation actually uses it. */
+    animation: cl-entry-rise 0.5s var(--glass-ease) backwards;
+    animation-delay: calc(var(--card-i, 0) * 0.05s);
+  }
+
+  @keyframes cl-entry-rise {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   .cl-entry-header { margin-bottom: 10px; }
@@ -688,6 +706,16 @@
   @media (prefers-reduced-transparency: reduce) {
     .cl-state-warn {
       background: #fcfefd;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cl-entry-card {
+      animation: none;
+    }
+
+    .cl-action-pill {
+      transition: none;
     }
   }
 </style>
