@@ -1,0 +1,27 @@
+{
+  "caseId": "syn-en-position-dom-order",
+  "viewKind": "stream",
+  "lang": "en",
+  "note": "Positional accuracy vs DOM order and adjacency: a chip rendered BEFORE the header (DOM order flipped) is still the chip container — count 6 believed. The meta/date line ('Posted Mar 2 · 3 comments on this post') and an unknown custom footer strip ('8 comments') are NOT Classroom comment-count positions: keyword+number text there is prose position and must neither flag nor leak a count. Position, not proximity, is the contract.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-pos-order-chip-first",
+      "commentPresent": true,
+      "commentCount": 6,
+      "editedPresent": false
+    },
+    {
+      "postId": "synth-pos-order-meta-says-comments",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    },
+    {
+      "postId": "synth-pos-order-footer-count",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    }
+  ]
+}

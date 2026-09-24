@@ -1,0 +1,21 @@
+{
+  "caseId": "syn-de-position-count-chip",
+  "viewKind": "stream",
+  "lang": "de",
+  "note": "Positional accuracy in German: the chip phrase \"3 Kurskommentare\" is believed with the exact count; the same words narrated in the body (\"Euer Entwurf hat 3 Kurskommentare\") are prose and must neither flag nor leak a count.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-pos-de-chip",
+      "commentPresent": true,
+      "commentCount": 3,
+      "editedPresent": false
+    },
+    {
+      "postId": "synth-pos-de-body",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "caseId": "syn-en-position-count-chip-with-word",
+  "viewKind": "stream",
+  "lang": "en",
+  "note": "Positional accuracy, positive direction: the chip itself renders the word form — '3 comments', '1 comment' (singular), '13 comments' (two-digit) — in the correct comment-chip position. The number must be believed exactly and the singular/plural boundary must not corrupt the parse.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-pos-chip-en",
+      "commentPresent": true,
+      "commentCount": 3,
+      "editedPresent": false
+    },
+    {
+      "postId": "synth-pos-chip-en-one",
+      "commentPresent": true,
+      "commentCount": 1,
+      "editedPresent": false
+    },
+    {
+      "postId": "synth-pos-chip-en-large",
+      "commentPresent": true,
+      "commentCount": 13,
+      "editedPresent": false
+    }
+  ]
+}
