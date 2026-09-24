@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+
+# Full-suite gate: nothing reaches the remote without the complete test
+# suite passing on this machine (strict pyramid + headless browser E2E).
+# Skip for one push with: git push --no-verify
+pnpm run test:gate
