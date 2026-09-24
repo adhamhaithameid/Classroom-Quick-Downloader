@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "ಎಲ್ಲಾ ರದ್ದುಗೊಳಿಸಿ",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "ಬದಲಾಯಿಸಲಾಗಿದೆ",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "ಪೋಸ್ಟ್ ಮಾಡಿದ ನಂತರ",
+    "description": "after_posting"
   }
 }
