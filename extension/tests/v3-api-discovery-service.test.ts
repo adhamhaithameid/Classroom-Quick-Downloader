@@ -20,6 +20,7 @@ describe('v3/api/discovery-service', () => {
       fetchStudentSubmissions: vi.fn(async () => ([
         { id: 'sub-1', attachments: [] },
       ])),
+      fetchCourseDriveFiles: vi.fn(async () => ([])),
     };
 
     const service = new ClassroomApiDiscoveryService(
@@ -40,6 +41,7 @@ describe('v3/api/discovery-service', () => {
   it('forceRefresh bypasses cache', async () => {
     const client: ClassroomApiClient = {
       fetchStudentSubmissions: vi.fn(async () => ([])),
+      fetchCourseDriveFiles: vi.fn(async () => ([])),
     };
 
     const service = new ClassroomApiDiscoveryService(

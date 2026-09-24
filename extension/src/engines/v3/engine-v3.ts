@@ -66,8 +66,13 @@ import {
   createDefaultApiDiscoveryService,
   publishStudentWorkApiSnapshot,
   resolveClassroomApiRouteContext,
+  sharedClassroomRateLimiter,
   type ApiDiscoveryService,
 } from './api';
+import {
+  ensureClassroomButton,
+  removeClassroomButton,
+} from '../../v2/render/classroom-download-controller';
 
 // ============================================================================
 // V3 ENGINE — Extends V2 with API integration
@@ -128,6 +133,10 @@ export class EngineV3 implements CQDEngine {
     // signal this is the real init scan; on an aborted one (tests, teardown
     // races) it is a no-op and fullScan picks the posts up instead.
     this.runApiCorroborationPass();
+    // csaa.6: the whole-classroom button is a v3-only feature — this call is
+    // the GATE (v3 mode ⇒ configured ⇒ API-beta consented). The controller
+    // itself removes it when the route is not classwork.
+    ensureClassroomButton();
 
     console.log(
       `[Engine V3] Initialized for view: ${viewKind} (API assist: ${this.latestApiSnapshot ? 'snapshot ready' : 'fallback to DOM'})`,
@@ -142,6 +151,8 @@ export class EngineV3 implements CQDEngine {
     this.currentView = null;
     this.apiCorroboration.clear();
     publishStudentWorkApiSnapshot(null);
+    sharedClassroomRateLimiter.reset();
+    removeClassroomButton();
     console.log('[Engine V3] Destroyed');
   }
 
@@ -155,6 +166,9 @@ export class EngineV3 implements CQDEngine {
 
   fullScan(): void {
     this.v2.fullScan();
+    // Re-check the button on every scan — SPA navigation between classes
+    // keeps this engine alive but changes the route context underneath it.
+    ensureClassroomButton();
     if (this.currentView && isStudentWorkView(this.currentView)) {
       // Refresh the cache, THEN corroborate the posts V2 just tracked — the
       // pass reads the detector's cache, so it must not race the refresh.

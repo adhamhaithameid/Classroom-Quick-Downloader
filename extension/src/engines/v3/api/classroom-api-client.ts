@@ -9,9 +9,31 @@ import type {
 
 const CLASSROOM_API_BASE_URL = 'https://classroom.googleapis.com/v1';
 const DEFAULT_PAGE_SIZE = 200;
+/** csaa.5: hard cap of pages per list call (quota guard, not correctness). */
+const MAX_LIST_PAGES = 3;
+const LIST_PAGE_SIZE = 100;
 
 interface GoogleClassroomStudentSubmissionResponse {
   studentSubmissions?: GoogleClassroomSubmission[];
+  nextPageToken?: string;
+}
+
+/** Materials union on courseWork/courseWorkMaterials. csaa.2: courseWork nests
+ *  the Drive file under SharedDriveFile (`driveFile.driveFile.id`); older flat
+ *  shapes are accepted defensively. */
+interface GoogleClassroomMaterial {
+  driveFile?: {
+    driveFile?: { id?: string; title?: string };
+    id?: string;
+    title?: string;
+  };
+  link?: { url?: string; title?: string };
+  form?: { formUrl?: string; title?: string };
+}
+
+interface GoogleClassroomMaterialListResponse {
+  courseWork?: { id?: string; title?: string; materials?: GoogleClassroomMaterial[] }[];
+  courseWorkMaterial?: { id?: string; title?: string; materials?: GoogleClassroomMaterial[] }[];
   nextPageToken?: string;
 }
 
@@ -96,11 +118,29 @@ function mapSubmission(
   };
 }
 
+export interface ClassroomApiClientOptions {
+  /**
+   * Budget gate consulted before EVERY HTTP call (initial + pagination
+   * pages). False → the call is skipped and whatever was collected so far
+   * is returned (csaa.5: silent degradation, never a thrown error).
+   */
+  beforeCall?: () => boolean;
+}
+
 export class GoogleClassroomApiClient implements ClassroomApiClient {
   private tokenProvider: ClassroomApiTokenProvider;
+  private beforeCall: (() => boolean) | null;
 
-  constructor(tokenProvider: ClassroomApiTokenProvider) {
+  constructor(
+    tokenProvider: ClassroomApiTokenProvider,
+    options: ClassroomApiClientOptions = {},
+  ) {
     this.tokenProvider = tokenProvider;
+    this.beforeCall = options.beforeCall ?? null;
+  }
+
+  private budgetAvailable(): boolean {
+    return !this.beforeCall || this.beforeCall();
   }
 
   async fetchStudentSubmissions(
@@ -116,6 +156,7 @@ export class GoogleClassroomApiClient implements ClassroomApiClient {
 
     while (pageGuard < 10) {
       pageGuard += 1;
+      if (!this.budgetAvailable()) return submissions;
       const requestUrl = new URL(
         `${CLASSROOM_API_BASE_URL}/courses/${encodeURIComponent(context.courseId)}/courseWork/${encodeURIComponent(context.courseWorkId)}/studentSubmissions`,
       );
@@ -151,5 +192,68 @@ export class GoogleClassroomApiClient implements ClassroomApiClient {
     }
 
     return submissions;
+  }
+
+  /**
+   * courseWork.list + courseWorkMaterials.list, materials embedded, driveFile
+   * only (links/forms/youtube are not files), deduped by Drive id (first
+   * wins). Paginated with a hard page cap (csaa.5); any non-OK response
+   * yields the partial list — silent degradation per R7.
+   */
+  async fetchCourseDriveFiles(
+    courseId: string,
+    authUser: string | null,
+    signal?: AbortSignal,
+  ): Promise<ClassroomApiAttachment[]> {
+    const token = await this.tokenProvider.getAccessToken(false);
+    if (!token) return [];
+
+    const byId = new Map<string, ClassroomApiAttachment>();
+    const collect = (materials: GoogleClassroomMaterial[] | undefined) => {
+      for (const material of materials || []) {
+        const driveId = material?.driveFile?.driveFile?.id?.trim() || material?.driveFile?.id?.trim() || '';
+        if (!driveId || byId.has(driveId)) continue;
+        byId.set(driveId, {
+          id: driveId,
+          title: material?.driveFile?.driveFile?.title?.trim()
+            || material?.driveFile?.title?.trim()
+            || `drive-${driveId}`,
+          downloadUrl: buildDriveDownloadUrl(driveId, authUser),
+          source: 'driveFile',
+        });
+      }
+    };
+
+    const listAll = async (
+      path: 'courseWork' | 'courseWorkMaterials',
+      collectionKey: 'courseWork' | 'courseWorkMaterial',
+    ): Promise<void> => {
+      let pageToken: string | null = null;
+      for (let page = 0; page < MAX_LIST_PAGES; page += 1) {
+        if (!this.budgetAvailable()) return;
+        const requestUrl = new URL(
+          `${CLASSROOM_API_BASE_URL}/courses/${encodeURIComponent(courseId)}/${path}`,
+        );
+        requestUrl.searchParams.set('pageSize', String(LIST_PAGE_SIZE));
+        if (pageToken) requestUrl.searchParams.set('pageToken', pageToken);
+
+        const response = await fetch(requestUrl.toString(), {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${token}` },
+          signal,
+        });
+        if (!response.ok) return;
+
+        const payload = await response.json() as GoogleClassroomMaterialListResponse;
+        for (const item of payload[collectionKey] || []) collect(item?.materials);
+        if (!payload.nextPageToken) return;
+        pageToken = payload.nextPageToken;
+      }
+    };
+
+    await listAll('courseWork', 'courseWork');
+    await listAll('courseWorkMaterials', 'courseWorkMaterial');
+
+    return Array.from(byId.values());
   }
 }

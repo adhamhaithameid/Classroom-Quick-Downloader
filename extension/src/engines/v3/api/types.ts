@@ -39,4 +39,15 @@ export interface ClassroomApiClient {
     context: ClassroomApiRouteContext,
     signal?: AbortSignal,
   ): Promise<ClassroomApiStudentSubmission[]>;
+  /**
+   * All driveFile attachments across a course's classwork (csaa.3 phase 1):
+   * courses.courseWork.list + courses.courseWorkMaterials.list, materials
+   * embedded. Deduped by Drive id; downloadUrl already points at the
+   * browser-session Drive fetch (zero API quota per download).
+   */
+  fetchCourseDriveFiles(
+    courseId: string,
+    authUser: string | null,
+    signal?: AbortSignal,
+  ): Promise<ClassroomApiAttachment[]>;
 }
