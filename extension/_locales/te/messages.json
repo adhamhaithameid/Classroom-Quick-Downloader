@@ -90,5 +90,13 @@
   "cancel_all": {
     "message": "అన్నీ రద్దు చేయి",
     "description": "cancelAll"
+  },
+  "modified": {
+    "message": "మార్చబడింది",
+    "description": "modified"
+  },
+  "after_posting": {
+    "message": "పోస్ట్ చేసిన తర్వాత",
+    "description": "after_posting"
   }
 }
