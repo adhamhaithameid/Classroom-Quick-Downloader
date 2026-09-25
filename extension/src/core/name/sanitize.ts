@@ -26,10 +26,12 @@ export { deriveFileNameFromUrl } from './derive';
  * legitimate ellipsis names like "notes...draft.pdf" survive untouched.
  */
 export function stripPathCharacters(rawName: string): string {
-  let name = rawName.replace(/[/\\:]/g, '');
+  // Trim first so padded forms like ' ..hidden' cannot survive the leading
+  // dot/tilde strip as '..hidden'.
+  let name = rawName.trim().replace(/[/\\:]/g, '');
   name = name.replace(/[\u0000-\u001f\u007f]/g, '');
   name = name.replace(/^[.~]+/, '');
-  return name;
+  return name.trim();
 }
 
 /**
@@ -38,7 +40,7 @@ export function stripPathCharacters(rawName: string): string {
  */
 export function sanitizeFileName(rawName: string, lang?: string): string {
   if (!rawName) return '';
-  let name = stripPathCharacters(rawName).trim();
+  let name = stripPathCharacters(rawName);
   if (!name) return '';
   name = stripTrailingTypeLabel(name, lang);
 

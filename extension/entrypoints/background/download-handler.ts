@@ -32,6 +32,30 @@ export const DOWNLOAD_START_TIMEOUT_MS = 15_000;
 
 type StartHandler = (downloadId: number | undefined, hadError: boolean) => void;
 
+export const DOWNLOAD_START_TIMEOUT_MESSAGE =
+  'The download could not be started — the source never responded. Try again.';
+
+/**
+ * Shared S2 timeout settle: analytics + honest status + optional sendResponse
+ * + cleanup. One body, four call sites (startSingleAttempt, attemptDriveStart,
+ * startNextDriveAttempt, index.ts retrySameAttempt) so the copies cannot drift.
+ */
+export function handleStartTimeout(
+  pending: PendingDownload,
+  respondOnce?: (payload: any) => void,
+): void {
+  recordDownloadEvent({
+    type: pending.fileMeta?.ext || 'unknown',
+    status: 'fail',
+    duration_ms: Date.now() - pending.startTime,
+    bypass_used: false,
+    error_type: 'DOWNLOAD_START_TIMEOUT',
+  });
+  sendStatusToTab(pending, 'error', DOWNLOAD_START_TIMEOUT_MESSAGE, 'DOWNLOAD_START_TIMEOUT');
+  respondOnce?.({ started: false, userMessage: DOWNLOAD_START_TIMEOUT_MESSAGE });
+  cleanup(pending);
+}
+
 export function startDownloadWithTimeout(
   url: string,
   pending: PendingDownload,
@@ -56,7 +80,7 @@ export function startDownloadWithTimeout(
           // eventually started; never double-settle or resurrect.
           if (downloadId) {
             try {
-              chrome.downloads.cancel(downloadId, () => { const _ = chrome.runtime.lastError; });
+              chrome.downloads.cancel(downloadId, () => { void chrome.runtime.lastError; });
             } catch { /* already gone */ }
           } else {
             void chrome.runtime.lastError;
@@ -112,26 +136,7 @@ export function startSingleAttempt(
       bindDownloadId(pending, downloadId as number);
       respondOnce?.({ started: true, requestId: pending.requestId, downloadId });
     },
-    () => {
-      recordDownloadEvent({
-        type: pending.fileMeta?.ext || 'unknown',
-        status: 'fail',
-        duration_ms: Date.now() - pending.startTime,
-        bypass_used: false,
-        error_type: 'DOWNLOAD_START_TIMEOUT',
-      });
-      cleanup(pending);
-      sendStatusToTab(
-        pending,
-        'error',
-        'The download could not be started — the source never responded. Try again.',
-        'DOWNLOAD_START_TIMEOUT',
-      );
-      respondOnce?.({
-        started: false,
-        userMessage: 'The download could not be started — the source never responded. Try again.',
-      });
-    },
+    () => handleStartTimeout(pending, respondOnce),
   );
 }
 
@@ -193,22 +198,7 @@ export function startNextDriveAttempt(pending: PendingDownload): void {
       }
       bindDownloadId(pending, downloadId as number);
     },
-    () => {
-      recordDownloadEvent({
-        type: pending.fileMeta?.ext || 'unknown',
-        status: 'fail',
-        duration_ms: Date.now() - pending.startTime,
-        bypass_used: false,
-        error_type: 'DOWNLOAD_START_TIMEOUT',
-      });
-      sendStatusToTab(
-        pending,
-        'error',
-        'The download could not be started — the source never responded. Try again.',
-        'DOWNLOAD_START_TIMEOUT',
-      );
-      cleanup(pending);
-    },
+    () => handleStartTimeout(pending),
   );
 }
 
@@ -342,26 +332,7 @@ export function handleDownloadRequest(
           bindDownloadId(pending, id as number);
           respondOnce({ started: true, requestId, downloadId: id });
         },
-        () => {
-          recordDownloadEvent({
-            type: pending.fileMeta?.ext || 'unknown',
-            status: 'fail',
-            duration_ms: Date.now() - pending.startTime,
-            bypass_used: false,
-            error_type: 'DOWNLOAD_START_TIMEOUT',
-          });
-          respondOnce({
-            started: false,
-            userMessage: 'The download could not be started — the source never responded. Try again.',
-          });
-          sendStatusToTab(
-            pending,
-            'error',
-            'The download could not be started — the source never responded. Try again.',
-            'DOWNLOAD_START_TIMEOUT',
-          );
-          cleanup(pending);
-        },
+        () => handleStartTimeout(pending, respondOnce),
       );
     };
     attemptDriveStart();

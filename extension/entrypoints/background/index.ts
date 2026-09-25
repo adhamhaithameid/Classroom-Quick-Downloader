@@ -32,6 +32,7 @@ import { ensureAnalyticsAlarm, checkAndCloseFileTab } from './analytics-alarm';
 import { sendStatusToTab } from './message-sender';
 import {
   handleDownloadRequest,
+  handleStartTimeout,
   startNextDriveAttempt,
   startSingleAttempt,
   startDownloadWithTimeout,
@@ -228,15 +229,7 @@ export default defineBackground(() => {
           }
           bindDownloadId(pending, downloadId);
         },
-        () => {
-          sendStatusToTab(
-            pending,
-            'error',
-            'The download could not be started — the source never responded. Try again.',
-            'DOWNLOAD_START_TIMEOUT',
-          );
-          cleanup(pending);
-        },
+        () => handleStartTimeout(pending),
       );
     } else {
       startSingleAttempt(pending);
