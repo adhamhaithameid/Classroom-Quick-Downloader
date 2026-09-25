@@ -185,6 +185,15 @@ jobs:
       - name: Run Extension E2E (Edge)
         run: pnpm run test:e2e:edge
 
+      # Headed security suite (audit 2026-09-24, S1): onDeterminingFilename
+      # never fires in headless Chromium, so the filename-suggestion contract
+      # is invisible to the legs above; this runs it headed under xvfb.
+      - name: Run headed filename-security suite
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y xvfb
+          xvfb-run -a pnpm run test:e2e:headed-security
+
       # Signed Firefox leg (S11 T3): AMO-sign the firefox-mv2 zip, then run
       # the qa journeys against the signed xpi (it survives Playwright's
       # bundled Firefox, unlike the unsigned sideload). Only runs when both

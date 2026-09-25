@@ -275,7 +275,7 @@ describe('core/name sanitize — path hardening (S1)', () => {
   });
 
   it('strips absolute-path prefixes and home-relative shortcuts', () => {
-    expect(sanitizeFileName('C:\\Users\\v\\evil.exe')).toBe('C:Usersvevil.exe');
+    expect(sanitizeFileName('C:\\Users\\v\\evil.exe')).toBe('CUsersvevil.exe');
     expect(sanitizeFileName('~/evil.sh')).toBe('evil.sh');
     expect(sanitizeFileName('..hidden')).toBe('hidden');
     expect(sanitizeFileName('...')).toBe('');

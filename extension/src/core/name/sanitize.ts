@@ -20,12 +20,13 @@ export { deriveFileNameFromUrl } from './derive';
  * S1 path hardening (audit docs/SECURITY_AUDIT_EXTENSION_2026-09-24.md):
  * page-controlled names must never reach a filesystem sink with traversal
  * capability, regardless of what the browser's download namer does. Strips
- * path separators, control characters, and leading dot/tilde. Interior '..'
- * is inert once separators are gone (no path components left to traverse),
- * so legitimate ellipsis names like "notes...draft.pdf" survive untouched.
+ * path separators (including ':' — a separator on macOS and invalid on
+ * Windows), control characters, and leading dot/tilde. Interior '..' is
+ * inert once separators are gone (no path components left to traverse), so
+ * legitimate ellipsis names like "notes...draft.pdf" survive untouched.
  */
 export function stripPathCharacters(rawName: string): string {
-  let name = rawName.replace(/[/\\]/g, '');
+  let name = rawName.replace(/[/\\:]/g, '');
   name = name.replace(/[\u0000-\u001f\u007f]/g, '');
   name = name.replace(/^[.~]+/, '');
   return name;
