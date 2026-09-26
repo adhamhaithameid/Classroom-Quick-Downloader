@@ -194,6 +194,12 @@ jobs:
         if: ${{ env.AMO_JWT_ISSUER != '' && env.AMO_JWT_SECRET != '' }}
         env:
           QA_SIGNED_XPI: ${{ github.workspace }}/extension/.output/signed.xpi
+          # CI signs the self-distribution QA companion add-on
+          # (docs/EXTENSION_TESTING_RUNBOOK.md), never the store listing.
+          # Defaulting to the store listing's guid wedges the leg: its
+          # already-registered version is owner-invisible to some API
+          # surfaces (version GET 404s) and the create flow 409s.
+          AMO_ADDON_ID: classroom-quick-downloader-qa@adhamhaitham.dev
         run: |
           pnpm exec playwright install firefox
           pnpm -C extension firefox
