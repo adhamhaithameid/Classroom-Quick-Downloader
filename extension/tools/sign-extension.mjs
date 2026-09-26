@@ -255,23 +255,43 @@ async function main() {
   console.log('✓ Uploaded — AMO is validating/signing the version…');
 
   // 2. Poll until the signed file object exists (validation is async).
+  // The single-version detail endpoint 404s for some server-side states
+  // even when the addon-resource PUT reports the version as existing, so
+  // every round also walks the add-on's full version list (filter=all is
+  // required to see unlisted versions) looking for the signed file.
+  const findSignedFile = async () => {
+    const getRes = await fetch(versionUrl, { headers: { Authorization: `JWT ${jwt}` } });
+    if (getRes.ok) {
+      const json = await getRes.json();
+      if (json.validation_errors) {
+        fail(`AMO rejected the upload:\n${JSON.stringify(json.validation_errors, null, 2)}`);
+      }
+      if (json.file?.url) return json.file;
+    }
+    const listRes = await fetch(
+      `${env.baseUrl}/api/v5/addons/${encodeURIComponent(env.addonId)}/versions/?filter=all`,
+      { headers: { Authorization: `JWT ${jwt}` } },
+    );
+    if (listRes.ok) {
+      const list = await listRes.json().catch(() => null);
+      const match = (list?.results ?? []).find((v) => v?.version === version);
+      if (match?.file?.url) return match.file;
+    }
+    return null;
+  };
   const deadline = Date.now() + env.pollTimeoutMs;
   let file = null;
   while (Date.now() < deadline) {
-    const getRes = await fetch(versionUrl, { headers: { Authorization: `JWT ${jwt}` } });
-    if (!getRes.ok) fail((await apiError('poll', getRes.status, await getRes.text())).message);
-    const json = await getRes.json();
-    file = json.file ?? null;
+    file = await findSignedFile();
     if (file?.url) break;
-    if (json.validation_errors) {
-      fail(`AMO rejected the upload:\n${JSON.stringify(json.validation_errors, null, 2)}`);
-    }
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
   }
   if (!file?.url) {
     fail(
       `signing did not complete within ${env.pollTimeoutMs} ms. Check the version manually: ${versionUrl}` +
-        (env.channel === 'listed' ? ' (listed channels sign only after review approval.)' : ''),
+        (env.channel === 'listed' ? ' (listed channels sign only after review approval.)' : '') +
+        ` If the version exists but exposes no file, its server-side state is stuck — ` +
+        `delete that version on AMO (or bump extension/package.json) and re-run.`,
     );
   }
 
