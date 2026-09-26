@@ -185,13 +185,16 @@ jobs:
           set -euo pipefail
           worker_base="${PUBLIC_WORKER_BASE_URL%/}"
           site_origin="$(printf '%s' "${PUBLIC_SITE_URL}" | sed -E 's#(https?://[^/]+).*#\1#')"
+          # Browser UA: the edge 502s datacenter ASNs on workers.dev for bare
+          # clients, and CI runners are exactly that (bead q8o).
+          curl_ua="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36 CQD-CI/1.0"
           if [ "${DEPLOYED}" != "true" ]; then
             echo "::notice::Deploy step skipped; running smoke checks against currently active Worker deployment."
           fi
 
           health_code="000"
           for _ in $(seq 1 20); do
-            health_code="$(curl -sS -o /tmp/worker-health.json -w "%{http_code}" "${worker_base}/health" || true)"
+            health_code="$(curl -sS -A "${curl_ua}" -o /tmp/worker-health.json -w "%{http_code}" "${worker_base}/health" || true)"
             if [ "${health_code}" = "200" ]; then
               break
             fi
@@ -203,14 +206,14 @@ jobs:
             exit 1
           fi
 
-          auth_code="$(curl -sS -o /tmp/worker-auth.txt -w "%{http_code}" "${worker_base}/admin/website/status" || true)"
+          auth_code="$(curl -sS -A "${curl_ua}" -o /tmp/worker-auth.txt -w "%{http_code}" "${worker_base}/admin/website/status" || true)"
           if [ "${auth_code}" != "401" ] && [ "${auth_code}" != "403" ]; then
             echo "::error::Worker auth smoke check expected 401/403, got ${auth_code}"
             cat /tmp/worker-auth.txt || true
             exit 1
           fi
 
-          snapshot_payload="$(curl -fsS "${worker_base}/api/public/website/snapshot")"
+          snapshot_payload="$(curl -fsS -A "${curl_ua}" "${worker_base}/api/public/website/snapshot")"
           echo "${snapshot_payload}" | grep -Eq '"schemaVersion"[[:space:]]*:[[:space:]]*"1"'
 
           event_id="gha-worker-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
@@ -218,7 +221,7 @@ jobs:
           {"schemaVersion":"1","sessionId":"gha-worker-smoke","pagePath":"/ci/smoke","events":[{"eventId":"${event_id}","eventType":"cta","action":"install_click","placement":"hero_install"}]}
           JSON
           )"
-          ingest_response="$(curl -fsS -X POST "${worker_base}/api/public/website/events" \
+          ingest_response="$(curl -fsS -A "${curl_ua}" -X POST "${worker_base}/api/public/website/events" \
             -H "Origin: ${site_origin}" \
             -H "Content-Type: application/json" \
             -H "X-Requested-With: XMLHttpRequest" \
