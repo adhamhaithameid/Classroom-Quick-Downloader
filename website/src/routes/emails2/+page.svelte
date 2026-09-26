@@ -120,7 +120,7 @@
           </a>
         </div>
 
-        <p class="hero-note">Free forever · No account · No tracking</p>
+        <p class="hero-note">Free forever · No account · No personal data</p>
       </section>
 
       <section class="section-block section-light">
