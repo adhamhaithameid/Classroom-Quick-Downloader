@@ -112,9 +112,22 @@ await check('legacy Pages host redirects to canonical', async () => {
 // 5) Infrastructure (informational failures do not block the website verdicts above)
 await check('worker /health reachable', async () => {
   const base = process.env.WORKER_BASE_URL ?? 'https://cqd-analytics.adhamhaithameid.workers.dev';
-  const response = await fetch(`${base}/health`);
-  if (response.status === 429) throw new Error('HTTP 429 error 1027 — free-plan daily cap consumed (see ORACLE_RECOVERY_RUNBOOK.md)');
-  if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
+  // Browser UA + retries: the edge 502s datacenter ASNs on workers.dev for
+  // bare clients, and CI runners are exactly that (bead q8o).
+  const headers = { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36 CQD-CI/1.0' };
+  let lastError = null;
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    try {
+      const response = await fetch(`${base}/health`, { headers });
+      if (response.status === 429) throw new Error('HTTP 429 error 1027 — free-plan daily cap consumed (see ORACLE_RECOVERY_RUNBOOK.md)');
+      if (response.status === 200) return;
+      lastError = new Error(`HTTP ${response.status}`);
+    } catch (error) {
+      lastError = error;
+    }
+    await new Promise((r) => setTimeout(r, 5_000));
+  }
+  throw lastError ?? new Error('worker /health unreachable');
 });
 // Oracle is severed from the live path (optional ORACLE_ENDPOINT mirror);
 // scheduled monitors set SKIP_ORACLE_CHECK=1 so a dormant backend does not

@@ -143,17 +143,23 @@ jobs:
           curl_ua="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36 CQD-CI/1.0"
 
           curl_worker() {
-            # curl_worker <output-file> <curl args...> — retries the request
-            # until it succeeds, printing the last response code.
+            # curl_worker <output-file> <curl args...> — retries only
+            # server-side/network failures (5xx, 000); any 4xx is returned
+            # immediately because callers expect specific codes (the auth
+            # check wants 401/403).
             local out="$1"; shift
             local attempt code
             for attempt in 1 2 3 4 5; do
               code="$(curl -sS -A "${curl_ua}" -o "${out}" -w "%{http_code}" "$@" || true)"
               case "${code}" in
-                2*) echo "${code}"; return 0 ;;
+                000|5*)
+                  echo "::warning::worker request ${*} got HTTP ${code} (attempt ${attempt}/5); retrying in 5s"
+                  sleep 5
+                  ;;
+                *)
+                  echo "${code}"; return 0
+                  ;;
               esac
-              echo "::warning::worker request ${*} got HTTP ${code} (attempt ${attempt}/5); retrying in 5s"
-              sleep 5
             done
             echo "${code}"; return 1
           }
