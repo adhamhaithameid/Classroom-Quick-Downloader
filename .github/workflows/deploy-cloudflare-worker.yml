@@ -249,6 +249,9 @@ jobs:
           fi
           # Full production verification (website pages + worker). Retries absorb
           # edge propagation delay; a genuine breakage fails the deploy.
+          # Oracle is severed from the live path, so its health check is
+          # skipped here (a dormant backend must not fail worker deploys).
+          export SKIP_ORACLE_CHECK=1
           for attempt in 1 2 3; do
             if node tools/verify-production.mjs; then
               echo "::notice::Post-deploy production verification passed (attempt ${attempt})."

@@ -247,6 +247,9 @@ jobs:
           set -euo pipefail
           # Full page-content + worker verification before search indexing runs.
           # Retries absorb edge propagation delay for the fresh deployment.
+          # Oracle is severed from the live path, so its health check is
+          # skipped here (a dormant backend must not fail site deploys).
+          export SKIP_ORACLE_CHECK=1
           for attempt in 1 2 3 4; do
             if node tools/verify-production.mjs; then
               echo "::notice::Post-deploy production verification passed (attempt ${attempt})."
