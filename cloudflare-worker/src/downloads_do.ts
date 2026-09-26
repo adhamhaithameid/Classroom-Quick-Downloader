@@ -19,6 +19,9 @@ import type {
   ChangelogSyncStatus,
   KVNamespaceBinding,
 } from "./types";
+// Explicit type imports (not the tsconfig global): the extension test suite
+// imports this module, and that program does not load workers-types globals.
+import type { D1Database, DurableObjectState } from "@cloudflare/workers-types";
 import { archiveBatch, readArchiveStats } from "./event-archive";
 import { generateSecureRandomString, secureRandom } from "./downloads_do/helpers";
 import { timingSafeStringEqual } from "./timing";
