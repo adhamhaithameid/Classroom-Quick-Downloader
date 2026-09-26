@@ -5,18 +5,100 @@
  * endpoint) and retry logic. Tab-free: no bypass windows, ever.
  */
 
-import type { PendingDownload } from './types';
+import type { FileMetaMsg, PendingDownload } from './types';
 import {
   registerPending,
   bindDownloadId,
   AUTHUSER_CANDIDATES,
 } from './state';
+import { sanitizeFileName } from '../../src/core/name/sanitize';
 import { extractAuthUserFromUrl } from './auth-utils';
 import { normalizeUrl, buildUrlWithAuthUser, getFilenameExt } from './url-helpers';
 import { cleanup } from './cleanup';
 import { sendStatusToTab } from './message-sender';
 import { recordDownloadEvent } from '../utils/analytics';
 import { validateDownloadUrl } from '../../src/v2/decision/download-validator';
+
+/**
+ * S2 (audit docs/SECURITY_AUDIT_EXTENSION_2026-09-24.md): the
+ * chrome.downloads.download callback never fires when the target host accepts
+ * the connection but stalls, which used to leave the CQD_DOWNLOAD response
+ * dangling until the 150s stall deadline reaped the pending. Every start now
+ * races the callback against DOWNLOAD_START_TIMEOUT_MS and settles honestly;
+ * a late callback after the timeout cancels the stray download and never
+ * resurrects the settled flow.
+ */
+export const DOWNLOAD_START_TIMEOUT_MS = 15_000;
+
+type StartHandler = (downloadId: number | undefined, hadError: boolean) => void;
+
+export const DOWNLOAD_START_TIMEOUT_MESSAGE =
+  'The download could not be started — the source never responded. Try again.';
+
+/**
+ * Shared S2 timeout settle: analytics + honest status + optional sendResponse
+ * + cleanup. One body, four call sites (startSingleAttempt, attemptDriveStart,
+ * startNextDriveAttempt, index.ts retrySameAttempt) so the copies cannot drift.
+ */
+export function handleStartTimeout(
+  pending: PendingDownload,
+  respondOnce?: (payload: any) => void,
+): void {
+  recordDownloadEvent({
+    type: pending.fileMeta?.ext || 'unknown',
+    status: 'fail',
+    duration_ms: Date.now() - pending.startTime,
+    bypass_used: false,
+    error_type: 'DOWNLOAD_START_TIMEOUT',
+  });
+  sendStatusToTab(pending, 'error', DOWNLOAD_START_TIMEOUT_MESSAGE, 'DOWNLOAD_START_TIMEOUT');
+  respondOnce?.({ started: false, userMessage: DOWNLOAD_START_TIMEOUT_MESSAGE });
+  cleanup(pending);
+}
+
+export function startDownloadWithTimeout(
+  url: string,
+  pending: PendingDownload,
+  handleStart: StartHandler,
+  onTimeout: () => void,
+): void {
+  let settled = false;
+  const timer = setTimeout(() => {
+    if (settled) return;
+    settled = true;
+    pending.startTimedOut = true;
+    if (pending.isCancelled) return;
+    onTimeout();
+  }, DOWNLOAD_START_TIMEOUT_MS);
+  try {
+    chrome.downloads.download(
+      { url, saveAs: false, conflictAction: 'uniquify' },
+      (downloadId) => {
+        clearTimeout(timer);
+        if (pending.startTimedOut) {
+          // Timeout already settled the flow. Kill the stray download if it
+          // eventually started; never double-settle or resurrect.
+          if (downloadId) {
+            try {
+              chrome.downloads.cancel(downloadId, () => { void chrome.runtime.lastError; });
+            } catch { /* already gone */ }
+          } else {
+            void chrome.runtime.lastError;
+          }
+          return;
+        }
+        settled = true;
+        handleStart(downloadId, !!chrome.runtime.lastError || !downloadId);
+      },
+    );
+  } catch {
+    clearTimeout(timer);
+    if (!settled) {
+      settled = true;
+      handleStart(undefined, true);
+    }
+  }
+}
 
 /**
  * Start a single (non-Drive) download attempt.
@@ -35,10 +117,11 @@ export function startSingleAttempt(
     return;
   }
 
-  chrome.downloads.download(
-    { url: pending.baseUrl, saveAs: false, conflictAction: 'uniquify' },
-    (downloadId) => {
-      if (chrome.runtime.lastError || !downloadId) {
+  startDownloadWithTimeout(
+    pending.baseUrl,
+    pending,
+    (downloadId, hadError) => {
+      if (hadError) {
         recordDownloadEvent({
           type: pending.fileMeta?.ext || 'unknown',
           status: 'fail',
@@ -50,9 +133,10 @@ export function startSingleAttempt(
         respondOnce?.({ started: false, userMessage: 'Browser blocked download.' });
         return;
       }
-      bindDownloadId(pending, downloadId);
+      bindDownloadId(pending, downloadId as number);
       respondOnce?.({ started: true, requestId: pending.requestId, downloadId });
-    }
+    },
+    () => handleStartTimeout(pending, respondOnce),
   );
 }
 
@@ -104,16 +188,33 @@ export function startNextDriveAttempt(pending: PendingDownload): void {
     return;
   }
 
-  chrome.downloads.download(
-    { url: attemptUrl, saveAs: false, conflictAction: 'uniquify' },
-    (downloadId) => {
-      if (chrome.runtime.lastError || !downloadId) {
+  startDownloadWithTimeout(
+    attemptUrl,
+    pending,
+    (downloadId, hadError) => {
+      if (hadError) {
         startNextDriveAttempt(pending);
         return;
       }
-      bindDownloadId(pending, downloadId);
-    }
+      bindDownloadId(pending, downloadId as number);
+    },
+    () => handleStartTimeout(pending),
   );
+}
+
+/**
+ * S1 boundary (audit docs/SECURITY_AUDIT_EXTENSION_2026-09-24.md): page-
+ * controlled fileMeta.name is path-hardened at the single chokepoint every
+ * download request crosses (the CQD_DOWNLOAD listener AND the bridge both
+ * converge on handleDownloadRequest). Never rely on the browser sink alone.
+ */
+export function sanitizeDownloadName(
+  fileMeta: FileMetaMsg | undefined,
+): FileMetaMsg | undefined {
+  if (!fileMeta?.name) return fileMeta;
+  const name = sanitizeFileName(fileMeta.name);
+  if (name === fileMeta.name) return fileMeta;
+  return { ...fileMeta, name };
 }
 
 /**
@@ -126,7 +227,7 @@ export function handleDownloadRequest(
   sendResponse: (response?: any) => void
 ): boolean {
   const rawUrl = message.url as string | undefined;
-  const fileMeta = message.fileMeta;
+  const fileMeta = sanitizeDownloadName(message.fileMeta);
   const requestId = message.requestId || `req-${Date.now()}`;
 
   if (!rawUrl) {
@@ -191,9 +292,10 @@ export function handleDownloadRequest(
     }
 
     const attemptDriveStart = (): void => {
-      chrome.downloads.download(
-        { url: firstUrl, saveAs: false, conflictAction: 'uniquify' },
-        (id) => {
+      startDownloadWithTimeout(
+        firstUrl,
+        pending,
+        (id, hadError) => {
           // Race condition check
           if (pending.isCancelled) {
             if (id) chrome.downloads.cancel(id, () => { const _ = chrome.runtime.lastError; });
@@ -201,8 +303,7 @@ export function handleDownloadRequest(
             return;
           }
 
-          if (chrome.runtime.lastError || !id) {
-            const _ = chrome.runtime.lastError;
+          if (hadError) {
             // No-dead-ends: the browser can transiently refuse a start.
             // Retry ONCE after a short beat, then settle with guidance.
             if (!pending.startRetried && !pending.isCancelled) {
@@ -228,9 +329,10 @@ export function handleDownloadRequest(
             cleanup(pending);
             return;
           }
-          bindDownloadId(pending, id);
+          bindDownloadId(pending, id as number);
           respondOnce({ started: true, requestId, downloadId: id });
-        }
+        },
+        () => handleStartTimeout(pending, respondOnce),
       );
     };
     attemptDriveStart();

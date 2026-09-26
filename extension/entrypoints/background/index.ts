@@ -32,8 +32,10 @@ import { ensureAnalyticsAlarm, checkAndCloseFileTab } from './analytics-alarm';
 import { sendStatusToTab } from './message-sender';
 import {
   handleDownloadRequest,
+  handleStartTimeout,
   startNextDriveAttempt,
   startSingleAttempt,
+  startDownloadWithTimeout,
 } from './download-handler';
 import { Analytics, refreshRemoteAnalyticsConfig, recordDownloadEvent } from '../utils/analytics';
 import { installRuntimeErrorReporting } from '../utils/analytics/runtime-errors';
@@ -198,7 +200,7 @@ export default defineBackground(() => {
       chrome.tabs.sendMessage(sender.tab.id, {
         type: STUDENT_WORK_RESOLVE_RELAY_TYPE,
         payload: message.payload,
-      });
+      }, () => { void chrome.runtime.lastError; });
     } catch {
       // Ignore send failures when tab/frame is gone.
     }
@@ -215,15 +217,20 @@ export default defineBackground(() => {
         typeof pending.currentAuthUser === 'number'
           ? buildUrlWithAuthUser(pending.baseUrl, pending.currentAuthUser)
           : pending.baseUrl;
-      chrome.downloads.download({ url, saveAs: false, conflictAction: 'uniquify' }, (id) => {
-        if (chrome.runtime.lastError || !id) {
-          const _ = chrome.runtime.lastError;
-          sendStatusToTab(pending, 'error', t('downloadInterrupted'), 'RETRY_START_FAIL');
-          cleanup(pending);
-          return;
-        }
-        bindDownloadId(pending, id);
-      });
+      // S2: same start-timeout contract as the primary attempt paths.
+      startDownloadWithTimeout(
+        url,
+        pending,
+        (downloadId, hadError) => {
+          if (hadError || downloadId == null) {
+            sendStatusToTab(pending, 'error', t('downloadInterrupted'), 'RETRY_START_FAIL');
+            cleanup(pending);
+            return;
+          }
+          bindDownloadId(pending, downloadId);
+        },
+        () => handleStartTimeout(pending),
+      );
     } else {
       startSingleAttempt(pending);
     }

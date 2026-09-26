@@ -252,3 +252,92 @@ describe('core/name sanitize — mutation hardening (S12)', () => {
     expect(deriveFileNameFromUrl('https://example.com/notes%2Etxt')).toBe('notes.txt');
   });
 });
+
+// ============================================================================
+// PATH HARDENING (S1) — audit docs/SECURITY_AUDIT_EXTENSION_2026-09-24.md.
+// Classroom attachment titles (and bridge `file.name` payloads) reach
+// onDeterminingFilename suggest(). Chrome's sink rejects hostile forms today,
+// but the pipeline must never TRUST the sink: path separators, control
+// characters, and leading dot/tilde are stripped at the source so a future
+// browser change cannot turn a page-controlled name into traversal.
+// Once separators are gone, interior '..' is an inert filename character
+// (no path components left to traverse), so it is preserved — collapsing it
+// would mutilate legitimate ellipsis names like "notes...draft.pdf".
+// ============================================================================
+
+describe('core/name sanitize — path hardening (S1)', () => {
+  it('strips path separators from traversal attempts', () => {
+    expect(sanitizeFileName('../../evil.js')).toBe('evil.js');
+    expect(sanitizeFileName('..\\..\\evil.js')).toBe('evil.js');
+    expect(sanitizeFileName('/etc/passwd')).toBe('etcpasswd');
+    expect(sanitizeFileName('foo/../../bar.pdf')).toBe('foo....bar.pdf');
+    expect(sanitizeFileName('..\\..\\..\\..\\Windows\\system32\\evil.dll')).toBe('Windowssystem32evil.dll');
+  });
+
+  it('strips absolute-path prefixes and home-relative shortcuts', () => {
+    expect(sanitizeFileName('C:\\Users\\v\\evil.exe')).toBe('CUsersvevil.exe');
+    expect(sanitizeFileName('~/evil.sh')).toBe('evil.sh');
+    expect(sanitizeFileName('..hidden')).toBe('hidden');
+    expect(sanitizeFileName('...')).toBe('');
+  });
+
+  it('strips control characters', () => {
+    expect(sanitizeFileName('bad\u0001name.pdf')).toBe('badname.pdf');
+    expect(sanitizeFileName('bad\u0000\u001fname.pdf')).toBe('badname.pdf');
+    expect(sanitizeFileName('bad\u007fname.pdf')).toBe('badname.pdf');
+  });
+
+  it('keeps legitimate names byte-identical', () => {
+    expect(sanitizeFileName('Homework.pdf')).toBe('Homework.pdf');
+    expect(sanitizeFileName('notes...draft.pdf')).toBe('notes...draft.pdf');
+    expect(sanitizeFileName('my file (2026) [final].pdf')).toBe('my file (2026) [final].pdf');
+    expect(sanitizeFileName('ファイル 名前 省略')).toBe('ファイル 名前 省略');
+  });
+
+  it('path-hardened output is still a valid input to the label pipeline', () => {
+    expect(sanitizeFileName('../../report.pdf Microsoft Word')).toBe('report.pdf');
+    expect(sanitizeFileName('..\\..\\notes.txtnotes.txt')).toBe('notes.txt');
+  });
+
+  it('never emits traversal-capable output (adversarial property, 200 cases)', () => {
+    const rnd = makeRandom(20260924);
+    const hostileAlphabets = [
+      './\\~',
+      '../',
+      '..\\',
+      'a/b\\c.~',
+      '\u0001\u0002\u007f',
+      ALPHABETS[0],
+    ];
+    for (let i = 0; i < 200; i++) {
+      const alphabet = hostileAlphabets[Math.floor(rnd() * hostileAlphabets.length)];
+      const length = Math.floor(rnd() * 40);
+      let input = '';
+      for (let j = 0; j < length; j++) {
+        input += alphabet[Math.floor(rnd() * alphabet.length)];
+      }
+      const result = sanitizeFileName(input);
+      expect(result, JSON.stringify(input)).not.toMatch(/[/\\]/);
+      expect(result, JSON.stringify(input)).not.toMatch(/[\u0000-\u001f\u007f]/);
+      if (result.length > 0) {
+        expect(result.startsWith('.'), JSON.stringify(input)).toBe(false);
+        expect(result.startsWith('~'), JSON.stringify(input)).toBe(false);
+      }
+    }
+  });
+
+  it('path hardening is idempotent on hostile input', () => {
+    const hostile = [
+      '../../evil.js',
+      '/etc/passwd',
+      'foo/../../bar.pdf',
+      '..\\..\\x.exe',
+      '~/.ssh/id_rsa',
+      '\u0000\u001fCON',
+    ];
+    for (const input of hostile) {
+      const once = sanitizeFileName(input);
+      expect(sanitizeFileName(once)).toBe(once);
+    }
+  });
+});

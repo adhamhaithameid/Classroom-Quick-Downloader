@@ -38,7 +38,7 @@ describe('background message sender', () => {
       status: 'error',
       errorCode: 'ERR',
       userMessage: 'failed',
-    });
+    }, expect.any(Function));
   });
 
   it('marks success as finalized and prevents duplicate success updates', () => {

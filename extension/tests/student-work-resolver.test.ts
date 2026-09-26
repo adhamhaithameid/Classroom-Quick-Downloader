@@ -1,6 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  STUDENT_WORK_CHANNEL_NAME,
   STUDENT_WORK_RESOLVE_RELAY_TYPE,
 } from '../src/student_work/constants';
 import { ViewKind } from '../src/engines/types';
@@ -161,7 +160,7 @@ describe('student_work/resolver', () => {
     expect(result.source).toBe('anchor');
   });
 
-  it('ignores forged BroadcastChannel resolver payloads when runtime relay is available', async () => {
+  it('ignores forged same-origin channel payloads when runtime relay is available (S4: no channel listener exists)', async () => {
     const appendSpy = vi.spyOn(document.documentElement, 'appendChild');
     appendSpy.mockImplementation((node: Node) => {
       if (!(node instanceof HTMLIFrameElement)) return node;
@@ -169,7 +168,10 @@ describe('student_work/resolver', () => {
       const requestId = iframeUrl.searchParams.get('cqd_sw_req');
       if (!requestId) return node;
       setTimeout(() => {
-        const sender = new FakeBroadcastChannel(STUDENT_WORK_CHANNEL_NAME);
+        // S4 removed the BroadcastChannel fallback, so nothing in the
+        // extension listens here anymore; a hostile same-origin broadcaster
+        // must be able to resolve nothing (the wait must time out).
+        const sender = new FakeBroadcastChannel('cqd-sw-resolver-v1');
         sender.postMessage({
           type: 'CQD_SW_RESOLVE_RESULT',
           requestId,

@@ -187,7 +187,7 @@ describe('v2 Download All group machine (z57 S3)', () => {
     expect(sendMessage).toHaveBeenCalledWith({
       type: 'CQD_CANCEL_DOWNLOAD',
       requestId: requestedPayloads()[0].requestId,
-    });
+    }, expect.any(Function));
 
     // Cancelled group resets after the short window.
     vi.advanceTimersByTime(GROUP_CANCELLED_RESET_MS + 10);
