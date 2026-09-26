@@ -140,7 +140,7 @@ function apiError(context, status, bodyText) {
     401: 'JWT rejected — check AMO_JWT_ISSUER/AMO_JWT_SECRET and that this machine’s clock is accurate.',
     403: 'Credentials are valid but not allowed to modify this add-on — check AMO_ADDON_ID ownership.',
     404: 'Add-on or version not found under this account — check AMO_ADDON_ID (GUID or slug).',
-    409: 'This version already exists on AMO — bump extension/package.json version or delete the AMO version.',
+    409: 'This version already exists on AMO. For unlisted channels the signed file is simply polled — if this persists unexpectedly, bump extension/package.json version or delete the AMO version.',
   };
   return new Error(`AMO API ${context} failed (HTTP ${status}): ${detail}${hints[status] ? `\nhint: ${hints[status]}` : ''}`);
 }
@@ -195,6 +195,15 @@ async function createNewAddon(env, jwt, xpiPath, versionUrl, version) {
     body: JSON.stringify({ version: { version, upload: uuid, channel: env.channel } }),
   });
   if (!createRes.ok) {
+    if (createRes.status === 409) {
+      // "Version 1.8.0 already exists" — an earlier run (or store upload)
+      // already registered this version. The version resource is exactly
+      // what the poll step below needs, so treat this as success and fetch
+      // its signed file. Re-runs of CI for the same package version stay
+      // green instead of wedging the signed-Firefox leg.
+      console.log('ℹ Version already exists on AMO — polling for its signed file…');
+      return true;
+    }
     console.error(`create flow: addon PUT failed (${createRes.status}): ${await createRes.text()}`);
     return false;
   }
