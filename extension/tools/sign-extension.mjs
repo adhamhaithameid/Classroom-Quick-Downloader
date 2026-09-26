@@ -140,7 +140,7 @@ function apiError(context, status, bodyText) {
     401: 'JWT rejected — check AMO_JWT_ISSUER/AMO_JWT_SECRET and that this machine’s clock is accurate.',
     403: 'Credentials are valid but not allowed to modify this add-on — check AMO_ADDON_ID ownership.',
     404: 'Add-on or version not found under this account — check AMO_ADDON_ID (GUID or slug).',
-    409: 'This version already exists on AMO — bump extension/package.json version or delete the AMO version.',
+    409: 'This version already exists on AMO. For unlisted channels the signed file is simply polled — if this persists unexpectedly, bump extension/package.json version or delete the AMO version.',
   };
   return new Error(`AMO API ${context} failed (HTTP ${status}): ${detail}${hints[status] ? `\nhint: ${hints[status]}` : ''}`);
 }
@@ -195,6 +195,15 @@ async function createNewAddon(env, jwt, xpiPath, versionUrl, version) {
     body: JSON.stringify({ version: { version, upload: uuid, channel: env.channel } }),
   });
   if (!createRes.ok) {
+    if (createRes.status === 409) {
+      // "Version 1.8.0 already exists" — an earlier run (or store upload)
+      // already registered this version. The version resource is exactly
+      // what the poll step below needs, so treat this as success and fetch
+      // its signed file. Re-runs of CI for the same package version stay
+      // green instead of wedging the signed-Firefox leg.
+      console.log('ℹ Version already exists on AMO — polling for its signed file…');
+      return true;
+    }
     console.error(`create flow: addon PUT failed (${createRes.status}): ${await createRes.text()}`);
     return false;
   }
@@ -246,23 +255,59 @@ async function main() {
   console.log('✓ Uploaded — AMO is validating/signing the version…');
 
   // 2. Poll until the signed file object exists (validation is async).
+  // The single-version detail endpoint 404s for some server-side states
+  // even when the addon-resource PUT reports the version as existing, so
+  // every round also walks the add-on's full version list (filter=all is
+  // required to see unlisted versions) looking for the signed file.
+  const findSignedFile = async () => {
+    const getRes = await fetch(versionUrl, { headers: { Authorization: `JWT ${jwt}` } });
+    if (getRes.ok) {
+      const json = await getRes.json();
+      if (json.validation_errors) {
+        fail(`AMO rejected the upload:\n${JSON.stringify(json.validation_errors, null, 2)}`);
+      }
+      if (json.file?.url) return json.file;
+    }
+    const listRes = await fetch(
+      `${env.baseUrl}/api/v5/addons/${encodeURIComponent(env.addonId)}/versions/?filter=all`,
+      { headers: { Authorization: `JWT ${jwt}` } },
+    );
+    if (listRes.ok) {
+      const list = await listRes.json().catch(() => null);
+      const match = (list?.results ?? []).find((v) => v?.version === version);
+      if (match?.file?.url) return match.file;
+    }
+    return null;
+  };
   const deadline = Date.now() + env.pollTimeoutMs;
   let file = null;
+  let lastDiagAt = 0;
   while (Date.now() < deadline) {
-    const getRes = await fetch(versionUrl, { headers: { Authorization: `JWT ${jwt}` } });
-    if (!getRes.ok) fail((await apiError('poll', getRes.status, await getRes.text())).message);
-    const json = await getRes.json();
-    file = json.file ?? null;
+    file = await findSignedFile();
     if (file?.url) break;
-    if (json.validation_errors) {
-      fail(`AMO rejected the upload:\n${JSON.stringify(json.validation_errors, null, 2)}`);
+    if (Date.now() - lastDiagAt > 30_000) {
+      lastDiagAt = Date.now();
+      const detail = await fetch(versionUrl, { headers: { Authorization: `JWT ${jwt}` } });
+      const list = await fetch(
+        `${env.baseUrl}/api/v5/addons/${encodeURIComponent(env.addonId)}/versions/?filter=all`,
+        { headers: { Authorization: `JWT ${jwt}` } },
+      );
+      const listBody = list.ok ? await list.json().catch(() => null) : null;
+      const versions = (listBody?.results ?? []).map((v) => v?.version).slice(0, 6);
+      console.log(
+        `… waiting: version detail HTTP ${detail.status}, version list HTTP ${list.status}` +
+          (versions.length ? ` (latest: ${versions.join(', ')})` : ' (no versions visible)') +
+          ` — ${Math.round((deadline - Date.now()) / 1000)}s left`,
+      );
     }
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
   }
   if (!file?.url) {
     fail(
       `signing did not complete within ${env.pollTimeoutMs} ms. Check the version manually: ${versionUrl}` +
-        (env.channel === 'listed' ? ' (listed channels sign only after review approval.)' : ''),
+        (env.channel === 'listed' ? ' (listed channels sign only after review approval.)' : '') +
+        ` If the version exists but exposes no file, its server-side state is stuck — ` +
+        `delete that version on AMO (or bump extension/package.json) and re-run.`,
     );
   }
 

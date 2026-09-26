@@ -135,6 +135,29 @@ jobs:
           site_origin="$(printf '%s' "${PUBLIC_SITE_URL}" | sed -E 's#(https?://[^/]+).*#\1#')"
           legacy_site_origin="https://classroom-quick-downloader-website.pages.dev"
 
+          # Cloudflare's edge applies IP-reputation challenges to datacenter
+          # ASNs on the workers.dev subdomain, which 502s GHA runners while
+          # residential IPs pass (bead q8o). A browser UA plus retries are the
+          # code-side mitigation; the durable fix is a custom domain route or
+          # WAF allowlist for CI (dashboard action).
+          curl_ua="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36 CQD-CI/1.0"
+
+          curl_worker() {
+            # curl_worker <output-file> <curl args...> — retries the request
+            # until it succeeds, printing the last response code.
+            local out="$1"; shift
+            local attempt code
+            for attempt in 1 2 3 4 5; do
+              code="$(curl -sS -A "${curl_ua}" -o "${out}" -w "%{http_code}" "$@" || true)"
+              case "${code}" in
+                2*) echo "${code}"; return 0 ;;
+              esac
+              echo "::warning::worker request ${*} got HTTP ${code} (attempt ${attempt}/5); retrying in 5s"
+              sleep 5
+            done
+            echo "${code}"; return 1
+          }
+
           site_code="$(curl -sS -o /tmp/website-home.txt -w "%{http_code}" "${site_url}" || true)"
           case "${site_code}" in
             200|301|302|307|308) ;;
@@ -145,22 +168,36 @@ jobs:
               ;;
           esac
 
-          health_code="$(curl -sS -o /tmp/worker-health.json -w "%{http_code}" "${worker_base}/health" || true)"
-          if [ "${health_code}" != "200" ]; then
+          if health_code="$(curl_worker /tmp/worker-health.json "${worker_base}/health")"; then
+            :
+          else
             echo "::error::Worker /health smoke check failed (HTTP ${health_code})"
             cat /tmp/worker-health.json || true
             exit 1
           fi
 
-          auth_code="$(curl -sS -o /tmp/worker-auth.txt -w "%{http_code}" "${worker_base}/admin/website/status" || true)"
-          if [ "${auth_code}" != "401" ] && [ "${auth_code}" != "403" ]; then
-            echo "::error::Worker auth smoke check expected 401/403, got ${auth_code}"
+          if auth_code="$(curl_worker /tmp/worker-auth.txt "${worker_base}/admin/website/status")"; then
+            case "${auth_code}" in
+              401|403) ;;
+              *)
+                echo "::error::Worker auth smoke check expected 401/403, got ${auth_code}"
+                cat /tmp/worker-auth.txt || true
+                exit 1
+                ;;
+            esac
+          else
+            echo "::error::Worker auth smoke check unreachable (HTTP ${auth_code})"
             cat /tmp/worker-auth.txt || true
             exit 1
           fi
 
-          snapshot_payload="$(curl -fsS "${worker_base}/api/public/website/snapshot")"
-          echo "${snapshot_payload}" | grep -Eq '"schemaVersion"[[:space:]]*:[[:space:]]*"1"'
+          if snapshot_code="$(curl_worker /tmp/worker-snapshot.json "${worker_base}/api/public/website/snapshot")"; then
+            grep -Eq '"schemaVersion"[[:space:]]*:[[:space:]]*"1"' /tmp/worker-snapshot.json
+          else
+            echo "::error::Worker snapshot smoke check failed (HTTP ${snapshot_code})"
+            cat /tmp/worker-snapshot.json || true
+            exit 1
+          fi
 
           event_id="gha-website-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           ingest_payload="$(cat <<JSON
@@ -170,11 +207,21 @@ jobs:
 
           post_ingest() {
             local origin="$1"
-            curl -fsS -X POST "${worker_base}/api/public/website/events" \
-              -H "Origin: ${origin}" \
-              -H "Content-Type: application/json" \
-              -H "X-Requested-With: XMLHttpRequest" \
-              --data "${ingest_payload}"
+            # The ingest POST is the request the edge most aggressively 502s
+            # for datacenter ASNs (bead q8o); retry with backoff + browser UA.
+            local attempt
+            for attempt in 1 2 3 4 5; do
+              if curl -fsS -A "${curl_ua}" -X POST "${worker_base}/api/public/website/events" \
+                -H "Origin: ${origin}" \
+                -H "Content-Type: application/json" \
+                -H "X-Requested-With: XMLHttpRequest" \
+                --data "${ingest_payload}"; then
+                return 0
+              fi
+              echo "::warning::ingest POST for origin ${origin} failed (attempt ${attempt}/5); retrying in 5s"
+              sleep 5
+            done
+            return 1
           }
 
           if ! ingest_response="$(post_ingest "${site_origin}")"; then

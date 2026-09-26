@@ -6,6 +6,10 @@
  * external dependency.
  */
 
+// Explicit type import (not the tsconfig global): the extension test suite
+// imports this module, and that program does not load workers-types globals.
+import type { D1Database } from "@cloudflare/workers-types";
+
 export type EventArchiveKind = "extension-batch" | "website-events";
 
 export interface ArchiveWriteResult {

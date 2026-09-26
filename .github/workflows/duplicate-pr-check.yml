@@ -23,6 +23,9 @@ jobs:
       - name: Compare against other open PRs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # No checkout in this job, so gh cannot resolve the repo from a
+          # git remote — it would die with "fatal: not a git repository".
+          GH_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           REPO: ${{ github.repository }}

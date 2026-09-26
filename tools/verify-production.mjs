@@ -8,6 +8,7 @@
 // Exit 0 = all checks passed; exit 1 = one or more failures (printed below).
 
 import { readFileSync } from 'node:fs';
+import { checkLegacyRedirect } from './check-legacy-redirect.mjs';
 
 const BASE = (process.env.BASE_URL ?? 'https://classroom-quick-downloader.adhamhaithameid.is-a.dev').replace(/\/+$/, '');
 const CANONICAL_HOST = 'classroom-quick-downloader.adhamhaithameid.is-a.dev';
@@ -67,7 +68,7 @@ const pages = [
   ['/', 'Classroom Quick Downloader', false],
   ['/security', 'Requested Permissions, Line By Line', true],
   ['/privacy', 'Browser permissions explained', false],
-  ['/download-all-attachments-google-classroom', 'Maintained by Adham Haitham', true],
+  ['/download-all-attachments-google-classroom', 'Maintained by', true],
   ['/install/chrome', 'Install CQD For Chrome', true],
   ['/faq', 'Frequently Asked Questions', false],
   ['/changelog', 'Changelog', false],
@@ -77,7 +78,12 @@ for (const [path, marker, expectByline] of pages) {
     const body = await fetchOk(path);
     expectContains(body, marker, 'content marker');
     expectContains(body, `https://${CANONICAL_HOST}`, 'canonical host');
-    if (expectByline) expectContains(body, 'Maintained by', 'guide byline');
+    if (expectByline) {
+      // Checked as two markers: the byline renders the name inside <strong>,
+      // so a single literal "Maintained by Adham Haitham" never matches.
+      expectContains(body, 'Maintained by', 'byline lead');
+      expectContains(body, 'Adham Haitham', 'byline name');
+    }
     if (/<meta name="robots" content="noindex/.test(body)) throw new Error('unexpected noindex');
   });
 }
@@ -100,10 +106,7 @@ await check('unknown route returns 404', async () => {
   if (response.status !== 404) throw new Error(`HTTP ${response.status}`);
 });
 await check('legacy Pages host redirects to canonical', async () => {
-  const response = await fetch('https://classroom-quick-downloader-website.pages.dev/', { redirect: 'manual' });
-  if (response.status !== 301) throw new Error(`HTTP ${response.status}, expected 301`);
-  const location = response.headers.get('location') ?? '';
-  if (!location.includes(CANONICAL_HOST)) throw new Error(`redirect target ${location}`);
+  await checkLegacyRedirect();
 });
 
 // 5) Infrastructure (informational failures do not block the website verdicts above)
@@ -113,11 +116,18 @@ await check('worker /health reachable', async () => {
   if (response.status === 429) throw new Error('HTTP 429 error 1027 — free-plan daily cap consumed (see ORACLE_RECOVERY_RUNBOOK.md)');
   if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
 });
-await check('oracle /health reachable', async () => {
-  const base = process.env.ORACLE_BASE_URL ?? 'https://oracle.classroom-quick-downloader.com';
-  const response = await fetch(`${base}/health`);
-  if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
-});
+// Oracle is severed from the live path (optional ORACLE_ENDPOINT mirror);
+// scheduled monitors set SKIP_ORACLE_CHECK=1 so a dormant backend does not
+// page anyone. Deploys keep the check by default.
+if (process.env.SKIP_ORACLE_CHECK === '1') {
+  checks.push('  skip  oracle /health reachable (SKIP_ORACLE_CHECK=1)');
+} else {
+  await check('oracle /health reachable', async () => {
+    const base = process.env.ORACLE_BASE_URL ?? 'https://oracle.classroom-quick-downloader.com';
+    const response = await fetch(`${base}/health`);
+    if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
+  });
+}
 
 console.log(`Production smoke — ${BASE}`);
 for (const line of checks) console.log(line);
