@@ -35,7 +35,7 @@ test('passes when the legacy host 301s to the canonical domain', async () => {
     },
     (base) =>
       checkLegacyRedirect({ legacyBase: base, canonicalHost: CANONICAL }).then((location) =>
-        assert.match(location, new RegExp(`^https://${CANONICAL.replace(/\./g, '\\.')}/$`))
+        assert.equal(location, `https://${CANONICAL}/`)
       )
   );
 });
