@@ -4084,7 +4084,10 @@ export class DownloadsDurable {
   private async handlePublicUninstallSubmit(request: Request): Promise<Response> {
     const now = Date.now();
 
-    let raw: unknown = null;
+    // No initializer: every try path assigns raw or returns, so the catch
+    // fall-through always leaves raw assigned (and a `= null` start value
+    // would be a provably dead write — eslint no-useless-assignment).
+    let raw: unknown;
     try {
       const text = await request.text();
       if (text.length > UNINSTALL_MAX_PAYLOAD_BYTES) {
