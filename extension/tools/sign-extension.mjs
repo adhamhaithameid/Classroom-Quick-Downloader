@@ -281,9 +281,25 @@ async function main() {
   };
   const deadline = Date.now() + env.pollTimeoutMs;
   let file = null;
+  let lastDiagAt = 0;
   while (Date.now() < deadline) {
     file = await findSignedFile();
     if (file?.url) break;
+    if (Date.now() - lastDiagAt > 30_000) {
+      lastDiagAt = Date.now();
+      const detail = await fetch(versionUrl, { headers: { Authorization: `JWT ${jwt}` } });
+      const list = await fetch(
+        `${env.baseUrl}/api/v5/addons/${encodeURIComponent(env.addonId)}/versions/?filter=all`,
+        { headers: { Authorization: `JWT ${jwt}` } },
+      );
+      const listBody = list.ok ? await list.json().catch(() => null) : null;
+      const versions = (listBody?.results ?? []).map((v) => v?.version).slice(0, 6);
+      console.log(
+        `… waiting: version detail HTTP ${detail.status}, version list HTTP ${list.status}` +
+          (versions.length ? ` (latest: ${versions.join(', ')})` : ' (no versions visible)') +
+          ` — ${Math.round((deadline - Date.now()) / 1000)}s left`,
+      );
+    }
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
   }
   if (!file?.url) {

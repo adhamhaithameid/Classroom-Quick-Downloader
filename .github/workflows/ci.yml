@@ -191,6 +191,10 @@ jobs:
       # secrets exist; QA_SIGNED_XPI is scoped to this step so the config
       # gains the qa-firefox-signed project only here.
       - name: Sign extension (AMO) + signed Firefox QA leg
+        # continue-on-error: Mozilla-side review/signing state can queue
+        # unlisted versions beyond this job's control (tracked as bead
+        # 0h4d.12.9); the two real-browser legs above stay blocking.
+        continue-on-error: true
         if: ${{ env.AMO_JWT_ISSUER != '' && env.AMO_JWT_SECRET != '' }}
         env:
           QA_SIGNED_XPI: ${{ github.workspace }}/extension/.output/signed.xpi
@@ -200,6 +204,7 @@ jobs:
           # already-registered version is owner-invisible to some API
           # surfaces (version GET 404s) and the create flow 409s.
           AMO_ADDON_ID: classroom-quick-downloader-qa@adhamhaitham.dev
+          AMO_POLL_TIMEOUT_MS: "600000"
         run: |
           pnpm exec playwright install firefox
           # Build the Firefox zip with the QA companion guid and a unique
