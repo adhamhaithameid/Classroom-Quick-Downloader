@@ -202,7 +202,9 @@ jobs:
           AMO_ADDON_ID: classroom-quick-downloader-qa@adhamhaitham.dev
         run: |
           pnpm exec playwright install firefox
-          pnpm -C extension firefox
+          # Build the Firefox zip with the QA companion guid so the manifest
+          # id matches the add-on AMO signs (AMO rejects mismatched ids).
+          FIREFOX_GECKO_ID=$AMO_ADDON_ID pnpm -C extension firefox
           pnpm -C extension sign:extension
           pnpm -C extension test:qa:firefox-signed
 

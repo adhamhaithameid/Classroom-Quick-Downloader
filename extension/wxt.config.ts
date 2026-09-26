@@ -70,7 +70,10 @@ export default defineConfig({
     },
     browser_specific_settings: {
       gecko: {
-        id: "classroom-quick-downloader@adhamhaitham.dev",
+        // CI's signed-Firefox QA leg overrides this with the QA companion
+        // guid (AMO_ADDON_ID / docs/EXTENSION_TESTING_RUNBOOK.md): AMO
+        // rejects uploads whose manifest id differs from the target add-on.
+        id: process.env.FIREFOX_GECKO_ID ?? "classroom-quick-downloader@adhamhaitham.dev",
         data_collection_permissions: {
           required: ["none"]
         },
