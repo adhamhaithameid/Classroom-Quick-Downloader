@@ -33,12 +33,15 @@ function listTsFiles(dir: string): string[] {
 }
 
 /** Strip string/template literals and comments so regex scanning of call
- *  shapes does not trip over prose or fixture payloads. */
+ *  shapes does not trip over prose or fixture payloads. The template-literal
+ *  alternation is deliberately unambiguous — escape, then `${…}`, then
+ *  anything-but-backtick with both prior shapes excluded — so no input can
+ *  backtrack it exponentially (CodeQL js/redos). */
 function stripLiteralsAndComments(src: string): string {
   return src
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/\/\/.*$/gm, '')
-    .replace(/`(?:\\[\s\S]|\$\{[^}]*\}|[^`\\])*`/g, '``')
+    .replace(/`(?:\\[\s\S]|\$\{[^}]*\}|(?!\\|\$\{)[^`])*`/g, '``')
     .replace(/'(?:\\.|[^'\\\n])*'/g, "''")
     .replace(/"(?:\\.|[^"\\\n])*"/g, '""');
 }
