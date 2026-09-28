@@ -1,10 +1,57 @@
 /* AUTO-GENERATED FILE. DO NOT EDIT DIRECTLY. */
 export const WEBSITE_MANUAL_CHANGELOG = {
-  "generatedAt": 1789611843976,
+  "generatedAt": 1790595943881,
   "source": "manual",
   "entries": [
     {
-      "id": "manual-1.8.0-1",
+      "id": "manual-1.8.7-1",
+      "version": "1.8.7",
+      "title": "Release 1.8.7",
+      "summary": "The site catches up with months of shipped work: a warmer look, real social proof, and live numbers — with the privacy copy now stating exactly what is true.",
+      "highlights": [
+        "A Buy Me a Coffee support button, a testimonials section built from real store reviews, and a live downloads-trend strip with a success badge on the overview.",
+        "Magnetic hover on the primary call-to-action buttons, and a branded cursor with native-cursor suppression (disabled for reduced-motion and touch users).",
+        "The privacy copy now says exactly what is true: \"Private by design\" and \"No personal data\" replace the old \"We collect nothing\" wording.",
+        "The footer shares the page's ambient background, and background grid lines bend gently around the cursor (static for reduced-motion / touch — falls back automatically).",
+        "Fixed the support button rendering as an empty image in production (the SVG asset was referenced but never committed)."
+      ],
+      "added": [
+        "A Buy Me a Coffee support button, a testimonials section built from real store reviews, and a live downloads-trend strip with a success badge on the overview.",
+        "Magnetic hover on the primary call-to-action buttons, and a branded cursor with native-cursor suppression (disabled for reduced-motion and touch users)."
+      ],
+      "changed": [
+        "The privacy copy now says exactly what is true: \"Private by design\" and \"No personal data\" replace the old \"We collect nothing\" wording.",
+        "The footer shares the page's ambient background, and background grid lines bend gently around the cursor (static for reduced-motion / touch — falls back automatically)."
+      ],
+      "fixed": [
+        "Fixed the support button rendering as an empty image in production (the SVG asset was referenced but never committed)."
+      ],
+      "releasedAtUtc": 1790595943878
+    },
+    {
+      "id": "manual-1.8.1-2",
+      "version": "1.8.1",
+      "title": "Release 1.8.1",
+      "summary": "The site gets a calmer, more personal feel: the background follows your cursor and the footer blends into the page.",
+      "highlights": [
+        "Background grid lines now bend gently around your cursor; static for reduced-motion / touch — falls back automatically.",
+        "The footer now shares the page's ambient background (orbs + interactive grid) instead of painting its own.",
+        "Fixed a duplicated static grid showing on the FAQ, Privacy, and Changelog pages.",
+        "Fixed a slight horizontal scroll caused by decorative background glow bleeding past the screen edge."
+      ],
+      "added": [],
+      "changed": [
+        "Background grid lines now bend gently around your cursor; static for reduced-motion / touch — falls back automatically.",
+        "The footer now shares the page's ambient background (orbs + interactive grid) instead of painting its own."
+      ],
+      "fixed": [
+        "Fixed a duplicated static grid showing on the FAQ, Privacy, and Changelog pages.",
+        "Fixed a slight horizontal scroll caused by decorative background glow bleeding past the screen edge."
+      ],
+      "releasedAtUtc": 1790509543878
+    },
+    {
+      "id": "manual-1.8.0-3",
       "version": "1.8.0",
       "title": "Release 1.8.0",
       "summary": "The no-dead-ends release: every download either succeeds or tells you exactly what to do next — with automatic retries, honest timeouts, and an adversarial test program proving it.",
@@ -26,10 +73,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed Sheets attachment downloads being rejected as invalid URLs."
       ],
-      "releasedAtUtc": 1789611843974
+      "releasedAtUtc": 1790423143878
     },
     {
-      "id": "manual-1.7.9-2",
+      "id": "manual-1.7.9-4",
       "version": "1.7.9",
       "title": "Release 1.7.9",
       "summary": "Firefox download reporting is now fully honest: success is only reported when the browser confirms the file finished.",
@@ -41,10 +88,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Firefox downloads report success only on actual completion — no more phantom successes that later vanish."
       ],
       "fixed": [],
-      "releasedAtUtc": 1789525443974
+      "releasedAtUtc": 1790336743878
     },
     {
-      "id": "manual-1.7.8-3",
+      "id": "manual-1.7.8-5",
       "version": "1.7.8",
       "title": "Release 1.7.8",
       "summary": "Stalled downloads now resolve honestly, and sign-in/error pages are never saved as fake downloads.",
@@ -59,10 +106,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed sign-in and error pages being saved as fake download files — they are now detected and reported as sign-in errors."
       ],
-      "releasedAtUtc": 1789439043974
+      "releasedAtUtc": 1790250343878
     },
     {
-      "id": "manual-1.7.7-4",
+      "id": "manual-1.7.7-6",
       "version": "1.7.7",
       "title": "Release 1.7.7",
       "summary": "Every download failure now has a classified, actionable outcome.",
@@ -79,10 +126,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed cancellations made from the browser's own download panel showing as errors — they now correctly show as cancelled."
       ],
-      "releasedAtUtc": 1789352643974
+      "releasedAtUtc": 1790163943878
     },
     {
-      "id": "manual-1.7.6-5",
+      "id": "manual-1.7.6-7",
       "version": "1.7.6",
       "title": "Release 1.7.6",
       "summary": "Internal hardening: a corpus of eleven real-world download failure scenarios now runs against both the engine's brain and its implementation, and they must agree on every outcome.",
@@ -90,10 +137,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1789266243974
+      "releasedAtUtc": 1790077543878
     },
     {
-      "id": "manual-1.7.5-6",
+      "id": "manual-1.7.5-8",
       "version": "1.7.5",
       "title": "Release 1.7.5",
       "summary": "The test simulator learned six new real-world failure shapes — server errors, sign-in redirects, mid-download connection drops, slow streams, empty files and quota pages — so the engine can be verified against them.",
@@ -101,10 +148,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1789179843974
+      "releasedAtUtc": 1789991143878
     },
     {
-      "id": "manual-1.7.4-7",
+      "id": "manual-1.7.4-9",
       "version": "1.7.4",
       "title": "Release 1.7.4",
       "summary": "Rendering groundwork for the next engine generation: all page observation now flows through one shared, throttled observer.",
@@ -112,10 +159,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1789093443974
+      "releasedAtUtc": 1789904743878
     },
     {
-      "id": "manual-1.7.3-8",
+      "id": "manual-1.7.3-10",
       "version": "1.7.3",
       "title": "Release 1.7.3",
       "summary": "Download All is now fully stabilized and the automated QA suite covers the entire manual runbook.",
@@ -129,10 +176,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed the root cause of Download All groups hanging on \"Downloading…\" forever.",
         "Fixed Download All progress not updating when the Classroom tab was in the background."
       ],
-      "releasedAtUtc": 1789007043974
+      "releasedAtUtc": 1789818343878
     },
     {
-      "id": "manual-1.7.2-9",
+      "id": "manual-1.7.2-11",
       "version": "1.7.2",
       "title": "Release 1.7.2",
       "summary": "The Engine Mode switch shipped in popup settings (Legacy / New) with live switching and one-click rollback, and page detection is now wired to the download engine through one typed bridge.",
@@ -140,10 +187,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1788920643974
+      "releasedAtUtc": 1789731943878
     },
     {
-      "id": "manual-1.7.1-10",
+      "id": "manual-1.7.1-12",
       "version": "1.7.1",
       "title": "Release 1.7.1",
       "summary": "The engine's internals now communicate through a typed event bus — the architectural groundwork that lets every later change be measured and rolled back independently.",
@@ -151,10 +198,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1788834243974
+      "releasedAtUtc": 1789645543878
     },
     {
-      "id": "manual-1.7.0-11",
+      "id": "manual-1.7.0-13",
       "version": "1.7.0",
       "title": "Release 1.7.0",
       "summary": "Zero-window downloads verified end-to-end: the old background-tab workaround is fully removed, and a locked test file proves the invisible account fallback completes real downloads.",
@@ -162,10 +209,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1788747843974
+      "releasedAtUtc": 1789559143878
     },
     {
-      "id": "manual-1.6.9-12",
+      "id": "manual-1.6.9-14",
       "version": "1.6.9",
       "title": "Release 1.6.9",
       "summary": "The fix for the most-reported download bug: files that start but fail now quietly try your other signed-in accounts, and downloads go straight through Google's direct file endpoint.",
@@ -179,10 +226,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed \"files start but fail\" reports on Firefox-family browsers (zen) and Brave.",
         "Fixed Download All groups with one broken file hanging instead of settling."
       ],
-      "releasedAtUtc": 1788661443974
+      "releasedAtUtc": 1789472743878
     },
     {
-      "id": "manual-1.6.8-13",
+      "id": "manual-1.6.8-15",
       "version": "1.6.8",
       "title": "Release 1.6.8",
       "summary": "The automated QA pipeline now replays the entire manual test runbook in real browsers — including real downloads verified byte-for-byte.",
@@ -190,10 +237,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1788575043974
+      "releasedAtUtc": 1789386343878
     },
     {
-      "id": "manual-1.6.7-14",
+      "id": "manual-1.6.7-16",
       "version": "1.6.7",
       "title": "Release 1.6.7",
       "summary": "Foundation for the automated QA program: a local, deterministic Google Classroom simulator that serves real downloadable files under the real Classroom origins.",
@@ -201,10 +248,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1788488643974
+      "releasedAtUtc": 1789299943878
     },
     {
-      "id": "manual-1.6.6-15",
+      "id": "manual-1.6.6-17",
       "version": "1.6.6",
       "title": "Release 1.6.6",
       "summary": "Detection and naming hardening: localized type labels no longer leak into filenames, download state races are fixed, and Sheets attachments get their buttons back.",
@@ -220,10 +267,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed download state races where concurrent downloads of the same file could cross wires.",
         "Fixed Google Sheets attachments not getting download buttons."
       ],
-      "releasedAtUtc": 1788402243974
+      "releasedAtUtc": 1789213543878
     },
     {
-      "id": "manual-1.6.5-16",
+      "id": "manual-1.6.5-18",
       "version": "1.6.5",
       "title": "Release 1.6.5",
       "summary": "More detection accuracy fixes: comment counts survive markup drift, exclusions match whole tokens, and localized dates parse correctly.",
@@ -231,10 +278,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1788315843974
+      "releasedAtUtc": 1789127143878
     },
     {
-      "id": "manual-1.6.4-17",
+      "id": "manual-1.6.4-19",
       "version": "1.6.4",
       "title": "Release 1.6.4",
       "summary": "Exclusion matching now operates on whole words, eliminating a family of false-positive detections.",
@@ -242,10 +289,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1788229443974
+      "releasedAtUtc": 1789040743878
     },
     {
-      "id": "manual-1.6.3-18",
+      "id": "manual-1.6.3-20",
       "version": "1.6.3",
       "title": "Release 1.6.3",
       "summary": "Detection defenses: number extraction now sanity-checks the page before trusting it.",
@@ -253,10 +300,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1788143043974
+      "releasedAtUtc": 1788954343878
     },
     {
-      "id": "manual-1.6.2-19",
+      "id": "manual-1.6.2-21",
       "version": "1.6.2",
       "title": "Release 1.6.2",
       "summary": "Detection accuracy across scripts: Armenian keywords, exact word-number matching, and Arabic diacritic folding fixed.",
@@ -264,10 +311,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1788056643974
+      "releasedAtUtc": 1788867943878
     },
     {
-      "id": "manual-1.6.1-20",
+      "id": "manual-1.6.1-22",
       "version": "1.6.1",
       "title": "Release 1.6.1",
       "summary": "The Engine V4 foundation: a measurable accuracy standard for the detection engine, a pure download state machine, and hardened release gates. Everything after this version is measured against a fixed corpus.",
@@ -281,10 +328,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1787970243974
+      "releasedAtUtc": 1788781543878
     },
     {
-      "id": "manual-1.6.0-21",
+      "id": "manual-1.6.0-23",
       "version": "1.6.0",
       "title": "Release 1.6.0",
       "summary": "The Engine V4 foundation: a measurable accuracy standard for the detection engine, a pure download state machine, and hardened release gates — plus the security-audit roll-up that closed the 1.5 line. Everything after this version is measured against a fixed corpus.",
@@ -305,10 +352,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed a race condition where concurrent downloads of the same file could cross wires.",
         "Removed an unused browser permission (least privilege)."
       ],
-      "releasedAtUtc": 1787883843974
+      "releasedAtUtc": 1788695143878
     },
     {
-      "id": "manual-1.5.9-22",
+      "id": "manual-1.5.9-24",
       "version": "1.5.9",
       "title": "Release 1.5.9",
       "summary": "A batch of reviewed, low-risk fixes and cleanups rolled into one stable release.",
@@ -316,10 +363,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1787797443974
+      "releasedAtUtc": 1788608743878
     },
     {
-      "id": "manual-1.5.8-23",
+      "id": "manual-1.5.8-25",
       "version": "1.5.8",
       "title": "Release 1.5.8",
       "summary": "Faster page scanning and a fully accessible popup.",
@@ -331,10 +378,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Optimized DOM traversal with combined CSS selectors for faster scans on busy pages."
       ],
       "fixed": [],
-      "releasedAtUtc": 1787711043974
+      "releasedAtUtc": 1788522343878
     },
     {
-      "id": "manual-1.5.7-24",
+      "id": "manual-1.5.7-26",
       "version": "1.5.7",
       "title": "Release 1.5.7",
       "summary": "A security-hardening release: the developer debug surface now escapes all runtime values before rendering.",
@@ -342,10 +389,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1787624643974
+      "releasedAtUtc": 1788435943878
     },
     {
-      "id": "manual-1.5.6-25",
+      "id": "manual-1.5.6-27",
       "version": "1.5.6",
       "title": "Release 1.5.6",
       "summary": "A security-and-accessibility release: cryptographically secure download identifiers, fully labeled controls, and deeper Student Work test coverage.",
@@ -353,10 +400,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1787538243974
+      "releasedAtUtc": 1788349543878
     },
     {
-      "id": "manual-1.5.5-26",
+      "id": "manual-1.5.5-28",
       "version": "1.5.5",
       "title": "Release 1.5.5",
       "summary": "A leaner packaging release focused on reducing extension size while preserving the same classroom behavior.",
@@ -374,10 +421,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed extension package bloat that increased install and update cost on slower networks."
       ],
-      "releasedAtUtc": 1787451843974
+      "releasedAtUtc": 1788263143878
     },
     {
-      "id": "manual-1.5.4-27",
+      "id": "manual-1.5.4-29",
       "version": "1.5.4",
       "title": "Release 1.5.4",
       "summary": "A performance-focused release with two measurable speed upgrades in scan and download orchestration paths.",
@@ -397,10 +444,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed repeated heavy-pass work that could slow down larger Classroom pages."
       ],
-      "releasedAtUtc": 1787365443974
+      "releasedAtUtc": 1788176743878
     },
     {
-      "id": "manual-1.5.3-28",
+      "id": "manual-1.5.3-30",
       "version": "1.5.3",
       "title": "Release 1.5.3",
       "summary": "Introduced a new detection layer for flags and files to keep ownership mapping stable across complex Classroom layouts.",
@@ -418,10 +465,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed edge cases where shared wrappers could cause mis-scoped file or flag decisions."
       ],
-      "releasedAtUtc": 1787279043974
+      "releasedAtUtc": 1788090343878
     },
     {
-      "id": "manual-1.5.2-29",
+      "id": "manual-1.5.2-31",
       "version": "1.5.2",
       "title": "Release 1.5.2",
       "summary": "A focused stabilization release delivering bug fixes and stronger security hardening for production classrooms.",
@@ -439,10 +486,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed download-state and mapping regressions that could impact reliability under mixed attachment sets."
       ],
-      "releasedAtUtc": 1787192643974
+      "releasedAtUtc": 1788003943878
     },
     {
-      "id": "manual-1.5.1-30",
+      "id": "manual-1.5.1-32",
       "version": "1.5.1",
       "title": "Release 1.5.1",
       "summary": "Expanded real-world support for the Student Work tap so teachers can download attached files and media directly from submissions.",
@@ -460,10 +507,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed early Student Work gaps where some submissions were not reachable through the normal download UX."
       ],
-      "releasedAtUtc": 1787106243974
+      "releasedAtUtc": 1787917543878
     },
     {
-      "id": "manual-1.5.0-31",
+      "id": "manual-1.5.0-33",
       "version": "1.5.0",
       "title": "Release 1.5.0",
       "summary": "This is the best and most reliable state the extension has reached so far. Download buttons, flag placement, and post detection are now much more accurate in real Google Classroom usage.",
@@ -491,10 +538,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed duplicate or nested flag borders on some posts.",
         "Fixed download states that could stay stuck even after the browser finished the file."
       ],
-      "releasedAtUtc": 1787019843974
+      "releasedAtUtc": 1787831143878
     },
     {
-      "id": "manual-1.4.0-32",
+      "id": "manual-1.4.0-34",
       "version": "1.4.0",
       "title": "Release 1.4.0",
       "summary": "A major under-the-hood release that introduced the V2 engine foundation. It made the extension safer to improve without breaking the stable experience you already rely on.",
@@ -514,10 +561,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed several fragile internal paths by giving the extension clearer runtime boundaries."
       ],
-      "releasedAtUtc": 1786933443974
+      "releasedAtUtc": 1787744743878
     },
     {
-      "id": "manual-1.3.9-33",
+      "id": "manual-1.3.9-35",
       "version": "1.3.9",
       "title": "Release 1.3.9",
       "summary": "Improved release consistency and user-facing clarity across the website and extension experiences.",
@@ -541,10 +588,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed issues where changelog visibility could be inconsistent across surfaces.",
         "Fixed multiple reliability edge cases in update-state handling."
       ],
-      "releasedAtUtc": 1786847043974
+      "releasedAtUtc": 1787658343878
     },
     {
-      "id": "manual-1.3.8-34",
+      "id": "manual-1.3.8-36",
       "version": "1.3.8",
       "title": "Release 1.3.8",
       "summary": "Improved changelog reliability so users always receive updates, even when the version number stays the same.",
@@ -568,10 +615,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed same-version publish cases where users could miss new changelog updates.",
         "Fixed stale version-pill and changelog content after changelog updates."
       ],
-      "releasedAtUtc": 1786760643974
+      "releasedAtUtc": 1787571943878
     },
     {
-      "id": "manual-1.3.7-35",
+      "id": "manual-1.3.7-37",
       "version": "1.3.7",
       "title": "Release 1.3.7",
       "summary": "Improved daily reliability and clearer release communication for normal users.",
@@ -595,10 +642,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed cancelled-download accounting edge cases.",
         "Fixed intermittent long-run progress-state inconsistencies."
       ],
-      "releasedAtUtc": 1786674243974
+      "releasedAtUtc": 1787485543878
     },
     {
-      "id": "manual-1.3.6-36",
+      "id": "manual-1.3.6-38",
       "version": "1.3.6",
       "title": "Release 1.3.6",
       "summary": "Focused on stability and compatibility hardening for heavy classroom workloads.",
@@ -622,10 +669,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed stuck-progress scenarios during long runs.",
         "Fixed dependency-path compatibility friction."
       ],
-      "releasedAtUtc": 1786587843974
+      "releasedAtUtc": 1787399143878
     },
     {
-      "id": "manual-1.3.0-37",
+      "id": "manual-1.3.0-39",
       "version": "1.3.0",
       "title": "Release 1.3.0",
       "summary": "Delivered major reliability, remote-config, and analytics improvements.",
@@ -649,10 +696,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed remote-config application issues on key limits and timing.",
         "Fixed queue integrity mismatch handling to avoid data drops."
       ],
-      "releasedAtUtc": 1786501443974
+      "releasedAtUtc": 1787312743878
     },
     {
-      "id": "manual-1.2.7-38",
+      "id": "manual-1.2.7-40",
       "version": "1.2.7",
       "title": "Release 1.2.7",
       "summary": "Broad security and reliability hardening across extension behavior.",
@@ -676,10 +723,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed multiple reliability edge cases found during hardening.",
         "Fixed several production stability regressions."
       ],
-      "releasedAtUtc": 1786415043974
+      "releasedAtUtc": 1787226343878
     },
     {
-      "id": "manual-1.2.3-39",
+      "id": "manual-1.2.3-41",
       "version": "1.2.3",
       "title": "Release 1.2.3",
       "summary": "Usability and telemetry consistency release.",
@@ -697,10 +744,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed inconsistent telemetry fields in specific event paths."
       ],
-      "releasedAtUtc": 1786328643974
+      "releasedAtUtc": 1787139943878
     },
     {
-      "id": "manual-1.2.2-40",
+      "id": "manual-1.2.2-42",
       "version": "1.2.2",
       "title": "Release 1.2.2",
       "summary": "Cancel-flow polish release.",
@@ -718,10 +765,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed inconsistent cleanup after cancellation."
       ],
-      "releasedAtUtc": 1786242243974
+      "releasedAtUtc": 1787053543878
     },
     {
-      "id": "manual-1.2.1-41",
+      "id": "manual-1.2.1-43",
       "version": "1.2.1",
       "title": "Release 1.2.1",
       "summary": "Unified cancel-system iteration release.",
@@ -739,10 +786,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed slow cancel-state reflection edge cases."
       ],
-      "releasedAtUtc": 1786155843974
+      "releasedAtUtc": 1786967143878
     },
     {
-      "id": "manual-1.2.0-42",
+      "id": "manual-1.2.0-44",
       "version": "1.2.0",
       "title": "Release 1.2.0",
       "summary": "Cancel feature baseline release.",
@@ -760,10 +807,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed flow limitations where in-flight operations could not be interrupted."
       ],
-      "releasedAtUtc": 1786069443974
+      "releasedAtUtc": 1786880743878
     },
     {
-      "id": "manual-1.1.10-43",
+      "id": "manual-1.1.10-45",
       "version": "1.1.10",
       "title": "Release 1.1.10",
       "summary": "Late 1.1 line reliability release.",
@@ -781,10 +828,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed regressions discovered across prolonged usage sessions."
       ],
-      "releasedAtUtc": 1785983043974
+      "releasedAtUtc": 1786794343878
     },
     {
-      "id": "manual-1.1.5-44",
+      "id": "manual-1.1.5-46",
       "version": "1.1.5",
       "title": "Release 1.1.5",
       "summary": "Mid 1.1 quality and compatibility release.",
@@ -802,10 +849,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed minor behavior mismatches in repeated task flows."
       ],
-      "releasedAtUtc": 1785896643974
+      "releasedAtUtc": 1786707943878
     },
     {
-      "id": "manual-1.1.1-45",
+      "id": "manual-1.1.1-47",
       "version": "1.1.1",
       "title": "Release 1.1.1",
       "summary": "Post-1.1 stabilization release.",
@@ -823,10 +870,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed early 1.1 edge-case runtime failures."
       ],
-      "releasedAtUtc": 1785810243974
+      "releasedAtUtc": 1786621543878
     },
     {
-      "id": "manual-1.1.0-46",
+      "id": "manual-1.1.0-48",
       "version": "1.1.0",
       "title": "Release 1.1.0",
       "summary": "Feature and packaging expansion release.",
@@ -844,10 +891,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed packaging and configuration mismatches."
       ],
-      "releasedAtUtc": 1785723843974
+      "releasedAtUtc": 1786535143878
     },
     {
-      "id": "manual-1.0.1-47",
+      "id": "manual-1.0.1-49",
       "version": "1.0.1",
       "title": "Release 1.0.1",
       "summary": "Post-launch stabilization release.",
@@ -865,10 +912,10 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed first-wave regressions after 1.0.0 rollout."
       ],
-      "releasedAtUtc": 1785637443974
+      "releasedAtUtc": 1786448743878
     },
     {
-      "id": "manual-1.0.0-48",
+      "id": "manual-1.0.0-50",
       "version": "1.0.0",
       "title": "Release 1.0.0",
       "summary": "First stable production release.",
@@ -886,7 +933,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed pre-stable blockers before public release."
       ],
-      "releasedAtUtc": 1785551043974
+      "releasedAtUtc": 1786362343878
     }
   ]
 } as const;

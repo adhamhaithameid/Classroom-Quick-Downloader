@@ -1,4 +1,18 @@
+## v1.8.7
+### Summary
+The site catches up with months of shipped work: a warmer look, real social proof, and live numbers — with the privacy copy now stating exactly what is true.
+### Added
+- A Buy Me a Coffee support button, a testimonials section built from real store reviews, and a live downloads-trend strip with a success badge on the overview.
+- Magnetic hover on the primary call-to-action buttons, and a branded cursor with native-cursor suppression (disabled for reduced-motion and touch users).
+### Changed
+- The privacy copy now says exactly what is true: "Private by design" and "No personal data" replace the old "We collect nothing" wording.
+- The footer shares the page's ambient background, and background grid lines bend gently around the cursor (static for reduced-motion / touch — falls back automatically).
+### Fixed
+- Fixed the support button rendering as an empty image in production (the SVG asset was referenced but never committed).
+
 ## v1.8.1
+### Summary
+The site gets a calmer, more personal feel: the background follows your cursor and the footer blends into the page.
 ### Changed
 - Background grid lines now bend gently around your cursor; static for reduced-motion / touch — falls back automatically.
 - The footer now shares the page's ambient background (orbs + interactive grid) instead of painting its own.

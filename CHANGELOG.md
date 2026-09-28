@@ -4,10 +4,90 @@ This is the main engineering changelog for Classroom Quick Downloader.
 It focuses on meaningful product, reliability, security, and architecture changes instead of raw commit history.
 
 ## Versioning Notes
-- Current extension release line: `1.8.0`
-- The `1.5.6`→`1.8.0` ladder below is the materialized internal history: every point version is anchored to the commit record and file-change dates of its window; patches never reach `.10` — the next minor takes over (`1.6.9` → `1.7.0`, `1.7.9` → `1.8.0`)
+- Current extension release line: `1.8.7`
+- The `1.8.0`→`1.8.7` ladder below materializes the post-1.8.0 work as 0.0.1 steps anchored to commit dates; the `1.5.6`→`1.8.0` ladder remains the internal history of the 1.5→1.8 line: every point version is anchored to the commit record and file-change dates of its window; patches never reach `.10` — the next minor takes over (`1.6.9` → `1.7.0`, `1.7.9` → `1.8.0`, `1.8.9` → `1.9.0` when the Free-completion milestone ships)
 - Planned next engine milestone: post-1.6 acquisition strategy wiring (API download tier behind the consent gate)
 - Pre-`1.0.0` bootstrap work is intentionally omitted from the user-facing release ledger
+
+## [1.8.7] - 2026-09-28
+
+### Summary
+Downloads now survive service-worker restarts: job records persist, so an MV3 suspension no longer orphans an in-flight download.
+
+### Added
+- Added persistent download job records: each download's request, account-sweep position and terminal status are written through and restored on restart, with the 150 s deadline re-armed against the restored record.
+
+### Fixed
+- Fixed MV3 restarts orphaning active downloads (a button stuck "trying" after the service worker slept).
+- Test armor for the real-life edges: corrupt-record recovery, same-URL concurrency, authuser-sweep continuity across restart, TTL boundary, batch counters, live registry wiring.
+
+## [1.8.6] - 2026-09-28
+
+### Summary
+The security-audit remediation: every finding from the 2026-09-24 extension audit fixed, each pinned with red/green/black regression armor.
+
+### Security
+- S1 — page-controlled filenames are path-hardened at the single download chokepoint (`stripPathCharacters`: separators, `:`, control characters, leading dots/tilde) before reaching the browser sink.
+- S2 — every download start races a 15-second timeout with one shared settle body: a stalled host settles honestly, and a late callback cancels the stray download without resurrecting the settled flow.
+- S3 — manifest least privilege: the severed Oracle host permission and unused accounts hosts/CSP entries are dropped.
+- S5 — all 13 fire-and-forget `sendMessage` sites consume `lastError`; port interfaces take callbacks.
+- S4 — the BroadcastChannel fallback is deleted.
+- A CodeQL high-severity ReDoS in the S5 guard's literal stripper was defused (unambiguous alternation — linear on every input).
+
+## [1.8.5] - 2026-09-26
+
+### Summary
+The phase-0 hardening gate: production verification, deploy-pipeline resilience, and honest claims.
+
+### Added
+- Added hourly production verification (pages, canonical, JSON-LD, 404 route, legacy pages.dev 301, worker health), with the legacy-301 contract extracted into a fixture-tested checker wired into the strict test pyramid.
+
+### Changed
+- Deploy smokes retry only server-side failures and send a browser UA — GitHub runner IPs no longer trip the edge 502; the severed-Oracle health check no longer blocks deploys.
+- The extension typecheck is a CI gate; the live-Classroom canary journey now asserts its auth guard.
+- Site privacy copy now says exactly what is true ("Private by design", "No personal data") instead of "We collect nothing".
+
+## [1.8.4] - 2026-09-24
+
+### Summary
+Edge self-serve: the worker serves the website its own data, archives events, and backs itself up; Oracle is severed from the live path.
+
+### Added
+- The worker serves website data directly: DO metrics + store scraping, D1 event archive with 1-year retention, `/admin/storage-export`; daily backups to a repo CSV and a live Google Sheet; archive/mirror admin cards; downloads-trend strip; scrape-health webhook; `page_error` beacon with full CTA coverage.
+
+### Changed
+- Oracle severed from the live path (restorable via the optional `ORACLE_ENDPOINT` mirror); session artifacts untracked and gitignored.
+
+## [1.8.3] - 2026-09-24
+
+### Summary
+Download All Classroom: one control downloads every attachment in the class.
+
+### Added
+- Added the route-context Download All Classroom button (engine v3): classroom-wide inventory via `CourseInventoryService`, the `classroom-download-controller`, and a shared 30/min API limiter — enumeration stays inside Classroom's quota while the downloads themselves remain quota-free.
+- OAuth2 client wiring for the reserved API download tier.
+
+## [1.8.2] - 2026-09-19
+
+### Summary
+The website experience wave: ambient footer, cursor-reactive background, magnetic CTAs, a branded cursor, testimonials, and the Buy Me a Coffee support button.
+
+### Added
+- Website: the footer shares the ambient page background (grid + lens), grid lines bend around the cursor (reduced-motion and touch fall back to static), magnetic hover on primary CTAs, the branded cursor with native-cursor suppression, the testimonials section, and the BMC support button.
+
+### Fixed
+- Fixed the BMC button shipping an empty image in production (asset referenced but never committed); a guard test now fails CI if the asset vanishes.
+
+## [1.8.1] - 2026-09-18
+
+### Summary
+Release-line infrastructure: 147-locale i18n, a signed-Firefox CI leg, mutation testing, and a tamper-evident corpus.
+
+### Added
+- `_locales` generated from the translation source (147 locales) with a no-drift CI check; AMO signing pipeline with an env-gated signed-Firefox leg and a unique-per-run QA companion version; a Stryker mutation-score gate over `src/core`; a corpus checksum manifest — a silently edited label fails the build.
+
+### Changed
+- Workspace dependencies refreshed.
 
 ## [1.8.0] - 2026-09-17
 

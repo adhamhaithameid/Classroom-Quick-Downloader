@@ -1,3 +1,27 @@
+## v1.8.7
+### Summary
+Downloads survive browser service-worker restarts — nothing gets stuck or lost mid-download.
+### Fixed
+- Fixed downloads becoming stuck when the browser paused the extension in the background.
+
+## v1.8.6
+### Summary
+A dedicated security-hardening release: filenames are sanitized against path tricks, stalled starts time out honestly, and background messaging is fully guarded.
+### Security
+- Filenames are hardened before any download starts; manifest permissions tightened; every background message consumer hardened.
+
+## v1.8.3
+### Summary
+Download All Classroom: one click collects every attachment in the class.
+### Added
+- A class-wide Download All control with smart pacing that stays inside Google Classroom's limits.
+
+## v1.8.1
+### Summary
+The extension now ships in 147 languages.
+### Added
+- Full interface translation coverage with automatic consistency checks.
+
 ## v1.8.0
 ### Summary
 The no-dead-ends release: every download either succeeds or tells you exactly what to do next — with automatic retries, honest timeouts, and an adversarial test program proving it.

@@ -120,14 +120,14 @@ jobs:
       - name: Package XPI
         run: cd dist-firefox && zip -r ../dist-firefox.xpi .
 
-      - name: Sign and Submit to AMO
-        uses: trmcnvn/firefox-addon@0d05671269b82c69c3f22ed86d8e772e89d47cf4 # v1
-        with:
-          uuid: 'classroom-quick-downloader@adhamhaitham.dev'
-          xpi: ./dist-firefox.xpi
-          manifest: ./dist-firefox/manifest.json
-          api-key: ${{ secrets.FIREFOX_API_KEY }}
-          api-secret: ${{ secrets.FIREFOX_API_SECRET }}
+      - name: Sign and submit to AMO (listed channel)
+        env:
+          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+          AMO_ADDON_ID: classroom-quick-downloader@adhamhaitham.dev
+          AMO_CHANNEL: listed
+          AMO_XPI_PATH: dist-firefox.xpi
+        run: node extension/tools/sign-extension.mjs
 
   draft-release:
     name: Create GitHub Draft Release
