@@ -64,7 +64,10 @@ export function startDownloadWithTimeout(
 ): void {
   let settled = false;
   const timer = setTimeout(() => {
-    if (settled) return;
+    // No settled re-check here: both settle paths (callback, sync throw)
+    // clearTimeout first, and a fired timer cannot be un-fired — the guard
+    // would be unreachable armor. The callback's startTimedOut check below
+    // is what actually neutralizes the post-timeout callback.
     settled = true;
     pending.startTimedOut = true;
     if (pending.isCancelled) return;
