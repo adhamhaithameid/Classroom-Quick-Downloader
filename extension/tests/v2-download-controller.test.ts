@@ -126,7 +126,7 @@ describe('download controller (page side)', () => {
     expect(requested).toHaveLength(1); // never re-published
     expect(getButtonStateV2(btn)).toBe('cancelled');
     expect(isRequestInFlight(requestId)).toBe(false);
-    expect(sendMessage).toHaveBeenCalledWith({ type: 'CQD_CANCEL_DOWNLOAD', requestId });
+    expect(sendMessage).toHaveBeenCalledWith({ type: 'CQD_CANCEL_DOWNLOAD', requestId }, expect.any(Function));
   });
 
   it('cancelInFlight sends the existing CQD_CANCEL_DOWNLOAD runtime message', () => {
@@ -140,7 +140,7 @@ describe('download controller (page side)', () => {
     expect(sendMessage).toHaveBeenCalledWith({
       type: 'CQD_CANCEL_DOWNLOAD',
       requestId: requested[0].requestId,
-    });
+    }, expect.any(Function));
   });
 
   it('a click with no wired bus fails the button honestly instead of spinning', () => {

@@ -17,12 +17,32 @@ export { fileNameExtension, hasFileExtension } from './verify';
 export { deriveFileNameFromUrl } from './derive';
 
 /**
- * Clean an attachment name: strip trailing type labels, collapse a doubled
- * filename ("file.txtfile.txt") and repeated extensions (".pdf.pdf").
+ * S1 path hardening (audit docs/SECURITY_AUDIT_EXTENSION_2026-09-24.md):
+ * page-controlled names must never reach a filesystem sink with traversal
+ * capability, regardless of what the browser's download namer does. Strips
+ * path separators (including ':' — a separator on macOS and invalid on
+ * Windows), control characters, and leading dot/tilde. Interior '..' is
+ * inert once separators are gone (no path components left to traverse), so
+ * legitimate ellipsis names like "notes...draft.pdf" survive untouched.
+ */
+export function stripPathCharacters(rawName: string): string {
+  // Trim first so padded forms like ' ..hidden' cannot survive the leading
+  // dot/tilde strip as '..hidden'.
+  let name = rawName.trim().replace(/[/\\:]/g, '');
+  name = name.replace(/[\u0000-\u001f\u007f]/g, '');
+  name = name.replace(/^[.~]+/, '');
+  return name.trim();
+}
+
+/**
+ * Clean an attachment name: path-harden, strip trailing type labels, collapse
+ * a doubled filename ("file.txtfile.txt") and repeated extensions (".pdf.pdf").
  */
 export function sanitizeFileName(rawName: string, lang?: string): string {
   if (!rawName) return '';
-  let name = stripTrailingTypeLabel(rawName.trim(), lang);
+  let name = stripPathCharacters(rawName);
+  if (!name) return '';
+  name = stripTrailingTypeLabel(name, lang);
 
   // Detect duplicated text (e.g., "file.txtfile.txt")
   if (name.length > 0 && name.length % 2 === 0) {

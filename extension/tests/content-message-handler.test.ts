@@ -196,7 +196,7 @@ describe('content message handler', () => {
   it('initContentScript wires icon update, subscription, and listener setup only on classroom pages', async () => {
     const classroom = await loadMessageHandler(true);
     classroom.mod.initContentScript();
-    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ type: 'CQD_UPDATE_ICON' });
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ type: 'CQD_UPDATE_ICON' }, expect.any(Function));
     expect(classroom.subscribeSpy).toHaveBeenCalled();
     expect((chrome.runtime.onMessage.addListener as any).mock.calls.length).toBeGreaterThan(0);
 

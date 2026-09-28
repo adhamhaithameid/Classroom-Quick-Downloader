@@ -148,11 +148,26 @@ describe('core/name sanitize — properties', () => {
     );
   });
 
-  it('P2: output is a substring of the trimmed input (only removes, length bounded by input)', () => {
+  it('P2: output is a subsequence of the trimmed input (only removes, never fabricates or reorders)', () => {
+    // S1 (audit 2026-09-24) added interior removal (path separators/control
+    // characters), so the output is no longer always a CONTIGUOUS substring.
+    // The property's intent — sanitize only removes characters — is exactly
+    // the subsequence relation; reorder/fabricate would break it.
+    const isSubsequence = (needle: string, haystack: string): boolean => {
+      // Code-point arrays: astral-plane chars (surrogate pairs) must compare
+      // as single units on both sides.
+      const n = [...needle];
+      const h = [...haystack];
+      let at = 0;
+      for (const ch of h) {
+        if (at < n.length && ch === n[at]) at += 1;
+      }
+      return at === n.length;
+    };
     fc.assert(
       fc.property(arbNoise, (noise) => {
         const result = sanitizeFileName(noise);
-        expect(noise.trim()).toContain(result);
+        expect(isSubsequence(result, noise.trim())).toBe(true);
         expect(result.length).toBeLessThanOrEqual(noise.length);
       }),
     );

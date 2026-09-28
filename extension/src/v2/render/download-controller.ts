@@ -58,7 +58,7 @@ let busRef: EventBus<PageTopicMap> | null = null;
 
 /** Minimal runtime surface, injectable for tests. */
 export interface DownloadRuntime {
-  sendMessage(message: unknown): void;
+  sendMessage(message: unknown, callback?: () => void): void;
 }
 
 let runtime: DownloadRuntime | null = null;
@@ -249,12 +249,12 @@ function publishRequest(
 export function cancelInFlight(button: HTMLButtonElement): void {
   const ds = button.dataset as Record<string, string>;
   const requestId = ds.cqdRequestId;
-  if (requestId && pending.has(requestId)) {
-    const entry = pending.get(requestId);
-    pending.delete(requestId);
-    if (entry) clearSettleWatchdog(entry);
-    getRuntime()?.sendMessage({ type: 'CQD_CANCEL_DOWNLOAD', requestId });
-  }
+    if (requestId && pending.has(requestId)) {
+      const entry = pending.get(requestId);
+      pending.delete(requestId);
+      if (entry) clearSettleWatchdog(entry);
+      getRuntime()?.sendMessage({ type: 'CQD_CANCEL_DOWNLOAD', requestId }, () => { void chrome.runtime.lastError; });
+    }
   setButtonStateV2(button, 'cancelled');
 }
 
@@ -335,9 +335,9 @@ function getRuntime(): DownloadRuntime | null {
   if (runtime) return runtime;
   if (typeof chrome !== 'undefined' && chrome?.runtime?.sendMessage) {
     runtime = {
-      sendMessage: (message: unknown) => {
+      sendMessage: (message: unknown, callback?: () => void) => {
         try {
-          chrome.runtime.sendMessage(message, () => void chrome.runtime.lastError);
+          chrome.runtime.sendMessage(message, callback ?? (() => void chrome.runtime.lastError));
         } catch { /* channel down — nothing to cancel */ }
       },
     };

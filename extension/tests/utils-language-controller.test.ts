@@ -49,6 +49,7 @@ describe('language controller', () => {
     expect(chrome.storage.local.set).toHaveBeenCalled();
     expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'CQD_LANGUAGE_CHANGED', mode: 'auto', language: 'fr-fr' }),
+      expect.any(Function),
     );
   });
 

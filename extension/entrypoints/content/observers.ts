@@ -275,7 +275,7 @@ export function applyEffectiveState(enabled: boolean): void {
       chrome.runtime.sendMessage({
         type: 'CQD_EFFECTIVE_STATE_CHANGED',
         enabled,
-      });
+      }, () => { void chrome.runtime.lastError; });
     } catch { /* ignore */ }
   }
 }

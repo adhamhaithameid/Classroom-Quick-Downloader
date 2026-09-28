@@ -54,7 +54,7 @@ export function sendStatusToTab(
       status,
       errorCode,
       userMessage,
-    });
+    }, () => { void chrome.runtime.lastError; });
   } catch {
     // Tab may have been closed
   }

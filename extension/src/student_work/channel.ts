@@ -1,7 +1,6 @@
 // filepath: extension/src/student_work/channel.ts
 
 import {
-  STUDENT_WORK_CHANNEL_NAME,
   STUDENT_WORK_RESOLVE_PUBLISH_TYPE,
   STUDENT_WORK_RESOLVE_RELAY_TYPE,
 } from './constants';
@@ -56,26 +55,22 @@ export function createResolverRequestId(): string {
 }
 
 export function publishResolveResult(message: StudentWorkResolveResultMessage): void {
+  // S4 (audit docs/SECURITY_AUDIT_EXTENSION_2026-09-24.md): the runtime relay
+  // is the ONLY publish path. The old BroadcastChannel fallback had no sender
+  // authentication — any same-origin page JS could inject a resolve result —
+  // and was unreachable in production anyway (chrome.runtime always exists in
+  // content scripts).
   const runtime = getRuntime();
-  if (runtime?.sendMessage) {
-    try {
-      const payload: StudentWorkResolvePublishMessage = {
-        type: STUDENT_WORK_RESOLVE_PUBLISH_TYPE,
-        payload: message,
-      };
-      runtime.sendMessage(payload);
-    } catch {
-      // Ignore runtime relay failures; resolver will timeout safely.
-    }
-    return;
-  }
+  if (!runtime?.sendMessage) return;
 
   try {
-    const channel = new BroadcastChannel(STUDENT_WORK_CHANNEL_NAME);
-    channel.postMessage(message);
-    channel.close();
+    const payload: StudentWorkResolvePublishMessage = {
+      type: STUDENT_WORK_RESOLVE_PUBLISH_TYPE,
+      payload: message,
+    };
+    runtime.sendMessage(payload, () => { void chrome.runtime.lastError; });
   } catch {
-    // Ignore channel failures; caller can still use fallback signaling.
+    // Ignore runtime relay failures; resolver will timeout safely.
   }
 }
 
@@ -96,8 +91,14 @@ export function waitForResolveResult(
     let runtimeListener:
       | ((message: unknown, sender?: chrome.runtime.MessageSender) => void)
       | null = null;
-    let channel: BroadcastChannel | null = null;
     let abortHandler: (() => void) | null = null;
+
+    // S4: no authenticated relay available — resolve empty. Never fall back
+    // to an unauthenticated same-origin channel.
+    if (!hasRuntimeRelayApi) {
+      resolve(null);
+      return;
+    }
 
     const finish = (value: StudentWorkResolveResultMessage | null) => {
       if (done) return;
@@ -108,16 +109,7 @@ export function waitForResolveResult(
         timer = null;
       }
 
-      if (channel) {
-        try {
-          channel.close();
-        } catch {
-          // Ignore close errors.
-        }
-        channel = null;
-      }
-
-      if (runtimeListener && hasRuntimeRelayApi) {
+      if (runtimeListener) {
         try {
           runtime!.onMessage.removeListener(runtimeListener);
         } catch {
@@ -134,43 +126,28 @@ export function waitForResolveResult(
       resolve(value);
     };
 
-    if (hasRuntimeRelayApi) {
-      runtimeListener = (message: unknown, sender?: chrome.runtime.MessageSender) => {
-        if (!isResolveRelayMessage(message)) return;
-        const payload = message.payload;
-        if (payload.requestId !== requestId) return;
+    runtimeListener = (message: unknown, sender?: chrome.runtime.MessageSender) => {
+      if (!isResolveRelayMessage(message)) return;
+      const payload = message.payload;
+      if (payload.requestId !== requestId) return;
 
-        const runtimeId = runtime.id;
-        if (
-          runtimeId &&
-          sender &&
-          typeof sender.id === 'string' &&
-          sender.id !== runtimeId
-        ) {
-          return;
-        }
-        finish(payload);
-      };
-
-      try {
-        runtime!.onMessage.addListener(runtimeListener);
-      } catch {
-        finish(null);
+      const runtimeId = runtime.id;
+      if (
+        runtimeId &&
+        sender &&
+        typeof sender.id === 'string' &&
+        sender.id !== runtimeId
+      ) {
         return;
       }
-    } else {
-      try {
-        channel = new BroadcastChannel(STUDENT_WORK_CHANNEL_NAME);
-        channel.onmessage = (event: MessageEvent) => {
-          const payload = event.data;
-          if (!isResolveResultMessage(payload)) return;
-          if (payload.requestId !== requestId) return;
-          finish(payload);
-        };
-      } catch {
-        finish(null);
-        return;
-      }
+      finish(payload);
+    };
+
+    try {
+      runtime!.onMessage.addListener(runtimeListener);
+    } catch {
+      finish(null);
+      return;
     }
 
     timer = window.setTimeout(() => finish(null), timeoutMs);

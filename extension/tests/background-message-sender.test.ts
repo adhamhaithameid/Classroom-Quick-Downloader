@@ -38,7 +38,7 @@ describe('background message sender', () => {
       status: 'error',
       errorCode: 'ERR',
       userMessage: 'failed',
-    });
+    }, expect.any(Function));
   });
 
   it('marks success as finalized and prevents duplicate success updates', () => {
@@ -61,6 +61,18 @@ describe('background message sender', () => {
     }) as never;
     const pending = makePending();
     expect(() => sendStatusToTab(pending, 'error')).not.toThrow();
+  });
+
+  it('consumes lastError in the sendMessage callback when the tab is gone', () => {
+    chrome.tabs.sendMessage = vi.fn((_tabId: number, _msg: unknown, cb?: () => void) => {
+      (chrome.runtime as { lastError?: { message: string } }).lastError = {
+        message: 'Receiving end does not exist.',
+      };
+      cb?.();
+    }) as never;
+    const pending = makePending();
+    expect(() => sendStatusToTab(pending, 'error', 'failed', 'ERR')).not.toThrow();
+    expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(10, expect.anything(), expect.any(Function));
   });
 
   // ─────────────────────────────────────────────────────────────────────────

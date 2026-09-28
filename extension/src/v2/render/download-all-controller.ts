@@ -76,7 +76,7 @@ const decoratedButtons = new WeakSet<HTMLButtonElement>();
 
 /** Minimal runtime surface, injectable for tests. */
 export interface GroupRuntime {
-  sendMessage(message: unknown): void;
+  sendMessage(message: unknown, callback?: () => void): void;
 }
 
 let runtime: GroupRuntime | null = null;
@@ -244,7 +244,7 @@ export function cancelRun(run: GroupRun): void {
     if (file.state !== 'loading' && file.state !== 'pending') continue;
     file.state = 'cancelled';
     if (file.requestId) {
-      getRuntime()?.sendMessage({ type: 'CQD_CANCEL_DOWNLOAD', requestId: file.requestId });
+      getRuntime()?.sendMessage({ type: 'CQD_CANCEL_DOWNLOAD', requestId: file.requestId }, () => { void chrome.runtime.lastError; });
     }
     setButtonStateV2(file.button, 'cancelled');
   }
@@ -409,9 +409,9 @@ function getRuntime(): GroupRuntime | null {
   if (runtime) return runtime;
   if (typeof chrome !== 'undefined' && chrome?.runtime?.sendMessage) {
     runtime = {
-      sendMessage: (message: unknown) => {
+      sendMessage: (message: unknown, callback?: () => void) => {
         try {
-          chrome.runtime.sendMessage(message, () => void chrome.runtime.lastError);
+          chrome.runtime.sendMessage(message, callback ?? (() => void chrome.runtime.lastError));
         } catch { /* channel down — nothing to cancel */ }
       },
     };

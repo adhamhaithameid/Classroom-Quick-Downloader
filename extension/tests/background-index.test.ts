@@ -396,6 +396,7 @@ describe('background/index', () => {
           ok: true,
         }),
       }),
+      expect.any(Function),
     );
   });
 

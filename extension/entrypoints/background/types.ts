@@ -64,6 +64,9 @@ export type PendingDownload = {
   transientRetried?: boolean;
   /** Browser start failures already retried (bounded to one) */
   startRetried?: boolean;
+  /** S2: the start callback never fired within DOWNLOAD_START_TIMEOUT_MS; the
+   * flow settled without a download id and any late callback kills the stray */
+  startTimedOut?: boolean;
   /** Whether success status was already sent */
   finalized?: boolean;
   /** Whether user cancelled this download */

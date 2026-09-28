@@ -1,61 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  STUDENT_WORK_CHANNEL_NAME,
   STUDENT_WORK_RESOLVE_PUBLISH_TYPE,
   STUDENT_WORK_RESOLVE_RELAY_TYPE,
 } from '../src/student_work/constants';
 
-class FakeBroadcastChannel {
-  static channels = new Map<string, Set<FakeBroadcastChannel>>();
-
-  name: string;
-  onmessage: ((event: MessageEvent) => void) | null = null;
-
-  constructor(name: string) {
-    this.name = name;
-    const peers = FakeBroadcastChannel.channels.get(name) || new Set<FakeBroadcastChannel>();
-    peers.add(this);
-    FakeBroadcastChannel.channels.set(name, peers);
-  }
-
-  postMessage(data: unknown) {
-    const peers = FakeBroadcastChannel.channels.get(this.name);
-    if (!peers) return;
-
-    for (const peer of peers) {
-      if (peer === this || typeof peer.onmessage !== 'function') continue;
-      peer.onmessage({ data } as MessageEvent);
-    }
-  }
-
-  close() {
-    const peers = FakeBroadcastChannel.channels.get(this.name);
-    if (!peers) return;
-    peers.delete(this);
-    if (peers.size === 0) {
-      FakeBroadcastChannel.channels.delete(this.name);
-    }
-  }
-
-  static reset() {
-    FakeBroadcastChannel.channels.clear();
-  }
-}
-
 describe('student_work/channel', () => {
-  const originalBroadcastChannel = globalThis.BroadcastChannel;
-
   beforeEach(() => {
     vi.resetModules();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
-    FakeBroadcastChannel.reset();
     (globalThis as any).chrome = undefined;
-    globalThis.BroadcastChannel = FakeBroadcastChannel as any;
   });
 
   afterEach(() => {
-    globalThis.BroadcastChannel = originalBroadcastChannel;
     delete (globalThis as any).chrome;
     vi.useRealTimers();
   });
@@ -95,7 +52,26 @@ describe('student_work/channel', () => {
     expect(sendMessage).toHaveBeenCalledWith({
       type: STUDENT_WORK_RESOLVE_PUBLISH_TYPE,
       payload,
-    });
+    }, expect.any(Function));
+  });
+
+  it('publish is a no-op when chrome.runtime is unavailable (no unauthenticated channel fallback)', async () => {
+    const { publishResolveResult } = await import('../src/student_work/channel');
+
+    expect(() =>
+      publishResolveResult({
+        type: 'CQD_SW_RESOLVE_RESULT',
+        requestId: 'req-no-runtime',
+        ok: true,
+        resolvedUrl: 'https://drive.google.com/uc?export=download&id=X',
+      }),
+    ).not.toThrow();
+  });
+
+  it('waits resolve results with no runtime by resolving null (S4: no channel fallback)', async () => {
+    const { waitForResolveResult } = await import('../src/student_work/channel');
+
+    await expect(waitForResolveResult('req-no-relay', 3_000)).resolves.toBeNull();
   });
 
   it('ignores mismatched runtime sender ids and accepts matching relay payloads', async () => {
@@ -155,29 +131,6 @@ describe('student_work/channel', () => {
         requestId: 'req-relay-1',
         ok: true,
         resolvedUrl: 'https://drive.google.com/uc?export=download&id=VALID',
-      }),
-    );
-  });
-
-  it('receives fallback BroadcastChannel payloads when runtime relay is unavailable', async () => {
-    const { waitForResolveResult } = await import('../src/student_work/channel');
-    const promise = waitForResolveResult('req-bc-1', 3_000);
-
-    const broadcaster = new FakeBroadcastChannel(STUDENT_WORK_CHANNEL_NAME);
-    broadcaster.postMessage({
-      type: 'CQD_SW_RESOLVE_RESULT',
-      requestId: 'req-bc-1',
-      ok: true,
-      resolvedUrl: 'https://drive.google.com/uc?export=download&id=BROADCAST_OK',
-      source: 'broadcast',
-    });
-    broadcaster.close();
-
-    await expect(promise).resolves.toEqual(
-      expect.objectContaining({
-        requestId: 'req-bc-1',
-        ok: true,
-        resolvedUrl: 'https://drive.google.com/uc?export=download&id=BROADCAST_OK',
       }),
     );
   });

@@ -709,3 +709,294 @@ describe('background download handler', () => {
     expect(ctx.stateModule.pendingByUrl.get('https://example.com/shared.pdf')?.has(pendingA)).toBe(false);
   });
 });
+
+// ============================================================================
+// START-CALLBACK TIMEOUT (S2) — audit docs/SECURITY_AUDIT_EXTENSION_2026-09-24.md
+// finding S2 / functional F1. A host that accepts the connection but never
+// responds makes chrome.downloads.download's callback never fire, so the
+// CQD_DOWNLOAD sendResponse dangled until the 150s stall deadline. The flow
+// must settle honestly within DOWNLOAD_START_TIMEOUT_MS, and a late callback
+// (download eventually created) must cancel the stray download, never
+// resurrect the settled flow.
+// ============================================================================
+
+describe('background download handler — start-callback timeout (S2)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    installChromeMocks();
+  });
+
+  it('exposes DOWNLOAD_START_TIMEOUT_MS', async () => {
+    const ctx = await loadDownloadHandler();
+    expect(ctx.mod.DOWNLOAD_START_TIMEOUT_MS).toBeGreaterThan(0);
+  });
+
+  it('startSingleAttempt settles with an error when the start callback never fires', async () => {
+    vi.useFakeTimers();
+    try {
+      const ctx = await loadDownloadHandler();
+      const pending = makePending();
+      ctx.stateModule.registerPending(pending);
+      (chrome.downloads.download as any).mockImplementation(() => {
+        /* never calls back */
+      });
+      const respondOnce = vi.fn();
+
+      ctx.mod.startSingleAttempt(pending, respondOnce);
+      expect(respondOnce).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(ctx.mod.DOWNLOAD_START_TIMEOUT_MS + 1);
+
+      expect(respondOnce).toHaveBeenCalledWith(
+        expect.objectContaining({ started: false, userMessage: expect.any(String) }),
+      );
+      expect(ctx.recordSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'fail', error_type: 'DOWNLOAD_START_TIMEOUT' }),
+      );
+      expect(ctx.cleanupSpy).toHaveBeenCalledWith(pending);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('handleDownloadRequest (Drive path) settles and reports when the start callback never fires', async () => {
+    vi.useFakeTimers();
+    try {
+      const ctx = await loadDownloadHandler();
+      (chrome.downloads.download as any).mockImplementation(() => {
+        /* never calls back */
+      });
+      const respond = vi.fn();
+
+      ctx.mod.handleDownloadRequest(
+        { url: 'https://drive.google.com/uc?id=hang', requestId: 'req-hang', fileMeta: { name: 'h.pdf', ext: 'pdf' } },
+        { tab: { id: 7 } } as chrome.runtime.MessageSender,
+        respond,
+      );
+      expect(respond).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(ctx.mod.DOWNLOAD_START_TIMEOUT_MS + 1);
+
+      expect(respond).toHaveBeenCalledWith(expect.objectContaining({ started: false }));
+      expect(ctx.sendStatusSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ requestId: 'req-hang' }),
+        'error',
+        expect.any(String),
+        'DOWNLOAD_START_TIMEOUT',
+      );
+      expect(ctx.recordSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'fail', error_type: 'DOWNLOAD_START_TIMEOUT' }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a late callback after the timeout cancels the stray download and stays settled', async () => {
+    vi.useFakeTimers();
+    try {
+      const ctx = await loadDownloadHandler();
+      const pending = makePending();
+      ctx.stateModule.registerPending(pending);
+      let lateCb: ((id?: number) => void) | undefined;
+      (chrome.downloads.download as any).mockImplementation((_: unknown, cb: (id?: number) => void) => {
+        lateCb = cb;
+      });
+      const respondOnce = vi.fn();
+
+      ctx.mod.startSingleAttempt(pending, respondOnce);
+      await vi.advanceTimersByTimeAsync(ctx.mod.DOWNLOAD_START_TIMEOUT_MS + 1);
+      expect(respondOnce).toHaveBeenCalledTimes(1);
+
+      // The download eventually starts after we already timed out.
+      lateCb?.(99);
+
+      expect(chrome.downloads.cancel).toHaveBeenCalledWith(99, expect.any(Function));
+      expect(ctx.stateModule.pendingByDownloadId.get(99)).toBeUndefined();
+      expect(respondOnce).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a late id-less callback after the timeout consumes lastError and stays settled', async () => {
+    vi.useFakeTimers();
+    try {
+      const ctx = await loadDownloadHandler();
+      const pending = makePending();
+      ctx.stateModule.registerPending(pending);
+      let lateCb: ((id?: number) => void) | undefined;
+      (chrome.downloads.download as any).mockImplementation((_: unknown, cb: (id?: number) => void) => {
+        lateCb = cb;
+      });
+      const respondOnce = vi.fn();
+
+      ctx.mod.startSingleAttempt(pending, respondOnce);
+      await vi.advanceTimersByTimeAsync(ctx.mod.DOWNLOAD_START_TIMEOUT_MS + 1);
+      expect(respondOnce).toHaveBeenCalledTimes(1);
+
+      // The browser reports a failed start (no id, lastError set) after the
+      // timeout already settled: nothing to cancel, nothing to resurrect.
+      (chrome.runtime as { lastError?: { message: string } }).lastError = { message: 'too late' };
+      lateCb?.(undefined);
+
+      expect(chrome.downloads.cancel).not.toHaveBeenCalled();
+      expect(respondOnce).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('settles honestly when chrome.downloads.download throws synchronously', async () => {
+    const ctx = await loadDownloadHandler();
+    (chrome.downloads.download as any).mockImplementation(() => {
+      throw new Error('sync API failure');
+    });
+    const pending = makePending();
+    const respondOnce = vi.fn();
+
+    ctx.mod.startSingleAttempt(pending, respondOnce);
+
+    expect(respondOnce).toHaveBeenCalledWith({ started: false, userMessage: 'Browser blocked download.' });
+    expect(ctx.recordSpy).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'fail',
+      error_type: 'BROWSER_START_FAIL_DIRECT',
+    }));
+    expect(ctx.cleanupSpy).toHaveBeenCalledWith(pending);
+  });
+
+  it('startNextDriveAttempt settles via its own timeout when the start callback never fires', async () => {
+    vi.useFakeTimers();
+    try {
+      const ctx = await loadDownloadHandler();
+      const pending = makePending({ isDrive: true });
+      ctx.stateModule.registerPending(pending);
+      (chrome.downloads.download as any).mockImplementation(() => {
+        /* never calls back */
+      });
+
+      ctx.mod.startNextDriveAttempt(pending);
+      await vi.advanceTimersByTimeAsync(ctx.mod.DOWNLOAD_START_TIMEOUT_MS + 1);
+
+      expect(ctx.recordSpy).toHaveBeenCalledWith(expect.objectContaining({
+        status: 'fail',
+        error_type: 'DOWNLOAD_START_TIMEOUT',
+      }));
+      expect(ctx.cleanupSpy).toHaveBeenCalledWith(pending);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('the start timeout reports an unknown download type when metadata is missing', async () => {
+    vi.useFakeTimers();
+    try {
+      const ctx = await loadDownloadHandler();
+      const pending = makePending({ isDrive: true, fileMeta: undefined as any });
+      ctx.stateModule.registerPending(pending);
+      (chrome.downloads.download as any).mockImplementation(() => {
+        /* never calls back */
+      });
+
+      ctx.mod.startNextDriveAttempt(pending);
+      await vi.advanceTimersByTimeAsync(ctx.mod.DOWNLOAD_START_TIMEOUT_MS + 1);
+
+      expect(ctx.recordSpy).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'unknown',
+        error_type: 'DOWNLOAD_START_TIMEOUT',
+      }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('the timeout timer no-ops when the start callback already settled the flow', async () => {
+    vi.useFakeTimers();
+    try {
+      const ctx = await loadDownloadHandler();
+      const pending = makePending();
+      ctx.stateModule.registerPending(pending);
+      (chrome.downloads.download as any).mockImplementation((_: unknown, cb: (id?: number) => void) => {
+        (chrome.runtime as { lastError?: { message: string } }).lastError = undefined;
+        cb(7);
+      });
+      const respondOnce = vi.fn();
+
+      ctx.mod.startSingleAttempt(pending, respondOnce);
+      expect(respondOnce).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(ctx.mod.DOWNLOAD_START_TIMEOUT_MS + 1);
+
+      // The late timer must not double-settle: no duplicate analytics, no
+      // cleanup, no second response.
+      expect(ctx.recordSpy).not.toHaveBeenCalled();
+      expect(ctx.cleanupSpy).not.toHaveBeenCalled();
+      expect(respondOnce).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a cancelled pending swallows its start timeout instead of reporting it', async () => {
+    vi.useFakeTimers();
+    try {
+      const ctx = await loadDownloadHandler();
+      const pending = makePending();
+      ctx.stateModule.registerPending(pending);
+      (chrome.downloads.download as any).mockImplementation(() => {
+        /* never calls back */
+      });
+      const respondOnce = vi.fn();
+
+      ctx.mod.startSingleAttempt(pending, respondOnce);
+      pending.isCancelled = true;
+      await vi.advanceTimersByTimeAsync(ctx.mod.DOWNLOAD_START_TIMEOUT_MS + 1);
+
+      expect(ctx.recordSpy).not.toHaveBeenCalled();
+      expect(ctx.cleanupSpy).not.toHaveBeenCalled();
+      expect(respondOnce).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('ignores a synchronous start failure after the callback already settled the start', async () => {
+    const ctx = await loadDownloadHandler();
+    const pending = makePending();
+    ctx.stateModule.registerPending(pending);
+    (chrome.downloads.download as any).mockImplementation((_: unknown, cb: (id?: number) => void) => {
+      (chrome.runtime as { lastError?: { message: string } }).lastError = undefined;
+      cb(9);
+      throw new Error('delayed sync failure');
+    });
+    const respondOnce = vi.fn();
+
+    expect(() => ctx.mod.startSingleAttempt(pending, respondOnce)).not.toThrow();
+
+    // The success already settled: the thrown error must not double-handle.
+    expect(respondOnce).toHaveBeenCalledTimes(1);
+    expect(respondOnce).toHaveBeenCalledWith({ started: true, requestId: pending.requestId, downloadId: 9 });
+    expect(pending.currentDownloadId).toBe(9);
+  });
+
+  describe('sanitizeDownloadName (S1 boundary)', () => {
+    it('returns undefined metadata untouched', async () => {
+      const ctx = await loadDownloadHandler();
+      expect(ctx.mod.sanitizeDownloadName(undefined)).toBeUndefined();
+    });
+
+    it('returns the same metadata object when the name is already clean', async () => {
+      const ctx = await loadDownloadHandler();
+      const meta = { ext: 'pdf', name: 'file.pdf' };
+      expect(ctx.mod.sanitizeDownloadName(meta)).toBe(meta);
+    });
+
+    it('returns a hardened copy when the page-controlled name carries path characters', async () => {
+      const ctx = await loadDownloadHandler();
+      const meta = { ext: 'pdf', name: '../report.pdf' };
+      const out = ctx.mod.sanitizeDownloadName(meta);
+      expect(out).not.toBe(meta);
+      expect(out?.name).toBe('report.pdf');
+    });
+  });
+});

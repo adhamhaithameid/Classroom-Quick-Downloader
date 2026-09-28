@@ -68,7 +68,7 @@ export default defineConfig({
       name: 'extension-chromium',
       // live/ is excluded like qa/: those specs launch their own persistent
       // contexts on the dedicated signed-in profile (tests/e2e/live/).
-      testIgnore: /[/\\](qa|live)[/\\]/,
+      testIgnore: /[/\\](qa|live|headed)[/\\]/,
       use: {
         ...devices['Desktop Chrome'],
         // channel 'chromium' = new headless, the build that supports extensions.
@@ -112,7 +112,7 @@ export default defineConfig({
     // ────────────────────────────────────────────────────────────────────
     {
       name: 'extension-edge',
-      testIgnore: /[/\\](qa|live)[/\\]/,
+      testIgnore: /[/\\](qa|live|headed)[/\\]/,
       use: {
         ...devices['Desktop Chrome'],
         channel: 'msedge',
@@ -198,6 +198,28 @@ export default defineConfig({
             use: {
               browserName: 'firefox',
               acceptDownloads: true,
+            },
+          },
+        ]
+      : []),
+
+    // ────────────────────────────────────────────────────────────────────
+    // HEADED security suite (tests/e2e/headed/) — S1/S2 black-box armor from
+    // the 2026-09-24 audit. onDeterminingFilename NEVER fires in headless
+    // Chromium, so the filename-suggestion pipeline is invisible to every
+    // headless project; these journeys must run headed. Specs self-launch
+    // their own persistent contexts (mock Drive over TLS + real download
+    // pipeline into a scratch dir). Gated on E2E_HEADED=1 like the debug
+    // opt-in above; CI runs them under xvfb (workflow job e2e-headed).
+    // ────────────────────────────────────────────────────────────────────
+    ...(process.env.E2E_HEADED === '1'
+      ? [
+          {
+            name: 'extension-headed',
+            testMatch: /tests\/e2e\/headed\/.*\.spec\.ts/,
+            use: {
+              ...devices['Desktop Chrome'],
+              channel: 'chromium',
             },
           },
         ]
