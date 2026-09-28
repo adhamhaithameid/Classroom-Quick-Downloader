@@ -26,6 +26,7 @@ import {
   IS_FIREFOX,
 } from './state';
 import { createStoragePersistence, reconcilePersistedJobs } from './job-persistence';
+import { queueSettled, queueRecoverActive } from './queue';
 import { createIconUpdaters, isClassroomUrl, setActionIcon, GRAY_ICON_PATHS } from './icon-manager';
 import { extractDriveFileId } from './auth-utils';
 import { getFilenameExt, buildUrlWithAuthUser } from './url-helpers';
@@ -149,8 +150,18 @@ export default defineBackground(() => {
 
   // MV3 restarts wipe the in-memory registry; mirror it into storage and
   // reconcile persisted job records on every worker boot (bead 0h4d.1.1).
-  setRegistryListener(createStoragePersistence());
-  void reconcilePersistedJobs();
+  // The queue (0h4d.1.2) shares the single registry-listener slot: every
+  // unregister (success/fail/cancel/TTL) frees its admission slot.
+  const persistence = createStoragePersistence();
+  setRegistryListener({
+    onRegister: (pending) => persistence.onRegister?.(pending),
+    onBind: (pending) => persistence.onBind?.(pending),
+    onUnregister: (requestId) => {
+      persistence.onUnregister?.(requestId);
+      queueSettled(requestId);
+    },
+  });
+  void reconcilePersistedJobs({ onRecovered: queueRecoverActive });
 
   // Create icon update closures
   const { updateTabIcon, updateGlobalIcon } = createIconUpdaters();
