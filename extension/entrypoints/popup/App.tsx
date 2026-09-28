@@ -363,6 +363,32 @@ function App() {
   // COLLAPSIBLE SETTINGS STATE (persisted)
   const [settingsCollapsed, setSettingsCollapsed] = useState(true);
 
+  // QUEUE PANEL (0h4d.1.2) — live snapshot while the popup is open
+  const [queueRows, setQueueRows] = useState<
+    Array<{ requestId: string; queued: boolean; filename: string; ext?: string }>
+  >([]);
+  const [queuePaused, setQueuePausedFlag] = useState(false);
+  useEffect(() => {
+    const browserApi = (globalThis as any).chrome;
+    if (!browserApi?.runtime?.sendMessage) return;
+    let alive = true;
+    const pull = () => {
+      browserApi.runtime.sendMessage({ type: 'CQD_QUEUE_SNAPSHOT' }, (res: any) => {
+        void chrome.runtime.lastError;
+        if (alive && res?.ok) {
+          setQueueRows(res.rows ?? []);
+          setQueuePausedFlag(!!res.paused);
+        }
+      });
+    };
+    pull();
+    const timer = setInterval(pull, 600);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, []);
+
   // Load collapse state from storage
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1216,6 +1242,65 @@ function App() {
                   </div>
                 </div>
               </section>
+
+              {/* Section 1.5: Download queue (0h4d.1.2) — visible while work is queued/active */}
+              {queueRows.length > 0 && (
+                <section className="cqd-panel" aria-label="Download queue">
+                  <div className="cqd-card cqd-card-queue">
+                    <div className="cqd-queue-head">
+                      <span className="cqd-queue-title">
+                        Downloads ({queueRows.filter((r) => !r.queued).length} active ·{' '}
+                        {queueRows.filter((r) => r.queued).length} queued)
+                      </span>
+                      <button
+                        type="button"
+                        className="cqd-queue-pause-btn"
+                        onClick={() => {
+                          const browserApi = (globalThis as any).chrome;
+                          browserApi?.runtime?.sendMessage?.(
+                            { type: 'CQD_QUEUE_PAUSE', paused: !queuePaused },
+                            () => {
+                              void chrome.runtime.lastError;
+                            },
+                          );
+                        }}
+                      >
+                        {queuePaused ? 'Resume' : 'Pause'}
+                      </button>
+                    </div>
+                    <ul className="cqd-queue-list">
+                      {queueRows.map((row) => (
+                        <li key={row.requestId} className="cqd-queue-row">
+                          <span
+                            className={`cqd-queue-state ${row.queued ? 'cqd-queue-state-queued' : 'cqd-queue-state-active'}`}
+                          >
+                            {row.queued ? 'Queued' : 'Downloading'}
+                          </span>
+                          <span className="cqd-queue-name" title={row.filename}>
+                            {row.filename}
+                          </span>
+                          <button
+                            type="button"
+                            className="cqd-queue-cancel"
+                            aria-label={`Cancel ${row.filename}`}
+                            onClick={() => {
+                              const browserApi = (globalThis as any).chrome;
+                              browserApi?.runtime?.sendMessage?.(
+                                { type: 'CQD_CANCEL_DOWNLOAD', requestId: row.requestId },
+                                () => {
+                                  void chrome.runtime.lastError;
+                                },
+                              );
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </section>
+              )}
 
               {/* Section 2: Settings (collapsible) */}
               <section className="cqd-panel">

@@ -111,6 +111,8 @@ export function createStoragePersistence(): RegistryListener {
 export type ReconcileDeps = {
   now?: () => number;
   search?: DownloadsLike['search'];
+  /** Called per rebound record — the queue marks it active (0h4d.1.2). */
+  onRecovered?: (requestId: string) => void;
 };
 
 /**
@@ -156,6 +158,7 @@ export async function reconcilePersistedJobs(deps: ReconcileDeps = {}): Promise<
     if (item && item.state === 'in_progress') {
       registerPending(pending);
       bindDownloadId(pending, pending.currentDownloadId);
+      deps.onRecovered?.(requestId);
       rebound += 1;
     } else {
       // interrupted/complete (settled while dead) or no longer known.

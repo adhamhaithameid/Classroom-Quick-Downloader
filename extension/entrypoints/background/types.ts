@@ -23,6 +23,7 @@ export type DownloadStatus =
   | 'error'
   | 'success'
   | 'trying'
+  | 'progress'
   | 'cancelled';
 
 /**
@@ -48,6 +49,9 @@ export type PendingDownload = {
 
   /** Tab ID that initiated the download */
   tabId?: number;
+
+  /** Declared total size (browser item) — 1.5 verification + 1.2 progress */
+  totalBytes?: number;
 
   /** List of authuser values already attempted */
   attemptedAuthUsers: number[];

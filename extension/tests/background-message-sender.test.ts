@@ -75,6 +75,23 @@ describe('background message sender', () => {
     expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(10, expect.anything(), expect.any(Function));
   });
 
+  it('forwards a progress payload on the status message (0h4d.1.2)', () => {
+    const pending = makePending();
+    sendStatusToTab(pending, 'progress', undefined, undefined, { received: 5, total: 10 });
+    expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(
+      10,
+      expect.objectContaining({ status: 'progress', progress: { received: 5, total: 10 } }),
+      expect.any(Function),
+    );
+  });
+
+  it('omits the progress field when no progress payload is given', () => {
+    const pending = makePending();
+    sendStatusToTab(pending, 'error', 'failed', 'ERR');
+    const payload = (chrome.tabs.sendMessage as any).mock.calls[0][1];
+    expect(payload.progress).toBeUndefined();
+  });
+
   // ─────────────────────────────────────────────────────────────────────────
   // S6/G2 bridge listener: the single status observer registered by the
   // bridge download service so tab-less downloads still settle.

@@ -18,6 +18,7 @@ import { cleanup } from './cleanup';
 import { sendStatusToTab } from './message-sender';
 import { recordDownloadEvent } from '../utils/analytics';
 import { validateDownloadUrl } from '../../src/v2/decision/download-validator';
+import { queueRequest } from './queue';
 
 /**
  * S2 (audit docs/SECURITY_AUDIT_EXTENSION_2026-09-24.md): the
@@ -34,6 +35,21 @@ type StartHandler = (downloadId: number | undefined, hadError: boolean) => void;
 
 export const DOWNLOAD_START_TIMEOUT_MESSAGE =
   'The download could not be started — the source never responded. Try again.';
+
+/** 0h4d.1.2: capture the declared size once, for progress + 1.5 verification. */
+function captureTotalBytes(pending: PendingDownload, downloadId: number): void {
+  try {
+    chrome.downloads.search({ id: downloadId }, (items) => {
+      void chrome.runtime.lastError;
+      const item = items?.[0];
+      if (item && typeof item.totalBytes === 'number' && item.totalBytes > 0) {
+        pending.totalBytes = item.totalBytes;
+      }
+    });
+  } catch {
+    // Search unavailable — progress stays unknown; downloads still work.
+  }
+}
 
 /**
  * Shared S2 timeout settle: analytics + honest status + optional sendResponse
@@ -137,6 +153,7 @@ export function startSingleAttempt(
         return;
       }
       bindDownloadId(pending, downloadId as number);
+      captureTotalBytes(pending, downloadId as number);
       respondOnce?.({ started: true, requestId: pending.requestId, downloadId });
     },
     () => handleStartTimeout(pending, respondOnce),
@@ -200,6 +217,7 @@ export function startNextDriveAttempt(pending: PendingDownload): void {
         return;
       }
       bindDownloadId(pending, downloadId as number);
+      captureTotalBytes(pending, downloadId as number);
     },
     () => handleStartTimeout(pending),
   );
@@ -273,80 +291,86 @@ export function handleDownloadRequest(
   // the old Firefox bypass-tab-only flow — the visible-window regression —
   // is gone. HTML/403 responses are caught downstream by the filename
   // interceptor (Chromium) or the onCreated mime guard (Firefox).
-  if (isDrive) {
-    if (pending.isCancelled) {
-      cleanup(pending);
-      return true;
-    }
+  // Queue (0h4d.1.2): the branch body is a deferred starter — the queue
+  // admits it when a slot frees, keeping chrome.downloads.download calls
+  // within QUEUE_CONCURRENCY. Cancelled requests never reach the queue.
+  const start = (): void => {
+    if (isDrive) {
+      const firstUrl =
+        typeof pending.currentAuthUser === 'number'
+          ? buildUrlWithAuthUser(pending.baseUrl, pending.currentAuthUser)
+          : pending.baseUrl;
 
-    const firstUrl =
-      typeof pending.currentAuthUser === 'number'
-        ? buildUrlWithAuthUser(pending.baseUrl, pending.currentAuthUser)
-        : pending.baseUrl;
+      // Security gate: validate URL before downloading
+      const validation = validateDownloadUrl(firstUrl);
+      if (!validation.valid) {
+        console.error(`[CQD Security] Blocked initial Drive download: ${validation.reason} — ${firstUrl}`);
+        sendStatusToTab(pending, 'error', 'Download blocked: invalid URL.', 'INVALID_URL');
+        respondOnce({ started: false, userMessage: 'Download blocked: invalid URL.' });
+        cleanup(pending);
+        return;
+      }
 
-    // Security gate: validate URL before downloading
-    const validation = validateDownloadUrl(firstUrl);
-    if (!validation.valid) {
-      console.error(`[CQD Security] Blocked initial Drive download: ${validation.reason} — ${firstUrl}`);
-      sendStatusToTab(pending, 'error', 'Download blocked: invalid URL.', 'INVALID_URL');
-      respondOnce({ started: false, userMessage: 'Download blocked: invalid URL.' });
-      cleanup(pending);
-      return true;
-    }
-
-    const attemptDriveStart = (): void => {
-      startDownloadWithTimeout(
-        firstUrl,
-        pending,
-        (id, hadError) => {
-          // Race condition check
-          if (pending.isCancelled) {
-            if (id) chrome.downloads.cancel(id, () => { const _ = chrome.runtime.lastError; });
-            cleanup(pending, id);
-            return;
-          }
-
-          if (hadError) {
-            // No-dead-ends: the browser can transiently refuse a start.
-            // Retry ONCE after a short beat, then settle with guidance.
-            if (!pending.startRetried && !pending.isCancelled) {
-              pending.startRetried = true;
-              sendStatusToTab(pending, 'trying', 'Retrying…', 'START_RETRY');
-              setTimeout(attemptDriveStart, 1_000);
+      const attemptDriveStart = (): void => {
+        startDownloadWithTimeout(
+          firstUrl,
+          pending,
+          (id, hadError) => {
+            // Race condition check
+            if (pending.isCancelled) {
+              if (id) chrome.downloads.cancel(id, () => { const _ = chrome.runtime.lastError; });
+              cleanup(pending, id);
               return;
             }
-            recordDownloadEvent({
-              type: pending.fileMeta?.ext || 'unknown',
-              status: 'fail',
-              duration_ms: Date.now() - pending.startTime,
-              bypass_used: false,
-              error_type: 'BROWSER_START_FAIL',
-            });
-            // Zero-tab contract: no bypass-tab fallback. Surface the honest
-            // failure with guidance about the usual cause.
-            respondOnce({
-              started: false,
-              userMessage: 'Browser blocked the download — check site permissions and try again.',
-            });
-            sendStatusToTab(pending, 'error', 'Browser blocked the download — check site permissions and try again.', 'BROWSER_START_FAIL');
-            cleanup(pending);
-            return;
-          }
-          bindDownloadId(pending, id as number);
-          respondOnce({ started: true, requestId, downloadId: id });
-        },
-        () => handleStartTimeout(pending, respondOnce),
-      );
-    };
-    attemptDriveStart();
-  } else {
-    if (pending.isCancelled) {
-      cleanup(pending);
-      return true;
+
+            if (hadError) {
+              // No-dead-ends: the browser can transiently refuse a start.
+              // Retry ONCE after a short beat, then settle with guidance.
+              if (!pending.startRetried && !pending.isCancelled) {
+                pending.startRetried = true;
+                sendStatusToTab(pending, 'trying', 'Retrying…', 'START_RETRY');
+                setTimeout(attemptDriveStart, 1_000);
+                return;
+              }
+              recordDownloadEvent({
+                type: pending.fileMeta?.ext || 'unknown',
+                status: 'fail',
+                duration_ms: Date.now() - pending.startTime,
+                bypass_used: false,
+                error_type: 'BROWSER_START_FAIL',
+              });
+              // Zero-tab contract: no bypass-tab fallback. Surface the honest
+              // failure with guidance about the usual cause.
+              respondOnce({
+                started: false,
+                userMessage: 'Browser blocked the download — check site permissions and try again.',
+              });
+              sendStatusToTab(pending, 'error', 'Browser blocked the download — check site permissions and try again.', 'BROWSER_START_FAIL');
+              cleanup(pending);
+              return;
+            }
+            bindDownloadId(pending, id as number);
+            respondOnce({ started: true, requestId, downloadId: id });
+          },
+          () => handleStartTimeout(pending, respondOnce),
+        );
+      };
+      attemptDriveStart();
+    } else {
+      startSingleAttempt(pending, respondOnce);
     }
-    startSingleAttempt(pending, respondOnce);
+  };
+
+  // Cancelled requests never reach the queue (a queued starter whose pending
+  // is gone would deadlock a slot).
+  if (pending.isCancelled) {
+    cleanup(pending);
+    return true;
   }
 
+  queueRequest(requestId, start, () => {
+    sendStatusToTab(pending, 'trying', 'Waiting in queue…', 'QUEUED');
+  });
   return true;
 }
 

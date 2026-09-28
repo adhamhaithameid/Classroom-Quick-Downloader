@@ -74,9 +74,21 @@ export function setupMessageListeners(): void {
             | ButtonState
             | 'blocked_html'
             | 'interrupted'
-            | 'complete';
+            | 'complete'
+            | 'progress';
           const userMessage = message.userMessage as string | undefined;
           const errorCode = message.errorCode as string | undefined;
+
+          // 0h4d.1.2: byte-level progress — pill only; the button stays "trying".
+          if (status === 'progress') {
+            const progress = (message as { progress?: { received: number; total: number } })
+              .progress;
+            if (progress && progress.total > 0) {
+              setButtonState(button, 'trying', { userMessage: undefined });
+              setPillProgress(button, Math.max(0, Math.min(1, progress.received / progress.total)));
+            }
+            return;
+          }
 
           if (status === 'trying') {
             setButtonState(button, 'trying', { userMessage });

@@ -43,6 +43,11 @@ export function makeFlowState(options: FlowHarnessOptions = {}) {
   const pendingByRequestId = new Map<string, PendingDownload>();
   const pendingByDownloadId = new Map<number, PendingDownload>();
   const pendingByUrl = new Map<string, Set<PendingDownload>>();
+  let flowListener: {
+    onRegister?: (p: PendingDownload) => void;
+    onBind?: (p: PendingDownload) => void;
+    onUnregister?: (requestId: string) => void;
+  } | null = null;
   const indexUrl = (url: string, p: PendingDownload) => {
     let bucket = pendingByUrl.get(url);
     if (!bucket) {
@@ -71,6 +76,9 @@ export function makeFlowState(options: FlowHarnessOptions = {}) {
     registerPending: (p: PendingDownload) => {
       pendingByRequestId.set(p.requestId, p);
       indexUrl(p.baseUrl, p);
+      // Faithful to the real state module: observers see every mutation
+      // (the queue's settlement hook rides onUnregister — 0h4d.1.2).
+      flowListener?.onRegister?.(p);
     },
     bindDownloadId: (p: PendingDownload, downloadId: number) => {
       if (pendingByRequestId.get(p.requestId) !== p) return false;
@@ -78,6 +86,7 @@ export function makeFlowState(options: FlowHarnessOptions = {}) {
       if (existing !== undefined && existing !== p) return false;
       p.currentDownloadId = downloadId;
       pendingByDownloadId.set(downloadId, p);
+      flowListener?.onBind?.(p);
       return true;
     },
     unbindDownloadId: (downloadId: number) => {
@@ -91,9 +100,12 @@ export function makeFlowState(options: FlowHarnessOptions = {}) {
       for (const [url, bucket] of pendingByUrl.entries()) {
         if (bucket.delete(p) && bucket.size === 0) pendingByUrl.delete(url);
       }
+      flowListener?.onUnregister?.(p.requestId);
     },
     isRegistered: (requestId: string) => pendingByRequestId.has(requestId),
-    setRegistryListener: () => {},
+    setRegistryListener: (listener: NonNullable<typeof flowListener>) => {
+      flowListener = listener;
+    },
     setPendingExpiredHook: (hook: ((p: PendingDownload) => void) | null) => {
       expiredHook = hook;
     },

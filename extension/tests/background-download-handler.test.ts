@@ -225,6 +225,36 @@ describe('background download handler', () => {
     expect(respondOnce).toHaveBeenCalledWith({ started: true, requestId: pending.requestId, downloadId: 42 });
   });
 
+  it('startSingleAttempt captures the declared size for progress (0h4d.1.2)', async () => {
+    const ctx = await loadDownloadHandler();
+    const pending = makePending();
+    ctx.stateModule.registerPending(pending);
+    (chrome.runtime as { lastError?: { message: string } }).lastError = undefined;
+    (chrome.downloads.download as any).mockImplementation((_: unknown, cb: (id?: number) => void) => cb(42));
+    (chrome.downloads as any).search = vi.fn((_q: unknown, cb: (items?: Array<{ totalBytes?: number }>) => void) =>
+      cb([{ totalBytes: 12345 }]),
+    );
+
+    ctx.mod.startSingleAttempt(pending, vi.fn());
+
+    expect(pending.totalBytes).toBe(12345);
+  });
+
+  it('startSingleAttempt ignores a zero/unknown total size (honest skip)', async () => {
+    const ctx = await loadDownloadHandler();
+    const pending = makePending();
+    ctx.stateModule.registerPending(pending);
+    (chrome.runtime as { lastError?: { message: string } }).lastError = undefined;
+    (chrome.downloads.download as any).mockImplementation((_: unknown, cb: (id?: number) => void) => cb(42));
+    (chrome.downloads as any).search = vi.fn((_q: unknown, cb: (items?: Array<{ totalBytes?: number }>) => void) =>
+      cb([{ totalBytes: 0 }]),
+    );
+
+    ctx.mod.startSingleAttempt(pending, vi.fn());
+
+    expect(pending.totalBytes).toBeUndefined();
+  });
+
   it('startNextDriveAttempt fails when all auth users are exhausted', async () => {
     const ctx = await loadDownloadHandler({ authCandidates: [0, 1] });
     const pending = makePending({
