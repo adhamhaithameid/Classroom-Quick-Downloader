@@ -118,7 +118,11 @@ jobs:
           path: ./dist-firefox
 
       - name: Package XPI
-        run: cd dist-firefox && zip -r ../dist-firefox.xpi .
+        run: |
+          cd dist-firefox
+          version=$(node -p "require('./manifest.json').version")
+          zip -r "../classroom-quick-downloader-${version}-firefox.zip" .
+          echo "AMO_XPI_PATH=classroom-quick-downloader-${version}-firefox.zip" >> "$GITHUB_ENV"
 
       - name: Sign and submit to AMO (listed channel)
         env:
@@ -126,7 +130,6 @@ jobs:
           AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
           AMO_ADDON_ID: classroom-quick-downloader@adhamhaitham.dev
           AMO_CHANNEL: listed
-          AMO_XPI_PATH: dist-firefox.xpi
         run: node extension/tools/sign-extension.mjs
 
   draft-release:
