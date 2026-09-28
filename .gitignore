@@ -87,3 +87,6 @@ brag-output/
 .beads.gate.lock
 website/prototype-assets/
 website/prototype-*.html
+# Exception: the magnetic guard test reads this approved prototype as its
+# sync source of truth (website/src/lib/motion/magnetic.guard.test.ts).
+!website/prototype-magnetic.html

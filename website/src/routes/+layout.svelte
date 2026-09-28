@@ -100,7 +100,7 @@
         kind: 'install',
         href: '',
         title: 'Free forever',
-        desc: 'No account. No tracking. Installed in under 10 seconds.',
+        desc: 'No account. No personal data. Installed in under 10 seconds.',
         cta: ''
       }
     },
@@ -121,8 +121,8 @@
       featured: {
         kind: 'link',
         href: '/privacy',
-        title: 'We collect nothing',
-        desc: 'No download analytics. No account. Ever.',
+        title: 'Private by design',
+        desc: 'No account. No personal data. Ever.',
         cta: 'Read the privacy policy'
       }
     },
@@ -1129,15 +1129,15 @@
                     </span>
                   </a>
                 {/if}
-                <span class="l2-nav-bmc-label">Support the maker</span>
+                <span class="l2-nav-bmc-label">Support Me</span>
                 <a
                   class="l2-nav-bmc"
                   href={BUY_COFFEE_URL}
                   target="_blank"
-                  rel="noopener noreferrer"
+                  rel="noopener noreferrer nofollow"
                   tabindex={openMenu === menu.key ? undefined : -1}
                 >
-                  <img src="/bmc-button.svg" alt="Buy me a coffee" loading="lazy" />
+                  <img src="/bmc-button.svg" alt="Buy Me a Coffee" width="545" height="153" loading="lazy" />
                 </a>
               </div>
             </div>
@@ -1197,15 +1197,15 @@
               </a>
             </div>
           </div>
-          <span class="l2-nav-bmc-label l2-nav-bmc-label-center">Support the maker</span>
+          <span class="l2-nav-bmc-label l2-nav-bmc-label-center">Support Me</span>
           <a
             class="l2-nav-bmc"
             href={BUY_COFFEE_URL}
             target="_blank"
-            rel="noopener noreferrer"
+            rel="noopener noreferrer nofollow"
             tabindex={openMenu === 'github' ? undefined : -1}
           >
-            <img src="/bmc-button.svg" alt="Buy me a coffee" loading="lazy" />
+            <img src="/bmc-button.svg" alt="Buy Me a Coffee" width="545" height="153" loading="lazy" />
           </a>
           </div>
         </div>

@@ -31,6 +31,11 @@ export default defineConfig({
     name: "Classroom Quick Downloader",
     short_name: "Classroom Quick Downloader",
     homepage_url: "https://classroom-quick-downloader.adhamhaithameid.is-a.dev/",
+    // CI's signed-Firefox QA leg overrides the version (unique per run) so
+    // the QA companion add-on never hits an already-registered version.
+    // Firefox version grammar: dot-separated parts, alphanumeric suffixes
+    // only — "1.8.0qa12" is valid, hyphens are not.
+    ...(process.env.FIREFOX_VERSION ? { version: process.env.FIREFOX_VERSION } : {}),
     // chrome.i18n: _locales is generated from the TRANSLATIONS monolith
     // (extension/tools/generate-locales.mjs) and copied into the bundle —
     // bead 770. The manifest must declare the default or Chrome rejects
@@ -70,7 +75,10 @@ export default defineConfig({
     },
     browser_specific_settings: {
       gecko: {
-        id: "classroom-quick-downloader@adhamhaitham.dev",
+        // CI's signed-Firefox QA leg overrides this with the QA companion
+        // guid (AMO_ADDON_ID / docs/EXTENSION_TESTING_RUNBOOK.md): AMO
+        // rejects uploads whose manifest id differs from the target add-on.
+        id: process.env.FIREFOX_GECKO_ID ?? "classroom-quick-downloader@adhamhaitham.dev",
         data_collection_permissions: {
           required: ["none"]
         },

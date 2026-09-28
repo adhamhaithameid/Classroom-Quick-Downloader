@@ -156,14 +156,15 @@ describe('site layout shell', () => {
     expect(html).toContain('Ready to save hours?');
     expect(html).toContain('Install Classroom Quick Downloader in under 10 seconds. Free forever. No account required.');
     expect(html).toContain('Works with Brave, Opera, Vivaldi, Arc and more.');
-    // Layer 2: product identity + navigation grid
-    expect(html).toContain('Classroom Quick');
+    // Layer 2: product identity (logo, no wordmark) + five-column navigation grid
     expect(html).toContain('Download Classroom files without repetitive clicking.');
     expect(html).toContain('Version');
     expect(html).toContain(`>${APP_VERSION}<`);
     expect(html).toContain('aria-label="Product"');
-    expect(html).toContain('aria-label="Support"');
+    expect(html).toContain('aria-label="Compare"');
     expect(html).toContain('aria-label="Install"');
+    expect(html).toContain('aria-label="Resources"');
+    expect(html).toContain('aria-label="Connect"');
     expect(html).toContain('How it works');
     expect(html).toContain('Report issue');
     expect(html).toContain('ft-mega');
