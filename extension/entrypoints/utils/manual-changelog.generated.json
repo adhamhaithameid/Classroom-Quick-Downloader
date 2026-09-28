@@ -4,9 +4,73 @@
   "source": "manual",
   "entries": [
     {
-      "id": "manual-1.8.0-1",
+      "id": "manual-1.8.7-1",
+      "version": "1.8.7",
+      "date": "2026-09-28T11:45:43.880Z",
+      "summary": "Downloads survive browser service-worker restarts — nothing gets stuck or lost mid-download.",
+      "changes": [
+        "Summary: Downloads survive browser service-worker restarts — nothing gets stuck or lost mid-download.",
+        "Fixed: Fixed downloads becoming stuck when the browser paused the extension in the background."
+      ],
+      "added": [],
+      "changed": [],
+      "fixed": [
+        "Fixed downloads becoming stuck when the browser paused the extension in the background."
+      ],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.8.6-2",
+      "version": "1.8.6",
+      "date": "2026-09-27T11:45:43.880Z",
+      "summary": "A dedicated security-hardening release: filenames are sanitized against path tricks, stalled starts time out honestly, and background messaging is fully guarded.",
+      "changes": [
+        "Summary: A dedicated security-hardening release: filenames are sanitized against path tricks, stalled starts time out honestly, and background messaging is fully guarded.",
+        "Changed: Filenames are hardened before any download starts; manifest permissions tightened; every background message consumer hardened."
+      ],
+      "added": [],
+      "changed": [
+        "Filenames are hardened before any download starts; manifest permissions tightened; every background message consumer hardened."
+      ],
+      "fixed": [],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.8.3-3",
+      "version": "1.8.3",
+      "date": "2026-09-26T11:45:43.880Z",
+      "summary": "Download All Classroom: one click collects every attachment in the class.",
+      "changes": [
+        "Summary: Download All Classroom: one click collects every attachment in the class.",
+        "Added: A class-wide Download All control with smart pacing that stays inside Google Classroom's limits."
+      ],
+      "added": [
+        "A class-wide Download All control with smart pacing that stays inside Google Classroom's limits."
+      ],
+      "changed": [],
+      "fixed": [],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.8.1-4",
+      "version": "1.8.1",
+      "date": "2026-09-25T11:45:43.880Z",
+      "summary": "The extension now ships in 147 languages.",
+      "changes": [
+        "Summary: The extension now ships in 147 languages.",
+        "Added: Full interface translation coverage with automatic consistency checks."
+      ],
+      "added": [
+        "Full interface translation coverage with automatic consistency checks."
+      ],
+      "changed": [],
+      "fixed": [],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.8.0-5",
       "version": "1.8.0",
-      "date": "2026-09-17T02:24:03.976Z",
+      "date": "2026-09-24T11:45:43.880Z",
       "summary": "The no-dead-ends release: every download either succeeds or tells you exactly what to do next — with automatic retries, honest timeouts, and an adversarial test program proving it.",
       "changes": [
         "Summary: The no-dead-ends release: every download either succeeds or tells you exactly what to do next — with automatic retries, honest timeouts, and an adversarial test program proving it.",
@@ -30,9 +94,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.7.9-2",
+      "id": "manual-1.7.9-6",
       "version": "1.7.9",
-      "date": "2026-09-16T02:24:03.976Z",
+      "date": "2026-09-23T11:45:43.880Z",
       "summary": "Firefox download reporting is now fully honest: success is only reported when the browser confirms the file finished.",
       "changes": [
         "Summary: Firefox download reporting is now fully honest: success is only reported when the browser confirms the file finished.",
@@ -46,9 +110,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.7.8-3",
+      "id": "manual-1.7.8-7",
       "version": "1.7.8",
-      "date": "2026-09-15T02:24:03.976Z",
+      "date": "2026-09-22T11:45:43.880Z",
       "summary": "Stalled downloads now resolve honestly, and sign-in/error pages are never saved as fake downloads.",
       "changes": [
         "Summary: Stalled downloads now resolve honestly, and sign-in/error pages are never saved as fake downloads.",
@@ -65,9 +129,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.7.7-4",
+      "id": "manual-1.7.7-8",
       "version": "1.7.7",
-      "date": "2026-09-14T02:24:03.976Z",
+      "date": "2026-09-21T11:45:43.880Z",
       "summary": "Every download failure now has a classified, actionable outcome.",
       "changes": [
         "Summary: Every download failure now has a classified, actionable outcome.",
@@ -86,9 +150,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.7.6-5",
+      "id": "manual-1.7.6-9",
       "version": "1.7.6",
-      "date": "2026-09-13T02:24:03.976Z",
+      "date": "2026-09-20T11:45:43.880Z",
       "summary": "Internal hardening: a corpus of eleven real-world download failure scenarios now runs against both the engine's brain and its implementation, and they must agree on every outcome.",
       "changes": [
         "Summary: Internal hardening: a corpus of eleven real-world download failure scenarios now runs against both the engine's brain and its implementation, and they must agree on every outcome."
@@ -99,9 +163,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.7.5-6",
+      "id": "manual-1.7.5-10",
       "version": "1.7.5",
-      "date": "2026-09-12T02:24:03.976Z",
+      "date": "2026-09-19T11:45:43.880Z",
       "summary": "The test simulator learned six new real-world failure shapes — server errors, sign-in redirects, mid-download connection drops, slow streams, empty files and quota pages — so the engine can be verified against them.",
       "changes": [
         "Summary: The test simulator learned six new real-world failure shapes — server errors, sign-in redirects, mid-download connection drops, slow streams, empty files and quota pages — so the engine can be verified against them."
@@ -112,9 +176,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.7.4-7",
+      "id": "manual-1.7.4-11",
       "version": "1.7.4",
-      "date": "2026-09-11T02:24:03.976Z",
+      "date": "2026-09-18T11:45:43.880Z",
       "summary": "Rendering groundwork for the next engine generation: all page observation now flows through one shared, throttled observer.",
       "changes": [
         "Summary: Rendering groundwork for the next engine generation: all page observation now flows through one shared, throttled observer."
@@ -125,9 +189,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.7.3-8",
+      "id": "manual-1.7.3-12",
       "version": "1.7.3",
-      "date": "2026-09-10T02:24:03.976Z",
+      "date": "2026-09-17T11:45:43.880Z",
       "summary": "Download All is now fully stabilized and the automated QA suite covers the entire manual runbook.",
       "changes": [
         "Summary: Download All is now fully stabilized and the automated QA suite covers the entire manual runbook.",
@@ -143,9 +207,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.7.2-9",
+      "id": "manual-1.7.2-13",
       "version": "1.7.2",
-      "date": "2026-09-09T02:24:03.976Z",
+      "date": "2026-09-16T11:45:43.880Z",
       "summary": "The Engine Mode switch shipped in popup settings (Legacy / New) with live switching and one-click rollback, and page detection is now wired to the download engine through one typed bridge.",
       "changes": [
         "Summary: The Engine Mode switch shipped in popup settings (Legacy / New) with live switching and one-click rollback, and page detection is now wired to the download engine through one typed bridge."
@@ -156,9 +220,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.7.1-10",
+      "id": "manual-1.7.1-14",
       "version": "1.7.1",
-      "date": "2026-09-08T02:24:03.976Z",
+      "date": "2026-09-15T11:45:43.880Z",
       "summary": "The engine's internals now communicate through a typed event bus — the architectural groundwork that lets every later change be measured and rolled back independently.",
       "changes": [
         "Summary: The engine's internals now communicate through a typed event bus — the architectural groundwork that lets every later change be measured and rolled back independently."
@@ -169,9 +233,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.7.0-11",
+      "id": "manual-1.7.0-15",
       "version": "1.7.0",
-      "date": "2026-09-07T02:24:03.976Z",
+      "date": "2026-09-14T11:45:43.880Z",
       "summary": "Zero-window downloads verified end-to-end: the old background-tab workaround is fully removed, and a locked test file proves the invisible account fallback completes real downloads.",
       "changes": [
         "Summary: Zero-window downloads verified end-to-end: the old background-tab workaround is fully removed, and a locked test file proves the invisible account fallback completes real downloads."
@@ -182,9 +246,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.6.9-12",
+      "id": "manual-1.6.9-16",
       "version": "1.6.9",
-      "date": "2026-09-06T02:24:03.976Z",
+      "date": "2026-09-13T11:45:43.880Z",
       "summary": "The fix for the most-reported download bug: files that start but fail now quietly try your other signed-in accounts, and downloads go straight through Google's direct file endpoint.",
       "changes": [
         "Summary: The fix for the most-reported download bug: files that start but fail now quietly try your other signed-in accounts, and downloads go straight through Google's direct file endpoint.",
@@ -200,9 +264,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.6.8-13",
+      "id": "manual-1.6.8-17",
       "version": "1.6.8",
-      "date": "2026-09-05T02:24:03.976Z",
+      "date": "2026-09-12T11:45:43.880Z",
       "summary": "The automated QA pipeline now replays the entire manual test runbook in real browsers — including real downloads verified byte-for-byte.",
       "changes": [
         "Summary: The automated QA pipeline now replays the entire manual test runbook in real browsers — including real downloads verified byte-for-byte."
@@ -213,9 +277,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.6.7-14",
+      "id": "manual-1.6.7-18",
       "version": "1.6.7",
-      "date": "2026-09-04T02:24:03.976Z",
+      "date": "2026-09-11T11:45:43.880Z",
       "summary": "Foundation for the automated QA program: a local, deterministic Google Classroom simulator that serves real downloadable files under the real Classroom origins.",
       "changes": [
         "Summary: Foundation for the automated QA program: a local, deterministic Google Classroom simulator that serves real downloadable files under the real Classroom origins."
@@ -226,9 +290,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.6.6-15",
+      "id": "manual-1.6.6-19",
       "version": "1.6.6",
-      "date": "2026-09-03T02:24:03.976Z",
+      "date": "2026-09-10T11:45:43.880Z",
       "summary": "Detection and naming hardening: localized type labels no longer leak into filenames, download state races are fixed, and Sheets attachments get their buttons back.",
       "changes": [
         "Summary: Detection and naming hardening: localized type labels no longer leak into filenames, download state races are fixed, and Sheets attachments get their buttons back.",
@@ -246,9 +310,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.6.5-16",
+      "id": "manual-1.6.5-20",
       "version": "1.6.5",
-      "date": "2026-09-02T02:24:03.976Z",
+      "date": "2026-09-09T11:45:43.880Z",
       "summary": "More detection accuracy fixes: comment counts survive markup drift, exclusions match whole tokens, and localized dates parse correctly.",
       "changes": [
         "Summary: More detection accuracy fixes: comment counts survive markup drift, exclusions match whole tokens, and localized dates parse correctly."
@@ -259,9 +323,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.6.4-17",
+      "id": "manual-1.6.4-21",
       "version": "1.6.4",
-      "date": "2026-09-01T02:24:03.976Z",
+      "date": "2026-09-08T11:45:43.880Z",
       "summary": "Exclusion matching now operates on whole words, eliminating a family of false-positive detections.",
       "changes": [
         "Summary: Exclusion matching now operates on whole words, eliminating a family of false-positive detections."
@@ -272,9 +336,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.6.3-18",
+      "id": "manual-1.6.3-22",
       "version": "1.6.3",
-      "date": "2026-08-31T02:24:03.976Z",
+      "date": "2026-09-07T11:45:43.880Z",
       "summary": "Detection defenses: number extraction now sanity-checks the page before trusting it.",
       "changes": [
         "Summary: Detection defenses: number extraction now sanity-checks the page before trusting it."
@@ -285,9 +349,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.6.2-19",
+      "id": "manual-1.6.2-23",
       "version": "1.6.2",
-      "date": "2026-08-30T02:24:03.976Z",
+      "date": "2026-09-06T11:45:43.880Z",
       "summary": "Detection accuracy across scripts: Armenian keywords, exact word-number matching, and Arabic diacritic folding fixed.",
       "changes": [
         "Summary: Detection accuracy across scripts: Armenian keywords, exact word-number matching, and Arabic diacritic folding fixed."
@@ -298,9 +362,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.6.1-20",
+      "id": "manual-1.6.1-24",
       "version": "1.6.1",
-      "date": "2026-08-29T02:24:03.976Z",
+      "date": "2026-09-05T11:45:43.880Z",
       "summary": "The Engine V4 foundation: a measurable accuracy standard for the detection engine, a pure download state machine, and hardened release gates. Everything after this version is measured against a fixed corpus.",
       "changes": [
         "Summary: The Engine V4 foundation: a measurable accuracy standard for the detection engine, a pure download state machine, and hardened release gates. Everything after this version is measured against a fixed corpus.",
@@ -316,9 +380,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.6.0-21",
+      "id": "manual-1.6.0-25",
       "version": "1.6.0",
-      "date": "2026-08-28T02:24:03.976Z",
+      "date": "2026-09-04T11:45:43.880Z",
       "summary": "The Engine V4 foundation: a measurable accuracy standard for the detection engine, a pure download state machine, and hardened release gates — plus the security-audit roll-up that closed the 1.5 line. Everything after this version is measured against a fixed corpus.",
       "changes": [
         "Summary: The Engine V4 foundation: a measurable accuracy standard for the detection engine, a pure download state machine, and hardened release gates — plus the security-audit roll-up that closed the 1.5 line. Everything after this version is measured against a fixed corpus.",
@@ -341,9 +405,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.5.9-22",
+      "id": "manual-1.5.9-26",
       "version": "1.5.9",
-      "date": "2026-08-27T02:24:03.976Z",
+      "date": "2026-09-03T11:45:43.880Z",
       "summary": "A batch of reviewed, low-risk fixes and cleanups rolled into one stable release.",
       "changes": [
         "Summary: A batch of reviewed, low-risk fixes and cleanups rolled into one stable release."
@@ -354,9 +418,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.5.8-23",
+      "id": "manual-1.5.8-27",
       "version": "1.5.8",
-      "date": "2026-08-26T02:24:03.976Z",
+      "date": "2026-09-02T11:45:43.880Z",
       "summary": "Faster page scanning and a fully accessible popup.",
       "changes": [
         "Summary: Faster page scanning and a fully accessible popup.",
@@ -370,9 +434,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.5.7-24",
+      "id": "manual-1.5.7-28",
       "version": "1.5.7",
-      "date": "2026-08-25T02:24:03.976Z",
+      "date": "2026-09-01T11:45:43.880Z",
       "summary": "A security-hardening release: the developer debug surface now escapes all runtime values before rendering.",
       "changes": [
         "Summary: A security-hardening release: the developer debug surface now escapes all runtime values before rendering."
@@ -383,9 +447,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.5.6-25",
+      "id": "manual-1.5.6-29",
       "version": "1.5.6",
-      "date": "2026-08-24T02:24:03.976Z",
+      "date": "2026-08-31T11:45:43.880Z",
       "summary": "A security-and-accessibility release: cryptographically secure download identifiers, fully labeled controls, and deeper Student Work test coverage.",
       "changes": [
         "Summary: A security-and-accessibility release: cryptographically secure download identifiers, fully labeled controls, and deeper Student Work test coverage."
@@ -396,9 +460,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.5.5-26",
+      "id": "manual-1.5.5-30",
       "version": "1.5.5",
-      "date": "2026-08-23T02:24:03.976Z",
+      "date": "2026-08-30T11:45:43.880Z",
       "summary": "A leaner packaging release focused on reducing extension size while preserving the same classroom behavior.",
       "changes": [
         "Summary: A leaner packaging release focused on reducing extension size while preserving the same classroom behavior.",
@@ -418,9 +482,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.5.4-27",
+      "id": "manual-1.5.4-31",
       "version": "1.5.4",
-      "date": "2026-08-22T02:24:03.976Z",
+      "date": "2026-08-29T11:45:43.880Z",
       "summary": "A performance-focused release with two measurable speed upgrades in scan and download orchestration paths.",
       "changes": [
         "Summary: A performance-focused release with two measurable speed upgrades in scan and download orchestration paths.",
@@ -442,9 +506,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.5.3-28",
+      "id": "manual-1.5.3-32",
       "version": "1.5.3",
-      "date": "2026-08-21T02:24:03.976Z",
+      "date": "2026-08-28T11:45:43.880Z",
       "summary": "Introduced a new detection layer for flags and files to keep ownership mapping stable across complex Classroom layouts.",
       "changes": [
         "Summary: Introduced a new detection layer for flags and files to keep ownership mapping stable across complex Classroom layouts.",
@@ -464,9 +528,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.5.2-29",
+      "id": "manual-1.5.2-33",
       "version": "1.5.2",
-      "date": "2026-08-20T02:24:03.976Z",
+      "date": "2026-08-27T11:45:43.880Z",
       "summary": "A focused stabilization release delivering bug fixes and stronger security hardening for production classrooms.",
       "changes": [
         "Summary: A focused stabilization release delivering bug fixes and stronger security hardening for production classrooms.",
@@ -486,9 +550,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.5.1-30",
+      "id": "manual-1.5.1-34",
       "version": "1.5.1",
-      "date": "2026-08-19T02:24:03.976Z",
+      "date": "2026-08-26T11:45:43.880Z",
       "summary": "Expanded real-world support for the Student Work tap so teachers can download attached files and media directly from submissions.",
       "changes": [
         "Summary: Expanded real-world support for the Student Work tap so teachers can download attached files and media directly from submissions.",
@@ -508,9 +572,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.5.0-31",
+      "id": "manual-1.5.0-35",
       "version": "1.5.0",
-      "date": "2026-08-18T02:24:03.976Z",
+      "date": "2026-08-25T11:45:43.880Z",
       "summary": "This is the best and most reliable state the extension has reached so far. Download buttons, flag placement, and post detection are now much more accurate in real Google Classroom usage.",
       "changes": [
         "Summary: This is the best and most reliable state the extension has reached so far. Download buttons, flag placement, and post detection are now much more accurate in real Google Classroom usage.",
@@ -540,9 +604,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.4.0-32",
+      "id": "manual-1.4.0-36",
       "version": "1.4.0",
-      "date": "2026-08-17T02:24:03.976Z",
+      "date": "2026-08-24T11:45:43.880Z",
       "summary": "A major under-the-hood release that introduced the V2 engine foundation. It made the extension safer to improve without breaking the stable experience you already rely on.",
       "changes": [
         "Summary: A major under-the-hood release that introduced the V2 engine foundation. It made the extension safer to improve without breaking the stable experience you already rely on.",
@@ -564,9 +628,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.3.9-33",
+      "id": "manual-1.3.9-37",
       "version": "1.3.9",
-      "date": "2026-08-16T02:24:03.976Z",
+      "date": "2026-08-23T11:45:43.880Z",
       "summary": "Improved release consistency and user-facing clarity across the website and extension experiences.",
       "changes": [
         "Summary: Improved release consistency and user-facing clarity across the website and extension experiences.",
@@ -592,9 +656,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.3.8-34",
+      "id": "manual-1.3.8-38",
       "version": "1.3.8",
-      "date": "2026-08-15T02:24:03.976Z",
+      "date": "2026-08-22T11:45:43.880Z",
       "summary": "Improved changelog reliability so users always receive updates, even when the version number stays the same.",
       "changes": [
         "Summary: Improved changelog reliability so users always receive updates, even when the version number stays the same.",
@@ -620,9 +684,9 @@
       "isImportant": true
     },
     {
-      "id": "manual-1.3.7-35",
+      "id": "manual-1.3.7-39",
       "version": "1.3.7",
-      "date": "2026-08-14T02:24:03.976Z",
+      "date": "2026-08-21T11:45:43.880Z",
       "summary": "Improved daily reliability and clearer release communication for normal users.",
       "changes": [
         "Summary: Improved daily reliability and clearer release communication for normal users.",
@@ -648,9 +712,9 @@
       "isImportant": true
     },
     {
-      "id": "manual-1.3.6-36",
+      "id": "manual-1.3.6-40",
       "version": "1.3.6",
-      "date": "2026-08-13T02:24:03.976Z",
+      "date": "2026-08-20T11:45:43.880Z",
       "summary": "Focused on stability and compatibility hardening for heavy classroom workloads.",
       "changes": [
         "Summary: Focused on stability and compatibility hardening for heavy classroom workloads.",
@@ -676,9 +740,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.3.0-37",
+      "id": "manual-1.3.0-41",
       "version": "1.3.0",
-      "date": "2026-08-12T02:24:03.976Z",
+      "date": "2026-08-19T11:45:43.880Z",
       "summary": "Delivered major reliability, remote-config, and analytics improvements.",
       "changes": [
         "Summary: Delivered major reliability, remote-config, and analytics improvements.",
@@ -704,9 +768,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.2.7-38",
+      "id": "manual-1.2.7-42",
       "version": "1.2.7",
-      "date": "2026-08-11T02:24:03.976Z",
+      "date": "2026-08-18T11:45:43.880Z",
       "summary": "Broad security and reliability hardening across extension behavior.",
       "changes": [
         "Summary: Broad security and reliability hardening across extension behavior.",
@@ -732,9 +796,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.2.3-39",
+      "id": "manual-1.2.3-43",
       "version": "1.2.3",
-      "date": "2026-08-10T02:24:03.976Z",
+      "date": "2026-08-17T11:45:43.880Z",
       "summary": "Usability and telemetry consistency release.",
       "changes": [
         "Summary: Usability and telemetry consistency release.",
@@ -754,9 +818,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.2.2-40",
+      "id": "manual-1.2.2-44",
       "version": "1.2.2",
-      "date": "2026-08-09T02:24:03.976Z",
+      "date": "2026-08-16T11:45:43.880Z",
       "summary": "Cancel-flow polish release.",
       "changes": [
         "Summary: Cancel-flow polish release.",
@@ -776,9 +840,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.2.1-41",
+      "id": "manual-1.2.1-45",
       "version": "1.2.1",
-      "date": "2026-08-08T02:24:03.976Z",
+      "date": "2026-08-15T11:45:43.880Z",
       "summary": "Unified cancel-system iteration release.",
       "changes": [
         "Summary: Unified cancel-system iteration release.",
@@ -798,9 +862,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.2.0-42",
+      "id": "manual-1.2.0-46",
       "version": "1.2.0",
-      "date": "2026-08-07T02:24:03.976Z",
+      "date": "2026-08-14T11:45:43.880Z",
       "summary": "Cancel feature baseline release.",
       "changes": [
         "Summary: Cancel feature baseline release.",
@@ -820,9 +884,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.1.10-43",
+      "id": "manual-1.1.10-47",
       "version": "1.1.10",
-      "date": "2026-08-06T02:24:03.976Z",
+      "date": "2026-08-13T11:45:43.880Z",
       "summary": "Late 1.1 line reliability release.",
       "changes": [
         "Summary: Late 1.1 line reliability release.",
@@ -842,9 +906,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.1.5-44",
+      "id": "manual-1.1.5-48",
       "version": "1.1.5",
-      "date": "2026-08-05T02:24:03.976Z",
+      "date": "2026-08-12T11:45:43.880Z",
       "summary": "Mid 1.1 quality and compatibility release.",
       "changes": [
         "Summary: Mid 1.1 quality and compatibility release.",
@@ -864,9 +928,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.1.1-45",
+      "id": "manual-1.1.1-49",
       "version": "1.1.1",
-      "date": "2026-08-04T02:24:03.976Z",
+      "date": "2026-08-11T11:45:43.880Z",
       "summary": "Post-1.1 stabilization release.",
       "changes": [
         "Summary: Post-1.1 stabilization release.",
@@ -886,9 +950,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.1.0-46",
+      "id": "manual-1.1.0-50",
       "version": "1.1.0",
-      "date": "2026-08-03T02:24:03.976Z",
+      "date": "2026-08-10T11:45:43.880Z",
       "summary": "Feature and packaging expansion release.",
       "changes": [
         "Summary: Feature and packaging expansion release.",
@@ -908,9 +972,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.0.1-47",
+      "id": "manual-1.0.1-51",
       "version": "1.0.1",
-      "date": "2026-08-02T02:24:03.976Z",
+      "date": "2026-08-09T11:45:43.880Z",
       "summary": "Post-launch stabilization release.",
       "changes": [
         "Summary: Post-launch stabilization release.",
@@ -930,9 +994,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.0.0-48",
+      "id": "manual-1.0.0-52",
       "version": "1.0.0",
-      "date": "2026-08-01T02:24:03.976Z",
+      "date": "2026-08-08T11:45:43.880Z",
       "summary": "First stable production release.",
       "changes": [
         "Summary: First stable production release.",
@@ -976,11 +1040,11 @@
         "color": "default"
       }
     ],
-    "lastUpdated": 1789611843976
+    "lastUpdated": 1790595943881
   },
   "meta": {
     "applyMode": "manual",
-    "liveUpdatedAt": 1789611843976,
-    "contentChecksum": "manual-1789611843976"
+    "liveUpdatedAt": 1790595943881,
+    "contentChecksum": "manual-1790595943881"
   }
 }
