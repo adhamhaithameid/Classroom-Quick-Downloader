@@ -25,7 +25,8 @@ const WIRED_FILES: Record<string, number> = {
   'src/routes/faq/+page.svelte': 1,
   'src/routes/uninstall/+page.svelte': 2, // detected-browser reinstall + submit while enabled
   'src/routes/404/+page.svelte': 1,
-  'src/routes/+error.svelte': 1
+  'src/routes/+error.svelte': 1,
+  'src/lib/components/TestimonialsSection.svelte': 2 // review card cluster, approved with the testimonials PR
 };
 
 /* Navbar, footer, and anything else must stay magnetic-free. */

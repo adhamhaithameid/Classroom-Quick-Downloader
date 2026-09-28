@@ -100,7 +100,7 @@
         kind: 'install',
         href: '',
         title: 'Free forever',
-        desc: 'No account. No tracking. Installed in under 10 seconds.',
+        desc: 'No account. No personal data. Installed in under 10 seconds.',
         cta: ''
       }
     },
@@ -121,8 +121,8 @@
       featured: {
         kind: 'link',
         href: '/privacy',
-        title: 'We collect nothing',
-        desc: 'No download analytics. No account. Ever.',
+        title: 'Private by design',
+        desc: 'No account. No personal data. Ever.',
         cta: 'Read the privacy policy'
       }
     },

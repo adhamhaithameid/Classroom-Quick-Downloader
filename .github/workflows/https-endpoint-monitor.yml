@@ -45,3 +45,16 @@ jobs:
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
         run: bash tools/https_smoke_matrix.sh
+
+      - name: Full production verification (pages + legacy 301 + canonical + worker)
+        # Catches the production-state regressions a per-endpoint smoke cannot:
+        # the legacy pages.dev host serving 200 instead of 301 (bead rhq) and
+        # stale/canonical-broken page content. Fails the run so GitHub's
+        # failure notifications page the maintainer (bead sqa9.4).
+        env:
+          BASE_URL: ${{ vars.PUBLIC_SITE_URL }}
+          WORKER_BASE_URL: ${{ vars.PUBLIC_WORKER_BASE_URL }}
+          # Oracle is severed from the live path; a dormant backend must not
+          # produce hourly pages.
+          SKIP_ORACLE_CHECK: "1"
+        run: node tools/verify-production.mjs
