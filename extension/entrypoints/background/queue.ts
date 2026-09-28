@@ -22,10 +22,12 @@ let snapshot: QueueSnapshot = createEmptyQueue();
 const starters = new Map<string, () => void>();
 
 /** A new download request: queue it and pump (admits immediately if capacity allows). */
-export function queueRequest(requestId: string, start: () => void): void {
+export function queueRequest(requestId: string, start: () => void, onQueued?: () => void): void {
   starters.set(requestId, start);
   snapshot = enqueue(snapshot, requestId, Date.now());
   pump();
+  // Still waiting after the pump? Tell the origin once (the pill shows it).
+  if (onQueued && snapshot.entries.some((e) => e.requestId === requestId)) onQueued();
 }
 
 /** A request reached a terminal state (success/fail/cancel/TTL) — free its slot. */

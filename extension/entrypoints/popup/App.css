@@ -1799,3 +1799,52 @@ body {
   border-color: #FF4036;
 }
 
+
+/* ── Queue panel (0h4d.1.2) ─────────────────────────────────────────────── */
+.cqd-card-queue { padding: 12px 14px; }
+.cqd-queue-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.cqd-queue-title { font-size: 12px; font-weight: 600; opacity: 0.85; }
+.cqd-queue-pause-btn {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: transparent;
+  cursor: pointer;
+}
+.cqd-queue-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.cqd-queue-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.cqd-queue-state {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.cqd-queue-state-active { background: rgba(52, 168, 83, 0.16); color: #1e7a34; }
+.cqd-queue-state-queued { background: rgba(0, 0, 0, 0.08); opacity: 0.75; }
+.cqd-queue-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cqd-queue-cancel {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.55;
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px 4px;
+}
+.cqd-queue-cancel:hover { opacity: 1; }

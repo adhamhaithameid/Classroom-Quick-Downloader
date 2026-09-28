@@ -36,6 +36,21 @@ type StartHandler = (downloadId: number | undefined, hadError: boolean) => void;
 export const DOWNLOAD_START_TIMEOUT_MESSAGE =
   'The download could not be started — the source never responded. Try again.';
 
+/** 0h4d.1.2: capture the declared size once, for progress + 1.5 verification. */
+function captureTotalBytes(pending: PendingDownload, downloadId: number): void {
+  try {
+    chrome.downloads.search({ id: downloadId }, (items) => {
+      void chrome.runtime.lastError;
+      const item = items?.[0];
+      if (item && typeof item.totalBytes === 'number' && item.totalBytes > 0) {
+        pending.totalBytes = item.totalBytes;
+      }
+    });
+  } catch {
+    // Search unavailable — progress stays unknown; downloads still work.
+  }
+}
+
 /**
  * Shared S2 timeout settle: analytics + honest status + optional sendResponse
  * + cleanup. One body, four call sites (startSingleAttempt, attemptDriveStart,
@@ -138,6 +153,7 @@ export function startSingleAttempt(
         return;
       }
       bindDownloadId(pending, downloadId as number);
+      captureTotalBytes(pending, downloadId as number);
       respondOnce?.({ started: true, requestId: pending.requestId, downloadId });
     },
     () => handleStartTimeout(pending, respondOnce),
@@ -201,6 +217,7 @@ export function startNextDriveAttempt(pending: PendingDownload): void {
         return;
       }
       bindDownloadId(pending, downloadId as number);
+      captureTotalBytes(pending, downloadId as number);
     },
     () => handleStartTimeout(pending),
   );
@@ -351,7 +368,9 @@ export function handleDownloadRequest(
     return true;
   }
 
-  queueRequest(requestId, start);
+  queueRequest(requestId, start, () => {
+    sendStatusToTab(pending, 'trying', 'Waiting in queue…', 'QUEUED');
+  });
   return true;
 }
 

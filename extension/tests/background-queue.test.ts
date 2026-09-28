@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import { loadFlowHarness } from './helpers/background-flow';
-
 // ============================================================================
 // BACKGROUND QUEUE INTEGRATION (0h4d.1.2 task 2, plan
 // docs/superpowers/plans/2026-09-28-queue-engine.md). Every start funnels
@@ -67,5 +66,25 @@ describe('background download queue (0h4d.1.2)', () => {
     // q slot freed → c-3 would be admitted if still queued; it must not be.
     expect(h.downloadCalls.length).toBe(4);
     expect(h.downloadCalls.every((c) => !c.url.includes('file3'))).toBe(true);
+  });
+
+  it('restart recovery: a reconciled in-progress record holds its active slot', async () => {
+    vi.resetModules();
+    const queue = await import('../entrypoints/background/queue');
+    queue.resetQueueForTests();
+
+    // A record that was downloading pre-restart comes back via reconcile.
+    queue.queueRecoverActive('r-1');
+
+    const started: string[] = [];
+    for (let i = 0; i < 3; i++) queue.queueRequest(`n-${i}`, () => started.push(`n-${i}`));
+
+    // r-1 occupies one of the 3 slots: only 2 of the new requests admit.
+    expect(started).toEqual(['n-0', 'n-1']);
+    expect(queue.getQueueSnapshot().activeIds).toContain('r-1');
+
+    // When the recovered download settles, the third request admits.
+    queue.queueSettled('r-1');
+    expect(started).toEqual(['n-0', 'n-1', 'n-2']);
   });
 });

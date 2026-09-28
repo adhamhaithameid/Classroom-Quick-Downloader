@@ -107,10 +107,11 @@ describe('queue engine — scheduler invariants (0h4d.1.2)', () => {
 
   it('P-Q3: paused freezes admissions; resuming admits nothing until select is called', () => {
     fc.assert(
-      fc.property(fc.array(arbId, { minLength: 1, maxLength: 8 }), (ids) => {
+      fc.property(fc.array(arbId, { minLength: 1, maxLength: 8 }), (rawIds) => {
+        const ids = [...new Set(rawIds)];
         let snap = createEmptyQueue();
-        ids.forEach((id) => {
-          snap = enqueue(snap, id, 0);
+        ids.forEach((id, idx) => {
+          snap = enqueue(snap, id, idx);
         });
         snap = setPaused(snap, true);
         const pausedResult = selectNext(snap, 10);

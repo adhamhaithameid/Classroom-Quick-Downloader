@@ -26,7 +26,7 @@ import {
   IS_FIREFOX,
 } from './state';
 import { createStoragePersistence, reconcilePersistedJobs } from './job-persistence';
-import { queueSettled, queueRecoverActive } from './queue';
+import { queueSettled, queueRecoverActive, getQueueSnapshot, setQueuePaused } from './queue';
 import { createIconUpdaters, isClassroomUrl, setActionIcon, GRAY_ICON_PATHS } from './icon-manager';
 import { extractDriveFileId } from './auth-utils';
 import { getFilenameExt, buildUrlWithAuthUser } from './url-helpers';
@@ -444,9 +444,31 @@ export default defineBackground(() => {
   }
 
   // 3) onChanged: settle + analytics
+  const progressThrottle = new WeakMap<PendingDownloadLike, { at: number; pct: number }>();
   chrome.downloads.onChanged.addListener((delta) => {
     const pending = getPendingByDownloadId(delta.id);
     if (!pending) return;
+
+    // 0h4d.1.2: byte-level progress relay (throttled; pill renders it).
+    // bytesReceived rides every progress delta but is missing from the
+    // installed DownloadDelta type — cast to the documented runtime shape.
+    const received = (delta as { bytesReceived?: { current?: number } }).bytesReceived?.current;
+    if (typeof received === 'number') {
+      const total = pending.totalBytes ?? 0;
+      if (total > 0) {
+        const prev = progressThrottle.get(pending);
+        const pct = received / total;
+        const now = Date.now();
+        if (!prev || (now - prev.at >= 500 && Math.abs(pct - prev.pct) >= 0.02) || pct >= 1) {
+          progressThrottle.set(pending, { at: now, pct });
+          sendStatusToTab(pending, 'progress', undefined, undefined, {
+            received,
+            total,
+          });
+        }
+      }
+      return;
+    }
 
     if (delta.state && delta.state.current === 'complete') {
       // No-dead-ends: verify what actually landed. Chromium does NOT always
@@ -579,7 +601,6 @@ export default defineBackground(() => {
   chrome.runtime.onMessage.addListener((message, sender) => {
     if (sender.id !== chrome.runtime.id) return false;
     if (!message || message.type !== 'CQD_CANCEL_DOWNLOAD') return false;
-
     const requestId = message.requestId as string | undefined;
     if (!requestId) return false;
 
@@ -609,6 +630,37 @@ export default defineBackground(() => {
     });
 
     cleanup(pending);
+    return false;
+  });
+
+  // 6) Queue surface (0h4d.1.2): the popup's queue panel.
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (sender.id !== chrome.runtime.id) return false;
+    if (!message) return false;
+
+    if (message.type === 'CQD_QUEUE_SNAPSHOT') {
+      const snap = getQueueSnapshot();
+      const ids = [...snap.activeIds, ...snap.entries.map((e) => e.requestId)];
+      const rows = ids.map((requestId) => {
+        const p = getPendingByRequestId(requestId);
+        const fallbackName = p?.originalUrl ? p.originalUrl.split('/').pop() : undefined;
+        return {
+          requestId,
+          queued: snap.entries.some((e) => e.requestId === requestId),
+          filename: p?.fileMeta?.name || fallbackName || requestId,
+          ext: p?.fileMeta?.ext,
+        };
+      });
+      sendResponse({ ok: true, paused: snap.paused, rows });
+      return false;
+    }
+
+    if (message.type === 'CQD_QUEUE_PAUSE') {
+      setQueuePaused(!!message.paused);
+      sendResponse({ ok: true, paused: !!message.paused });
+      return false;
+    }
+
     return false;
   });
 });

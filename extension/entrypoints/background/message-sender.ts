@@ -31,7 +31,8 @@ export function sendStatusToTab(
   pending: PendingDownload,
   status: DownloadStatus,
   userMessage?: string,
-  errorCode?: string
+  errorCode?: string,
+  progress?: { received: number; total: number },
 ): void {
   // Don't send duplicate success messages
   if (pending.finalized && status === 'success') return;
@@ -54,6 +55,7 @@ export function sendStatusToTab(
       status,
       errorCode,
       userMessage,
+      ...(progress ? { progress } : {}),
     }, () => { void chrome.runtime.lastError; });
   } catch {
     // Tab may have been closed
