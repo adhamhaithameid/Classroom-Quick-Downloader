@@ -40,6 +40,7 @@ function makeFlowState(options: FlowOptions = {}) {
   };
   return {
     setPendingExpiredHook: vi.fn(),
+    setRegistryListener: vi.fn(),
     pendingByRequestId,
     pendingByDownloadId,
     pendingByUrl,
