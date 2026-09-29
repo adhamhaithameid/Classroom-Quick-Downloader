@@ -49,6 +49,7 @@ import { startBridgeDownloadService } from './bridge-download-service';
 import { UNINSTALL_SITE_URL } from '../utils/analytics/constants';
 import { t } from '../content/i18n';
 import { canRetry, delayForMs, DEFAULT_RETRY_POLICY } from '../../src/retry/backoff';
+import { composeFailureMessage } from '../../src/core/acquire/failure-copy';
 import {
   STUDENT_WORK_RESOLVE_PUBLISH_TYPE,
   STUDENT_WORK_RESOLVE_RELAY_TYPE,
@@ -609,14 +610,6 @@ export default defineBackground(() => {
       // in-place retry (same URL, same account) before the honest terminal;
       // permanent failures fail fast with a message that names the cause.
       const TRANSIENT = new Set(['NETWORK_FAILED', 'SERVER_FAILED', 'NETWORK_TIMED_OUT']);
-      const PERMANENT_MESSAGE: Record<string, string> = {
-        FILE_FAILED: 'The file could not be saved. Try downloading it again.',
-        STORAGE_FULL: 'Your disk is full — free up some space and try again.',
-        CRASH: 'The browser crashed during the download. Try again.',
-        SERVER_BAD_CONTENT: 'The file is no longer available at its source.',
-        FILE_VIRUS_INFECTED: 'The file is infected and was blocked by your browser.',
-        FILE_BLOCKED: 'Your browser blocked this file type for security reasons.',
-      };
       // 0h4d.1.3: transient interrupts back off exponentially (bounded by the
       // policy); the delay is jittered so simultaneous failures spread out.
       if (TRANSIENT.has(errorType) && canRetry(DEFAULT_RETRY_POLICY, pending.retryCount ?? 0)) {
@@ -640,8 +633,11 @@ export default defineBackground(() => {
         bypass_used: false,
         error_type: errorType,
       });
-      const guidance = PERMANENT_MESSAGE[errorType];
-      sendStatusToTab(pending, 'error', guidance ?? t('downloadInterrupted'), errorType);
+      // 0h4d.1.4: copy comes from the canonical registry (one entry per
+      // classified failure; tests/failure-copy.test.ts guarantees coverage —
+      // transient classes too, since their copy shows when retries exhaust).
+      const guidance = composeFailureMessage(errorType);
+      sendStatusToTab(pending, 'error', guidance || t('downloadInterrupted'), errorType);
       cleanup(pending, delta.id);
     }
   });
