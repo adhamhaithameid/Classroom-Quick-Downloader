@@ -1848,3 +1848,67 @@ body {
   padding: 2px 4px;
 }
 .cqd-queue-cancel:hover { opacity: 1; }
+
+/* ── History panel (0h4d.1.6) ───────────────────────────────────────────── */
+.cqd-card-history { padding: 12px 14px; }
+.cqd-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.cqd-history-title { font-size: 12px; font-weight: 600; opacity: 0.85; }
+.cqd-history-clear {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: transparent;
+  cursor: pointer;
+}
+.cqd-history-search {
+  width: 100%;
+  font-size: 12px;
+  padding: 5px 8px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: transparent;
+}
+.cqd-history-empty { font-size: 12px; opacity: 0.6; padding: 4px 0; }
+.cqd-history-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.cqd-history-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.cqd-history-state {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  flex: none;
+}
+.cqd-history-state-ok { background: rgba(52, 168, 83, 0.16); color: #1e7a34; }
+.cqd-history-state-fail { background: rgba(234, 67, 53, 0.14); color: #b3261e; }
+.cqd-history-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cqd-history-date { font-size: 10px; opacity: 0.55; white-space: nowrap; }
+.cqd-history-redownload {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 4px;
+  opacity: 0.6;
+}
+.cqd-history-redownload:hover { opacity: 1; }
