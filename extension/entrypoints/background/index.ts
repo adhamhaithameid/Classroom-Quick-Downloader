@@ -291,6 +291,41 @@ export default defineBackground(() => {
     startNextDriveAttempt(pending);
   }
 
+  /**
+   * 0h4d.1.5: the finished file's byte count does not match its declared
+   * size — a truncated download. Erase already handled by the caller; retry
+   * within the backoff policy (same engine as transient interrupts), then
+   * settle honestly. detail 'SIZE_MISMATCH' rides the machine's
+   * transient-failed class, so pure and production agree by construction.
+   */
+  function handleSizeMismatch(pending: PendingDownloadLike): void {
+    if (pending.finalized) return;
+    if (canRetry(DEFAULT_RETRY_POLICY, pending.retryCount ?? 0)) {
+      pending.retryCount = (pending.retryCount ?? 0) + 1;
+      const delay = delayForMs(pending.retryCount, DEFAULT_RETRY_POLICY);
+      sendStatusToTab(pending, 'trying', 'The file arrived incomplete — retrying…', 'SIZE_RETRY');
+      setTimeout(() => {
+        if (!isRegistered(pending.requestId) || pending.finalized) return;
+        retrySameAttempt(pending);
+      }, delay);
+      return;
+    }
+    recordDownloadEvent({
+      type: pending.finalExtension || pending.fileMeta?.ext || 'unknown',
+      status: 'fail',
+      duration_ms: Date.now() - pending.startTime,
+      bypass_used: false,
+      error_type: 'SIZE_MISMATCH',
+    });
+    sendStatusToTab(
+      pending,
+      'error',
+      'The download arrived incomplete and retrying did not fix it. Try again.',
+      'SIZE_MISMATCH',
+    );
+    cleanup(pending);
+  }
+
   type PendingDownloadLike = NonNullable<ReturnType<typeof getPendingByDownloadId>>;
 
   // 0) Bridge download service (S6/G2): serves CQD_BRIDGE_REQUEST messages
@@ -509,6 +544,23 @@ export default defineBackground(() => {
               });
               unbindDownloadId(delta.id);
               handleForbiddenFailure(pending);
+            });
+            return;
+          }
+          // 0h4d.1.5: never report a truncated file as success. A known
+          // declared size with a short byte count erases the partial and
+          // retries within the policy; unknown size (0) skips honestly.
+          const declared = item?.totalBytes ?? 0;
+          const received = item?.bytesReceived ?? 0;
+          if (!pending.finalized && declared > 0 && received !== declared) {
+            cancelledByUs.add(delta.id);
+            chrome.downloads.cancel(delta.id, () => {
+              const _e3 = chrome.runtime.lastError;
+              chrome.downloads.erase({ id: delta.id }, () => {
+                const _e4 = chrome.runtime.lastError;
+              });
+              unbindDownloadId(delta.id);
+              handleSizeMismatch(pending);
             });
             return;
           }
