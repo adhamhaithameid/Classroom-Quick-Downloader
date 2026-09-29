@@ -180,6 +180,33 @@ const CASES: CorpusCase[] = [
     },
   },
   {
+    id: 'size-mismatch-rides-transient-policy-to-honest-fail',
+    expected: { outcome: 'failed', buttonStatus: 'error', errorCode: 'SIZE_MISMATCH', maxAttempts: 3 },
+    machineEvents: [
+      { type: 'plan', isDrive: true, strategies: ['direct', 'drive-auth'] },
+      { type: 'strategy-started', strategy: 'direct' },
+      { type: 'download-started', downloadId: 1 },
+      { type: 'transient-failed', detail: 'SIZE_MISMATCH' },
+      { type: 'transient-failed', detail: 'SIZE_MISMATCH' },
+      { type: 'transient-failed', detail: 'SIZE_MISMATCH' },
+    ],
+    drive: (h) => {
+      // Production shape (0h4d.1.5): a completed download whose bytes are
+      // short erases + retries within the policy, then settles SIZE_MISMATCH.
+      (chrome.downloads as any).search = vi.fn(
+        (q: { id: number }, cb: (items?: Array<{ totalBytes?: number; bytesReceived?: number; mime?: string }>) => void) => {
+          cb([{ totalBytes: 100, bytesReceived: 40, mime: 'application/pdf' }]);
+        },
+      );
+      h.requestDownload();
+      h.dispatchDownloadChange(complete(1000));
+      vi.advanceTimersByTime(2_000);
+      h.dispatchDownloadChange(complete(1001));
+      vi.advanceTimersByTime(4_000);
+      h.dispatchDownloadChange(complete(1002));
+    },
+  },
+  {
     id: 'permanent-file-failed-fails-fast',
     expected: { outcome: 'failed', buttonStatus: 'error', errorCode: 'FILE_FAILED', maxAttempts: 1 },
     machineEvents: [
