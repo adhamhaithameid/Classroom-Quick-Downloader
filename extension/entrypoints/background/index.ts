@@ -51,6 +51,12 @@ import { t } from '../content/i18n';
 import { canRetry, delayForMs, DEFAULT_RETRY_POLICY } from '../../src/retry/backoff';
 import { composeFailureMessage } from '../../src/core/acquire/failure-copy';
 import {
+  recordDownloadHistory,
+  getHistory as getHistoryEntries,
+  clearHistory as clearHistoryEntries,
+  searchEntries,
+} from '../../src/history/history-store';
+import {
   STUDENT_WORK_RESOLVE_PUBLISH_TYPE,
   STUDENT_WORK_RESOLVE_RELAY_TYPE,
 } from '../../src/student_work/constants';
@@ -318,6 +324,7 @@ export default defineBackground(() => {
       bypass_used: false,
       error_type: 'SIZE_MISMATCH',
     });
+    void recordDownloadHistory(pending, 'failed', 'SIZE_MISMATCH');
     sendStatusToTab(
       pending,
       'error',
@@ -529,6 +536,8 @@ export default defineBackground(() => {
           bypass_used: false,
         });
         if (pending.fileMeta?.name) recentDownloads.set(pending.fileMeta.name, Date.now());
+        // 0h4d.1.6: one history row per terminal settle.
+        void recordDownloadHistory(pending, 'success');
         cleanup(pending, delta.id);
       };
       try {
@@ -637,6 +646,8 @@ export default defineBackground(() => {
       // classified failure; tests/failure-copy.test.ts guarantees coverage —
       // transient classes too, since their copy shows when retries exhaust).
       const guidance = composeFailureMessage(errorType);
+      // 0h4d.1.6: one history row per terminal settle.
+      void recordDownloadHistory(pending, 'failed', errorType);
       sendStatusToTab(pending, 'error', guidance || t('downloadInterrupted'), errorType);
       cleanup(pending, delta.id);
     }
@@ -710,6 +721,43 @@ export default defineBackground(() => {
     if (message.type === 'CQD_QUEUE_PAUSE') {
       setQueuePaused(!!message.paused);
       sendResponse({ ok: true, paused: !!message.paused });
+      return false;
+    }
+
+    // 0h4d.1.6: history surface for the popup (search + clear + re-download).
+    // Rows carry the full entry: the popup is the extension's own local UI
+    // (the url never leaves the machine — any future EXPORT path strips it).
+    if (message.type === 'CQD_HISTORY_GET') {
+      void (async () => {
+        const entries = await getHistoryEntries();
+        const query = typeof message.query === 'string' ? message.query : '';
+        const rows = searchEntries(entries, query).slice(-50).reverse();
+        sendResponse({ ok: true, rows });
+      })();
+      return false;
+    }
+
+    if (message.type === 'CQD_HISTORY_CLEAR') {
+      void (async () => {
+        await clearHistoryEntries();
+        sendResponse({ ok: true });
+      })();
+      return false;
+    }
+
+    // 0h4d.1.6: re-download straight from a history row.
+    if (message.type === 'CQD_HISTORY_REDOWNLOAD') {
+      const entryUrl = typeof message.url === 'string' ? message.url : '';
+      const requestId = `redownload-${Date.now()}`;
+      if (entryUrl) {
+        handleDownloadRequest(
+          { url: entryUrl, requestId },
+          { tab: { id: undefined } } as chrome.runtime.MessageSender,
+          sendResponse,
+        );
+        return true;
+      }
+      sendResponse({ ok: false });
       return false;
     }
 

@@ -19,6 +19,7 @@ import { sendStatusToTab } from './message-sender';
 import { recordDownloadEvent } from '../utils/analytics';
 import { validateDownloadUrl } from '../../src/v2/decision/download-validator';
 import { queueRequest } from './queue';
+import { recordDownloadHistory } from '../../src/history/history-store';
 
 /**
  * S2 (audit docs/SECURITY_AUDIT_EXTENSION_2026-09-24.md): the
@@ -68,6 +69,7 @@ export function handleStartTimeout(
     error_type: 'DOWNLOAD_START_TIMEOUT',
   });
   sendStatusToTab(pending, 'error', DOWNLOAD_START_TIMEOUT_MESSAGE, 'DOWNLOAD_START_TIMEOUT');
+  void recordDownloadHistory(pending, 'failed', 'DOWNLOAD_START_TIMEOUT');
   respondOnce?.({ started: false, userMessage: DOWNLOAD_START_TIMEOUT_MESSAGE });
   cleanup(pending);
 }
@@ -132,6 +134,7 @@ export function startSingleAttempt(
     console.error(`[CQD Security] Blocked download: ${validation.reason} — ${pending.baseUrl}`);
     cleanup(pending);
     sendStatusToTab(pending, 'error', 'Download blocked: invalid URL.', 'INVALID_URL');
+    void recordDownloadHistory(pending, 'failed', 'INVALID_URL');
     respondOnce?.({ started: false, userMessage: 'Download blocked: invalid URL.' });
     return;
   }
@@ -148,6 +151,7 @@ export function startSingleAttempt(
           bypass_used: false,
           error_type: 'BROWSER_START_FAIL_DIRECT',
         });
+        void recordDownloadHistory(pending, 'failed', 'BROWSER_START_FAIL_DIRECT');
         cleanup(pending);
         respondOnce?.({ started: false, userMessage: 'Browser blocked download.' });
         return;
@@ -187,6 +191,7 @@ export function startNextDriveAttempt(pending: PendingDownload): void {
       bypass_used: false,
       error_type: 'AUTH_ALL_FAILED',
     });
+    void recordDownloadHistory(pending, 'failed', 'AUTH_ALL_FAILED');
     cleanup(pending);
     return;
   }
@@ -339,6 +344,7 @@ export function handleDownloadRequest(
                 bypass_used: false,
                 error_type: 'BROWSER_START_FAIL',
               });
+              void recordDownloadHistory(pending, 'failed', 'BROWSER_START_FAIL');
               // Zero-tab contract: no bypass-tab fallback. Surface the honest
               // failure with guidance about the usual cause.
               respondOnce({

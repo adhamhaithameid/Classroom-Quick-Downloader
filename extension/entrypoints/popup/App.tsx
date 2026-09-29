@@ -389,6 +389,37 @@ function App() {
     };
   }, []);
 
+  // HISTORY PANEL (0h4d.1.6) — search + re-download + clear
+  const [historyRows, setHistoryRows] = useState<
+    Array<{
+      id: string;
+      ts: number;
+      filename: string;
+      ext?: string;
+      bytes?: number;
+      status: string;
+      errorCode?: string;
+      host: string;
+      url: string;
+    }>
+  >([]);
+  const [historyQuery, setHistoryQuery] = useState('');
+  useEffect(() => {
+    const browserApi = (globalThis as any).chrome;
+    if (!browserApi?.runtime?.sendMessage) return;
+    let alive = true;
+    const timer = setTimeout(() => {
+      browserApi.runtime.sendMessage({ type: 'CQD_HISTORY_GET', query: historyQuery }, (res: any) => {
+        void chrome.runtime.lastError;
+        if (alive && res?.ok) setHistoryRows(res.rows ?? []);
+      });
+    }, 200);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [historyQuery]);
+
   // Load collapse state from storage
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1302,6 +1333,33 @@ function App() {
                 </section>
               )}
 
+              {/* Section 1.7: Download history (0h4d.1.6) — search, re-download, clear */}
+              <section className="cqd-panel" aria-label="Download history">
+                <div className="cqd-card cqd-card-history">
+                  <HistoryPanel
+                    rows={historyRows}
+                    query={historyQuery}
+                    onQueryChange={setHistoryQuery}
+                    onClear={() => {
+                      const browserApi = (globalThis as any).chrome;
+                      browserApi?.runtime?.sendMessage?.({ type: 'CQD_HISTORY_CLEAR' }, () => {
+                        void chrome.runtime.lastError;
+                      });
+                      setHistoryRows([]);
+                    }}
+                    onRedownload={(url) => {
+                      const browserApi = (globalThis as any).chrome;
+                      browserApi?.runtime?.sendMessage?.(
+                        { type: 'CQD_HISTORY_REDOWNLOAD', url },
+                        () => {
+                          void chrome.runtime.lastError;
+                        },
+                      );
+                    }}
+                  />
+                </div>
+              </section>
+
               {/* Section 2: Settings (collapsible) */}
               <section className="cqd-panel">
                 <div className="cqd-card cqd-card-settings">
@@ -1679,6 +1737,79 @@ interface EngineModeRowProps {
  *  The API (beta) option is disabled-with-tooltip until OAuth is configured
  *  (S13) — a hidden option is not a shipped option, and neither is an
  *  option that silently does nothing. */
+export interface HistoryRow {
+  id: string;
+  ts: number;
+  filename: string;
+  ext?: string;
+  bytes?: number;
+  status: string;
+  errorCode?: string;
+  host: string;
+  url: string;
+}
+
+export function HistoryPanel({
+  rows,
+  query,
+  onQueryChange,
+  onClear,
+  onRedownload,
+}: {
+  rows: HistoryRow[];
+  query: string;
+  onQueryChange: (q: string) => void;
+  onClear: () => void;
+  onRedownload: (url: string) => void;
+}) {
+  return (
+    <>
+      <div className="cqd-history-head">
+        <span className="cqd-history-title">History</span>
+        <button type="button" className="cqd-history-clear" onClick={onClear}>
+          Clear all
+        </button>
+      </div>
+      <input
+        type="search"
+        className="cqd-history-search"
+        placeholder="Search history…"
+        value={query}
+        onChange={(e) => onQueryChange(e.target.value)}
+        aria-label="Search download history"
+      />
+      {rows.length === 0 ? (
+        <div className="cqd-history-empty">No downloads yet</div>
+      ) : (
+        <ul className="cqd-history-list">
+          {rows.map((row) => (
+            <li key={row.id} className="cqd-history-row">
+              <span
+                className={`cqd-history-state ${row.status === 'success' ? 'cqd-history-state-ok' : 'cqd-history-state-fail'}`}
+                title={row.errorCode || row.status}
+              >
+                {row.status === 'success' ? '✓' : '✕'}
+              </span>
+              <span className="cqd-history-name" title={row.host}>
+                {row.filename}
+              </span>
+              <span className="cqd-history-date">{new Date(row.ts).toLocaleDateString()}</span>
+              <button
+                type="button"
+                className="cqd-history-redownload"
+                aria-label={`Download ${row.filename} again`}
+                onClick={() => onRedownload(row.url)}
+              >
+                ⤓
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
 export function EngineModeRow({ mode, loading, apiConfigured, onSelect }: EngineModeRowProps) {
   const options: Array<{ value: PopupEngineMode; label: string; disabled: boolean; title: string }> = [
     { value: 'legacy', label: popupMessage('popupEngineModeLegacy'), disabled: false, title: '' },
