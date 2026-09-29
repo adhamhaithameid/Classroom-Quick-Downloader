@@ -41,6 +41,15 @@ export const AUTHUSER_CANDIDATES: readonly number[] = [0, 1, 2, 3, 4, 5, 6, 7, 8
 /** Wall-clock budget for ONE acquisition attempt before the deadline event. */
 export const ATTEMPT_DEADLINE_MS = 30_000;
 
+/**
+ * Transient-interrupt attempt bound, AS DATA (architecture fitness ADR-0007:
+ * core imports nothing and times nothing — the engine-side jitter policy in
+ * src/retry/backoff.ts must keep this number honest; the differential corpus
+ * tests/acquire-corpus.test.ts is the contract that they agree). Total
+ * attempts including the first: 3 failed attempts then the honest settle.
+ */
+export const MAX_TRANSIENT_ATTEMPTS = 3;
+
 // ============================================================================
 // STATE
 // ============================================================================
@@ -54,8 +63,8 @@ interface AcquireCommon {
   attemptedAuthUsers: number[];
   /** Authuser carried in from the original URL, if any. */
   initialAuthUser?: number;
-  /** Transient interrupts already retried in place (bounded to one). */
-  transientRetried?: boolean;
+  /** Transient interrupts already retried (policy-bounded, 0h4d.1.3). */
+  retryCount?: number;
   /** Browser start failures already retried (bounded to one). */
   startRetried?: boolean;
 }
@@ -266,13 +275,14 @@ export function nextAcquireState(
     }
 
     case 'transient-failed': {
-      // NETWORK_FAILED / SERVER_FAILED class: one in-place retry with a fresh
-      // deadline, then settle — transient failures are worth one more try,
-      // never an unbounded loop.
+      // NETWORK_FAILED / SERVER_FAILED class: bounded exponential backoff
+      // (0h4d.1.3) — each retry gets a fresh deadline, then settle. The
+      // policy is data; timing stays the engine's job.
       if (state.phase === 'direct' || state.phase === 'drive-auth') {
-        if (!state.transientRetried) {
+        const retryCount = state.retryCount ?? 0;
+        if (retryCount + 1 < MAX_TRANSIENT_ATTEMPTS) {
           return {
-            state: { ...state, transientRetried: true },
+            state: { ...state, retryCount: retryCount + 1 },
             effects: [
               { type: 'begin-strategy', strategy: state.phase === 'direct' ? 'direct' : 'drive-auth', authUser: state.authUser },
               { type: 'set-deadline', ms: ATTEMPT_DEADLINE_MS },

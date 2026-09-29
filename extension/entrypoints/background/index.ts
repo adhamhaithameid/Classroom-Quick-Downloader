@@ -48,6 +48,7 @@ import { createWorkerRuntimeBridge } from '../../src/adapters/bridge/runtime-bri
 import { startBridgeDownloadService } from './bridge-download-service';
 import { UNINSTALL_SITE_URL } from '../utils/analytics/constants';
 import { t } from '../content/i18n';
+import { canRetry, delayForMs, DEFAULT_RETRY_POLICY } from '../../src/retry/backoff';
 import {
   STUDENT_WORK_RESOLVE_PUBLISH_TYPE,
   STUDENT_WORK_RESOLVE_RELAY_TYPE,
@@ -564,13 +565,16 @@ export default defineBackground(() => {
         FILE_VIRUS_INFECTED: 'The file is infected and was blocked by your browser.',
         FILE_BLOCKED: 'Your browser blocked this file type for security reasons.',
       };
-      if (TRANSIENT.has(errorType) && !pending.transientRetried) {
-        pending.transientRetried = true;
+      // 0h4d.1.3: transient interrupts back off exponentially (bounded by the
+      // policy); the delay is jittered so simultaneous failures spread out.
+      if (TRANSIENT.has(errorType) && canRetry(DEFAULT_RETRY_POLICY, pending.retryCount ?? 0)) {
+        pending.retryCount = (pending.retryCount ?? 0) + 1;
+        const delay = delayForMs(pending.retryCount, DEFAULT_RETRY_POLICY);
         unbindDownloadId(delta.id);
         setTimeout(() => {
           if (!isRegistered(pending.requestId) || pending.finalized) return;
           retrySameAttempt(pending);
-        }, 2_000);
+        }, delay);
         sendStatusToTab(pending, 'trying', 'Retrying…', 'TRANSIENT_RETRY');
         return;
       }

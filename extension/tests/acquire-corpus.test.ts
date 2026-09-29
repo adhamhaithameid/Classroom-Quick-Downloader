@@ -159,6 +159,27 @@ const CASES: CorpusCase[] = [
     },
   },
   {
+    id: 'transient-exhausts-policy-settles-honestly',
+    expected: { outcome: 'failed', buttonStatus: 'error', maxAttempts: 3 },
+    machineEvents: [
+      { type: 'plan', isDrive: true, strategies: ['direct', 'drive-auth'] },
+      { type: 'strategy-started', strategy: 'direct' },
+      { type: 'download-started', downloadId: 1 },
+      { type: 'transient-failed' },
+      { type: 'transient-failed' },
+      { type: 'transient-failed' },
+    ],
+    drive: (h) => {
+      h.requestDownload();
+      h.dispatchDownloadChange(interrupted('NETWORK_FAILED')(1000));
+      vi.advanceTimersByTime(2_000); // retry 1 (delay ≤ 2s)
+      h.dispatchDownloadChange(interrupted('NETWORK_FAILED')(1001));
+      vi.advanceTimersByTime(4_000); // retry 2 (delay ≤ 4s)
+      h.dispatchDownloadChange(interrupted('NETWORK_FAILED')(1002));
+      // Attempt 3 failed → policy exhausted → the honest terminal.
+    },
+  },
+  {
     id: 'permanent-file-failed-fails-fast',
     expected: { outcome: 'failed', buttonStatus: 'error', errorCode: 'FILE_FAILED', maxAttempts: 1 },
     machineEvents: [
