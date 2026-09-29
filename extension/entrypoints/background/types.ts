@@ -64,8 +64,8 @@ export type PendingDownload = {
 
   /** Whether an HTML (interstitial/error) response was intercepted */
   htmlSeen?: boolean;
-  /** Transient interrupts already retried in place (bounded to one) */
-  transientRetried?: boolean;
+  /** Transient interrupts already retried (policy-bounded, 0h4d.1.3) */
+  retryCount?: number;
   /** Browser start failures already retried (bounded to one) */
   startRetried?: boolean;
   /** S2: the start callback never fired within DOWNLOAD_START_TIMEOUT_MS; the

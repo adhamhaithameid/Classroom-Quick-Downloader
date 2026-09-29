@@ -521,7 +521,7 @@ describe('DIRECT / DRIVE_AUTH — transient retries, inheritance, settle shape (
     });
 
     expect(state.phase).toBe('direct');
-    expect(state.transientRetried).toBe(true);
+    expect(state.retryCount).toBe(1);
     expect(effects).toEqual([
       { type: 'begin-strategy', strategy: 'direct', authUser: 5 },
       { type: 'set-deadline', ms: 30000 },
@@ -541,15 +541,15 @@ describe('DIRECT / DRIVE_AUTH — transient retries, inheritance, settle shape (
     const { state: next, effects } = nextAcquireState(state, { type: 'transient-failed' });
 
     expect(next.phase).toBe('drive-auth');
-    expect(next.transientRetried).toBe(true);
+    expect(next.retryCount).toBe(1);
     expect(effects).toEqual([
       { type: 'begin-strategy', strategy: 'drive-auth', authUser: 0 },
       { type: 'set-deadline', ms: 30000 },
     ]);
   });
 
-  it('a second transient failure settles failed with the engine detail', () => {
-    const retried = direct({ transientRetried: true, downloadId: 8 });
+  it('a failure on the final policy attempt settles failed with the engine detail', () => {
+    const retried = direct({ retryCount: 2, downloadId: 8 });
     const { state, effects } = nextAcquireState(retried, {
       type: 'transient-failed',
       detail: 'SERVER_FAILED',
@@ -566,8 +566,8 @@ describe('DIRECT / DRIVE_AUTH — transient retries, inheritance, settle shape (
     ]);
   });
 
-  it('a second transient failure without a detail settles failed "transient"', () => {
-    const retried = direct({ transientRetried: true });
+  it('a final-policy transient failure without a detail settles failed "transient"', () => {
+    const retried = direct({ retryCount: 2 });
     const { state } = nextAcquireState(retried, { type: 'transient-failed' });
 
     if (state.phase === 'settled') {

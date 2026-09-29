@@ -359,16 +359,24 @@ describe('S9 zero-tab Drive flow — Chromium (#manual-403 regression)', () => {
       error: { current: 'NETWORK_FAILED' },
     });
 
-    // Transient: one in-place retry (2s backoff), then terminal — no account
-    // cycling.
+    // Transient: bounded backoff retries (0h4d.1.3), then terminal — no
+    // account cycling.
     expect(flow.downloadCalls).toHaveLength(1);
-    vi.advanceTimersByTime(2_000); // retry fires
+    vi.advanceTimersByTime(2_000); // retry 1 fires (delay ≤ 2s)
     expect(flow.downloadCalls).toHaveLength(2);
     flow.dispatchDownloadChange({
       id: 1001,
       state: { current: 'interrupted' },
       error: { current: 'NETWORK_FAILED' },
     });
+    vi.advanceTimersByTime(4_000); // retry 2 fires (delay ≤ 4s)
+    expect(flow.downloadCalls).toHaveLength(3);
+    flow.dispatchDownloadChange({
+      id: 1002,
+      state: { current: 'interrupted' },
+      error: { current: 'NETWORK_FAILED' },
+    });
+    // Policy exhausted → honest terminal, still zero account cycling.
     expect(errorStatusCall(flow.sendStatusSpy, 'NETWORK_FAILED')).toBeTruthy();
     expect(flow.cleanupSpy).toHaveBeenCalledTimes(1);
     expectZeroTabs(flow);
