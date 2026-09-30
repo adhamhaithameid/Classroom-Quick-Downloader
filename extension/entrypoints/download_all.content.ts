@@ -1489,3 +1489,22 @@ function getPageDirection(): 'ltr' | 'rtl' {
   const computed = window.getComputedStyle(document.body).direction;
   return computed === 'rtl' ? 'rtl' : 'ltr';
 }
+
+// ============================================================================
+// KEYBOARD SHORTCUT (0h4d.1.9) — the background routes Alt+Shift+D here.
+// Same entry as the button click (handleDownloadAllClick): the first
+// eligible group wins (≥ MIN_FILES_FOR_DOWNLOAD_ALL attachments, not busy).
+// ============================================================================
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (!message || message.type !== 'CQD_RUN_DOWNLOAD_ALL') return false;
+  const groups = Array.from(document.querySelectorAll<HTMLElement>(GROUP_SELECTOR))
+    .map((el) => groupStates.get(el))
+    .filter((g): g is GroupState => !!g && !g.isBusy && g.files.size >= MIN_FILES_FOR_DOWNLOAD_ALL);
+  if (groups.length === 0) {
+    sendResponse({ ok: false, reason: 'no-group' });
+    return false;
+  }
+  handleDownloadAllClick(groups[0]);
+  sendResponse({ ok: true, groups: groups.length });
+  return false;
+});

@@ -763,4 +763,33 @@ export default defineBackground(() => {
 
     return false;
   });
+
+  // 0h4d.1.9: keyboard shortcut (Alt+Shift+D) — route to the active tab's
+  // Download All flow. Non-Classroom tabs get a transient badge hint instead;
+  // the content script answers and runs the same path the button uses.
+  chrome.commands?.onCommand?.addListener((command: string) => {
+    if (command !== 'download-all-classroom') return;
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tab = tabs?.[0];
+      if (!tab?.id) return;
+      if (!isClassroomUrl(tab.url)) {
+        try {
+          chrome.action.setBadgeText({ tabId: tab.id, text: '⤓' });
+          setTimeout(() => {
+            try {
+              chrome.action.setBadgeText({ tabId: tab.id, text: '' });
+            } catch {
+              // tab gone — nothing to clear
+            }
+          }, 1_500);
+        } catch {
+          // badge API unavailable — silent
+        }
+        return;
+      }
+      chrome.tabs.sendMessage(tab.id, { type: 'CQD_RUN_DOWNLOAD_ALL' }, () => {
+        void chrome.runtime.lastError;
+      });
+    });
+  });
 });
