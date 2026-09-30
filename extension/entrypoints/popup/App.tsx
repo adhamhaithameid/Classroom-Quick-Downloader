@@ -1357,18 +1357,33 @@ function App() {
                   </button>
 
                   {/* 0h4d.1.8: advanced settings moved to the options page */}
-                  <button
-                    type="button"
-                    className="cqd-settings-options-link"
-                    onClick={() => {
-                      const browserApi = (globalThis as any).chrome;
-                      browserApi?.runtime?.openOptionsPage?.(() => {
-                        void chrome.runtime.lastError;
-                      });
-                    }}
-                  >
-                    All settings
-                  </button>
+                  <div className="cqd-settings-links">
+                    <button
+                      type="button"
+                      className="cqd-settings-options-link"
+                      onClick={() => {
+                        const browserApi = (globalThis as any).chrome;
+                        browserApi?.runtime?.openOptionsPage?.(() => {
+                          void chrome.runtime.lastError;
+                        });
+                      }}
+                    >
+                      All settings
+                    </button>
+                    {/* 0h4d.1.7: the copyable PII-free diagnostics report */}
+                    <button
+                      type="button"
+                      className="cqd-settings-options-link"
+                      onClick={() => {
+                        const browserApi = (globalThis as any).chrome;
+                        browserApi?.tabs?.create?.({ url: 'diagnostics.html' }, () => {
+                          void chrome.runtime.lastError;
+                        });
+                      }}
+                    >
+                      Diagnostics report
+                    </button>
+                  </div>
 
                   <div
                     id="cqd-settings-body"

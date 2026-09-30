@@ -1980,3 +1980,47 @@ body {
 .cqd-options-toggle.on .cqd-options-knob { left: 21px; }
 .cqd-options-toggle.off .cqd-options-knob { left: 3px; }
 .cqd-options-note { font-size: 12px; opacity: 0.55; margin-top: 16px; }
+
+/* ── Settings links row (0h4d.1.7/1.8) ─────────────────────────────────── */
+.cqd-settings-links { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/* ── Diagnostics page (0h4d.1.7) ───────────────────────────────────────── */
+.cqd-diag {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 32px 20px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #1f2937;
+}
+.cqd-diag-header h1 { font-size: 20px; margin: 0 0 4px; font-family: system-ui, sans-serif; }
+.cqd-diag-sub { font-size: 13px; opacity: 0.65; margin: 0 0 20px; font-family: system-ui, sans-serif; }
+.cqd-diag-card {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px;
+  overflow: auto;
+  max-height: 60vh;
+}
+.cqd-diag-report { font-size: 11px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; margin: 0; }
+.cqd-diag-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.cqd-diag-btn {
+  font-size: 13px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: transparent;
+  cursor: pointer;
+  font-family: system-ui, sans-serif;
+}
+.cqd-diag-btn-primary { background: #1a73e8; border-color: #1a73e8; color: #fff; }
+.cqd-diag-btn:disabled { opacity: 0.5; cursor: default; }
+.cqd-options-diag-link {
+  margin-top: 12px;
+  font-size: 13px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: transparent;
+  cursor: pointer;
+}
