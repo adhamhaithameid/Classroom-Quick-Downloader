@@ -21,7 +21,9 @@ const CSP_BASE_DIRECTIVES = [
   'upgrade-insecure-requests'
 ];
 
-const INLINE_SCRIPT_RE = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
+// The end tag allows trailing whitespace, exactly like the HTML parser:
+// a body hashed past a `</script >` would not match what the browser runs.
+const INLINE_SCRIPT_RE = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
 const EXECUTABLE_TYPE_RE = /type\s*=\s*("module"|'module')/i;
 const ANY_TYPE_RE = /type\s*=\s*("[^"]*"|'[^']*')/i;
 
