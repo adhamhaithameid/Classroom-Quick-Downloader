@@ -481,10 +481,9 @@ const HEALTH_CRIT_BUFFER_UTIL = 0.95;
 const HEALTH_NOTIFY_WARN_INTERVAL_MS = 30 * 60 * 1000;
 const HEALTH_NOTIFY_CRIT_INTERVAL_MS = 10 * 60 * 1000;
 
-// Track endpoint rate limits (per IP per minute)
+// Track endpoint rate limits (per IP per minute). Prune/key-cap/policy
+// constants are shared with the other public endpoints (PUBLIC_IP_RATE_*).
 const TRACK_RATE_LIMIT_PER_MIN = 120;
-const TRACK_RATE_PRUNE_AFTER_MIN = 10;
-const TRACK_RATE_MAX_KEYS = 5000;
 // Public website write endpoints (per IP per minute). Each events request can
 // carry up to 64 events and each uninstall submit is a user action, so these
 // stay far above human traffic while bounding scripted abuse.
@@ -1375,6 +1374,8 @@ function trimAndLimitString(value: unknown, maxLen: number): string {
 function sanitizeUserFreeText(value: unknown, maxLen: number): string {
   if (typeof value !== "string") return "";
   return value
+    // Matching control characters is the entire purpose of this sanitizer.
+    // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001f\u007f\u0080-\u009f]+/g, " ")
     .replace(/\s{2,}/g, " ")
     .trim()
