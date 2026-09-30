@@ -22,6 +22,13 @@ import {
 import { popupMessage } from './i18n';
 import { CHANGELOG_SITE_URL } from '../utils/analytics/constants';
 import { isApiConfigured } from '../../src/engines/v3/api/config';
+import {
+  DEFAULT_SETTINGS,
+  loadSettings,
+  saveSetting,
+  watchSettings,
+  type Settings,
+} from '../../src/ui/settings/store';
 
 // External Links
 const SURVEY_URL = 'https://forms.gle/wPU2b1Qxa7svHqJa6';
@@ -64,21 +71,8 @@ function detectBrowser(): BrowserDetection {
   return { browser: 'chrome', isCertain: false };
 }
 
-type Settings = {
-  extensionEnabled: boolean;
-  downloadAllEnabled: boolean;
-  commentsFlagEnabled: boolean;
-  editedFlagEnabled: boolean;
-  combinedFlagEnabled: boolean;
-};
-
-const DEFAULT_SETTINGS: Settings = {
-  extensionEnabled: true,
-  downloadAllEnabled: true,
-  commentsFlagEnabled: true,
-  editedFlagEnabled: true,
-  combinedFlagEnabled: true,
-};
+// Settings type + defaults live in the shared store (0h4d.1.8,
+// src/ui/settings/store.ts) — popup and options consume the same source.
 
 type ToggleRowProps = {
   label: string;
@@ -691,61 +685,27 @@ function App() {
       return;
     }
 
-    // Initial load — load ALL settings keys
-    const settingsKeys = [
-      'extensionEnabled',
-      'downloadAllEnabled',
-      'commentsFlagEnabled',
-      'editedFlagEnabled',
-      'combinedFlagEnabled',
-    ];
-    browserApi.storage.local.get(settingsKeys, (res: Record<string, boolean | undefined>) => {
-      setSettings((prev) => ({
-        ...DEFAULT_SETTINGS,
-        ...prev,
-        extensionEnabled: res.extensionEnabled !== false,
-        downloadAllEnabled: res.downloadAllEnabled !== false,
-        commentsFlagEnabled: res.commentsFlagEnabled !== false,
-        editedFlagEnabled: res.editedFlagEnabled !== false,
-        combinedFlagEnabled: res.combinedFlagEnabled !== false,
-      }));
+    // Initial load + live sync through the shared settings store (0h4d.1.8):
+    // one load/save/watch API, shared with the options page.
+    void loadSettings().then((loaded) => {
+      setSettings(loaded);
       setLoadingState(false);
     });
-
-    // Listen for changes (cross-tab sync)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const listener = (changes: any, area: string) => {
-      if (area !== 'local') return;
-      setSettings((prev) => {
-        if (!prev) return prev;
-        const updated = { ...prev };
-        if ('extensionEnabled' in changes) updated.extensionEnabled = changes.extensionEnabled.newValue !== false;
-        if ('commentsFlagEnabled' in changes) updated.commentsFlagEnabled = changes.commentsFlagEnabled.newValue !== false;
-        if ('editedFlagEnabled' in changes) updated.editedFlagEnabled = changes.editedFlagEnabled.newValue !== false;
-        if ('combinedFlagEnabled' in changes) updated.combinedFlagEnabled = changes.combinedFlagEnabled.newValue !== false;
-        return updated;
-      });
-    };
-    
-    if (browserApi.storage.onChanged) {
-      browserApi.storage.onChanged.addListener(listener);
-      return () => browserApi.storage.onChanged.removeListener(listener);
-    }
+    const unwatch = watchSettings((updated) => {
+      setSettings((prev) => (prev ? updated : prev));
+    });
+    return unwatch;
   }, []);
 
   function handleToggleExtension() {
     if (!settings) return;
     const nextState = !settings.extensionEnabled;
-    
+
     // Optimistic update
     setSettings({ ...settings, extensionEnabled: nextState });
-    
-    // Save to storage
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const browserApi = (globalThis as any).chrome;
-    if (browserApi && browserApi.storage && browserApi.storage.local) {
-      browserApi.storage.local.set({ extensionEnabled: nextState });
-    }
+
+    // Save through the shared store (0h4d.1.8)
+    void saveSetting('extensionEnabled', nextState);
   }
 
   function handleToggleSettingsCollapse() {
@@ -764,12 +724,12 @@ function App() {
     const updatedSettings = { ...settings, [flag]: nextState };
     setSettings(updatedSettings);
 
+    // Save through the shared store (0h4d.1.8)
+    void saveSetting(flag, nextState);
+
+    // Notify content scripts
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const browserApi = (globalThis as any).chrome;
-    if (browserApi?.storage?.local) {
-      browserApi.storage.local.set({ [flag]: nextState });
-    }
-    // Notify content scripts
     if (browserApi?.tabs?.query) {
       browserApi.tabs.query({ active: true, currentWindow: true }, (tabs: any[]) => {
         if (tabs?.[0]?.id) {
@@ -1394,6 +1354,20 @@ function App() {
                         <path d="M6 9l6 6 6-6" />
                       </svg>
                     </span>
+                  </button>
+
+                  {/* 0h4d.1.8: advanced settings moved to the options page */}
+                  <button
+                    type="button"
+                    className="cqd-settings-options-link"
+                    onClick={() => {
+                      const browserApi = (globalThis as any).chrome;
+                      browserApi?.runtime?.openOptionsPage?.(() => {
+                        void chrome.runtime.lastError;
+                      });
+                    }}
+                  >
+                    All settings
                   </button>
 
                   <div
