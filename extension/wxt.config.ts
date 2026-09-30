@@ -64,6 +64,14 @@ export default defineConfig({
     content_security_policy: {
       extension_pages: `script-src 'self'; object-src 'none'; connect-src 'self' https://*.google.com https://*.googleapis.com https://*.googleusercontent.com https://cqd-analytics.adhamhaithameid.workers.dev${devConnectSources}; img-src 'self' https://*.google.com https://*.googleusercontent.com data:${devImageSources};`,
     },
+    // 0h4d.1.9: keyboard shortcut — Alt+Shift+D triggers Download All on the
+    // active Classroom page (user-remappable at chrome://extensions/shortcuts).
+    commands: {
+      'download-all-classroom': {
+        suggested_key: { default: 'Alt+Shift+D', mac: 'Alt+Shift+D' },
+        description: 'Download all attachments on the current Classroom page',
+      },
+    },
     icons: {
       "16": "icon/16.png",
       "32": "icon/32.png",
