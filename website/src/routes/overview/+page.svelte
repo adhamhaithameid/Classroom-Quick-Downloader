@@ -3,6 +3,7 @@
   import { fade, fly, scale } from 'svelte/transition';
   import { quintOut } from 'svelte/easing';
   import { magnetic } from '$lib/actions/magnetic';
+  import { portalToBody } from '$lib/actions/portalToBody';
   import { base } from '$app/paths';
   import { APP_VERSION, SITE_URL, STORE_LINKS } from '$lib/config';
   import SeoMeta from '$lib/components/SeoMeta.svelte';
@@ -15,8 +16,14 @@
   import AnimatedNumericText from '$lib/components/AnimatedNumericText.svelte';
   import {
     canStartCelebration,
-    nextCooldownUntil
+    createBalloonsEngine,
+    createBalloonsEngineConfig,
+    detectBalloonDeviceTier,
+    nextCooldownUntil,
+    type BalloonParticle,
+    type BalloonsEngine
   } from '$lib/celebration/balloons';
+  import BalloonsOverlay from '$lib/components/BalloonsOverlay.svelte';
   import {
     type PlacementSection,
     type ElementPlacement,
@@ -38,9 +45,9 @@
   const ENABLE_SILLY_QUESTION = true;
   const CELEBRATION_SESSION_KEY = 'cqd-balloon-celebration-session-v1';
   const CELEBRATION_COOLDOWN_MS = 1200;
-  const CELEBRATION_OVERLAY_Z_INDEX = '2147483647';
-  const CELEBRATION_BURST_COUNT = 4;
-  const CELEBRATION_BURST_STAGGER_MS = 320;
+  // Leak guard: the engine normally finishes on its own; this only fires if
+  // the environment stalls rAF entirely (e.g. occluded webviews).
+  const CELEBRATION_SAFETY_TIMEOUT_MS = 40000;
   // Visual identity guard: this pinned star and sample are verified in
   // overview.visual-guard.test.ts so accidental decorative regressions fail CI.
   const PINNED_SUPERCHARGE_STAR_ID = 'dd-1772174598462-101';
@@ -332,7 +339,11 @@
   let mapInteractionState: 'idle' | 'yes' | 'no' = 'idle';
   let sillyAnswered = false;
   let celebrationActive = false;
-  let celebrationObserver: MutationObserver | null = null;
+  let celebrationEngine: BalloonsEngine | null = null;
+  let celebrationParticles: readonly BalloonParticle[] = [];
+  let celebrationVisible = false;
+  let celebrationFrameId = 0;
+  let celebrationSafetyTimer: ReturnType<typeof setTimeout> | null = null;
   let balloonSessionPlayed = false;
   let balloonCooldownUntil = 0;
   let reducedMotionPreferred = false;
@@ -341,8 +352,6 @@
   let mapSectionEl: HTMLElement | null = null;
   let mapPromptVisible = false;
   let mapPromptTimer: ReturnType<typeof setTimeout> | null = null;
-  let celebrationBurstTimers: number[] = [];
-  let launchHyperBalloonsFn: (() => Promise<void>) | null = null;
 
   function readCelebrationSessionState(): boolean {
     if (typeof window === 'undefined') return false;
@@ -365,41 +374,81 @@
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   }
 
-  function forceCelebrationLayerZIndex(): void {
-    if (typeof document === 'undefined') return;
-    document.querySelectorAll<HTMLElement>('balloons, text-balloons').forEach((layer) => {
-      layer.style.zIndex = CELEBRATION_OVERLAY_Z_INDEX;
-      layer.style.pointerEvents = 'none';
-      layer.style.position = 'fixed';
-      layer.style.inset = '0';
+  function clearCelebrationRun(): void {
+    if (typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function' && celebrationFrameId) {
+      window.cancelAnimationFrame(celebrationFrameId);
+    }
+    celebrationFrameId = 0;
+    if (celebrationSafetyTimer) {
+      clearTimeout(celebrationSafetyTimer);
+      celebrationSafetyTimer = null;
+    }
+    celebrationEngine = null;
+    celebrationActive = false;
+  }
+
+  function finishCelebrationRun(): void {
+    clearCelebrationRun();
+    celebrationVisible = false;
+    // Keep the last frame during the overlay fade-out, then drop the particles.
+    setTimeout(() => {
+      if (!celebrationVisible) celebrationParticles = [];
+    }, 320);
+  }
+
+  function runCelebrationFrame(timestamp: number): void {
+    const engine = celebrationEngine;
+    if (!engine) return;
+
+    const state = engine.step(timestamp, { hidden: typeof document !== 'undefined' && document.hidden });
+    celebrationParticles = engine.getParticles();
+
+    if (state === 'done') {
+      finishCelebrationRun();
+      return;
+    }
+
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      celebrationFrameId = window.requestAnimationFrame(runCelebrationFrame);
+    } else {
+      finishCelebrationRun();
+    }
+  }
+
+  function startCelebrationRun(): boolean {
+    if (typeof window === 'undefined') return false;
+
+    const viewport = { width: window.innerWidth, height: window.innerHeight };
+    const nav = typeof navigator !== 'undefined' ? navigator : undefined;
+    const tier = detectBalloonDeviceTier({
+      viewport,
+      hardwareConcurrency: nav?.hardwareConcurrency,
+      deviceMemory: (nav as Navigator & { deviceMemory?: number } | undefined)?.deviceMemory,
+      userAgent: nav?.userAgent
     });
-  }
 
-  function startCelebrationObserver(): void {
-    if (typeof MutationObserver === 'undefined' || typeof document === 'undefined') return;
-    celebrationObserver?.disconnect();
-    celebrationObserver = new MutationObserver(() => {
-      forceCelebrationLayerZIndex();
-    });
-    celebrationObserver.observe(document.documentElement, { childList: true, subtree: true });
-    forceCelebrationLayerZIndex();
-  }
+    const engine = createBalloonsEngine(
+      createBalloonsEngineConfig({ viewport, tier, reducedMotion: reducedMotionPreferred })
+    );
+    const startState = engine.start();
+    if (startState === 'done') return false;
 
-  function stopCelebrationObserver(): void {
-    celebrationObserver?.disconnect();
-    celebrationObserver = null;
-  }
+    celebrationEngine = engine;
+    celebrationParticles = engine.getParticles();
+    celebrationVisible = true;
+    celebrationFrameId =
+      typeof window.requestAnimationFrame === 'function'
+        ? window.requestAnimationFrame(runCelebrationFrame)
+        : 0;
+    if (!celebrationFrameId) {
+      finishCelebrationRun();
+      return false;
+    }
 
-  function clearCelebrationBurstTimers(): void {
-    celebrationBurstTimers.forEach((id) => window.clearTimeout(id));
-    celebrationBurstTimers = [];
-  }
-
-  async function getLaunchHyperBalloons(): Promise<() => Promise<void>> {
-    if (launchHyperBalloonsFn) return launchHyperBalloonsFn;
-    const module = await import('balloons-js');
-    launchHyperBalloonsFn = module.balloons;
-    return launchHyperBalloonsFn;
+    celebrationSafetyTimer = setTimeout(() => {
+      if (celebrationEngine) finishCelebrationRun();
+    }, CELEBRATION_SAFETY_TIMEOUT_MS);
+    return true;
   }
 
   async function loadMapComponents(): Promise<void> {
@@ -412,33 +461,7 @@
     CountryHeatmapComponent = heatmapModule.default;
   }
 
-  async function launchDenseBalloonBursts(): Promise<boolean> {
-    if (typeof window === 'undefined') return false;
-    clearCelebrationBurstTimers();
-
-    const burstTasks = Array.from({ length: CELEBRATION_BURST_COUNT }, (_, index) => {
-      return new Promise<boolean>((resolve) => {
-        const timer = window.setTimeout(async () => {
-          try {
-            const launchHyperBalloons = await getLaunchHyperBalloons();
-            await launchHyperBalloons();
-            forceCelebrationLayerZIndex();
-            resolve(true);
-          } catch {
-            resolve(false);
-          }
-        }, index * CELEBRATION_BURST_STAGGER_MS);
-
-        celebrationBurstTimers.push(timer);
-      });
-    });
-
-    const results = await Promise.all(burstTasks);
-    clearCelebrationBurstTimers();
-    return results.some(Boolean);
-  }
-
-  async function triggerCelebration(): Promise<boolean> {
+  function triggerCelebration(): boolean {
     if (typeof window === 'undefined' || reducedMotionPreferred) return false;
     const nowMs = Date.now();
     if (
@@ -455,19 +478,19 @@
 
     balloonCooldownUntil = nextCooldownUntil(nowMs, CELEBRATION_COOLDOWN_MS);
     celebrationActive = true;
-    startCelebrationObserver();
 
     try {
-      const launched = await launchDenseBalloonBursts();
-      if (!launched) return false;
+      const launched = startCelebrationRun();
+      if (!launched) {
+        clearCelebrationRun();
+        return false;
+      }
       balloonSessionPlayed = true;
       writeCelebrationSessionState();
       return true;
     } catch {
+      clearCelebrationRun();
       return false;
-    } finally {
-      celebrationActive = false;
-      stopCelebrationObserver();
     }
   }
 
@@ -529,7 +552,7 @@
     });
     sillyAnswered = true;
     mapInteractionState = 'yes';
-    void triggerCelebration();
+    triggerCelebration();
     try { localStorage.setItem('cqd-silly-answer', 'yes'); } catch {}
   }
 
@@ -1455,8 +1478,8 @@
 
     return () => {
       celebrationActive = false;
-      stopCelebrationObserver();
-      clearCelebrationBurstTimers();
+      clearCelebrationRun();
+      celebrationVisible = false;
       if (typeof stopMarquee === 'function') stopMarquee();
       if (typeof stopHeavierScroll === 'function') stopHeavierScroll();
       if (typeof stopMapPromptDelay === 'function') stopMapPromptDelay();
@@ -2069,6 +2092,7 @@
   {#if mapExpanded}
     <div
       class="l2-map-modal-backdrop"
+      use:portalToBody
       transition:fade={{ duration: 180 }}
       on:click|self={closeMapExpanded}
       role="presentation"
@@ -2347,20 +2371,15 @@
     {/if}
   {/if}
 
+  <BalloonsOverlay
+    visible={celebrationVisible}
+    particles={celebrationParticles}
+    idPrefix="overview-celebration"
+  />
+
 </div>
 
 <style>
-  :global(balloons),
-  :global(text-balloons) {
-    z-index: 2147483647 !important;
-    pointer-events: none !important;
-  }
-
-  :global(balloons balloon),
-  :global(text-balloons text-balloon) {
-    pointer-events: none !important;
-  }
-
   /* ── Base ──────────────────────────── */
   .l2 {
     --green: #1a8b55;

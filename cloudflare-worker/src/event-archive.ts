@@ -98,6 +98,30 @@ export async function archiveBatch(db: D1Database, input: ArchiveBatchInput): Pr
   }
 }
 
+/**
+ * Delete archived batches older than the retention window. Runs on the daily
+ * alarm so the archive cannot grow without bound (the table has no other
+ * DELETE path). Best-effort: a failed prune never fails the alarm.
+ */
+export async function pruneArchive(db: D1Database, retentionDays: number): Promise<boolean> {
+  const cutoff = Date.now() - Math.max(1, Math.floor(retentionDays)) * 24 * 60 * 60 * 1000;
+  try {
+    await db.prepare(`DELETE FROM ${ARCHIVE_TABLE} WHERE archived_at_utc < ?1`).bind(cutoff).run();
+    return true;
+  } catch (error) {
+    logPruneFailure(error);
+    return false;
+  }
+}
+
+function logPruneFailure(error: unknown): void {
+  try {
+    console.warn(`archive_prune_failed: ${String(error).slice(0, 200)}`);
+  } catch {
+    // Logging must never throw.
+  }
+}
+
 /** Aggregate counters for admin consoles, best-effort only. */
 export async function readArchiveStats(db: D1Database): Promise<ArchiveStats | null> {
   try {

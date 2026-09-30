@@ -1,0 +1,61 @@
+name: Worker Diagnostics
+
+# Read-only operational diagnostics against the deployed analytics Worker.
+# Uses the existing DO_SHARED_SECRET to read /stats and /pipeline-health and
+# prints only the pipeline/failure fields — no full storage dump in logs.
+# Dispatch-only so it can never run on an untrusted trigger.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    name: Read pipeline diagnostics
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fetch pipeline health and stats
+        env:
+          WORKER_BASE_URL: ${{ vars.PUBLIC_WORKER_BASE_URL }}
+          DO_SHARED_SECRET: ${{ secrets.DO_SHARED_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DO_SHARED_SECRET:-}" ]; then
+            echo "::error::DO_SHARED_SECRET not configured"
+            exit 1
+          fi
+          echo "## pipeline-health (public)" >> "$GITHUB_STEP_SUMMARY"
+          curl -sS --max-time 20 "${WORKER_BASE_URL%/}/pipeline-health" | tee /tmp/health.json
+          echo >> "$GITHUB_STEP_SUMMARY"
+          echo "## /stats (admin) — pipeline + retry state only" >> "$GITHUB_STEP_SUMMARY"
+          code="$(curl -sS --max-time 20 -o /tmp/stats.json -w "%{http_code}" \
+            -H "X-Admin-Secret: ${DO_SHARED_SECRET}" \
+            "${WORKER_BASE_URL%/}/stats" || true)"
+          echo "stats HTTP ${code}"
+          if [ "${code}" != "200" ]; then
+            echo "::error::/stats returned HTTP ${code}; cannot read retry state"
+            exit 1
+          fi
+          node -e '
+            const fs = require("fs");
+            const d = JSON.parse(fs.readFileSync("/tmp/stats.json", "utf8"));
+            const pick = (o) => ({
+              lastFlushAt: o.lastFlushAt ?? null,
+              lastEventAt: o.lastEventAt ?? null,
+              committedSeq: o.committedSeq ?? null,
+              bufferSize: o.bufferSize ?? null,
+              pendingBatches: o.pendingBatches ?? null,
+              oldestPendingAgeMs: o.oldestPendingAgeMs ?? null,
+              retryState: o.retryState ?? null,
+              archiveStats: o.archiveStats ?? null,
+            });
+            const out = {
+              retryState: d.retryState ?? null,
+              pipeline: d.pipeline ? pick(d.pipeline) : null,
+              topKeys: Object.keys(d),
+            };
+            fs.writeFileSync(process.env.GITHUB_STEP_SUMMARY, "```json\n" + JSON.stringify(out, null, 2) + "\n```\n");
+          '

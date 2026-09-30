@@ -10,6 +10,7 @@ import {
   loadPublishedPlacements,
   maxPlacementZIndex,
   publishPlacements,
+  resolvePlacementSvg,
   saveDraftPlacements
 } from './placements';
 
@@ -251,5 +252,19 @@ describe('placements draft/publish storage', () => {
     const loaded = loadPublishedPlacements();
     expect(loaded).toHaveLength(1);
     expect(loaded[0]?.id).toBe('legacy-1');
+  });
+});
+
+describe('resolvePlacementSvg sink re-validation', () => {
+  it('returns safe custom SVG as-is', () => {
+    const safe = '<circle cx="5" cy="5" r="4" fill="#22c55e"/>';
+    const resolved = resolvePlacementSvg({ sampleId: 'custom-1', customSvg: safe });
+    expect(resolved.svg).toBe(safe);
+  });
+
+  it('drops custom SVG that fails the safety filter at the sink', () => {
+    const hostile = '<g><script>alert(1)</script></g>';
+    const resolved = resolvePlacementSvg({ sampleId: 'custom-2', customSvg: hostile });
+    expect(resolved.svg).toBe('');
   });
 });

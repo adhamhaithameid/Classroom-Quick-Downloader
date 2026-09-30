@@ -81,7 +81,8 @@ node tools/backup-to-sheet.mjs /tmp/event-archive.json /tmp/backups
 The daily workflow also overwrites the project's Google Sheet with the full
 archive, restoring the export the retired Oracle backend used to perform.
 
-- **Sheet:** https://docs.google.com/spreadsheets/d/1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI
+- **Sheet:** configured via the `GOOGLE_SHEETS_ID` Actions secret (URL not
+  committed — the sheet ID is access-grant material).
 - **Range:** `Sheet1!A1` (override with the `GOOGLE_SHEETS_RANGE` Actions
   variable). The write is a full `values.update` from A1 — the sheet always
   mirrors the whole archive; stale rows below the data range are not cleared.
@@ -93,8 +94,8 @@ archive, restoring the export the retired Oracle backend used to perform.
 
 | Name | Kind | Value |
 | --- | --- | --- |
-| `GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON` | Secret | Full service-account JSON key (`sheet-archiver@gen-lang-client-0718938725.iam.gserviceaccount.com`) |
-| `GOOGLE_SHEETS_ID` | Secret | `1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI` |
+| `GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON` | Secret | Full service-account JSON key (client_email redacted here; rotate via Google Cloud Console if it ever leaks) |
+| `GOOGLE_SHEETS_ID` | Secret | Backing spreadsheet ID (redacted here) |
 | `GOOGLE_SHEETS_RANGE` | Optional var | Defaults to `Sheet1!A1` |
 
 **Access requirement:** the spreadsheet must be shared with the service

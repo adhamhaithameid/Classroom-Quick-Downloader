@@ -71,6 +71,11 @@ jobs:
               "",
               "If this supersedes one of them, close the older PR and say which one replaces it.",
             ].join("\n");
-            execSync(`gh pr comment ${self} --body ${JSON.stringify(body)}`, { stdio: "inherit" });
+            // Fork-controlled PR titles must never travel through a shell:
+            // JSON.stringify does not neutralize $(...) / backticks inside a
+            // double-quoted bash word. Write the body to a file instead.
+            const { writeFileSync } = require("node:fs");
+            writeFileSync("pr-comment-body.md", body, "utf8");
+            execSync(`gh pr comment ${self} --body-file pr-comment-body.md`, { stdio: "inherit" });
             console.log(`flagged ${hits.length} candidate(s)`);
           '
