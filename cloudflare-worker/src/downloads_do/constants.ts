@@ -16,6 +16,7 @@ export const DEFAULT_COUNTERS: Counters = {
   byLanguage: {},
   byCountry: {},
   byErrorType: {},
+  successByRetries: {},
 };
 
 export const DEFAULT_RETRY_STATE: RetryState = {

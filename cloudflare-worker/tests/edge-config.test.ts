@@ -134,9 +134,13 @@ describe("Worker edge /config serving", () => {
     const controller = { scheduledTime: Date.UTC(2026, 0, 15, 2, 0, 0) };
     await worker.scheduled(controller as unknown as ScheduledController, env, {} as ExecutionContext);
 
-    expect(put).toHaveBeenCalledTimes(1);
-    const [key, value, opts] = put.mock.calls[0];
-    expect(key).toBe(ANALYTICS_CONFIG_KV_KEY);
+    // Two writes land on this tick: the config snapshot AND the reliability
+    // metric refresh (0h4d.1.10). Assert the config write specifically.
+    const configCall = put.mock.calls.find(
+      ([key]) => key === ANALYTICS_CONFIG_KV_KEY,
+    );
+    expect(configCall).toBeTruthy();
+    const [key, value, opts] = configCall!;
     const payload = JSON.parse(value as string) as Record<string, unknown>;
     expect("serverTimeUtc" in payload).toBe(false);
     expect("committedSeq" in payload).toBe(false);

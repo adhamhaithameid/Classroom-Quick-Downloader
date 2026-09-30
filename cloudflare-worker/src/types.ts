@@ -66,6 +66,12 @@ export interface Counters {
   byLanguage: Record<string, number>;
   byCountry: Record<string, number>;
   byErrorType: Record<string, number>; // NEW: breakdown by error_type
+  /**
+   * Successful downloads bucketed by the download-level retry count
+   * ("0" = first attempt, "1", "2", "3+"). Reliability-metric input
+   * (bead 0h4d.1.10) — join with totalSuccess/totalFail for rates.
+   */
+  successByRetries: Record<string, number>;
 }
 
 /**
@@ -581,6 +587,8 @@ export interface BucketCounters {
   byLanguage: Record<string, number>;
   byCountry: Record<string, number>;
   byErrorType: Record<string, number>;
+  /** Successful downloads by retry bucket ("0"/"1"/"2"/"3+") — 0h4d.1.10. */
+  successByRetries: Record<string, number>;
 }
 
 /**

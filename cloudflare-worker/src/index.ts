@@ -7,6 +7,7 @@ import { fetchStoreStats } from "./store-stats";
 import type { StoreStatsSnapshot } from "./store-stats";
 import { computeTrends } from "./archive-trends";
 import type { TrendsSeries } from "./archive-trends";
+import { computeReliability } from "./reliability";
 import {
   createEmptyStoreHealthDoc,
   evaluateScrapeHealth,
@@ -1518,6 +1519,7 @@ const WEBSITE_CONSOLE_ADMIN_PATHS = new Set<string>([
   "/admin/website/console/telemetry",
   "/admin/website/console/snapshot/raw",
   "/admin/website/console/archive-trends",
+  "/admin/website/reliability",
 ]);
 
 const WEBSITE_CONSOLE_RAW_PATHS = new Set<string>([
@@ -1689,6 +1691,36 @@ async function handleWebsiteConsoleAdminEndpoint(
   }
 
   try {
+    if (pathname === "/admin/website/reliability") {
+      // 0h4d.1.10: serve the cached reliability metric; recompute on miss so
+      // the first admin visit after deploy is not an empty payload.
+      let raw = env.SITE_SNAPSHOT_KV ? await env.SITE_SNAPSHOT_KV.get(RELIABILITY_KV_KEY) : null;
+      if (!raw) {
+        await refreshReliabilityKv(env);
+        raw = env.SITE_SNAPSHOT_KV ? await env.SITE_SNAPSHOT_KV.get(RELIABILITY_KV_KEY) : null;
+      }
+      let reliability: unknown = null;
+      try {
+        reliability = raw ? JSON.parse(raw) : null;
+      } catch {
+        reliability = null;
+      }
+      return withCors(
+        request,
+        new Response(
+          JSON.stringify({
+            ok: true,
+            code: "ok",
+            message: "website_reliability",
+            generatedAtUtc: Date.now(),
+            reliability,
+          }),
+          { status: 200, headers: { "content-type": "application/json; charset=utf-8" } },
+        ),
+        env,
+      );
+    }
+
     if (pathname === "/admin/website/console/summary") {
       const doStatus = await fetchDoWebsiteStatus(env);
       const cachedRaw = await readSiteSnapshotCache(env);
@@ -2672,6 +2704,7 @@ type DoPublicSiteMetrics = {
   success: number;
   fail: number;
   countries: Array<{ countryCode: string; count: number }>;
+  successByRetries?: Record<string, number>;
 };
 
 async function fetchDoPublicSiteMetrics(env: WorkerEnv): Promise<DoPublicSiteMetrics | null> {
@@ -2682,6 +2715,7 @@ async function fetchDoPublicSiteMetrics(env: WorkerEnv): Promise<DoPublicSiteMet
     const payload = (await res.json()) as {
       totals?: { downloads?: unknown; success?: unknown; fail?: unknown };
       countries?: unknown;
+      successByRetries?: unknown;
     };
     const asCount = (value: unknown): number =>
       typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
@@ -2702,10 +2736,36 @@ async function fetchDoPublicSiteMetrics(env: WorkerEnv): Promise<DoPublicSiteMet
       success: asCount(payload.totals?.success),
       fail: asCount(payload.totals?.fail),
       countries,
+      successByRetries:
+        payload.successByRetries && typeof payload.successByRetries === "object"
+          ? (payload.successByRetries as Record<string, number>)
+          : undefined,
     };
   } catch {
     return null;
   }
+}
+
+const RELIABILITY_KV_KEY = "site:v1:reliability";
+
+/**
+ * 0h4d.1.10: compute the reliability metric from the DO counters and cache
+ * it in KV for the admin surface. Best-effort: a DO hiccup leaves the
+ * previous snapshot in place.
+ */
+async function refreshReliabilityKv(env: WorkerEnv): Promise<void> {
+  if (!env.SITE_SNAPSHOT_KV) return;
+  const metrics = await fetchDoPublicSiteMetrics(env);
+  if (!metrics) return;
+  const reliability = computeReliability(
+    {
+      totalSuccess: metrics.success,
+      totalFail: metrics.fail,
+      successByRetries: metrics.successByRetries ?? {},
+    },
+    { now: Date.now() },
+  );
+  await env.SITE_SNAPSHOT_KV.put(RELIABILITY_KV_KEY, JSON.stringify(reliability));
 }
 
 function readPrevLiveSinceUtc(prevSnapshot: Record<string, unknown> | null): number | null {
@@ -3240,6 +3300,9 @@ export default {
     // notifier fires on warn/critical (e.g. archive writes failing). Without
     // this, alerts only trigger when an authorized admin polls by hand.
     await pingPipelineHealthAlerts(env);
+
+    // 0h4d.1.10: refresh the reliability metric cache (best effort).
+    await refreshReliabilityKv(env);
 
     if (SITE_SNAPSHOT_REFRESH_HOURS_UTC.has(hour)) {
       await refreshTrendsKv(env);
