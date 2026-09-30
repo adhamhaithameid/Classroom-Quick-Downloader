@@ -29,7 +29,8 @@
     discardDraftPlacements,
     exportPlacementsJSON, importPlacementsJSON,
     genPlacementId, getBuiltinSvg,
-    maxPlacementZIndex
+    maxPlacementZIndex,
+    isSafeSvgMarkup
   } from '$lib/svgCatalog/placements';
   import { categories as svgCategories, doodleItems, threeDElements } from '$lib/svgCatalog/index';
   import type { SvgItem } from '$lib/svgCatalog/index';
@@ -879,7 +880,12 @@
     if (builtin) return builtin;
 
     if (p.customSvg) {
-      return { svg: p.customSvg, viewBox: p.viewBox || '0 0 64 64' };
+      // Re-check at the sink: load-time validation is the primary gate, this
+      // catches any in-memory path that bypassed normalizePlacementArray.
+      if (isSafeSvgMarkup(p.customSvg)) {
+        return { svg: p.customSvg, viewBox: p.viewBox || '0 0 64 64' };
+      }
+      return { svg: '', viewBox: p.viewBox || '0 0 64 64' };
     }
 
     for (const cat of svgCategories) {

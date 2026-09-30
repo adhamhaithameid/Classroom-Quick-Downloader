@@ -353,7 +353,7 @@ function hasOnlySafeSvgAttributes(rawAttributes: string): boolean {
   return true;
 }
 
-function isSafeSvgMarkup(svg: string): boolean {
+export function isSafeSvgMarkup(svg: string): boolean {
   if (!svg || svg.length > 50_000) return false;
 
   const openElements: string[] = [];
@@ -805,7 +805,13 @@ export function resolvePlacementSvg(p: {
   if (builtin) return builtin;
 
   if (p.customSvg) {
-    return { svg: p.customSvg, viewBox: p.viewBox || '0 0 64 64' };
+    // Defense-in-depth: placements are validated on load, but the value that
+    // reaches the {@html} sink is re-checked here so any future call path
+    // that skips normalization cannot inject unfiltered SVG markup.
+    if (isSafeSvgMarkup(p.customSvg)) {
+      return { svg: p.customSvg, viewBox: p.viewBox || '0 0 64 64' };
+    }
+    return { svg: '', viewBox: p.viewBox || '0 0 64 64' };
   }
 
   for (const cat of svgCategories) {
