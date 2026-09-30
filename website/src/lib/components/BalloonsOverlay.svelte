@@ -1,6 +1,7 @@
 <script lang="ts">
   import { fade } from 'svelte/transition';
   import type { BalloonParticle } from '$lib/celebration/balloons';
+  import { portalToBody } from '$lib/actions/portalToBody';
 
   export let visible = false;
   export let particles: readonly BalloonParticle[] = [];
@@ -16,7 +17,7 @@
 </script>
 
 {#if visible && particles.length > 0}
-  <div class="l2-balloon-fullscreen" transition:fade={{ duration: 240 }} aria-hidden="true">
+  <div class="l2-balloon-fullscreen" use:portalToBody transition:fade={{ duration: 240 }} aria-hidden="true">
     {#each particles as p (p.id)}
       {@const fillId = gradientId('fill', p.id)}
       {@const glowId = gradientId('glow', p.id)}
