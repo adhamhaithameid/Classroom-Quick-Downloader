@@ -94,18 +94,22 @@ describe('Cloudflare worker security headers', () => {
     const appHtml = readFileSync(new URL('../../src/app.html', import.meta.url), 'utf8');
     const csp = await buildContentSecurityPolicy(appHtml);
 
-    const inlineBodies = [...appHtml.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi)].map((m) => m[1]);
+    const inlineBodies = [...appHtml.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script[^>]*>/gi)].map((m) => m[1]);
     expect(inlineBodies.length).toBeGreaterThanOrEqual(2);
     for (const body of inlineBodies) {
       expect(csp).toContain(expectedSource(body));
     }
   });
 
-  it('treats </script > with trailing whitespace as an end tag, like the browser', async () => {
+  it('treats junk-bearing script end tags as end tags, like the browser', async () => {
     const { buildContentSecurityPolicy } = await loadWorkerModule();
-    const html = '<html><head><script>doThing("<b>");</script ><script>other();</script></head></html>';
+    const html = '<html><head>'
+      + '<script>doThing("<b>");</script >'
+      + '<script>other();</script\t\n junk attr>'
+      + '<script>third();</script></head></html>';
     const csp = await buildContentSecurityPolicy(html);
     expect(csp).toContain(expectedSource('doThing("<b>");'));
     expect(csp).toContain(expectedSource('other();'));
+    expect(csp).toContain(expectedSource('third();'));
   });
 });

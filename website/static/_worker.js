@@ -21,9 +21,10 @@ const CSP_BASE_DIRECTIVES = [
   'upgrade-insecure-requests'
 ];
 
-// The end tag allows trailing whitespace, exactly like the HTML parser:
-// a body hashed past a `</script >` would not match what the browser runs.
-const INLINE_SCRIPT_RE = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
+// The HTML parser closes a script element at '</script' followed by any
+// attribute junk up to '>' — hashing past it would emit a hash for a body
+// the browser never executes (and miss the one it does).
+const INLINE_SCRIPT_RE = /<script\b([^>]*)>([\s\S]*?)<\/script[^>]*>/gi;
 const EXECUTABLE_TYPE_RE = /type\s*=\s*("module"|'module')/i;
 const ANY_TYPE_RE = /type\s*=\s*("[^"]*"|'[^']*')/i;
 
