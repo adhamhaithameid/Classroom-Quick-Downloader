@@ -47,7 +47,7 @@ jobs:
           # The event_archive table appears once the new worker code has flushed
           # its first batch; until then fall back to an empty sheet.
           if ! npx --yes wrangler@latest d1 execute SITE_CACHE_DB --remote --json \
-            "SELECT batch_id, kind, created_at_utc, event_count, weighted_count, archived_at_utc FROM event_archive ORDER BY created_at_utc ASC" \
+            --command "SELECT batch_id, kind, created_at_utc, event_count, weighted_count, archived_at_utc FROM event_archive ORDER BY created_at_utc ASC" \
             > backups/latest/event-archive.json 2>/tmp/d1-export-error.txt; then
             if grep -qi "no such table" /tmp/d1-export-error.txt; then
               echo "::notice::event_archive table not created yet (new worker not deployed); writing empty sheet."

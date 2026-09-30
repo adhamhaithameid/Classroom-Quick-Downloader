@@ -60,7 +60,9 @@ Classroom Quick Downloader is a 4-service pnpm monorepo with 3.2+ years of growt
 ### Security-Critical
 
 **6. Remove committed secrets from git tracking:**
-- `oracle-backend/.env` contains plaintext `DASHBOARD_PASSWORD` and `SUPER_ADMIN_PASSWORD`. Already in `.gitignore` (line 6) but committed before the rule was added. Run `git rm --cached oracle-backend/.env`.
+- `oracle-backend/.env` — CORRECTED 2026-09-30: full git history scan shows this
+  file was NEVER committed; the original claim here was wrong. The local file
+  is correctly gitignored and no action is needed.
 - `extension/.env` line 10: hardcoded production `VITE_WORKER_URL`. Run `git rm --cached extension/.env`. Already covered by the `.env` gitignore pattern.
 
 **7. Create `oracle-backend/.env.example`:**

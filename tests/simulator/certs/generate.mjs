@@ -31,6 +31,22 @@ const crt = path.join(dir, "server.crt");
 const caKey = path.join(dir, "ca.key");
 const caCrt = path.join(dir, "ca.crt");
 
+// Self-sufficiency: a fresh clone has no CA (private key material is not
+// committed). Generate a throwaway test CA so the simulator still stands up.
+if (!fs.existsSync(caKey) || !fs.existsSync(caCrt)) {
+  execFileSync(
+    "openssl",
+    [
+      "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+      "-keyout", caKey, "-out", caCrt,
+      "-days", "3650",
+      "-subj", "/CN=CQD Simulator Test CA",
+    ],
+    { stdio: "inherit" },
+  );
+  console.log("generated throwaway test CA (not trusted by any browser profile)");
+}
+
 fs.writeFileSync(ext, `subjectAltName=${san}\n`);
 
 execFileSync(

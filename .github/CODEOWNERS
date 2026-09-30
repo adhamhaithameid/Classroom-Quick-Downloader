@@ -1,0 +1,13 @@
+# Default ownership: everything requires the maintainer's review.
+# Reference: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# Analytics data plane — highest sensitivity (admin endpoints, secrets, telemetry)
+/cloudflare-worker/ @adhamhaithameid
+# Marketing website — public-facing, deploy-gated
+/website/ @adhamhaithameid
+# Deployment pipelines — a compromised workflow is a site compromise
+/.github/workflows/ @adhamhaithameid
+# Extension — store-published artifact
+/extension/ @adhamhaithameid
+# Oracle backend — dormant but restorable
+/oracle-backend/ @adhamhaithameid

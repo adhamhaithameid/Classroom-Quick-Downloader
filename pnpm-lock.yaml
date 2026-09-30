@@ -174,9 +174,6 @@ importers:
       isomorphic-dompurify:
         specifier: ^3.23.0
         version: 3.23.0
-      marked:
-        specifier: ^18.0.13
-        version: 18.0.13
       topojson-client:
         specifier: ^3.1.0
         version: 3.1.0
@@ -2874,11 +2871,6 @@ packages:
   many-keys-map@3.0.3:
     resolution: {integrity: sha512-1DiZmDHPXMBgMRjeUtHy1q1VYmeJscHxhIAexX9z/zjRMP80+0ETuPfssi8z+kMY4DwUgsKuHqpjxgmeA9gBNA==}
     engines: {node: '>=18'}
-
-  marked@18.0.13:
-    resolution: {integrity: sha512-xTxVzZsBFwunP6HDmtBkabUQEYArnP7/rMDGmPj9SlrKlQ4i8MdYVow+nJL0eOqwpUqhzBoTBRADGN6uYwPyOw==}
-    engines: {node: '>= 20'}
-    hasBin: true
 
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
@@ -6108,8 +6100,6 @@ snapshots:
       semver: 7.8.5
 
   many-keys-map@3.0.3: {}
-
-  marked@18.0.13: {}
 
   math-intrinsics@1.1.0: {}
 

@@ -90,3 +90,8 @@ website/prototype-*.html
 # Exception: the magnetic guard test reads this approved prototype as its
 # sync source of truth (website/src/lib/motion/magnetic.guard.test.ts).
 !website/prototype-magnetic.html
+
+# Simulator private key material: regenerable via tests/simulator/certs/generate.mjs
+tests/simulator/certs/*.key
+tests/simulator/certs/*.csr
+tests/simulator/certs/*.srl
