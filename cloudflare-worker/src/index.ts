@@ -1527,6 +1527,11 @@ const WEBSITE_CONSOLE_RAW_PATHS = new Set<string>([
   "/admin/website/console/snapshot/raw",
 ]);
 
+// Full-state dumps leak login-attempt IPs, free-text feedback, and telemetry
+// queues; they demand the same danger step-up as the raw console readers.
+// The literal X-Admin-Secret header (CI backups) still satisfies the gate.
+const DANGER_STEP_UP_PATHS = new Set<string>([...WEBSITE_CONSOLE_RAW_PATHS, "/admin/storage-export"]);
+
 const MAX_D1_QUERY_ROWS = 500;
 const D1_BLOCKED_KEYWORDS = /\b(insert|update|delete|alter|drop|attach|detach|pragma|vacuum|replace|create|truncate|reindex)\b/i;
 
@@ -1534,8 +1539,8 @@ function isWebsiteConsoleAdminPath(pathname: string): boolean {
   return WEBSITE_CONSOLE_ADMIN_PATHS.has(pathname);
 }
 
-function requiresWebsiteConsoleStepUp(pathname: string): boolean {
-  return WEBSITE_CONSOLE_RAW_PATHS.has(pathname);
+function requiresDangerStepUp(pathname: string): boolean {
+  return DANGER_STEP_UP_PATHS.has(pathname);
 }
 
 async function fetchDoWebsiteStatus(env: WorkerEnv): Promise<Record<string, unknown>> {
@@ -1677,7 +1682,7 @@ async function handleWebsiteConsoleAdminEndpoint(
     );
   }
 
-  if (requiresWebsiteConsoleStepUp(pathname) && !auth.hasValidSecret && !auth.hasDangerStepUp) {
+  if (requiresDangerStepUp(pathname) && !auth.hasValidSecret && !auth.hasDangerStepUp) {
     return consoleErrorResponse(
       request,
       env,

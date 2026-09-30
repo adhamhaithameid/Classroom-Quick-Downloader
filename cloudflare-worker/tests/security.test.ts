@@ -1472,9 +1472,11 @@ describe("Durable Object security behaviors", () => {
       configMaxBufferSize: 50000,
     });
 
-    const res = await callDOGet(obj, "/pipeline-health");
-    expect(res.status).toBe(200);
-    const payload = await res.json() as { thresholds?: Record<string, unknown> };
+    // Configured thresholds are admin-only detail: the authenticated view
+    // carries them, the public view is reduced to {ok, status, reasons}.
+    const adminRes = await callDOGetWithAdmin(obj, "/pipeline-health");
+    expect(adminRes.status).toBe(200);
+    const payload = await adminRes.json() as { thresholds?: Record<string, unknown> };
     expect(payload.thresholds?.warnPendingBatches).toBe(2);
     expect(payload.thresholds?.criticalPendingBatches).toBe(4);
     expect(payload.thresholds?.warnFailures).toBe(1);
@@ -1483,6 +1485,15 @@ describe("Durable Object security behaviors", () => {
     expect(payload.thresholds?.criticalStaleMs).toBe(2000);
     expect(payload.thresholds?.warnBufferUtil).toBe(0.4);
     expect(payload.thresholds?.criticalBufferUtil).toBe(0.6);
+
+    const publicRes = await callDOGet(obj, "/pipeline-health");
+    expect(publicRes.status).toBe(200);
+    const publicPayload = await publicRes.json() as Record<string, unknown>;
+    expect(publicPayload.ok).toBe(true);
+    expect(publicPayload.status).toBeDefined();
+    expect(publicPayload.thresholds).toBeUndefined();
+    expect(publicPayload.pendingBatches).toBeUndefined();
+    expect(publicPayload.committedSeq).toBeUndefined();
   });
 
   it("compacts pending batches when all attempts are non-zero", async () => {

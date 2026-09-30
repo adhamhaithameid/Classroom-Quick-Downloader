@@ -22,7 +22,7 @@ import type {
 // Explicit type imports (not the tsconfig global): the extension test suite
 // imports this module, and that program does not load workers-types globals.
 import type { D1Database, DurableObjectState } from "@cloudflare/workers-types";
-import { archiveBatch, readArchiveStats } from "./event-archive";
+import { archiveBatch, pruneArchive, readArchiveStats } from "./event-archive";
 import { generateSecureRandomString, secureRandom } from "./downloads_do/helpers";
 import { timingSafeStringEqual } from "./timing";
 
@@ -135,6 +135,10 @@ type DurableStateShape = {
 
   // Track endpoint rate limiting (per-IP, per-minute)
   trackRates: Record<string, { count: number; minute: number }>;
+
+  // Public website write endpoints (per-IP, per-minute)
+  websiteEventRates: Record<string, { count: number; minute: number }>;
+  uninstallRates: Record<string, { count: number; minute: number }>;
 
   // =========================================================================
   // CHANGELOG & CONFIG
@@ -481,6 +485,13 @@ const HEALTH_NOTIFY_CRIT_INTERVAL_MS = 10 * 60 * 1000;
 const TRACK_RATE_LIMIT_PER_MIN = 120;
 const TRACK_RATE_PRUNE_AFTER_MIN = 10;
 const TRACK_RATE_MAX_KEYS = 5000;
+// Public website write endpoints (per IP per minute). Each events request can
+// carry up to 64 events and each uninstall submit is a user action, so these
+// stay far above human traffic while bounding scripted abuse.
+const WEBSITE_EVENTS_RATE_LIMIT_PER_MIN = 30;
+const UNINSTALL_RATE_LIMIT_PER_MIN = 3;
+const PUBLIC_IP_RATE_PRUNE_AFTER_MIN = 10;
+const PUBLIC_IP_RATE_MAX_KEYS = 5000;
 const REQUEST_HISTORY_DAYS = 400;
 const PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC = [3, 6, 9, 12, 15, 18, 21] as const;
 const MAX_PUBLIC_SITE_COUNTRIES = 300;
@@ -1356,6 +1367,20 @@ function trimAndLimitString(value: unknown, maxLen: number): string {
   return value.trim().slice(0, Math.max(0, maxLen));
 }
 
+/**
+ * User-authored free text (uninstall reason/notes): strip control characters
+ * (including newlines, which would otherwise smuggle markup into the public
+ * topReasons output), collapse the whitespace left behind, then clamp.
+ */
+function sanitizeUserFreeText(value: unknown, maxLen: number): string {
+  if (typeof value !== "string") return "";
+  return value
+    .replace(/[\u0000-\u001f\u007f\u0080-\u009f]+/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    .slice(0, Math.max(0, maxLen));
+}
+
 function sanitizeWebsiteTelemetrySessionID(value: unknown): string {
   return trimAndLimitString(value, WEBSITE_EVENTS_MAX_SESSION_ID_LEN);
 }
@@ -1930,6 +1955,8 @@ export class DownloadsDurable {
       sessionBindingLastExpectedPrefix: null,
       sessionBindingLastActualPrefix: null,
       trackRates: {},
+      websiteEventRates: {},
+      uninstallRates: {},
 
       // Remote config defaults
       configVersion: CONFIG_VERSION,
@@ -2180,6 +2207,14 @@ export class DownloadsDurable {
       sessionBindingLastActualPrefix:
         trimAndLimitString((stored as unknown as Record<string, unknown>).sessionBindingLastActualPrefix, 120) || null,
       trackRates: stored.trackRates && typeof stored.trackRates === "object" ? stored.trackRates : base.trackRates,
+      websiteEventRates:
+        stored.websiteEventRates && typeof stored.websiteEventRates === "object"
+          ? stored.websiteEventRates
+          : base.websiteEventRates,
+      uninstallRates:
+        stored.uninstallRates && typeof stored.uninstallRates === "object"
+          ? stored.uninstallRates
+          : base.uninstallRates,
 
       // Remote config - preserve stored values or use defaults
       configVersion: stored.configVersion ?? base.configVersion,
@@ -2858,6 +2893,8 @@ export class DownloadsDurable {
       this.d.ipCountsSize = 0;
       this.d.uniqueRequestsToday = 0;
       this.d.trackRates = {};
+      this.d.websiteEventRates = {};
+      this.d.uninstallRates = {};
       
       // hardRemoteOff is NOT reset automatically here.
     }
@@ -2955,30 +2992,57 @@ export class DownloadsDurable {
   }
 
   private checkTrackRateLimit(ip: string, nowMs: number): { allowed: boolean; retryAfterSec?: number } {
+    return this.checkIpMinuteRateLimit(this.d.trackRates, ip, nowMs, TRACK_RATE_LIMIT_PER_MIN);
+  }
+
+  private checkWebsiteEventsRateLimit(ip: string, nowMs: number): { allowed: boolean; retryAfterSec?: number } {
+    return this.checkIpMinuteRateLimit(
+      this.d.websiteEventRates,
+      ip,
+      nowMs,
+      WEBSITE_EVENTS_RATE_LIMIT_PER_MIN,
+    );
+  }
+
+  private checkUninstallRateLimit(ip: string, nowMs: number): { allowed: boolean; retryAfterSec?: number } {
+    return this.checkIpMinuteRateLimit(this.d.uninstallRates, ip, nowMs, UNINSTALL_RATE_LIMIT_PER_MIN);
+  }
+
+  /**
+   * Shared per-IP per-minute limiter over one state bucket. Entries are
+   * pruned when the bucket exceeds the shared key cap; an emergency reset
+   * avoids unbounded memory growth under distributed abuse.
+   */
+  private checkIpMinuteRateLimit(
+    bucket: Record<string, { count: number; minute: number }>,
+    ip: string,
+    nowMs: number,
+    limitPerMin: number,
+  ): { allowed: boolean; retryAfterSec?: number } {
     const minute = Math.floor(nowMs / 60000);
-    const entry = this.d.trackRates[ip];
+    const entry = bucket[ip];
 
     if (!entry || entry.minute !== minute) {
-      this.d.trackRates[ip] = { count: 1, minute };
+      bucket[ip] = { count: 1, minute };
     } else {
       entry.count += 1;
-      if (entry.count > TRACK_RATE_LIMIT_PER_MIN) {
+      if (entry.count > limitPerMin) {
         const nextMinuteMs = (minute + 1) * 60000;
         return { allowed: false, retryAfterSec: Math.max(1, Math.ceil((nextMinuteMs - nowMs) / 1000)) };
       }
     }
 
     // Prune old entries to prevent unbounded growth.
-    if (Object.keys(this.d.trackRates).length > TRACK_RATE_MAX_KEYS) {
-      const minMinute = minute - TRACK_RATE_PRUNE_AFTER_MIN;
-      for (const [k, v] of Object.entries(this.d.trackRates)) {
+    if (Object.keys(bucket).length > PUBLIC_IP_RATE_MAX_KEYS) {
+      const minMinute = minute - PUBLIC_IP_RATE_PRUNE_AFTER_MIN;
+      for (const [k, v] of Object.entries(bucket)) {
         if (!v || v.minute < minMinute) {
-          delete this.d.trackRates[k];
+          delete bucket[k];
         }
       }
-      if (Object.keys(this.d.trackRates).length > TRACK_RATE_MAX_KEYS) {
+      if (Object.keys(bucket).length > PUBLIC_IP_RATE_MAX_KEYS) {
         // Emergency reset to avoid unbounded memory growth under abuse.
-        this.d.trackRates = {};
+        for (const k of Object.keys(bucket)) delete bucket[k];
       }
     }
 
@@ -3190,6 +3254,14 @@ export class DownloadsDurable {
         trigger: "daily_alarm",
         maxBatches: 300,
       });
+    }
+
+    // Bound the archive: delete rows older than the retention window so D1
+    // storage stays flat. Best-effort; shares the alarm's daily cadence.
+    if (this.env.SITE_CACHE_DB && currentHour === 23) {
+      this.state.waitUntil(
+        pruneArchive(this.env.SITE_CACHE_DB, REQUEST_HISTORY_DAYS).catch(() => {}),
+      );
     }
 
     // Schedule next daily alarm
@@ -3515,6 +3587,14 @@ export class DownloadsDurable {
   }
 
   private async handlePublicWebsiteEvents(request: Request): Promise<Response> {
+    const rate = this.checkWebsiteEventsRateLimit(this.getClientIp(request), Date.now());
+    if (!rate.allowed) {
+      return json(
+        { ok: false, error: "rate_limited", retryAfterSec: rate.retryAfterSec ?? 60 },
+        { status: 429, headers: { "retry-after": String(rate.retryAfterSec ?? 60) } },
+      );
+    }
+
     const contentType = request.headers.get("content-type") || "";
     if (!contentType.toLowerCase().includes("application/json")) {
       return websiteEventsError(
@@ -4084,6 +4164,14 @@ export class DownloadsDurable {
   private async handlePublicUninstallSubmit(request: Request): Promise<Response> {
     const now = Date.now();
 
+    const rate = this.checkUninstallRateLimit(this.getClientIp(request), now);
+    if (!rate.allowed) {
+      return json(
+        { ok: false, error: "rate_limited", retryAfterSec: rate.retryAfterSec ?? 60 },
+        { status: 429, headers: { "retry-after": String(rate.retryAfterSec ?? 60) } },
+      );
+    }
+
     // No initializer: every try path assigns raw or returns, so the catch
     // fall-through always leaves raw assigned (and a `= null` start value
     // would be a provably dead write — eslint no-useless-assignment).
@@ -4101,7 +4189,7 @@ export class DownloadsDurable {
       return json({ ok: false, error: "invalid_payload" }, { status: 400 });
     }
 
-    const reason = trimAndLimitString(raw.reason, 200);
+    const reason = sanitizeUserFreeText(raw.reason, 200);
     if (!reason) {
       return json({ ok: false, error: "reason_required" }, { status: 400 });
     }
@@ -4123,7 +4211,7 @@ export class DownloadsDurable {
       browser: trimAndLimitString(raw.browser, 80),
       version: trimAndLimitString(raw.version, 80),
       source: trimAndLimitString(raw.source, 80),
-      notes: trimAndLimitString(raw.notes ?? "", 400) || null,
+      notes: sanitizeUserFreeText(raw.notes ?? "", 400) || null,
     };
     this.d.uninstallSubmissions.push(record);
     if (this.d.uninstallSubmissions.length > UNINSTALL_MAX_RETAINED) {
@@ -4871,8 +4959,15 @@ export class DownloadsDurable {
     const payload = this.buildPipelineHealthPayload();
     if (this.isAuthorizedAdmin(request)) {
       this.state.waitUntil(this.notifyHealthIfNeeded(payload).catch(() => {}));
+      return json(payload);
     }
-    return json(payload);
+    // Public callers get the status verdict only: queue depths, sequence
+    // numbers, and error strings are recon surface, not public data.
+    return json({
+      ok: payload.ok,
+      status: payload.status,
+      reasons: payload.reasons,
+    });
   }
 
   private async notifyHealthIfNeeded(payload: PipelineHealthResponse): Promise<void> {
@@ -5036,6 +5131,8 @@ export class DownloadsDurable {
       ipAllowlist: [],
       ipAllowlistStepUpBypassEnabled: true,
       trackRates: {},
+      websiteEventRates: {},
+      uninstallRates: {},
       uninstallSubmissions: [],
       uninstallSubmissionsTotal: 0,
       uninstallSeq: 0,
