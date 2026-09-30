@@ -322,6 +322,7 @@ export default defineBackground(() => {
       status: 'fail',
       duration_ms: Date.now() - pending.startTime,
       bypass_used: false,
+      retries: pending.retryCount ?? 0,
       error_type: 'SIZE_MISMATCH',
     });
     void recordDownloadHistory(pending, 'failed', 'SIZE_MISMATCH');
@@ -534,6 +535,7 @@ export default defineBackground(() => {
           status: 'success',
           duration_ms: duration,
           bypass_used: false,
+          retries: pending.retryCount ?? 0,
         });
         if (pending.fileMeta?.name) recentDownloads.set(pending.fileMeta.name, Date.now());
         // 0h4d.1.6: one history row per terminal settle.
@@ -640,6 +642,7 @@ export default defineBackground(() => {
         status: 'fail',
         duration_ms: duration,
         bypass_used: false,
+        retries: pending.retryCount ?? 0,
         error_type: errorType,
       });
       // 0h4d.1.4: copy comes from the canonical registry (one entry per
@@ -690,6 +693,7 @@ export default defineBackground(() => {
       status: 'cancelled',
       duration_ms: Date.now() - pending.startTime,
       bypass_used: false,
+      retries: pending.retryCount ?? 0,
     });
 
     cleanup(pending);

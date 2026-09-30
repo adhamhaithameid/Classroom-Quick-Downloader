@@ -90,6 +90,7 @@ async function internalTrack(
     source,
     id: generateEventId(safeTime.nowMs || Date.now()),
     retryCount: 0,
+    download_retries: clampInt(event.download_retries ?? 0, 0, 99),
   };
 
   // Update local stats
@@ -151,6 +152,7 @@ export function recordDownloadEvent(input: RecordDownloadEventInput): void {
     bypass_used: input.bypass_used ?? false,
     error_type: input.error_type,
     source: input.source,
+    download_retries: input.retries ?? 0,
   });
 }
 

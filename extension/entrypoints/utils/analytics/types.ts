@@ -17,6 +17,13 @@ export interface AnalyticsEvent {
   id?: string;
   source?: string;
   retryCount?: number;
+  /**
+   * Download-level retry count at settle time (0 = first attempt; the
+   * backoff policy's attempt bound is 3). Distinct from `retryCount`,
+   * which is the analytics-flush upload retry. Reliability-metric input
+   * (bead 0h4d.1.10).
+   */
+  download_retries?: number;
   commitSeq?: number;
   /**
    * Rollup count for compacted/offline events.
@@ -127,4 +134,6 @@ export interface RecordDownloadEventInput {
   duration_ms?: number;
   bypass_used?: boolean;
   error_type?: string;
+  /** Download-level retry count at settle (0 = first attempt). */
+  retries?: number;
 }

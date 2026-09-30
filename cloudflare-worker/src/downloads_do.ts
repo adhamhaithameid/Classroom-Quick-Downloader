@@ -394,6 +394,7 @@ function createEmptyCounters(): Counters {
     byLanguage: {},
     byCountry: {},
     byErrorType: {},
+    successByRetries: {},
   };
 }
 
@@ -2043,6 +2044,7 @@ export class DownloadsDurable {
         byLanguage: cloneCounterMap(stored.counters?.byLanguage),
         byCountry: cloneCounterMap(stored.counters?.byCountry),
         byErrorType: cloneCounterMap(stored.counters?.byErrorType),
+        successByRetries: cloneCounterMap(stored.counters?.successByRetries),
       },
       retryState: stored.retryState ?? { ...DEFAULT_RETRY_STATE },
 
@@ -3926,6 +3928,18 @@ export class DownloadsDurable {
         const errKey = (ev.error_type || "unknown").toLowerCase();
         c.byErrorType[errKey] = (c.byErrorType[errKey] || 0) + eventCount;
       }
+
+      // 0h4d.1.10: successful downloads bucketed by download-level retries
+      // ("0" first attempt / "1" / "2" / "3+"); the reliability metric joins
+      // this with totalSuccess/totalFail for the rates.
+      if (ev.status === "success") {
+        const rawRetries = Number((ev as { download_retries?: unknown }).download_retries);
+        const retries = Number.isFinite(rawRetries)
+          ? Math.max(0, Math.min(99, Math.floor(rawRetries)))
+          : 0;
+        const retryBucket = retries >= 3 ? "3+" : String(retries);
+        c.successByRetries[retryBucket] = (c.successByRetries[retryBucket] || 0) + eventCount;
+      }
     }
 
     // =========================================================================
@@ -4063,6 +4077,14 @@ export class DownloadsDurable {
         cancelled: clampInt(this.d.totalCancelled, 0, Number.MAX_SAFE_INTEGER, 0),
         countries: effectiveSnapshot.countries.length,
       },
+      // 0h4d.1.10: successful downloads by retry bucket — the reliability
+      // metric's raw material (join with totals.success/fail for rates).
+      successByRetries: Object.fromEntries(
+        Object.entries(this.d.counters.successByRetries).map(([k, v]) => [
+          k,
+          clampInt(v, 0, Number.MAX_SAFE_INTEGER, 0),
+        ]),
+      ),
       countries: effectiveSnapshot.countries,
       schedule: {
         refreshHoursUtc: PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC,
@@ -5784,6 +5806,7 @@ export class DownloadsDurable {
       this.mergeCounts(existing.counters.byLanguage, bucket.counters.byLanguage);
       this.mergeCounts(existing.counters.byCountry, bucket.counters.byCountry);
       this.mergeCounts(existing.counters.byErrorType, bucket.counters.byErrorType);
+      this.mergeCounts(existing.counters.successByRetries, bucket.counters.successByRetries);
     };
     a.forEach(addBucket);
     b.forEach(addBucket);
@@ -6102,6 +6125,7 @@ export class DownloadsDurable {
       byLanguage: {},
       byCountry: {},
       byErrorType: {},
+      successByRetries: {},
     };
 
     for (const ev of events) {

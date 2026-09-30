@@ -66,6 +66,7 @@ export function handleStartTimeout(
     status: 'fail',
     duration_ms: Date.now() - pending.startTime,
     bypass_used: false,
+    retries: pending.retryCount ?? 0,
     error_type: 'DOWNLOAD_START_TIMEOUT',
   });
   sendStatusToTab(pending, 'error', DOWNLOAD_START_TIMEOUT_MESSAGE, 'DOWNLOAD_START_TIMEOUT');
@@ -149,6 +150,7 @@ export function startSingleAttempt(
           status: 'fail',
           duration_ms: Date.now() - pending.startTime,
           bypass_used: false,
+          retries: pending.retryCount ?? 0,
           error_type: 'BROWSER_START_FAIL_DIRECT',
         });
         void recordDownloadHistory(pending, 'failed', 'BROWSER_START_FAIL_DIRECT');
@@ -189,6 +191,7 @@ export function startNextDriveAttempt(pending: PendingDownload): void {
       status: 'fail',
       duration_ms: Date.now() - pending.startTime,
       bypass_used: false,
+      retries: pending.retryCount ?? 0,
       error_type: 'AUTH_ALL_FAILED',
     });
     void recordDownloadHistory(pending, 'failed', 'AUTH_ALL_FAILED');
@@ -342,6 +345,7 @@ export function handleDownloadRequest(
                 status: 'fail',
                 duration_ms: Date.now() - pending.startTime,
                 bypass_used: false,
+                retries: pending.retryCount ?? 0,
                 error_type: 'BROWSER_START_FAIL',
               });
               void recordDownloadHistory(pending, 'failed', 'BROWSER_START_FAIL');
