@@ -110,6 +110,16 @@ export function OptionsApp() {
       <p className="cqd-options-note">
         Everything here stays on your machine. Quick controls live in the toolbar popup.
       </p>
+      <button
+        type="button"
+        className="cqd-options-diag-link"
+        onClick={() => {
+          const browserApi = (globalThis as { chrome?: { tabs?: { create?: Function } } }).chrome;
+          browserApi?.tabs?.create?.({ url: 'diagnostics.html' });
+        }}
+      >
+        Diagnostics report
+      </button>
     </main>
   );
 }
