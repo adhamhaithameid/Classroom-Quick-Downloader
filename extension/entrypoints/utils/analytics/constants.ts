@@ -109,6 +109,14 @@ export const CHANGELOG_SITE_URL = `${WEBSITE_BASE_URL}/changelog`;
 export const UNINSTALL_SITE_URL = `${WEBSITE_BASE_URL}/uninstall`;
 export const TRACK_URL = WORKER_URL;
 
+// --- Remote Config ---
+
+// The remote config moves only when the dashboard owner updates it, so one
+// fetch per day per browser is plenty. This gate is what keeps /config from
+// dominating the Worker's free-plan request quota (~95% of traffic was these
+// uncached wake-driven fetches).
+export const CONFIG_REFRESH_MIN_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
 // --- Rate Limits ---
 
 export const MAX_DAILY_REQUESTS = 50;

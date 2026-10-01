@@ -95,3 +95,6 @@ website/prototype-*.html
 tests/simulator/certs/*.key
 tests/simulator/certs/*.csr
 tests/simulator/certs/*.srl
+
+# opencode tool state
+.opencode/
