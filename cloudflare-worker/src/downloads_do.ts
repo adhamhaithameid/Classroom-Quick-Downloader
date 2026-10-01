@@ -408,7 +408,10 @@ function cloneCounterMap(input: Record<string, number> | undefined): Record<stri
 }
 
 const CONFIG_VERSION = 2;
-const DEFAULT_DAILY_FLUSH_WINDOW_START_UTC = 23;
+// Flush just after the UTC daily reset (00:00): on the free plan the request
+// quota is typically exhausted by late evening, so a 23:00 flush always ran
+// into error 1027. 00:15 lands in a fresh quota window every day.
+const DEFAULT_DAILY_FLUSH_WINDOW_START_UTC = 0;
 const DEFAULT_DAILY_FLUSH_WINDOW_MINUTES = 120;
 const WEBSITE_EVENTS_BODY_LIMIT_BYTES = 128 * 1024;
 const WEBSITE_EVENTS_MAX_BATCH = 64;
@@ -3240,9 +3243,11 @@ export class DownloadsDurable {
     const now = Date.now();
     this.ensureRequestDay();
 
-    // Flush extension buffered events once daily at 23:00 UTC.
+    // Flush extension buffered events once daily at 00:15 UTC — shortly after
+    // the free-plan request quota resets at midnight, so the flush does not
+    // run into error 1027 on heavy-traffic days.
     const currentHour = new Date().getUTCHours();
-    if ((this.d.buffer.length > 0 || this.d.pendingBatches.length > 0) && currentHour === 23) {
+    if ((this.d.buffer.length > 0 || this.d.pendingBatches.length > 0) && currentHour === 0) {
       logEvent("info", "alarm_daily_flush", {
         bufferedEvents: this.d.buffer.length,
         pendingBatches: this.d.pendingBatches.length,
@@ -3250,8 +3255,8 @@ export class DownloadsDurable {
       await this.flushBufferToArchive(true);
     }
 
-    // Flush website telemetry queue once daily at 23:00 UTC.
-    if (this.d.websiteTelemetryQueue.length > 0 && currentHour === 23) {
+    // Flush website telemetry queue once daily at 00:15 UTC.
+    if (this.d.websiteTelemetryQueue.length > 0 && currentHour === 0) {
       await this.flushWebsiteTelemetryQueue({
         force: true,
         trigger: "daily_alarm",
@@ -3261,7 +3266,7 @@ export class DownloadsDurable {
 
     // Bound the archive: delete rows older than the retention window so D1
     // storage stays flat. Best-effort; shares the alarm's daily cadence.
-    if (this.env.SITE_CACHE_DB && currentHour === 23) {
+    if (this.env.SITE_CACHE_DB && currentHour === 0) {
       this.state.waitUntil(
         pruneArchive(this.env.SITE_CACHE_DB, REQUEST_HISTORY_DAYS).catch(() => {}),
       );
@@ -3317,13 +3322,15 @@ export class DownloadsDurable {
   }
 
   /**
-   * Schedule an alarm for the next 23:00 UTC daily flush.
+   * Schedule an alarm for the next 00:15 UTC daily flush — shortly after the
+   * free-plan request quota resets at midnight, so the flush lands in a fresh
+   * quota window instead of the always-exhausted 23:00 one.
    * Called after each alarm to ensure continuous scheduling.
    */
   private async scheduleNextMidnightAlarm(): Promise<void> {
     const now = new Date();
     const next = new Date(now);
-    next.setUTCHours(23, 0, 0, 0);
+    next.setUTCHours(0, 15, 0, 0);
     if (next.getTime() <= now.getTime()) {
       next.setUTCDate(next.getUTCDate() + 1);
     }
