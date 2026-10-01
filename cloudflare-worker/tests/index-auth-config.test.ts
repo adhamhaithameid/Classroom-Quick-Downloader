@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import worker from "../src/index";
+import { clearKvCacheForTests } from "../src/cache";
 import type { Env } from "../src/types";
 import { TEST_DO_SHARED_SECRET, TEST_DASHBOARD_PASSWORD, TEST_DANGER_PASSWORD } from "./helpers/dummy-secrets";
 
@@ -49,6 +50,11 @@ function extractCookie(setCookie: string | null): string {
 }
 
 describe("Worker auth config hardening", () => {
+  beforeEach(() => {
+    // The quota shield's memory cache is per-isolate — reset between cases.
+    clearKvCacheForTests();
+  });
+
   it("requires DASHBOARD_PASSWORD and does not fall back to DO_SHARED_SECRET", async () => {
     const env = mockEnv({ DASHBOARD_PASSWORD: undefined });
     const request = new Request("https://example.com/", {

@@ -203,8 +203,16 @@ jobs:
         # continue-on-error: Mozilla-side review/signing state can queue
         # unlisted versions beyond this job's control (tracked as bead
         # 0h4d.12.9); the two real-browser legs above stay blocking.
+        # QUOTA/FLOOD GATE (2026-09-30): every push used to create a fresh
+        # AMO version (1.8.0qa<N>), flooding the QA companion with
+        # auto-approved versions. The leg now runs only when explicitly
+        # requested: workflow_dispatch, or [amo-qa] in the commit message.
         continue-on-error: true
-        if: ${{ env.AMO_JWT_ISSUER != '' && env.AMO_JWT_SECRET != '' }}
+        if: >-
+          env.AMO_JWT_ISSUER != '' &&
+          env.AMO_JWT_SECRET != '' &&
+          (github.event_name == 'workflow_dispatch' ||
+           contains(github.event.head_commit.message, '[amo-qa]'))
         env:
           QA_SIGNED_XPI: ${{ github.workspace }}/extension/.output/signed.xpi
           # CI signs the self-distribution QA companion add-on

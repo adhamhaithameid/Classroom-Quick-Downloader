@@ -8,6 +8,7 @@ import type { StoreStatsSnapshot } from "./store-stats";
 import { computeTrends } from "./archive-trends";
 import type { TrendsSeries } from "./archive-trends";
 import { computeReliability } from "./reliability";
+import { cachedKvGet, withEdgeCache } from "./cache";
 import {
   createEmptyStoreHealthDoc,
   evaluateScrapeHealth,
@@ -2147,20 +2148,20 @@ async function proxyToDO(request: Request, env: WorkerEnv): Promise<Response> {
 // ---------------------------------------------------------------------------
 
 /**
- * Serve GET /config from the KV snapshot when possible (KV reads do not count
- * against the request budget). On KV miss, absent binding, or invalid JSON,
- * fall back to proxying the Durable Object, which stays the source of truth.
+ * Serve GET /config from the KV snapshot when possible. 0h4d quota shield:
+ * the read is memory-cached (60s TTL, stale-on-error) — this endpoint is
+ * polled by every extension install and was the largest KV-get consumer.
+ * On cache miss, absent binding, or invalid JSON, fall back to proxying the
+ * Durable Object, which stays the source of truth.
  */
 async function handleEdgeConfig(request: Request, env: WorkerEnv): Promise<Response> {
   let snapshot: Record<string, unknown> | null = null;
   try {
-    if (env.SITE_SNAPSHOT_KV) {
-      const raw = await env.SITE_SNAPSHOT_KV.get(ANALYTICS_CONFIG_KV_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as unknown;
-        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-          snapshot = parsed as Record<string, unknown>;
-        }
+    const raw = await cachedKvGet(env.SITE_SNAPSHOT_KV, ANALYTICS_CONFIG_KV_KEY, 60_000);
+    if (raw) {
+      const parsed = JSON.parse(raw) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        snapshot = parsed as Record<string, unknown>;
       }
     }
   } catch {
@@ -2178,7 +2179,9 @@ async function handleEdgeConfig(request: Request, env: WorkerEnv): Promise<Respo
           status: 200,
           headers: {
             "content-type": "application/json",
-            "cache-control": "no-store",
+            // Quota shield: a short browser max-age absorbs rapid per-install
+            // polls; serverTimeUtc drift correction tolerates 2 minutes.
+            "cache-control": "public, max-age=120",
           },
         },
       ),
@@ -2340,12 +2343,9 @@ async function handlePublicWebsiteDataRoute(request: Request, env: WorkerEnv): P
 }
 
 async function readSiteSnapshotCache(env: WorkerEnv): Promise<string | null> {
-  try {
-    if (!env.SITE_SNAPSHOT_KV) return null;
-    return await env.SITE_SNAPSHOT_KV.get(SITE_SNAPSHOT_KV_KEY);
-  } catch {
-    return null;
-  }
+  // 0h4d quota shield: memory-cached (60s TTL, stale-on-error) — this read
+  // sat on every site-visitor request and burned the daily KV budget.
+  return cachedKvGet(env.SITE_SNAPSHOT_KV, SITE_SNAPSHOT_KV_KEY, 60_000);
 }
 
 async function writeSiteSnapshotCache(env: WorkerEnv, payloadText: string): Promise<void> {
@@ -2474,10 +2474,10 @@ const SITE_PRIVACY_URL = "https://classroom-quick-downloader.adhamhaithameid.is-
 const SITE_FULL_PRIVACY_URL = `${PUBLIC_STORE_LINKS.github}/blob/main/PRIVACY.md`;
 
 async function readStoreStatsCache(env: WorkerEnv): Promise<StoreStatsSnapshot | null> {
+  // Quota shield: 5-minute memory cache (stats refresh on a 3-hour cron).
+  const raw = await cachedKvGet(env.SITE_SNAPSHOT_KV, STORE_STATS_KV_KEY, 300_000);
+  if (!raw) return null;
   try {
-    if (!env.SITE_SNAPSHOT_KV) return null;
-    const raw = await env.SITE_SNAPSHOT_KV.get(STORE_STATS_KV_KEY);
-    if (!raw) return null;
     const parsed = JSON.parse(raw) as StoreStatsSnapshot | null;
     if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.browsers)) return null;
     return parsed;
@@ -2500,10 +2500,10 @@ async function writeStoreStatsCache(env: WorkerEnv, stats: StoreStatsSnapshot): 
 }
 
 async function readStoreHealth(env: WorkerEnv): Promise<StoreHealthDoc> {
+  // Quota shield: 5-minute memory cache.
+  const raw = await cachedKvGet(env.SITE_SNAPSHOT_KV, STORE_HEALTH_KV_KEY, 300_000);
+  if (!raw) return createEmptyStoreHealthDoc();
   try {
-    if (!env.SITE_SNAPSHOT_KV) return createEmptyStoreHealthDoc();
-    const raw = await env.SITE_SNAPSHOT_KV.get(STORE_HEALTH_KV_KEY);
-    if (!raw) return createEmptyStoreHealthDoc();
     const parsed = JSON.parse(raw) as StoreHealthDoc;
     if (!parsed || typeof parsed !== "object" || typeof parsed.stores !== "object") {
       return createEmptyStoreHealthDoc();
@@ -2526,10 +2526,10 @@ async function writeStoreHealth(env: WorkerEnv, doc: StoreHealthDoc): Promise<vo
 }
 
 async function readTrendsKv(env: WorkerEnv): Promise<TrendsSeries | null> {
+  // Quota shield: 5-minute memory cache.
+  const raw = await cachedKvGet(env.SITE_SNAPSHOT_KV, TRENDS_KV_KEY, 300_000);
+  if (!raw) return null;
   try {
-    if (!env.SITE_SNAPSHOT_KV) return null;
-    const raw = await env.SITE_SNAPSHOT_KV.get(TRENDS_KV_KEY);
-    if (!raw) return null;
     const parsed = JSON.parse(raw) as TrendsSeries | null;
     if (!parsed || !Array.isArray(parsed.daily)) return null;
     return parsed;
@@ -2653,10 +2653,10 @@ async function refreshStoreStats(
 }
 
 async function readStoreReviewsCache(env: WorkerEnv): Promise<StoreReviewsSnapshot | null> {
+  // Quota shield: 5-minute memory cache.
+  const raw = await cachedKvGet(env.SITE_SNAPSHOT_KV, STORE_REVIEWS_KV_KEY, 300_000);
+  if (!raw) return null;
   try {
-    if (!env.SITE_SNAPSHOT_KV) return null;
-    const raw = await env.SITE_SNAPSHOT_KV.get(STORE_REVIEWS_KV_KEY);
-    if (!raw) return null;
     const parsed = JSON.parse(raw) as StoreReviewsSnapshot | null;
     if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.reviews)) return null;
     return parsed;
@@ -3180,7 +3180,8 @@ export default {
       return handleSiteV1Snapshot(request, env);
     }
     if (pathname === "/api/public/website/snapshot") {
-      return handleSiteV1Snapshot(request, env);
+      // Quota shield: edge-cached 120s — every site visitor hits this.
+      return withEdgeCache(request, 120, () => handleSiteV1Snapshot(request, env));
     }
 
     if (pathname === "/api/site/v1/privacy") {
@@ -3244,16 +3245,21 @@ export default {
 
     // Public endpoints (no auth required)
     if (pathname === "/config" && request.method === "GET") {
-      return handleEdgeConfig(request, env);
+      // Quota shield: edge-cached 120s (public CORS = ACAO *, safe to share);
+      // browser max-age lets each install's fetch cache absorb rapid polls.
+      return withEdgeCache(request, 120, () => handleEdgeConfig(request, env));
     }
     if (
       (pathname === "/health" && request.method === "GET") ||
       (pathname === "/pipeline-health" && request.method === "GET") ||
-      (pathname === "/public/site-metrics" && request.method === "GET") ||
       (pathname === "/changelog" && request.method === "GET") ||
       (pathname === "/track" && request.method === "POST")
     ) {
       return proxyToDO(request, env);
+    }
+    if (pathname === "/public/site-metrics" && request.method === "GET") {
+      // Quota shield: edge-cached 300s — this is the website's hottest poll.
+      return withEdgeCache(request, 300, () => proxyToDO(request, env));
     }
 
     // Admin endpoints (require session OR X-Admin-Secret - session injects secret for DO)
