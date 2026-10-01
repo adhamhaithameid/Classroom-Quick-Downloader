@@ -60,7 +60,7 @@ export async function cachedKvGet(
   if (pending) return pending;
 
   const flight = (async (): Promise<string | null> => {
-    let value: string | null = null;
+    let value: string | null;
     try {
       value = kv ? await kv.get(key) : null;
     } catch {
@@ -92,6 +92,15 @@ export async function cachedKvGet(
   }
 }
 
+/** The worker runtime's CacheStorage has `default`; the DOM type does not. */
+function defaultCache(): Cache | null {
+  try {
+    return (caches as unknown as { default?: Cache }).default ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Edge-cache wrapper for expensive public GETs: on a `caches.default` hit the
  * producer never runs (no DO fetch, no KV reads); on a miss the produced
@@ -104,13 +113,7 @@ export async function withEdgeCache(
   produce: () => Promise<Response>,
 ): Promise<Response> {
   if (request.method !== "GET") return produce();
-  let cache: Cache | null = null;
-  try {
-    // The worker runtime's CacheStorage has `default`; the DOM type does not.
-    cache = (caches as unknown as { default?: Cache }).default ?? null;
-  } catch {
-    cache = null;
-  }
+  const cache = defaultCache();
   const url = new URL(request.url);
   const cacheKey = new Request(url.toString(), { method: "GET" });
 
