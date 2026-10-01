@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import worker from '../src/index';
+import { clearKvCacheForTests } from '../src/cache';
 import type { Env } from '../src/types';
 import { TEST_DASHBOARD_PASSWORD, TEST_DANGER_PASSWORD, TEST_SHARED_SECRET } from "./helpers/dummy-secrets";
 
@@ -31,6 +32,12 @@ function createEnv(overrides: Partial<Env> = {}): Env {
 }
 
 describe('cloudflare worker smoke tests', () => {
+  beforeEach(() => {
+    // The quota shield's memory cache is per-isolate — reset between cases
+    // so snapshot pipeline tests exercise fresh KV behavior.
+    clearKvCacheForTests();
+  });
+
   it(
     'returns healthy payload for /health and exposes /public/site-metrics',
     async () => {

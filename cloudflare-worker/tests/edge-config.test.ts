@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import worker from "../src/index";
+import { clearKvCacheForTests } from "../src/cache";
 import { DownloadsDurable } from "../src/downloads_do";
 import type { Env as WorkerEnv } from "../src/types";
 import type { Env as DownloadsEnv } from "../src/downloads_do";
@@ -36,6 +37,12 @@ function makeWorkerEnv(kv: unknown, doFetch: (input: RequestInfo | URL) => Promi
 }
 
 describe("Worker edge /config serving", () => {
+  beforeEach(() => {
+    // The quota shield's memory cache persists across tests in one isolate —
+    // clear it so each case exercises its own KV stub.
+    clearKvCacheForTests();
+  });
+
   it("serves GET /config from KV with fresh serverTimeUtc and without calling the DO", async () => {
     const { kv } = makeKvMock({
       [ANALYTICS_CONFIG_KV_KEY]: JSON.stringify({
@@ -57,7 +64,8 @@ describe("Worker edge /config serving", () => {
     const body = await res.json() as Record<string, unknown>;
 
     expect(res.status).toBe(200);
-    expect(res.headers.get("cache-control")).toBe("no-store");
+    // Quota shield: short browser max-age absorbs rapid per-install polls.
+    expect(res.headers.get("cache-control")).toBe("public, max-age=120");
     expect(res.headers.get("content-type")).toContain("application/json");
     // CORS applied the same way the DO proxy path applies it (public route).
     expect(res.headers.get("access-control-allow-origin")).toBe("*");
