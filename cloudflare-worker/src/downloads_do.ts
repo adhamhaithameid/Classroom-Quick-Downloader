@@ -3329,10 +3329,12 @@ export class DownloadsDurable {
     }
 
     const alarmTime = next.getTime();
-    
-    // Only set if no alarm is scheduled or if this is earlier
+
+    // Only set if no alarm is scheduled, if this is earlier, or if the stored
+    // alarm is already in the past (fired or missed) — a stale past alarm must
+    // never block re-arming, or the flush pipeline deadlocks forever.
     const currentAlarm = await this.state.storage.getAlarm();
-    if (!currentAlarm || currentAlarm > alarmTime) {
+    if (!currentAlarm || currentAlarm < Date.now() || currentAlarm > alarmTime) {
       await this.state.storage.setAlarm(alarmTime);
       logEvent("info", "alarm_scheduled_next_daily_flush", { at: next.toISOString() });
     }
