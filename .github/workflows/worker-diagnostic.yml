@@ -23,39 +23,48 @@ jobs:
           DO_SHARED_SECRET: ${{ secrets.DO_SHARED_SECRET }}
         run: |
           set -euo pipefail
-          if [ -z "${DO_SHARED_SECRET:-}" ]; then
-            echo "::error::DO_SHARED_SECRET not configured"
-            exit 1
-          fi
           echo "## pipeline-health (public)" >> "$GITHUB_STEP_SUMMARY"
           curl -sS --max-time 20 "${WORKER_BASE_URL%/}/pipeline-health" | tee /tmp/health.json
           echo >> "$GITHUB_STEP_SUMMARY"
-          echo "## /stats (admin) — pipeline + retry state only" >> "$GITHUB_STEP_SUMMARY"
-          code="$(curl -sS --max-time 20 -o /tmp/stats.json -w "%{http_code}" \
-            -H "X-Admin-Secret: ${DO_SHARED_SECRET}" \
-            "${WORKER_BASE_URL%/}/stats" || true)"
-          echo "stats HTTP ${code}"
-          if [ "${code}" != "200" ]; then
-            echo "::error::/stats returned HTTP ${code}; cannot read retry state"
-            exit 1
+
+          if [ -n "${DO_SHARED_SECRET:-}" ]; then
+            code="$(curl -sS --max-time 20 -o /tmp/stats.json -w "%{http_code}" \
+              -H "X-Admin-Secret: ${DO_SHARED_SECRET}" \
+              "${WORKER_BASE_URL%/}/stats" || true)"
+            echo "stats HTTP ${code}"
+            if [ "${code}" = "200" ]; then
+              echo "## /stats (admin) — pipeline + retry state only" >> "$GITHUB_STEP_SUMMARY"
+              node -e '
+                const fs = require("fs");
+                const d = JSON.parse(fs.readFileSync("/tmp/stats.json", "utf8"));
+                const out = {
+                  retryState: d.retryState ?? null,
+                  pipeline: d.pipeline ?? null,
+                  topKeys: Object.keys(d),
+                };
+                fs.writeFileSync(process.env.GITHUB_STEP_SUMMARY, "```json\n" + JSON.stringify(out, null, 2) + "\n```\n");
+              '
+            else
+              echo "::warning::/stats returned HTTP ${code}; retry state unavailable (is DO_SHARED_SECRET the deployed value?)"
+            fi
+          else
+            echo "::warning::DO_SHARED_SECRET secret not configured; retry state unavailable. Add it (value = deployed DO_SHARED_SECRET from wrangler secrets) to enable /stats diagnostics."
           fi
-          node -e '
+
+      - name: Query event archive directly (D1)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          echo "## D1 event_archive — last 5 archived batches" >> "$GITHUB_STEP_SUMMARY"
+          npx --yes wrangler@latest d1 execute SITE_CACHE_DB --remote --json \
+            --command "SELECT batch_id, kind, event_count, weighted_count, archived_at_utc FROM event_archive ORDER BY archived_at_utc DESC LIMIT 5" \
+            > /tmp/d1-last.json 2>/tmp/d1-error.txt \
+          && node -e '
             const fs = require("fs");
-            const d = JSON.parse(fs.readFileSync("/tmp/stats.json", "utf8"));
-            const pick = (o) => ({
-              lastFlushAt: o.lastFlushAt ?? null,
-              lastEventAt: o.lastEventAt ?? null,
-              committedSeq: o.committedSeq ?? null,
-              bufferSize: o.bufferSize ?? null,
-              pendingBatches: o.pendingBatches ?? null,
-              oldestPendingAgeMs: o.oldestPendingAgeMs ?? null,
-              retryState: o.retryState ?? null,
-              archiveStats: o.archiveStats ?? null,
-            });
-            const out = {
-              retryState: d.retryState ?? null,
-              pipeline: d.pipeline ? pick(d.pipeline) : null,
-              topKeys: Object.keys(d),
-            };
-            fs.writeFileSync(process.env.GITHUB_STEP_SUMMARY, "```json\n" + JSON.stringify(out, null, 2) + "\n```\n");
-          '
+            const d = JSON.parse(fs.readFileSync("/tmp/d1-last.json", "utf8"));
+            const rows = Array.isArray(d) ? d[0]?.results : d.results;
+            fs.writeFileSync(process.env.GITHUB_STEP_SUMMARY, "```json\n" + JSON.stringify(rows, null, 2) + "\n```\n");
+          ' \
+          || echo "::warning::D1 query failed: $(head -c 200 /tmp/d1-error.txt)"
