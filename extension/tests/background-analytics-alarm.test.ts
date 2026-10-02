@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type AlarmName = 'CQD_ANALYTICS_FLUSH' | 'CQD_ANALYTICS_CONFIG' | 'CQD_CHANGELOG_DAILY';
-
 async function loadAlarmModule(isFirefox = false) {
   vi.resetModules();
   const flushSpy = vi.fn();
@@ -40,36 +39,31 @@ describe('background analytics alarm', () => {
   });
 
   it('initializes analytics alarms once and dispatches alarm handlers', async () => {
-    const { mod, flushSpy, refreshSpy, fetchChangelogSpy } = await loadAlarmModule(false);
+    const { mod, flushSpy, fetchChangelogSpy } = await loadAlarmModule(false);
     const addListener = (chrome as any).alarms.onAlarm.addListener as ReturnType<typeof vi.fn>;
     mod.ensureAnalyticsAlarm();
     mod.ensureAnalyticsAlarm();
 
-    expect((chrome as any).alarms.create).toHaveBeenCalledTimes(3);
+    expect((chrome as any).alarms.create).toHaveBeenCalledTimes(2);
     expect((chrome as any).alarms.create).toHaveBeenNthCalledWith(1, 'CQD_ANALYTICS_FLUSH', { periodInMinutes: 5 });
-    expect((chrome as any).alarms.create).toHaveBeenNthCalledWith(2, 'CQD_ANALYTICS_CONFIG', { periodInMinutes: 1440 });
-    expect((chrome as any).alarms.create).toHaveBeenNthCalledWith(3, 'CQD_CHANGELOG_DAILY', expect.objectContaining({ periodInMinutes: 1440 }));
+    expect((chrome as any).alarms.create).toHaveBeenNthCalledWith(2, 'CQD_CHANGELOG_DAILY', expect.objectContaining({ periodInMinutes: 1440 }));
     expect(addListener).toHaveBeenCalledTimes(1);
 
     const listener = addListener.mock.calls[0]?.[0] as (alarm: { name: AlarmName }) => void;
     listener({ name: 'CQD_ANALYTICS_FLUSH' });
     expect(flushSpy).toHaveBeenCalledTimes(1);
-    listener({ name: 'CQD_ANALYTICS_CONFIG' });
-    await Promise.resolve();
-    expect(refreshSpy).toHaveBeenCalledTimes(1);
     listener({ name: 'CQD_CHANGELOG_DAILY' });
     await Promise.resolve();
     expect(fetchChangelogSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('creates the config refresh alarm with a daily period', async () => {
+  it('never schedules a remote-config alarm on the free model', async () => {
     const { mod } = await loadAlarmModule(false);
     mod.ensureAnalyticsAlarm();
 
     const create = (chrome as any).alarms.create as ReturnType<typeof vi.fn>;
     const configCall = create.mock.calls.find((call) => call[0] === 'CQD_ANALYTICS_CONFIG');
-    expect(configCall).toBeDefined();
-    expect(configCall?.[1]).toEqual({ periodInMinutes: 1440 });
+    expect(configCall).toBeUndefined();
   });
 
   it('no-ops when alarms API is unavailable', async () => {

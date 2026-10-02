@@ -40,7 +40,7 @@ import {
   startSingleAttempt,
   startDownloadWithTimeout,
 } from './download-handler';
-import { Analytics, refreshRemoteAnalyticsConfig, recordDownloadEvent } from '../utils/analytics';
+import { Analytics, recordDownloadEvent } from '../utils/analytics';
 import { installRuntimeErrorReporting } from '../utils/analytics/runtime-errors';
 import { buildUninstallUrl } from '../utils/analytics/flush';
 import { loadStats } from '../utils/analytics/storage';
@@ -139,7 +139,9 @@ export default defineBackground(() => {
   // Report unhandled background errors as runtime_error analytics events
   // (rate-capped, signature-only; see utils/analytics/runtime-errors.ts).
   installRuntimeErrorReporting();
-  refreshRemoteAnalyticsConfig().catch(() => {});
+  // Free model: no remote-config fetch. /config dominated the Worker's API
+  // traffic (~95%) and exhausted its free-plan quota daily. Re-introduce
+  // refreshRemoteAnalyticsConfig() behind a Pro entitlement gate.
   // Startup catch-up: the flush decision gates everything, so this is safe and
   // idempotent (no-op unless a trigger is due, e.g. weekly slot catch-up).
   // W3: once the flush resolves, rebuild the uninstall URL so it carries the
