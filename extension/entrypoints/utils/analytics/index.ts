@@ -5,7 +5,7 @@
  */
 
 import type { AnalyticsEvent, RecordDownloadEventInput, AnalyticsConfig } from './types';
-import { DEFAULT_CONFIG, CONFIG_URL } from './constants';
+import { DEFAULT_CONFIG, CONFIG_URL, CONFIG_REFRESH_MIN_INTERVAL_MS } from './constants';
 import { detectBrowser, detectOS, detectLanguage, getExtensionVersion, generateEventId } from './detection';
 import { loadQueue, saveQueue, loadConfig, saveConfig, loadStats, loadMeta, saveMeta } from './storage';
 import { internalFlush, updateLocalStats, getSafeUtcNowMs } from './flush';
@@ -160,9 +160,19 @@ export function recordDownloadEvent(input: RecordDownloadEventInput): void {
 
 /**
  * Fetch and update config from Cloudflare Worker.
+ *
+ * The config essentially never changes (it moves only when the dashboard
+ * owner presses update), but this used to run on EVERY service-worker wake —
+ * hundreds of requests per browser per day, which alone exceeded the
+ * Worker's free-plan quota. A local staleness gate now caps it at one fetch
+ * per day; a failed fetch is not recorded, so the next wake retries.
  */
 export async function refreshRemoteAnalyticsConfig(): Promise<void> {
   if (!CONFIG_URL) return;
+
+  const meta = await loadMeta();
+  const sinceLastFetch = Date.now() - (meta.lastConfigFetchAt ?? 0);
+  if (sinceLastFetch < CONFIG_REFRESH_MIN_INTERVAL_MS) return;
 
   try {
     const resp = await fetch(CONFIG_URL);
@@ -229,6 +239,11 @@ export async function refreshRemoteAnalyticsConfig(): Promise<void> {
       nextMeta = { ...nextMeta, lastCommittedSeq: nextCommitted };
       metaChanged = true;
     }
+
+    // Record the successful fetch last: early returns above leave the gate
+    // open so the next wake retries after a failed request.
+    nextMeta = { ...nextMeta, lastConfigFetchAt: Date.now() };
+    metaChanged = true;
 
     if (metaChanged) {
       await saveMeta(nextMeta);

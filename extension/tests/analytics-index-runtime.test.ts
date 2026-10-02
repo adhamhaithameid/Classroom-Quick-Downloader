@@ -159,6 +159,51 @@ describe('analytics runtime index', () => {
     const savedMeta = saveMeta.mock.calls.at(-1)?.[0] as AnalyticsMeta;
     expect((savedMeta.lastCommittedSeq ?? 0) >= 20).toBe(true);
     expect(typeof savedMeta.serverTimeOffsetMs).toBe('number');
+    expect(typeof savedMeta.lastConfigFetchAt).toBe('number');
+  });
+
+  it('refreshRemoteAnalyticsConfig fetches at most once per day (staleness gate)', async () => {
+    const fetchMock = vi.mocked(fetch);
+    // Fresh meta: gate open, first call fetches and records the timestamp.
+    const state: RuntimeState = {
+      queue: [],
+      cfg: baseConfig(),
+      meta: { lastFlushAt: null, nextRetryAt: null, backoffIndex: 0 },
+    };
+    const { mod, saveConfig, saveMeta } = await loadAnalyticsRuntime(state);
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, batchSize: 100 }), { status: 200 }));
+    await mod.refreshRemoteAnalyticsConfig();
+    expect(saveConfig).toHaveBeenCalledTimes(1);
+    const savedMeta = saveMeta.mock.calls.at(-1)?.[0] as AnalyticsMeta;
+    expect(typeof savedMeta.lastConfigFetchAt).toBe('number');
+
+    // Second immediate call: inside the 24h window, no fetch, no save.
+    fetchMock.mockClear();
+    saveConfig.mockClear();
+    saveMeta.mockClear();
+    await mod.refreshRemoteAnalyticsConfig();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(saveConfig).not.toHaveBeenCalled();
+    expect(saveMeta).not.toHaveBeenCalled();
+  });
+
+  it('a failed config fetch does not arm the staleness gate (next wake retries)', async () => {
+    const state: RuntimeState = {
+      queue: [],
+      cfg: baseConfig(),
+      meta: { lastFlushAt: null, nextRetryAt: null, backoffIndex: 0 },
+    };
+    const { mod, saveConfig, saveMeta } = await loadAnalyticsRuntime(state);
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('fail', { status: 500 }));
+    await mod.refreshRemoteAnalyticsConfig();
+    expect(saveMeta).not.toHaveBeenCalled();
+
+    // Gate stayed open: the next wake fetches again.
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, batchSize: 100 }), { status: 200 }));
+    await mod.refreshRemoteAnalyticsConfig();
+    expect(saveConfig).toHaveBeenCalledTimes(1);
+    const savedMeta = saveMeta.mock.calls.at(-1)?.[0] as AnalyticsMeta;
+    expect(typeof savedMeta.lastConfigFetchAt).toBe('number');
   });
 
   it('refreshRemoteAnalyticsConfig tolerates network and payload failures', async () => {

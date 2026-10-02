@@ -87,6 +87,8 @@ export interface AnalyticsMeta {
   lastWeeklyFlushSlotKey?: string | null;
   weeklyOffsetSlotKey?: string | null;
   weeklyOffsetMinutes?: number | null;
+  /** Timestamp of the last successful remote-config fetch (staleness gate). */
+  lastConfigFetchAt?: number | null;
 }
 
 export interface RateLimitState {
