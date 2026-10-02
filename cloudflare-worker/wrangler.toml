@@ -50,5 +50,8 @@ compatibility_date = "2024-12-01"
   persist = true
 
 [triggers]
-  # Runs every 3 hours (0:00, 3:00, 6:00, ...)
-  crons = ["0 1-22/3 * * *"]
+  # Hourly: the worker's own hour-sets gate each job. The snapshot/trends/
+  # scrape-alert set fires at hours {0,3,6,...} and the telemetry-export set
+  # at {1,4,7,...} — a 3-hour cron could only ever satisfy one of the two,
+  # which left the snapshot side dead for months.
+  crons = ["0 * * * *"]
