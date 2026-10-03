@@ -349,6 +349,32 @@ describe('CQD_RUN_DOWNLOAD_ALL shortcut (v2 hotkey path)', () => {
     expect(getRunFor('post-1')).toBeUndefined();
   });
 
+  it('runs a group with fewer single buttons than the decision count (eligibility is not a DOM census)', () => {
+    // The button's eligibility comes from the placement DECISION (recorded
+    // on the group button as data-cqd-group-count), not from counting
+    // .cqd-download-btn nodes — a collapsed or mid-render post can hold a
+    // placed group button while its single buttons are absent, and the
+    // hotkey must reach the same run path the button click uses.
+    const { group, files } = makePost(2, 'post-1');
+    files[1].remove(); // only ONE single button reachable now
+
+    expect(handleRunDownloadAllRequest()).toBe(true);
+    expect(getRunFor('post-1')).toBeDefined();
+    expect(requested).toHaveLength(1); // the reachable file enters the run
+    expect(group.isConnected).toBe(true);
+  });
+
+  it('skips a group whose decision count is below the threshold (mixed-post regression)', () => {
+    // A post whose downloadable-attachment count is 1 never gets a group
+    // decision in production; a stale/hand-made count="1" button must not
+    // be hotkey-runnable (V1: 1 registered file < MIN_FILES_FOR_DOWNLOAD_ALL).
+    makePost(1, 'post-1');
+
+    expect(handleRunDownloadAllRequest()).toBe(false);
+    expect(requested).toHaveLength(0);
+    expect(getRunFor('post-1')).toBeUndefined();
+  });
+
   it('skips a busy group and does not restart it', () => {
     const { group } = makePost(2, 'post-1');
     handleDownloadAllClickV2('post-1', group);

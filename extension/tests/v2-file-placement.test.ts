@@ -577,10 +577,14 @@ describe('File Placement: collapsed classwork keeps Download All (bug 2.1)', () 
     expect(all[0].targetElement).toBe(menu);
   });
 
-  it('download-all decision counts link attachments (V1 grouping parity)', () => {
-    // 1 Drive file + 1 link attachment (YouTube). Discovery only yields the
-    // Drive file, but the group decision must see BOTH attachment nodes —
-    // a post mixing kinds still gets its Download All button.
+  it('mixed post (1 Drive + 1 link) stays below the threshold — V1 skips non-downloadable attachments', () => {
+    // V1 evidence: single download buttons exist ONLY for Drive/Docs URLs
+    // (entrypoints/content/observers.ts injectSingleFileButtons gated by
+    // state.ts DRIVE_URL_PATTERNS — "External links never get download
+    // buttons"), and V1's group machine counts registered single buttons
+    // only (download_all.content.ts registerSingleButton + the >=2 gate).
+    // So a post mixing 1 Drive file and 1 external link gets NO Download
+    // All button in V1: the link is invisible to the group machine.
     const drive = mockFile('linkMixA_20chars_pad');
     const postEl = document.createElement('div');
     postEl.setAttribute('data-stream-item-id', 'link-mix-1');
@@ -612,12 +616,122 @@ describe('File Placement: collapsed classwork keeps Download All (bug 2.1)', () 
     const decisions = computePlacement(post, ViewKind.STREAM);
 
     const all = decisions.filter((d) => d.fileId === 'download-all:link-mix-1');
-    expect(all).toHaveLength(1);
+    expect(all).toHaveLength(0);
 
     // Single-download placement must NOT change: still only the Drive file.
     const single = decisions.filter((d) => !d.fileId.startsWith('download-all:'));
     expect(single).toHaveLength(1);
     expect(single[0].fileId).toBe(drive.canonicalId);
+  });
+
+  it('link/video attachments do not inflate the count on an above-threshold post', () => {
+    // 2 downloadable Drive attachments + 1 YouTube chip: the decision's
+    // attachmentCount is the DOWNLOADABLE set (2), not the raw attachment
+    // node set (3) — the "N files" label and the run stay in agreement
+    // (V1's group counts exactly what it can download).
+    const postEl = document.createElement('div');
+    postEl.setAttribute('data-stream-item-id', 'link-mix-2');
+    const files = [mockFile('linkMixB_20chars_pad'), mockFile('linkMixC_20chars_pad')];
+    for (const f of files) {
+      const chip = document.createElement('div');
+      chip.className = 'KlRXdf';
+      chip.appendChild(f.element);
+      postEl.appendChild(chip);
+    }
+
+    const video = document.createElement('a');
+    video.href = 'https://www.youtube.com/watch?v=cqd-test';
+    video.setAttribute('aria-label', 'Attachment: Lecture video');
+    const videoChip = document.createElement('div');
+    videoChip.className = 'KlRXdf';
+    videoChip.appendChild(video);
+    postEl.appendChild(videoChip);
+
+    document.body.appendChild(postEl);
+
+    const post: ScannedPost = {
+      id: 'link-mix-2',
+      element: postEl,
+      fingerprint: 'link-mix-2',
+      files,
+      isExpanded: true,
+      isConnected: true,
+    };
+
+    const decisions = computePlacement(post, ViewKind.STREAM);
+    const all = decisions.filter((d) => d.fileId === 'download-all:link-mix-2');
+    expect(all).toHaveLength(1);
+    expect(all[0].attachmentCount).toBe(2);
+  });
+
+  it('download-all decision still counts downloadable attachment nodes discovery misses', () => {
+    // 1 discovered Drive file + 1 chip whose Classroom drive-proxy anchor
+    // discovery cannot canonicalize (no /d/<id> in the href, no drive-id
+    // data attribute). V1 downloads it (DRIVE_URL_PATTERNS matches
+    // classroom.google.com/drive/), so the threshold holds and the decision
+    // carries the true downloadable count.
+    const drive = mockFile('missMixA_20chars_pad');
+    const postEl = document.createElement('div');
+    postEl.setAttribute('data-stream-item-id', 'link-mix-3');
+
+    const driveChip = document.createElement('div');
+    driveChip.className = 'KlRXdf';
+    driveChip.appendChild(drive.element);
+    postEl.appendChild(driveChip);
+
+    const proxyChip = document.createElement('div');
+    proxyChip.setAttribute('data-attachment-id', 'att-1');
+    const proxy = document.createElement('a');
+    proxy.href = 'https://classroom.google.com/drive/attachment/abc123';
+    proxy.textContent = 'Slides.pdf';
+    proxyChip.appendChild(proxy);
+    postEl.appendChild(proxyChip);
+
+    document.body.appendChild(postEl);
+
+    const post: ScannedPost = {
+      id: 'link-mix-3',
+      element: postEl,
+      fingerprint: 'link-mix-3',
+      files: [drive],
+      isExpanded: true,
+      isConnected: true,
+    };
+
+    const decisions = computePlacement(post, ViewKind.STREAM);
+    const all = decisions.filter((d) => d.fileId === 'download-all:link-mix-3');
+    expect(all).toHaveLength(1);
+    expect(all[0].attachmentCount).toBe(2);
+  });
+
+  it('a post with only link/video attachments gets no Download All decision', () => {
+    const postEl = document.createElement('div');
+    postEl.setAttribute('data-stream-item-id', 'links-only-1');
+
+    for (const url of ['https://www.youtube.com/watch?v=a', 'https://example.com/doc']) {
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('aria-label', 'Attachment: something');
+      const chip = document.createElement('div');
+      chip.className = 'KlRXdf';
+      chip.appendChild(link);
+      postEl.appendChild(chip);
+    }
+
+    document.body.appendChild(postEl);
+
+    const post: ScannedPost = {
+      id: 'links-only-1',
+      element: postEl,
+      fingerprint: 'links-only-1',
+      files: [],
+      isExpanded: true,
+      isConnected: true,
+    };
+
+    const decisions = computePlacement(post, ViewKind.STREAM);
+    expect(decisions.filter((d) => d.fileId.startsWith('download-all:'))).toHaveLength(0);
+    expect(decisions).toHaveLength(0);
   });
 
   it('plain page links without attachment signals do not trigger the decision', () => {

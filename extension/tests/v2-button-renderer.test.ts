@@ -374,6 +374,24 @@ describe('Button Renderer: Download All', () => {
     expect(subEl!.textContent).toBe('3 files');
   });
 
+  it('labels the group with the decision attachment count when present (label == decision)', () => {
+    // Follow-up to bug 2.1: the decision threshold counts DOWNLOADABLE
+    // attachment nodes; the "N files" label must show that same number —
+    // not discovery's file list, which can be smaller (V1's group button
+    // reports exactly the set its group machine will download).
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    const files = [mockFile('labelCount1_20chars')];
+    const decision = { ...mockDecision('download-all:post-4', target), attachmentCount: 2 };
+
+    const btn = renderDownloadAllButton(decision, files);
+
+    expect(btn!.querySelector('.cqd-download-all-sub')?.textContent).toBe('2 files');
+    expect(btn!.dataset.cqdGroupCount).toBe('2');
+    expect(btn!.getAttribute('aria-label')).toBe('Download all 2 files');
+    expect(btn!.title).toBe('Download All (2 files)');
+  });
+
   it('Download All button is idempotent', () => {
     const target = document.createElement('div');
     document.body.appendChild(target);

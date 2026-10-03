@@ -347,10 +347,14 @@ export function renderDownloadAllButton(
   // Clone the Download All template
   const btn = getDownloadAllTemplate().cloneNode(true) as HTMLButtonElement;
 
-  // Set attributes
+  // Set attributes. The count shown is the DOWNLOADABLE-attachment count the
+  // decision threshold used (V1 parity: the group button reports exactly the
+  // set its group machine counts) — falling back to discovery's file list
+  // for decisions that predate attachmentCount.
+  const count = decision.attachmentCount ?? files.length;
   btn.setAttribute(getFileIdAttr(), decision.fileId);
-  btn.setAttribute('aria-label', `Download all ${files.length} files`);
-  btn.title = `Download All (${files.length} files)`;
+  btn.setAttribute('aria-label', `Download all ${count} files`);
+  btn.title = `Download All (${count} files)`;
 
   // Add extra class from recipe if specified
   for (const code of decision.reasonCodes) {
@@ -361,10 +365,11 @@ export function renderDownloadAllButton(
   // Seed the group sub-text with the file count (V1 parity: "N files")
   const subEl = btn.querySelector('.cqd-download-all-sub');
   if (subEl) {
-    subEl.textContent = `${files.length} ${files.length === 1 ? 'file' : 'files'}`;
+    subEl.textContent = `${count} ${count === 1 ? 'file' : 'files'}`;
   }
-  // The group machine's reset restores the idle sub-text from this count.
-  btn.dataset.cqdGroupCount = String(files.length);
+  // The group machine's reset restores the idle sub-text from this count —
+  // and the hotkey reads it as the decision's eligibility record.
+  btn.dataset.cqdGroupCount = String(count);
 
   // Apply dark mode
   if (isDark) {

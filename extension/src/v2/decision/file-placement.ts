@@ -42,6 +42,7 @@ import {
   type InsertionPoint,
   getRecipe,
 } from './placement-recipes';
+import { validateDownloadUrl } from './download-validator';
 
 // Import the ScannedPost and ScannedFile types from dom-scanner
 import type { ScannedPost, ScannedFile } from '../model/dom-scanner';
@@ -174,15 +175,17 @@ export function computePlacement(
     }
   }
 
-  // Compute Download All placement if enough files. The threshold counts ALL
-  // attachment nodes in the post — discovery only yields Drive/Docs anchors,
-  // so a post mixing link/video attachments would otherwise fall below the
-  // >=2 threshold (bug 2.1). max() guarantees the threshold never counts FEWER
-  // files than discovery did.
-  if (
-    Math.max(post.files.length, countAttachmentNodes(post)) >=
-    recipe.downloadAll.minFilesForDownloadAll
-  ) {
+  // Compute Download All placement if enough files. The threshold counts
+  // DOWNLOADABLE attachment nodes in the post — V1's group machine counts
+  // registered single buttons only, and V1 injects those for Drive/Docs
+  // targets alone ("External links never get download buttons",
+  // entrypoints/content/state.ts). So a post mixing link/video attachments
+  // with fewer downloadable ones stays below the >=2 threshold, exactly like
+  // V1 — and the run, label, and hotkey all act on that same set.
+  // max() guarantees the threshold never counts FEWER files than discovery
+  // did (nested-merge can drop a discovered file nested inside another chip).
+  const attachmentCount = Math.max(post.files.length, countAttachmentNodes(post));
+  if (attachmentCount >= recipe.downloadAll.minFilesForDownloadAll) {
     const downloadAllId = `download-all:${post.id}`;
 
     if (!isAlreadyPlaced(downloadAllId, post.element)) {
@@ -200,6 +203,9 @@ export function computePlacement(
         confidence: anchor.confidence,
         reasonCodes: buildReasonCodes(anchor, 'download-all', recipe),
         fallbackUsed: anchor.isFallback,
+        // The "N files" label reads this — it must match the threshold the
+        // decision used, even when discovery's file list is smaller.
+        attachmentCount,
       });
     }
   }
@@ -239,10 +245,8 @@ export function computeDownloadAllPlacement(
 ): PlacementDecision | null {
   const recipe = getRecipe(viewKind);
 
-  if (
-    Math.max(post.files.length, countAttachmentNodes(post)) <
-    recipe.downloadAll.minFilesForDownloadAll
-  ) {
+  const attachmentCount = Math.max(post.files.length, countAttachmentNodes(post));
+  if (attachmentCount < recipe.downloadAll.minFilesForDownloadAll) {
     return null;
   }
 
@@ -266,6 +270,8 @@ export function computeDownloadAllPlacement(
     confidence: anchor.confidence,
     reasonCodes: buildReasonCodes(anchor, 'download-all', recipe),
     fallbackUsed: anchor.isFallback,
+    // Same contract as computePlacement: the label reads the threshold count.
+    attachmentCount,
   };
 }
 
@@ -295,22 +301,30 @@ const ATTACHMENT_NODE_SELECTOR = [
 ].join(', ');
 
 /**
- * Count the DISTINCT attachment nodes in a post, including the kinds file
- * discovery does not carry (link / YouTube attachments — Classroom labels
- * them `aria-label="Attachment: …"`).
+ * Count the DISTINCT DOWNLOADABLE attachment nodes in a post.
+ *
+ * V1's group machine counts registered single download buttons, and V1 only
+ * injects those for Drive/Docs targets ("External links never get download
+ * buttons" — entrypoints/content/state.ts DRIVE_URL_PATTERNS). Link/YouTube
+ * attachments never join V1's group: not counted, not run. This counter
+ * mirrors that set so the Download All decision, its "N files" label, the
+ * group run, and the hotkey all agree:
+ *
+ * - discovered files always count (the run's own set), and
+ * - any other attachment-signal node counts only when it carries a
+ *   downloadable target — a data-drive-id (V1's findDriveUrl builds a Drive
+ *   download URL from it) or an anchor whose href passes the download
+ *   validator (the same URL family V1's DRIVE_URL_PATTERNS accepts).
  *
  * Nested candidates (a chip container and the anchor it wraps) merge into
  * ONE attachment: only outermost candidates are counted.
- *
- * Bug 2.1: the Download All decision uses this so a post mixing attachment
- * kinds still reaches the >=2 threshold, exactly like V1's grouping.
  */
 export function countAttachmentNodes(
   post: Pick<ScannedPost, 'element' | 'files'>,
 ): number {
   const candidates = new Set<HTMLElement>();
 
-  // Discovered files are attachments by definition.
+  // Discovered files are attachments by definition — and the run's set.
   for (const file of post.files) {
     candidates.add(file.element);
   }
@@ -327,7 +341,10 @@ export function countAttachmentNodes(
     }
   }
 
-  // Merge nested chains: drop any candidate that sits inside another one.
+  // Merge nested chains: drop any candidate that sits inside another one,
+  // then keep only nodes with a downloadable target. A nested DISCOVERED
+  // file can be dropped here — the caller's max() with post.files.length
+  // keeps the threshold honest.
   let count = 0;
   for (const el of candidates) {
     let nested = false;
@@ -337,9 +354,28 @@ export function countAttachmentNodes(
         break;
       }
     }
-    if (!nested) count++;
+    if (nested) continue;
+    if (carriesDownloadableTarget(el)) count++;
   }
   return count;
+}
+
+/**
+ * Whether an attachment node carries a target V1's group machine would run:
+ * a data-drive-id (self or descendant — V1 builds a Drive download URL from
+ * it) or an anchor (self or descendant) whose href the download validator
+ * accepts (Drive / Classroom drive-proxy / Docs viewers — the same URL
+ * family V1's DRIVE_URL_PATTERNS gate single buttons on).
+ */
+function carriesDownloadableTarget(el: HTMLElement): boolean {
+  if (el.hasAttribute('data-drive-id') || el.querySelector('[data-drive-id]')) {
+    return true;
+  }
+  const anchors =
+    el.tagName === 'A'
+      ? [el as HTMLAnchorElement]
+      : Array.from(el.querySelectorAll<HTMLAnchorElement>('a[href]'));
+  return anchors.some((a) => validateDownloadUrl(a.href).valid);
 }
 
 // ============================================================================

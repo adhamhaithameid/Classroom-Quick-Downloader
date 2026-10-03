@@ -118,19 +118,24 @@ export function resetDownloadAllController(): void {
 /**
  * The delegated Download All click. Busy run → cancel; otherwise start.
  * (V1's ensureDownloadAllButton click semantics.)
+ *
+ * @returns true when a run actually started — false for a cancel click and
+ *   for a post with no runnable single buttons (startRun's empty bail, e.g.
+ *   a never-expanded collapsed post). The hotkey scan uses this to move on
+ *   to the next eligible group instead of claiming a run it did not start.
  */
-export function handleDownloadAllClickV2(postId: string, groupButton: HTMLButtonElement): void {
+export function handleDownloadAllClickV2(postId: string, groupButton: HTMLButtonElement): boolean {
   const run = runs.get(postId);
   if (run && !isRunSettled(run)) {
     cancelRun(run);
-    return;
+    return false;
   }
   if (run) {
     // Previous run finished and reset — restart clean.
     teardownRun(run);
     runs.delete(postId);
   }
-  startRun(postId, groupButton);
+  return startRun(postId, groupButton);
 }
 
 /**
@@ -143,6 +148,14 @@ export function handleDownloadAllClickV2(postId: string, groupButton: HTMLButton
  *
  * Runs from the v2 bootstrap's onMessage listener (mode-gated to 'v2');
  * legacy/shadow modes keep the V1 entrypoint handler.
+ *
+ * Eligibility is the group button's OWN decision record, not a census of
+ * `.cqd-download-btn` nodes: the button exists only where the placement
+ * decision emitted (downloadable attachments ≥ threshold), and
+ * data-cqd-group-count carries that decision's count. Counting single
+ * buttons instead made the hotkey skip posts the button serves — collapsed
+ * classwork items keep their header-anchored group button while their
+ * single-file buttons stay unplaced (bug 2.1's collapse contract).
  *
  * @returns true when a group was started (the caller answers the runtime
  *   message with { ok: true }); false when no group was eligible.
@@ -161,26 +174,20 @@ export function handleRunDownloadAllRequest(): boolean {
     const run = runs.get(postId);
     if (run && !isRunSettled(run)) continue;
 
-    // Eligibility is read from the DOM (self-contained, like startRun):
-    // the post must hold at least MIN_FILES_FOR_DOWNLOAD_ALL single-file
-    // buttons, deduped by canonical file id.
-    const root =
-      button.closest<HTMLElement>('[data-stream-item-id]') ?? button.parentElement;
-    if (!root) continue;
-    const seen = new Set<string>();
-    for (const fileBtn of root.querySelectorAll<HTMLButtonElement>('.cqd-download-btn')) {
-      const id = fileBtn.getAttribute('data-cqd-file-id');
-      if (id) seen.add(id);
-    }
-    if (seen.size < MIN_FILES_FOR_DOWNLOAD_ALL) continue;
+    // Decision-recorded downloadable count (absent attribute = the decision
+    // guarantees the threshold held when the button was placed).
+    const count = Number(button.getAttribute('data-cqd-group-count') ?? MIN_FILES_FOR_DOWNLOAD_ALL);
+    if (count < MIN_FILES_FOR_DOWNLOAD_ALL) continue;
 
-    handleDownloadAllClickV2(postId, button);
-    return true;
+    if (handleDownloadAllClickV2(postId, button)) return true;
+    // The run could not start (no runnable single buttons in this post —
+    // e.g. a never-expanded collapsed post): fall through to the next
+    // eligible group, exactly like V1's first-eligible scan.
   }
   return false;
 }
 
-function startRun(postId: string, groupButton: HTMLButtonElement): void {
+function startRun(postId: string, groupButton: HTMLButtonElement): boolean {
   const root =
     groupButton.closest<HTMLElement>('[data-stream-item-id]') ??
     groupButton.parentElement ??
@@ -204,7 +211,9 @@ function startRun(postId: string, groupButton: HTMLButtonElement): void {
       requestId: null,
     });
   }
-  if (files.length === 0) return;
+  // Nothing runnable (single buttons not placed yet — collapsed classwork
+  // post): no run to start. The caller reports that instead of claiming one.
+  if (files.length === 0) return false;
 
   const run: GroupRun = {
     root,
@@ -253,6 +262,7 @@ function startRun(postId: string, groupButton: HTMLButtonElement): void {
   });
 
   updateRunUI(run);
+  return true;
 }
 
 /** One file's request settled — promote the group machine. */
