@@ -17,9 +17,10 @@
  * independent for testing purposes.
  *
  * The flow:
- * 1. Extension loads → readMode() reads from storage (default: 'legacy')
+ * 1. Extension loads → readMode() reads from storage (default: 'v2',
+ *    DEFAULT_MODE below)
  * 2. Mode is set in the EngineRegistry
- * 3. User changes mode via debug panel → setMode() writes to storage
+ * 3. User changes mode via the popup's engine control → setMode() writes to storage
  * 4. Registry fires onModeChange callback → Orchestrator re-initializes
  *
  * Why not just put this in the registry? Separation of concerns.

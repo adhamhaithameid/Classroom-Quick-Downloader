@@ -47,7 +47,7 @@ Historical/point-in-time files live in `archive/`.
 - [ATTACHMENT_CLASSIFICATION_DESIGN_NOTE.md](ATTACHMENT_CLASSIFICATION_DESIGN_NOTE.md) — attachment classification design
 - [EXTENSION_GOLDEN_BEHAVIOR_MATRIX.md](EXTENSION_GOLDEN_BEHAVIOR_MATRIX.md) — golden behavior matrix
 - [PHASE12_TEST_MATRIX.md](PHASE12_TEST_MATRIX.md) — phase 12 strict/comprehensive matrix
-- Subdirectory [engine/](engine/) — API-assist setup, mutation/selector audits
+- Subdirectory [engine/](engine/) — ENGINE_MODES capabilities map, API-assist setup, mutation/selector audits
 
 ## Testing & QA
 
