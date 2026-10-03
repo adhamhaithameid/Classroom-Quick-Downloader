@@ -217,3 +217,52 @@ pure-machine vs production), `tests/acquire-properties.test.ts` (fast-check
 invariants — terminals absorb events, sweep bounded, deadline closure),
 `tests/e2e/qa/qa-08-resilience.spec.ts` (real-browser journey: transient 5xx,
 quota HTML, zero-byte — all reach a classified terminal, zero windows).
+
+## Observing the extension under Playwright (2026-10-03)
+
+Hard-won semantics from the 2026-09-24 security audit. Re-deriving any of
+these costs tens of tool calls — they are pinned by committed specs.
+
+**The headless gap.** Headless Chromium never fires `onDeterminingFilename`,
+so the filename-suggestion pipeline (and the HTML-interstitial guard's
+terminal behavior) is invisible to every headless Playwright project. Results
+that depend on suggested filenames are headless artifacts, not lies in your
+code (audit finding F3). Observe the real pipeline headed:
+`E2E_HEADED=1` + `tests/e2e/headed/filename-security.spec.ts`.
+
+**Playwright hijacks downloads.** Playwright's `allowAndName` redirects every
+download browser-wide into GUID names in an artifacts dir, masking whatever
+the extension suggests. Restore Chrome's native pipeline per context with a
+CDP session:
+`Browser.setDownloadBehavior { behavior: 'default', eventsEnabled: true }`
+(see `filename-security.spec.ts` ~line 140). `behavior: 'allow'` bypasses the
+suggestion pipeline entirely — it is not the fix.
+
+**Loading the extension.** Playwright passes `--disable-extensions` unless you
+do; the working recipe is `chromium.launchPersistentContext` with
+`--load-extension=<abs path>` + `--disable-extensions-except=<abs path>`
+(`playwright.config.ts`, `filename-security.spec.ts:92`). Headless projects
+work only because `chromium` (new headless) honors these flags.
+
+**Multi-extension setups.** Two working tricks, neither written down anywhere
+else until now:
+- An unpacked extension's ID is deterministic — derived from the absolute
+  path via a fixed key. Generating a constant throwaway key and loading every
+  run from the same path gives you a stable ID to target (CDP
+  `Target.getTargets` field is `targetInfos`, not `targets`).
+- Drive attacker logic from an extension **page** (`attack.html`), never from
+  its MV3 service worker — the SW is event-driven and dormant; it never
+  appears in the target list. Classic (non-module) page scripts have no
+  top-level await: wrap in an IIFE or the script silently never starts.
+
+**Content-script injection repro.** When a fixture yields zero
+`.cqd-download-btn`s, do not invent a fixture — copy the proven recipe in
+`tests/e2e/core-flow.spec.ts`: STREAM URL `/c/course-1` +
+`classwork-material-post-en.html` + default v2 mode. Minimal hand-rolled
+fixtures miss the route classifier (view must resolve, e.g.
+`/c/<id>/details`), and the popup only renders toggles for Classroom tabs.
+
+**Oracles.** Final filenames/state read back via `chrome.downloads.search`
+from an extension page (the black-box oracle in the headed spec). Console
+hygiene reads the SW console (see `tests/e2e/console-hygiene.spec.ts`); the
+lastError guard teeth are `sendmessage-hygiene.guard.test.ts`.
