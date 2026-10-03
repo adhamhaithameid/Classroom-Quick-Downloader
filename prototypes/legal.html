@@ -173,7 +173,7 @@
   <p class="lede">What users must see to keep the extension compliant and trusted: privacy disclosure, permission explanations, the "Not affiliated with Google" notice, the API-beta risk warning, and a copyright reminder for downloaded materials. Each is rendered as it would ship, labeled <b>REQUIRED</b> (store policy demands it) or <b>RECOMMENDED</b> (not demanded, but protects users and the listing). Full mapping in the summary table below.</p>
 
   <!-- ================= 1. PRIVACY ROW ================= -->
-  <div class="sec">
+  <div class="sec" id="surface-privacy">
     <div class="sec-label">01 · Privacy / data-use disclosure</div>
     <h2>A footer row in the popup, expanding in place</h2>
     <p class="desc">Store level: the privacy policy itself is <b>REQUIRED</b> (dashboard + listing) and data practices must be "prominently disclosed" with affirmative consent before install. In-product, the popup gets a one-tap summary row — users should never leave the popup to learn where their files go. Click the row to expand it.</p>
@@ -221,7 +221,7 @@
   </div>
 
   <!-- ================= 2. PERMISSIONS ================= -->
-  <div class="sec">
+  <div class="sec" id="surface-permissions">
     <div class="sec-label">02 · Permissions explainer</div>
     <h2>Every permission, one plain-language reason</h2>
     <p class="desc">Store level: justifications are <b>REQUIRED</b> in the dashboard — "request access to the narrowest permissions necessary" and explain each one. In-product: <b>RECOMMENDED</b>, best shown in Options and at first run, not only on the listing. The API-beta permission only appears once the beta is relevant.</p>
@@ -274,7 +274,7 @@
   </div>
 
   <!-- ================= 3. NOT AFFILIATED ================= -->
-  <div class="sec">
+  <div class="sec" id="surface-affiliation">
     <div class="sec-label">03 · "Not affiliated with Google"</div>
     <h2>Footer notice, always visible, never hidden in a menu</h2>
     <p class="desc">Store level: impersonation and false-endorsement policy — the extension must not "represent that your product is authorized by, endorsed by, or produced by" Google. The product name and the Classroom integration make a standing disclaimer the only safe posture, so it is treated as <b>REQUIRED</b> mitigation.</p>
@@ -302,7 +302,7 @@
   </div>
 
   <!-- ================= 4. API BETA WARNING ================= -->
-  <div class="sec">
+  <div class="sec" id="surface-api-warning">
     <div class="sec-label">04 · API (beta) risk warning</div>
     <h2>Shown at selection time, inside the selector's context</h2>
     <p class="desc">No store rule mandates a beta warning, but "features must be stated clearly and in a transparent manner" — and the beta changes the trust model (an OAuth scope is added). Marked <b>RECOMMENDED</b>, strongly advised; it renders when the user selects API (beta) and in Options next to the engine cards.</p>
@@ -336,7 +336,7 @@
   </div>
 
   <!-- ================= 5. COPYRIGHT REMINDER ================= -->
-  <div class="sec">
+  <div class="sec" id="surface-copyright">
     <div class="sec-label">05 · Copyright / ToS reminder for downloaded materials</div>
     <h2>One-time dialog before the first classroom-wide download</h2>
     <p class="desc">No CWS clause demands this verbatim, but the policy prohibits facilitating illegal activity, and bulk-downloading an entire classroom is exactly where overzealous use begins. A one-time, check-box-gated reminder before the first big run is marked <b>RECOMMENDED</b> (strongly). It fires once per profile, then the classroom button carries a one-line footer echo.</p>
@@ -377,7 +377,7 @@
   </div>
 
   <!-- ================= 6. LIMITED USE ================= -->
-  <div class="sec">
+  <div class="sec" id="surface-limited-use">
     <div class="sec-label">06 · Limited Use affirmation</div>
     <h2>The one-line API statement, in Options</h2>
     <p class="desc">Because the API beta uses Google APIs, the store requires an affirmative statement that data use complies with the Chrome Web Store User Data Policy (Limited Use). Store level: <b>REQUIRED</b> (dashboard + policy page). In-product echo in Options: <b>RECOMMENDED</b>.</p>

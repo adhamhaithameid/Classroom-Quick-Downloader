@@ -1,0 +1,1586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Decision Center — Phase 3/4 Picks · CQD 1.8.9</title>
+<style>
+  /* ============ Page shell (same system as the other prototype pages) ============ */
+  :root {
+    --bg: #0B0C10;
+    --panel: #14151C;
+    --surface: rgba(255,255,255,.045);
+    --surface2: rgba(255,255,255,.08);
+    --border: rgba(255,255,255,.10);
+    --border2: rgba(255,255,255,.18);
+    --text: #F3F4F8;
+    --text2: #A7ACBD;
+    --text3: #767C90;
+    --accent: #8F7BFF;
+    --accent2: #6E5BFF;
+    --success: #07DA3F;
+    --success-text: #4AE376;
+    --error: #FF4036;
+    --error-text: #FF7A72;
+    --trying: #FFD93D;
+    --cancel: #EC6300;
+    --comment-text: #B983FF;
+    --edited-text: #00D6EE;
+    --bmc: #FFDD00;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--font);
+    font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased;
+    padding: 48px 24px 96px;
+  }
+  a { color: var(--accent); }
+  button { font-family: inherit; cursor: pointer; }
+  button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px;
+  }
+  .crumb { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--text3); margin-bottom: 8px; }
+  .crumb a { color: var(--accent); text-decoration: none; }
+  .crumb a:hover { text-decoration: underline; }
+  h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.25; }
+  .lede { color: var(--text2); font-size: 15px; margin-top: 8px; max-width: 70ch; }
+  .identity { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .identity span, .identity a.chip {
+    font-size: 11px; font-weight: 500; color: var(--text2);
+    border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; background: var(--surface);
+    text-decoration: none;
+  }
+  .identity a.chip:hover { border-color: var(--border2); color: var(--text); }
+  .sec { margin-top: 56px; scroll-margin-top: 84px; }
+  .sec-label { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+  .sec h2 { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+  .sec p.desc { font-size: 13px; color: var(--text2); max-width: 76ch; margin-bottom: 20px; }
+  code { font-size: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1px 5px; }
+  footer.page-end { margin-top: 64px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text3); line-height: 1.6; }
+
+  /* ============ Layout: main + sticky ballot ============ */
+  .layout {
+    max-width: 1200px; margin: 0 auto;
+    display: grid; gap: 28px; align-items: start;
+    grid-template-areas: "main ballot";
+    grid-template-columns: minmax(0, 1fr) 300px;
+  }
+  main { grid-area: main; min-width: 0; }
+  .ballot { grid-area: ballot; }
+  @media (max-width: 1120px) {
+    .layout { grid-template-areas: "ballot" "main"; grid-template-columns: minmax(0, 1fr); }
+  }
+
+  /* ============ Reduce-motion bar (same convention as effects.html) ============ */
+  .rm-bar {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(20,21,28,.92); backdrop-filter: blur(8px);
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 10px 16px; margin-top: 20px;
+  }
+  .rm-bar .rm-txt { font-size: 13px; font-weight: 600; }
+  .rm-bar .rm-sub { font-size: 11px; color: var(--text3); line-height: 1.4; }
+  .rm-switch {
+    position: relative; width: 40px; height: 22px; border-radius: 999px;
+    border: 1px solid var(--border2); background: rgba(0,0,0,.35);
+    transition: background 200ms var(--ease), border-color 200ms var(--ease);
+    flex: 0 0 auto; margin-left: auto;
+  }
+  .rm-switch::after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 16px; height: 16px; border-radius: 50%; background: var(--text3);
+    transition: transform 200ms var(--ease), background 200ms var(--ease);
+  }
+  .rm-switch[aria-pressed="true"] { background: var(--trying); border-color: var(--trying); }
+  .rm-switch[aria-pressed="true"]::after { transform: translateX(18px); background: #241C00; }
+  .rm-state { font-size: 11px; font-weight: 600; color: var(--text2); min-width: 110px; text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* ============ 01 · State comparison frames ============ */
+  .compare-tools { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .state-switch {
+    display: inline-flex; background: rgba(0,0,0,.28); border: 1px solid var(--border);
+    border-radius: 12px; padding: 3px; gap: 2px;
+  }
+  .state-switch button {
+    border: none; background: transparent; color: var(--text2);
+    font-size: 12px; font-weight: 500; padding: 8px 14px; border-radius: 9px;
+    transition: background 200ms var(--ease), color 200ms var(--ease), box-shadow 200ms var(--ease);
+  }
+  .state-switch button:hover { color: var(--text); }
+  .state-switch button[aria-checked="true"] {
+    background: linear-gradient(180deg, rgba(143,123,255,.24), rgba(143,123,255,.16));
+    color: var(--text); font-weight: 600;
+    box-shadow: inset 0 0 0 1px rgba(143,123,255,.45);
+  }
+  .state-desc { font-size: 12px; color: var(--text2); margin-top: 12px; max-width: 76ch; }
+
+  .frames { display: grid; grid-template-columns: repeat(2, 372px); gap: 24px; justify-content: center; margin-top: 20px; }
+  @media (max-width: 840px) { .frames { grid-template-columns: minmax(0, 392px); } }
+  .frame-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px; }
+  .frame-head b { font-weight: 600; }
+  .frame-tag {
+    width: 20px; height: 20px; border-radius: 6px; flex: 0 0 auto;
+    display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #fff;
+  }
+  .frame-tag.a { background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+  .frame-tag.b { background: linear-gradient(135deg, #2E86FF, #1A5FD0); }
+  .frame-state {
+    font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--trying); border: 1px solid rgba(255,217,61,.35); border-radius: 999px; padding: 1px 8px;
+    font-variant-numeric: tabular-nums;
+  }
+  .frame-head .open-full { margin-left: auto; font-size: 11px; text-decoration: none; }
+  .frame {
+    border: 1px solid rgba(255,255,255,.14); border-radius: 20px; padding: 6px;
+    background: rgba(0,0,0,.25); box-shadow: 0 24px 80px rgba(0,0,0,.45);
+  }
+  .frame iframe {
+    display: block; width: 360px; height: 600px; max-width: 100%;
+    border: 0; border-radius: 15px; background: var(--bg);
+  }
+  .dir-pick { margin-top: 24px; background: var(--panel); border: 1px solid rgba(143,123,255,.35); border-radius: 14px; padding: 16px 20px; }
+  .dir-pick .p-label { margin-bottom: 2px; }
+
+  /* ============ Pick controls (radios styled as pills) ============ */
+  .p-label { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text3); margin-bottom: 6px; }
+  .pick { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; align-items: center; }
+  .pick .pick-label { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text3); margin-right: 2px; }
+  .pick button, .pick-one {
+    border: 1px solid var(--border); background: var(--surface); color: var(--text2);
+    border-radius: 999px; font-size: 12px; font-weight: 500; padding: 7px 14px;
+    transition: border-color 160ms var(--ease), background 160ms var(--ease), color 160ms var(--ease), box-shadow 160ms var(--ease);
+  }
+  .pick button:hover, .pick-one:hover { border-color: var(--border2); color: var(--text); }
+  .pick button[aria-checked="true"], .pick-one[aria-checked="true"] {
+    border-color: rgba(143,123,255,.65); background: rgba(143,123,255,.16); color: var(--text);
+    font-weight: 600; box-shadow: inset 0 0 0 1px rgba(143,123,255,.4);
+  }
+  .pick button.pick-none[aria-checked="true"] { border-color: rgba(255,255,255,.32); background: var(--surface2); box-shadow: none; }
+  .pick.disabled { opacity: .45; }
+  .pick.disabled button { pointer-events: none; }
+
+  /* ============ 02 · Face-off cards ============ */
+  .fo { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 20px; margin-top: 16px; }
+  .fo-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .fo-num { font-size: 11px; font-weight: 600; color: var(--accent); letter-spacing: .08em; font-variant-numeric: tabular-nums; }
+  .fo-head h3 { font-size: 15px; font-weight: 600; }
+  .fo-note { font-size: 11px; color: var(--text3); }
+  .fo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .fo-grid.cols3 { grid-template-columns: 1fr 1fr 1fr; }
+  @media (max-width: 700px) { .fo-grid, .fo-grid.cols3 { grid-template-columns: 1fr; } }
+  .fo-panel { border: 1px solid var(--border); border-radius: 12px; background: #17181F; overflow: hidden; margin: 0; }
+  .fo-panel figcaption {
+    display: flex; justify-content: space-between; gap: 8px;
+    font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--text3);
+    padding: 7px 12px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,.2);
+  }
+  .fo-stage { padding: 14px; }
+  .fo-center { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 92px; }
+  .demo-hint { font-size: 10px; color: var(--text3); margin-top: 10px; text-align: center; }
+  .demo-run {
+    margin-top: 12px; border: none; border-radius: 8px;
+    background: var(--surface2); color: var(--text);
+    font-size: 12px; font-weight: 600; padding: 8px 14px;
+    transition: background 200ms var(--ease);
+  }
+  .demo-run:hover { background: rgba(255,255,255,.12); }
+
+  /* ---- Direction A hero CTA (from popup-direction-a.html) ---- */
+  .ctaA {
+    position: relative; overflow: hidden; display: block; width: 100%;
+    border: 1px solid rgba(143,123,255,.5); border-radius: 14px;
+    background: linear-gradient(180deg, rgba(143,123,255,.22), rgba(110,91,255,.14));
+    color: var(--text); padding: 14px 16px; text-align: left;
+    box-shadow: 0 4px 20px rgba(110,91,255,.22), inset 0 1px 0 rgba(255,255,255,.12);
+    transition: transform 200ms var(--ease), border-color 200ms var(--ease), box-shadow 200ms var(--ease);
+  }
+  button.ctaA { cursor: pointer; }
+  .ctaA:hover { transform: translateY(-1px); border-color: rgba(143,123,255,.85); }
+  .ctaA .row { display: flex; align-items: center; gap: 10px; position: relative; z-index: 2; }
+  .ctaA .ic { flex: 0 0 auto; display: grid; place-items: center; }
+  .ctaA .tt { flex: 1; min-width: 0; }
+  .ctaA .tt b { display: block; font-size: 15px; font-weight: 600; line-height: 1.25; }
+  .ctaA .tt small { display: block; font-size: 11px; font-weight: 400; color: var(--text2); line-height: 1.4; margin-top: 1px; font-variant-numeric: tabular-nums; }
+  .ctaA .fill {
+    position: absolute; left: 0; right: 0; bottom: 0; height: var(--fill, 0%);
+    background: linear-gradient(180deg, rgba(143,123,255,.3), rgba(110,91,255,.55));
+    transition: height 360ms var(--ease); z-index: 1;
+  }
+  .ctaA .wave {
+    position: absolute; left: -50%; width: 200%; height: 10px; z-index: 1;
+    bottom: calc(var(--fill, 0%) - 5px);
+    opacity: 0; transition: opacity 280ms var(--ease);
+  }
+  .ctaA .wave svg { display: block; width: 100%; height: 100%; }
+  .ctaA .w1 { animation: waveA-slide 2.4s linear infinite; }
+  .ctaA .w2 { animation: waveA-slide 3.6s linear infinite reverse; opacity: .45; }
+  .ctaA.loading .wave { opacity: 1; }
+  @keyframes waveA-slide { from { transform: translateX(0); } to { transform: translateX(50%); } }
+  .ctaA.is-success { border-color: rgba(7,218,63,.6); }
+  .ctaA.is-success .fill { background: linear-gradient(180deg, rgba(7,218,63,.25), rgba(7,218,63,.45)); }
+  .ctaA.is-error { border-color: rgba(255,64,54,.6); }
+  .ctaA.is-error .fill { background: linear-gradient(180deg, rgba(255,64,54,.22), rgba(255,64,54,.4)); }
+
+  /* ---- Direction B action bar (from popup-direction-b.html) ---- */
+  .ctaB {
+    position: relative; overflow: hidden; display: flex; align-items: center; gap: 8px;
+    width: 100%; border: none; border-radius: 8px;
+    background: linear-gradient(180deg, var(--accent), var(--accent2));
+    color: #14121F; padding: 0 12px; height: 44px;
+    box-shadow: 0 2px 10px rgba(110,91,255,.3);
+    transition: filter 90ms var(--ease), transform 90ms var(--ease);
+  }
+  button.ctaB { cursor: pointer; }
+  .ctaB:hover { filter: brightness(1.08); }
+  .ctaB:active { transform: translateY(1px); }
+  .ctaB .t { flex: 1; min-width: 0; text-align: left; font-size: 13px; font-weight: 600; letter-spacing: .01em; position: relative; z-index: 2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ctaB .n {
+    position: relative; z-index: 2; white-space: nowrap;
+    font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums;
+    background: rgba(0,0,0,.22); color: #EDEBFF; border-radius: 5px; padding: 2px 7px;
+  }
+  .ctaB .fill {
+    position: absolute; left: 0; top: 0; bottom: 0; width: var(--fill, 0%);
+    background: rgba(0,0,0,.3); transition: width 200ms steps(6, end); z-index: 1;
+  }
+  .ctaB .wave {
+    position: absolute; left: calc(var(--fill, 0%) - 3px); top: -50%; height: 200%; width: 6px;
+    z-index: 1; opacity: 0; transition: opacity 140ms var(--ease);
+  }
+  .ctaB .wave svg { display: block; width: 100%; height: 100%; }
+  .ctaB.loading .wave { opacity: .8; animation: waveB-slide 1.8s linear infinite; }
+  @keyframes waveB-slide { from { transform: translateY(0); } to { transform: translateY(50%); } }
+  .ctaB.is-success { background: linear-gradient(180deg, #0BCE44, #08A837); color: #06210F; box-shadow: 0 2px 10px rgba(7,218,63,.25); }
+  .ctaB.is-success .t { color: #06210F; }
+  .ctaB.is-success .n { background: rgba(0,0,0,.22); color: #D6FFE2; }
+  .ctaB.is-error { background: linear-gradient(180deg, #FF5A50, #E6342A); color: #2B0503; box-shadow: 0 2px 10px rgba(255,64,54,.25); }
+  .ctaB.is-error .t { color: #2B0503; }
+  .ctaB.is-error .n { background: rgba(0,0,0,.25); color: #FFD9D6; }
+
+  /* ---- water intensity variants (apply to the demo grid) ---- */
+  .int-subtle .ctaA.loading .wave { opacity: .3; }
+  .int-subtle .ctaA .fill { opacity: .8; }
+  .int-subtle .ctaB.loading .wave { opacity: .3; }
+  .int-pronounced .ctaA.loading { box-shadow: 0 6px 28px rgba(110,91,255,.42), inset 0 1px 0 rgba(255,255,255,.14); }
+  .int-pronounced .ctaA .wave { filter: drop-shadow(0 0 6px rgba(143,123,255,.8)); }
+  .int-pronounced .ctaB.loading .wave { opacity: 1; }
+
+  /* ---- A engine segmented (from popup-direction-a.html) ---- */
+  .seg {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2px;
+    background: rgba(0,0,0,.28); border: 1px solid var(--border);
+    border-radius: 11px; padding: 2px;
+  }
+  .seg button {
+    border: none; background: transparent; color: var(--text2);
+    font-size: 12px; font-weight: 500; padding: 8px 4px; border-radius: 9px;
+    transition: background 200ms var(--ease), color 200ms var(--ease), box-shadow 200ms var(--ease);
+  }
+  .seg button:hover { color: var(--text); }
+  .seg button[aria-pressed="true"] {
+    background: linear-gradient(180deg, rgba(143,123,255,.24), rgba(143,123,255,.16));
+    color: var(--text); font-weight: 600;
+    box-shadow: inset 0 0 0 1px rgba(143,123,255,.45);
+  }
+  .seg .beta, .mini-seg .beta { font-size: 10px; vertical-align: super; color: var(--trying); }
+  .engine-copy { margin-top: 8px; font-size: 11px; line-height: 1.5; color: var(--text3); }
+  .engine-copy strong { color: var(--text2); font-weight: 600; }
+
+  /* ---- A flag pills (from popup-direction-a.html) ---- */
+  .flags { display: flex; gap: 6px; }
+  .flag {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+    border: 1px solid var(--border); border-radius: 999px;
+    background: var(--surface); color: var(--text2);
+    font-size: 12px; font-weight: 500; padding: 8px 4px;
+    transition: border-color 200ms var(--ease), background 200ms var(--ease), color 200ms var(--ease), box-shadow 200ms var(--ease);
+  }
+  .flag .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text3); transition: background 200ms var(--ease), box-shadow 200ms var(--ease); }
+  .flag:hover { border-color: var(--border2); color: var(--text); }
+  .flag[aria-pressed="true"] { color: var(--text); background: var(--surface2); }
+  .flag.c-comment[aria-pressed="true"] { border-color: rgba(185,131,255,.55); box-shadow: inset 0 0 0 1px rgba(185,131,255,.3); }
+  .flag.c-comment[aria-pressed="true"] .dot { background: var(--comment-text); box-shadow: 0 0 8px rgba(185,131,255,.7); }
+  .flag.c-edited[aria-pressed="true"] { border-color: rgba(0,214,238,.55); box-shadow: inset 0 0 0 1px rgba(0,214,238,.3); }
+  .flag.c-edited[aria-pressed="true"] .dot { background: var(--edited-text); box-shadow: 0 0 8px rgba(0,214,238,.7); }
+  .flag.c-both[aria-pressed="true"] { border-color: rgba(185,131,255,.55); box-shadow: inset 0 0 0 1px rgba(0,214,238,.35); }
+  .flag.c-both[aria-pressed="true"] .dot { background: linear-gradient(135deg, var(--comment-text), var(--edited-text)); box-shadow: 0 0 8px rgba(140,180,255,.7); }
+
+  /* ---- B rows, mini-seg, switches (from popup-direction-b.html) ---- */
+  .b-rows { border: 1px solid rgba(255,255,255,.12); border-radius: 10px; background: rgba(0,0,0,.18); overflow: hidden; }
+  .b-row { display: flex; align-items: center; gap: 8px; padding: 7px 10px; min-height: 32px; }
+  .b-row + .b-row, .b-row-copy { border-top: 1px solid rgba(255,255,255,.05); }
+  .b-row .r-label { flex: 1; min-width: 0; font-size: 12px; font-weight: 500; }
+  .b-row-copy { padding: 6px 10px 8px; font-size: 10px; color: var(--text3); line-height: 1.45; }
+  .b-row-copy strong { color: var(--text2); font-weight: 600; }
+  .mini-seg { display: inline-flex; background: rgba(0,0,0,.3); border: 1px solid var(--border); border-radius: 7px; padding: 1px; gap: 1px; }
+  .mini-seg button {
+    border: none; background: transparent; color: var(--text2);
+    font-size: 11px; font-weight: 500; padding: 4px 9px; border-radius: 5px; white-space: nowrap;
+    transition: background 200ms var(--ease), color 200ms var(--ease);
+  }
+  .mini-seg button:hover { color: var(--text); }
+  .mini-seg button[aria-pressed="true"] { background: var(--accent); color: #14121F; font-weight: 600; }
+  .switch {
+    position: relative; width: 30px; height: 17px; border-radius: 999px;
+    border: 1px solid var(--border2); background: rgba(0,0,0,.35); flex: 0 0 auto;
+    transition: background 200ms var(--ease), border-color 200ms var(--ease);
+  }
+  .switch::after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 11px; height: 11px; border-radius: 50%; background: var(--text3);
+    transition: transform 200ms var(--ease), background 200ms var(--ease);
+  }
+  .switch[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); }
+  .switch[aria-pressed="true"]::after { transform: translateX(13px); background: #14121F; }
+  .switch.c-comment[aria-pressed="true"] { background: var(--comment-text); border-color: var(--comment-text); }
+  .switch.c-edited[aria-pressed="true"] { background: var(--edited-text); border-color: var(--edited-text); }
+  .flag-count {
+    font-size: 10px; color: var(--text3); font-variant-numeric: tabular-nums;
+    border: 1px solid var(--border); border-radius: 5px; padding: 1px 5px;
+  }
+
+  /* ---- mode row (A placement, from components.html) ---- */
+  .mode-row {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,.03); border: 1px solid var(--border); border-radius: 12px;
+    padding: 10px 12px;
+  }
+  .mode-row .mr-main { flex: 1; min-width: 0; }
+  .mode-row .mr-label { display: block; font-size: 13px; font-weight: 600; }
+  .mode-row .mr-hint { display: block; font-size: 11px; color: var(--text3); line-height: 1.4; margin-top: 1px; }
+
+  /* ---- BMC + shimmer (from effects.html) ---- */
+  .bmc {
+    position: relative; display: inline-flex; align-items: center; gap: 7px;
+    background: var(--bmc); color: #241C00;
+    border: none; border-radius: 999px;
+    font-size: 12px; font-weight: 600; padding: 9px 16px;
+    transition: transform 200ms var(--ease), box-shadow 200ms var(--ease);
+  }
+  .bmc:hover { transform: translateY(-1px); box-shadow: 0 6px 22px rgba(255,221,0,.35); }
+  .bmc .sheen {
+    position: absolute; top: 0; bottom: 0; width: 60%;
+    left: 0; border-radius: 999px; overflow: hidden; pointer-events: none;
+  }
+  .bmc .sheen::before {
+    content: ""; position: absolute; top: -20%; bottom: -20%; left: 0; width: 60%;
+    background: linear-gradient(105deg, transparent 20%, rgba(255,255,255,.55) 50%, transparent 80%);
+    transform: translateX(-160%) skewX(-12deg);
+    animation: sheen-pass 6.5s ease-in-out infinite; animation-delay: 1.2s;
+  }
+  @keyframes sheen-pass {
+    0% { transform: translateX(-160%) skewX(-12deg); }
+    16% { transform: translateX(340%) skewX(-12deg); }
+    100% { transform: translateX(340%) skewX(-12deg); }
+  }
+  .star {
+    position: absolute; pointer-events: none;
+    opacity: 0; transform: scale(.4) rotate(0deg);
+    animation: twinkle 4.8s ease-in-out infinite;
+  }
+  @keyframes twinkle {
+    0% { opacity: 0; transform: scale(.3) rotate(0deg); }
+    8% { opacity: .9; transform: scale(1) rotate(24deg); }
+    16% { opacity: .35; transform: scale(.7) rotate(40deg); }
+    26% { opacity: 0; transform: scale(.3) rotate(60deg); }
+    100% { opacity: 0; transform: scale(.3) rotate(60deg); }
+  }
+
+  /* ---- type specimens ---- */
+  .type-row { display: flex; align-items: baseline; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+  .type-row:last-child { border-bottom: none; }
+  .type-tag { flex: 0 0 124px; font-size: 11px; color: var(--text3); font-variant-numeric: tabular-nums; }
+
+  /* ============ 03 · Name picker — light Classroom surfaces ============ */
+  .name-grid { display: flex; flex-direction: column; gap: 16px; margin-top: 4px; }
+  .name-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 20px; position: relative; }
+  .name-card.reco { border-color: rgba(7,218,63,.4); }
+  .reco-tag {
+    position: absolute; top: -10px; right: 16px;
+    font-size: 10px; font-weight: 600; letter-spacing: .08em;
+    background: var(--success); color: #06210F;
+    border-radius: 999px; padding: 2px 10px;
+  }
+  .name-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .name-head h3 { font-size: 15px; font-weight: 600; }
+  .name-head .chars { font-size: 11px; color: var(--text3); font-variant-numeric: tabular-nums; }
+  .name-note { font-size: 12px; color: var(--text2); line-height: 1.55; margin: 12px 0 0; }
+  .name-ctas { margin-top: 14px; }
+
+  /* light "Classroom page" surface */
+  .cr-surface { background: #fff; border: 1px solid #DADCE0; border-radius: 12px; overflow: hidden; color: #202124; }
+  .cr-top { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid #E8EAED; background: #F8F9FA; flex-wrap: wrap; }
+  .cr-banner { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: #202124; }
+  .cr-banner .cr-ic {
+    width: 22px; height: 22px; border-radius: 6px; background: #1a73e8; color: #fff;
+    display: grid; place-items: center; font-size: 11px; font-weight: 700;
+  }
+  .cr-class-btn {
+    display: inline-flex; align-items: center; gap: 6px; margin-left: auto;
+    background: #1a73e8; color: #fff; border: none; border-radius: 999px;
+    font-size: 11px; font-weight: 600; padding: 7px 13px;
+  }
+  .cr-class-btn .cnt {
+    font-size: 10px; font-weight: 600; background: rgba(255,255,255,.22);
+    border-radius: 999px; padding: 1px 7px; font-variant-numeric: tabular-nums;
+  }
+  .cr-post { padding: 10px 12px 12px; }
+  .cr-post-title { font-size: 12px; font-weight: 500; color: #202124; }
+  .cr-post-meta { font-size: 10px; color: #5F6368; margin-top: 1px; }
+  .cr-post-row { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .att {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10px; font-weight: 500; color: #3C4043;
+    background: #F1F3F4; border: 1px solid #DADCE0; border-radius: 6px; padding: 3px 7px;
+  }
+  .cr-post-btn {
+    display: inline-flex; align-items: center; gap: 5px; margin-left: auto;
+    background: #fff; color: #1a73e8; border: 1px solid #DADCE0; border-radius: 999px;
+    font-size: 11px; font-weight: 600; padding: 6px 11px;
+  }
+  .cr-caption { font-size: 10px; color: var(--text3); margin-top: 8px; text-align: center; }
+
+  /* ============ 04 · Legal rows ============ */
+  .legal-tools { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; }
+  #legal-approve-all {
+    border: 1px solid rgba(7,218,63,.5); background: rgba(7,218,63,.1); color: var(--success-text);
+    border-radius: 999px; font-size: 12px; font-weight: 600; padding: 7px 14px;
+    transition: background 200ms var(--ease);
+  }
+  #legal-approve-all:hover { background: rgba(7,218,63,.18); }
+  .legal-tools span { font-size: 11px; color: var(--text3); }
+  .lg-row {
+    display: flex; gap: 16px; align-items: flex-start;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px 20px; margin-top: 12px;
+  }
+  .lg-main { flex: 1; min-width: 0; }
+  .lg-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .lg-head h3 { font-size: 14px; font-weight: 600; }
+  .lg-main p { font-size: 12px; color: var(--text2); line-height: 1.55; margin-top: 5px; }
+  .lg-main a { font-size: 11px; text-decoration: none; }
+  .lg-main a:hover { text-decoration: underline; }
+  .lg-pick { flex: 0 0 auto; margin-top: 2px; }
+  .lg-pick .pick { margin-top: 0; }
+  .lg-pick button[aria-checked="true"][data-val="approve"] {
+    border-color: rgba(7,218,63,.6); background: rgba(7,218,63,.14); color: var(--success-text);
+    box-shadow: inset 0 0 0 1px rgba(7,218,63,.35);
+  }
+  .lg-pick button[aria-checked="true"][data-val="edit"] {
+    border-color: rgba(255,217,61,.55); background: rgba(255,217,61,.1); color: var(--trying);
+    box-shadow: inset 0 0 0 1px rgba(255,217,61,.3);
+  }
+  .req {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 10px; font-weight: 700; letter-spacing: .08em;
+    border-radius: 999px; padding: 3px 10px;
+  }
+  .req.required { background: rgba(255,64,54,.14); color: var(--error-text); border: 1px solid rgba(255,64,54,.4); }
+  .req.recommended { background: rgba(143,123,255,.13); color: #B4A6FF; border: 1px solid rgba(143,123,255,.4); }
+  @media (max-width: 700px) { .lg-row { flex-direction: column; } }
+
+  /* ============ Ballot panel ============ */
+  .ballot {
+    background: var(--panel); border: 1px solid rgba(143,123,255,.4); border-radius: 16px;
+    padding: 16px 18px; scroll-margin-top: 20px;
+  }
+  @media (min-width: 1121px) {
+    .ballot { position: sticky; top: 20px; max-height: calc(100vh - 40px); overflow: auto; }
+  }
+  .ballot-head { display: flex; align-items: flex-start; gap: 8px; }
+  .ballot-title { font-size: 14px; font-weight: 600; }
+  .ballot-sub { font-size: 10px; color: var(--text3); margin-top: 1px; }
+  .ballot-collapse {
+    margin-left: auto; flex: 0 0 auto;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text2);
+    border-radius: 999px; font-size: 10px; font-weight: 600; padding: 4px 10px;
+  }
+  .ballot-collapse:hover { color: var(--text); border-color: var(--border2); }
+  .ballot.collapsed .ballot-body { display: none; }
+  .ballot-body { margin-top: 8px; }
+  .ballot-progress {
+    font-size: 11px; font-weight: 600; color: var(--trying);
+    font-variant-numeric: tabular-nums; padding: 8px 0 2px;
+  }
+  .ballot-list { display: flex; flex-direction: column; }
+  .bl-row { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .bl-row dt { color: var(--text3); font-weight: 500; flex: 0 0 auto; }
+  .bl-row dd { color: var(--text2); text-align: right; min-width: 0; overflow-wrap: anywhere; }
+  .bl-row dd.set { color: var(--text); font-weight: 600; }
+  .bl-row dd.none { color: var(--trying); font-weight: 500; }
+  .ballot label.notes-label { display: block; font-size: 11px; font-weight: 600; color: var(--text3); margin: 12px 0 6px; }
+  #ballot-notes {
+    width: 100%; resize: vertical; min-height: 60px;
+    background: rgba(0,0,0,.25); border: 1px solid var(--border); border-radius: 10px;
+    color: var(--text); font-family: inherit; font-size: 12px; line-height: 1.5; padding: 8px 10px;
+  }
+  #ballot-notes::placeholder { color: var(--text3); }
+  .ballot-copy {
+    width: 100%; margin-top: 12px;
+    border: none; border-radius: 10px;
+    background: var(--accent); color: #14121F;
+    font-size: 13px; font-weight: 600; padding: 10px 0;
+    transition: filter 160ms var(--ease);
+  }
+  .ballot-copy:hover { filter: brightness(1.08); }
+  .ballot-copy.copied { background: var(--success); }
+  .ballot-secondary { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+  #ballot-reset {
+    border: none; background: transparent; color: var(--text3);
+    font-size: 11px; font-weight: 500; text-decoration: underline; text-underline-offset: 2px;
+  }
+  #ballot-reset:hover { color: var(--error-text); }
+  .ballot-preview summary { font-size: 11px; color: var(--text3); cursor: pointer; }
+  .ballot-preview summary:hover { color: var(--text2); }
+  .ballot-preview pre {
+    margin-top: 8px; padding: 10px; border-radius: 8px;
+    background: rgba(0,0,0,.3); border: 1px solid var(--border);
+    font-size: 10.5px; line-height: 1.55; color: var(--text2);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    white-space: pre-wrap; overflow-wrap: anywhere;
+  }
+
+  /* ============ Reduced motion (media query + in-app toggle convention) ============ */
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+    .ctaA .wave, .ctaB .wave { display: none; }
+    .bmc .sheen::before { animation: none; transform: translateX(-160%) skewX(-12deg); }
+    .star { animation: none; opacity: .3; transform: scale(.8); }
+    .ctaA:hover, .bmc:hover { transform: none; }
+  }
+  .reduce-motion *, .reduce-motion *::before, .reduce-motion *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  .reduce-motion .ctaA .wave, .reduce-motion .ctaB .wave { display: none !important; }
+  .reduce-motion .bmc .sheen::before { animation: none; transform: translateX(-160%) skewX(-12deg); }
+  .reduce-motion .star { animation: none; opacity: .3; transform: scale(.8); }
+  .reduce-motion .ctaA:hover, .reduce-motion .bmc:hover { transform: none; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ================= STICKY BALLOT ================= -->
+  <aside class="ballot" id="ballot" aria-label="My choices">
+    <div class="ballot-head">
+      <div>
+        <div class="ballot-title">My choices</div>
+        <div class="ballot-sub">Live ballot · saved on this device</div>
+      </div>
+      <button type="button" class="ballot-collapse" id="ballot-collapse" aria-expanded="true" aria-controls="ballot-body">Hide</button>
+    </div>
+    <div class="ballot-body" id="ballot-body">
+      <div class="ballot-progress" id="ballot-progress">0 of 14 decided</div>
+      <dl class="ballot-list" id="ballot-list"></dl>
+      <label class="notes-label" for="ballot-notes">Notes (optional — included in the ballot)</label>
+      <textarea id="ballot-notes" rows="3" placeholder="Hybrid ideas, copy tweaks, anything the ballot should carry…"></textarea>
+      <button type="button" class="ballot-copy" id="ballot-copy">Copy my choices</button>
+      <div class="ballot-secondary">
+        <button type="button" id="ballot-reset">Reset all picks</button>
+        <details class="ballot-preview">
+          <summary>Preview markdown</summary>
+          <pre id="ballot-md"></pre>
+        </details>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ================= MAIN ================= -->
+  <main>
+
+    <div class="crumb"><a href="index.html">← All prototypes</a> · Decision center</div>
+    <h1>Decision center — make your Phase-3 picks</h1>
+    <p class="lede">Everything that needs your approval in one sitting: both popup directions side by side on the <b>same state switcher</b>, every Phase-4 component as an A/B face-off, the three classroom-action names rendered where users will see them, and the six trust surfaces with per-item approval. Every pick lands in the <b>My choices</b> panel — copy the ballot when you're done. Nothing here ships; picks persist in this browser only.</p>
+    <div class="identity">
+      <span>Same state, both directions</span>
+      <span>Picks persist in localStorage</span>
+      <a class="chip" href="#ballot">My choices ↓</a>
+    </div>
+
+    <div class="rm-bar">
+      <div>
+        <div class="rm-txt">Reduce motion</div>
+        <div class="rm-sub">Simulates the in-app setting — also syncs to both live frames. System preference detected on load.</div>
+      </div>
+      <span class="rm-state" id="rm-state">Standard motion</span>
+      <button type="button" class="rm-switch" id="rm-toggle" aria-pressed="false" aria-label="Toggle reduced motion simulation"></button>
+    </div>
+
+    <!-- ================= 01 · SIDE-BY-SIDE COMPARISON ================= -->
+    <div class="sec" id="compare">
+      <div class="sec-label">01 · Side-by-side — same state, both directions</div>
+      <h2>Stillwater vs Gridline, on one switcher</h2>
+      <p class="desc">Both frames are the real prototype pages running in embed mode, driven by the state switch below — pick a state once and both directions show exactly it. The frames stay interactive: click inside to try controls. Use this to answer the direction question, then record it.</p>
+
+      <div class="compare-tools">
+        <div class="state-switch" role="radiogroup" aria-label="Popup state" id="state-switch">
+          <button type="button" role="radio" aria-checked="true" data-state="idle">Idle</button>
+          <button type="button" role="radio" aria-checked="false" data-state="loading">Loading</button>
+          <button type="button" role="radio" aria-checked="false" data-state="success">Success</button>
+          <button type="button" role="radio" aria-checked="false" data-state="error">Error</button>
+          <button type="button" role="radio" aria-checked="false" data-state="history">History</button>
+        </div>
+      </div>
+      <p class="state-desc" id="state-desc">Idle: nothing running. A leads with the hero action; B answers "is anything running?" with the status strip first.</p>
+
+      <div class="frames">
+        <div class="frame-col">
+          <div class="frame-head">
+            <span class="frame-tag a" aria-hidden="true">A</span>
+            <b>Stillwater — calm glass</b>
+            <span class="frame-state" id="fs-a">idle</span>
+            <a class="open-full" href="popup-direction-a.html" target="_blank" rel="noopener">open full ↗</a>
+          </div>
+          <div class="frame">
+            <iframe id="frame-a" src="popup-direction-a.html#embed=1&amp;state=idle" title="Direction A — Stillwater popup, 360 by 600"></iframe>
+          </div>
+        </div>
+        <div class="frame-col">
+          <div class="frame-head">
+            <span class="frame-tag b" aria-hidden="true">B</span>
+            <b>Gridline — compact utility</b>
+            <span class="frame-state" id="fs-b">idle</span>
+            <a class="open-full" href="popup-direction-b.html" target="_blank" rel="noopener">open full ↗</a>
+          </div>
+          <div class="frame">
+            <iframe id="frame-b" src="popup-direction-b.html#embed=1&amp;state=idle" title="Direction B — Gridline popup, 360 by 600"></iframe>
+          </div>
+        </div>
+      </div>
+
+      <div class="dir-pick">
+        <div class="p-label">Stop Gate · which direction ships?</div>
+        <div class="pick" role="radiogroup" aria-label="Direction pick" style="margin-top:8px;">
+          <button type="button" role="radio" aria-checked="false" data-key="direction" data-val="a">A — Stillwater</button>
+          <button type="button" role="radio" aria-checked="false" data-key="direction" data-val="b">B — Gridline</button>
+          <button type="button" role="radio" aria-checked="false" data-key="direction" data-val="hybrid">Hybrid — describe in notes</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= 02 · COMPONENT FACE-OFFS ================= -->
+    <div class="sec" id="faceoffs">
+      <div class="sec-label">02 · Component face-offs — pick one per row</div>
+      <h2>Phase-4 items, both directions at 360px width</h2>
+      <p class="desc">Each row renders both directions' version of the component, then asks for one pick. Where "no change" is the honest option, it's on the list. Full production specs live in <a href="components.html">components.html</a> and <a href="effects.html">effects.html</a>.</p>
+
+      <!-- 2.1 Engine selector -->
+      <div class="fo">
+        <div class="fo-head">
+          <span class="fo-num">2.1</span>
+          <h3>Engine selector</h3>
+          <span class="fo-note">Trust copy is verbatim in every option: "New runs the rewritten engine. Switch back to Legacy any time — one click rolls everything back."</span>
+        </div>
+        <div class="fo-grid">
+          <figure class="fo-panel">
+            <figcaption><span>A · Stillwater</span><span>segmented + caption</span></figcaption>
+            <div class="fo-stage">
+              <div class="p-label">Engine</div>
+              <div class="seg" role="group" aria-label="Engine selector, direction A">
+                <button type="button" aria-pressed="false">Legacy</button>
+                <button type="button" aria-pressed="true">New</button>
+                <button type="button" aria-pressed="false">API <span class="beta">β</span></button>
+              </div>
+              <p class="engine-copy"><strong>New</strong> runs the rewritten engine. Switch back to Legacy any time — one click rolls everything back.</p>
+            </div>
+          </figure>
+          <figure class="fo-panel">
+            <figcaption><span>B · Gridline</span><span>32px row + mini-segment</span></figcaption>
+            <div class="fo-stage">
+              <div class="b-rows">
+                <div class="b-row">
+                  <span class="r-label">Engine</span>
+                  <span class="mini-seg" role="group" aria-label="Engine selector, direction B">
+                    <button type="button" aria-pressed="false">Legacy</button>
+                    <button type="button" aria-pressed="true">New</button>
+                    <button type="button" aria-pressed="false">API<span class="beta">β</span></button>
+                  </span>
+                </div>
+                <div class="b-row-copy"><strong>New</strong> runs the rewritten engine. Switch back to Legacy any time — one click rolls everything back.</div>
+              </div>
+            </div>
+          </figure>
+        </div>
+        <div class="pick" role="radiogroup" aria-label="Engine selector pick">
+          <button type="button" role="radio" aria-checked="false" data-key="engine" data-val="a">Ship A — segmented + caption</button>
+          <button type="button" role="radio" aria-checked="false" data-key="engine" data-val="b">Ship B — compact row</button>
+          <button type="button" role="radio" aria-checked="false" data-key="engine" data-val="none" class="pick-none">No change — keep today's selector</button>
+        </div>
+      </div>
+
+      <!-- 2.2 Flag cards with Both -->
+      <div class="fo">
+        <div class="fo-head">
+          <span class="fo-num">2.2</span>
+          <h3>Flag cards with "Both"</h3>
+          <span class="fo-note">"Both" moves into the popup with the purple→cyan gradient (today's red #FF4036 collides with error). Animated preview cards: components.html §B.</span>
+        </div>
+        <div class="fo-grid">
+          <figure class="fo-panel">
+            <figcaption><span>A · Stillwater</span><span>pills + gradient dot</span></figcaption>
+            <div class="fo-stage">
+              <div class="p-label">Highlight changes</div>
+              <div class="flags" role="group" aria-label="Flag pills, direction A">
+                <button type="button" class="flag c-comment" aria-pressed="true"><span class="dot" aria-hidden="true"></span>Comment</button>
+                <button type="button" class="flag c-edited" aria-pressed="false"><span class="dot" aria-hidden="true"></span>Edited</button>
+                <button type="button" class="flag c-both" aria-pressed="true"><span class="dot" aria-hidden="true"></span>Both</button>
+              </div>
+              <p class="demo-hint">One row of pills; selected flags glow. "Both" carries the gradient dot.</p>
+            </div>
+          </figure>
+          <figure class="fo-panel">
+            <figcaption><span>B · Gridline</span><span>switch rows + counts</span></figcaption>
+            <div class="fo-stage">
+              <div class="b-rows" role="group" aria-label="Flag switches, direction B">
+                <div class="b-row">
+                  <span class="r-label" style="color:var(--comment-text);">Comment highlights</span>
+                  <span class="flag-count">12 posts</span>
+                  <button type="button" class="switch c-comment" aria-pressed="true" aria-label="Comment highlights"></button>
+                </div>
+                <div class="b-row">
+                  <span class="r-label" style="color:var(--edited-text);">Edited highlights</span>
+                  <span class="flag-count">3 posts</span>
+                  <button type="button" class="switch" aria-pressed="false" aria-label="Edited highlights"></button>
+                </div>
+                <div class="b-row">
+                  <span class="r-label">Both (comment + edited)</span>
+                  <span class="flag-count">2 posts</span>
+                  <button type="button" class="switch" aria-pressed="true" aria-label="Both flag"></button>
+                </div>
+              </div>
+              <p class="demo-hint">Switch rows with live post counts — the count is the feedback.</p>
+            </div>
+          </figure>
+        </div>
+        <div class="pick" role="radiogroup" aria-label="Flag cards pick">
+          <button type="button" role="radio" aria-checked="false" data-key="flags" data-val="a">Ship A — pills</button>
+          <button type="button" role="radio" aria-checked="false" data-key="flags" data-val="b">Ship B — switches</button>
+          <button type="button" role="radio" aria-checked="false" data-key="flags" data-val="none" class="pick-none">No change — "Both" stays Options-only</button>
+        </div>
+      </div>
+
+      <!-- 2.3 Sequential / parallel row -->
+      <div class="fo">
+        <div class="fo-head">
+          <span class="fo-num">2.3</span>
+          <h3>Sequential / parallel row</h3>
+          <span class="fo-note">Exposes the existing <code>QUEUE_CONCURRENCY = 3</code> as <code>downloadConcurrency: 1 | 3</code> ("1 at a time" / "3 at a time"). Same control in both; the difference is placement.</span>
+        </div>
+        <div class="fo-grid">
+          <figure class="fo-panel">
+            <figcaption><span>A · Stillwater</span><span>card row + hint</span></figcaption>
+            <div class="fo-stage">
+              <div class="mode-row">
+                <span class="mr-main">
+                  <span class="mr-label">Download mode</span>
+                  <span class="mr-hint">Parallel is faster for big posts. Switch any time.</span>
+                </span>
+                <span class="mini-seg" role="group" aria-label="Download mode, direction A">
+                  <button type="button" aria-pressed="false">Seq · 1</button>
+                  <button type="button" aria-pressed="true">Parallel · 3</button>
+                </span>
+              </div>
+            </div>
+          </figure>
+          <figure class="fo-panel">
+            <figcaption><span>B · Gridline</span><span>settings-list row</span></figcaption>
+            <div class="fo-stage">
+              <div class="b-rows">
+                <div class="b-row">
+                  <span class="r-label">Download mode</span>
+                  <span class="mini-seg" role="group" aria-label="Download mode, direction B">
+                    <button type="button" aria-pressed="false">Seq · 1</button>
+                    <button type="button" aria-pressed="true">Parallel · 3</button>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </figure>
+        </div>
+        <div class="pick" role="radiogroup" aria-label="Download mode pick">
+          <button type="button" role="radio" aria-checked="false" data-key="mode" data-val="a">Ship it — A placement</button>
+          <button type="button" role="radio" aria-checked="false" data-key="mode" data-val="b">Ship it — B placement</button>
+          <button type="button" role="radio" aria-checked="false" data-key="mode" data-val="none" class="pick-none">No change — don't expose the setting</button>
+        </div>
+      </div>
+
+      <!-- 2.4 Water effect + intensity -->
+      <div class="fo">
+        <div class="fo-head">
+          <span class="fo-num">2.4</span>
+          <h3>Water effect — with intensity option</h3>
+          <span class="fo-note">A fills continuously (liquid rise, dual crest); B advances in discrete per-file ticks. Intensity applies to whichever ships. Reduced-motion contract: waves hide, fill and counters remain.</span>
+        </div>
+        <div class="fo-grid int-subtle" id="water-demos">
+          <figure class="fo-panel">
+            <figcaption><span>A · Stillwater</span><span>continuous liquid</span></figcaption>
+            <div class="fo-stage">
+              <button type="button" class="ctaA" id="water-a" style="--fill:0%">
+                <span class="fill" aria-hidden="true"></span>
+                <span class="wave w1" aria-hidden="true">
+                  <svg viewBox="0 0 120 10" preserveAspectRatio="none"><path d="M0 6 Q 7.5 0 15 6 T 30 6 T 45 6 T 60 6 T 75 6 T 90 6 T 105 6 T 120 6 V10 H0 Z" fill="rgba(143,123,255,.55)"/></svg>
+                </span>
+                <span class="wave w2" aria-hidden="true">
+                  <svg viewBox="0 0 120 10" preserveAspectRatio="none"><path d="M0 5 Q 10 10 20 5 T 40 5 T 60 5 T 80 5 T 100 5 T 120 5 V10 H0 Z" fill="rgba(110,91,255,.5)"/></svg>
+                </span>
+                <span class="row">
+                  <span class="ic" aria-hidden="true">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0 3-3m-3 3L5 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 12.5h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+                  </span>
+                  <span class="tt"><b id="wa-t">Download Classroom</b><small id="wa-s">24 files across 4 posts</small></span>
+                </span>
+              </button>
+              <div class="demo-hint">Click to run — smooth rise, settling ease.</div>
+            </div>
+          </figure>
+          <figure class="fo-panel">
+            <figcaption><span>B · Gridline</span><span>per-file ticks</span></figcaption>
+            <div class="fo-stage">
+              <button type="button" class="ctaB" id="water-b" style="--fill:0%">
+                <span class="fill" aria-hidden="true"></span>
+                <span class="wave" aria-hidden="true">
+                  <svg viewBox="0 0 6 120" preserveAspectRatio="none"><path d="M3 0 Q 6 5 3 10 T 3 20 T 3 30 T 3 40 T 3 50 T 3 60 T 3 70 T 3 80 T 3 90 T 3 100 T 3 110 T 3 120 H0 Z" fill="rgba(20,18,31,.55)"/></svg>
+                </span>
+                <span class="t" id="wb-t">Download Classroom</span>
+                <span class="n" id="wb-s">24 files</span>
+              </button>
+              <div class="demo-hint">Click to run — progress ticks per file (steps).</div>
+            </div>
+          </figure>
+        </div>
+        <div class="pick" role="radiogroup" aria-label="Water effect pick">
+          <button type="button" role="radio" aria-checked="false" data-key="water" data-val="a">Ship A — liquid</button>
+          <button type="button" role="radio" aria-checked="false" data-key="water" data-val="b">Ship B — ticks</button>
+          <button type="button" role="radio" aria-checked="false" data-key="water" data-val="none" class="pick-none">No change — plain progress bar</button>
+        </div>
+        <div class="pick" role="radiogroup" aria-label="Water intensity" id="intensity-pick">
+          <span class="pick-label">Intensity</span>
+          <button type="button" role="radio" aria-checked="true" data-key="waterIntensity" data-val="subtle">Subtle</button>
+          <button type="button" role="radio" aria-checked="false" data-key="waterIntensity" data-val="pronounced">Pronounced</button>
+          <button type="button" class="demo-run" id="water-run" style="margin-top:0; margin-left:auto;">Run both</button>
+        </div>
+      </div>
+
+      <!-- 2.5 BMC star shimmer -->
+      <div class="fo">
+        <div class="fo-head">
+          <span class="fo-num">2.5</span>
+          <h3>BMC star shimmer</h3>
+          <span class="fo-note">Same footer button in both directions, so this is a ship / don't-ship call, not an A/B one. Stars: 5 × 4.8s, ≤25% duty cycle · sheen: one pass / 6.5s · decorative only.</span>
+        </div>
+        <div class="fo-grid cols3">
+          <figure class="fo-panel">
+            <figcaption><span>Option 1</span><span>stars + sheen</span></figcaption>
+            <div class="fo-stage fo-center">
+              <button type="button" class="bmc">
+                <svg class="star" style="top:-9px; left:14%; animation-delay:0s;" width="14" height="14" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 0 7.2 4.8 12 6 7.2 7.2 6 12 4.8 7.2 0 6 4.8 4.8Z" fill="#FFE566"/></svg>
+                <svg class="star" style="top:-12px; left:46%; animation-delay:1.4s;" width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 0 7.2 4.8 12 6 7.2 7.2 6 12 4.8 7.2 0 6 4.8 4.8Z" fill="#FFF3B0"/></svg>
+                <svg class="star" style="top:-6px; right:16%; animation-delay:2.6s;" width="13" height="13" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 0 7.2 4.8 12 6 7.2 7.2 6 12 4.8 7.2 0 6 4.8 4.8Z" fill="#FFE566"/></svg>
+                <svg class="star" style="bottom:-9px; left:28%; animation-delay:3.4s;" width="9" height="9" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 0 7.2 4.8 12 6 7.2 7.2 6 12 4.8 7.2 0 6 4.8 4.8Z" fill="#FFF3B0"/></svg>
+                <span class="sheen" aria-hidden="true"></span>
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 6h8v4a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6Z" fill="#241C00"/><path d="M11 7h1.2a1.8 1.8 0 0 1 0 3.6H11" stroke="#241C00" stroke-width="1.3"/><path d="M5.2 4.2c0-.8.8-.8.8-1.6M8 4.2c0-.8.8-.8.8-1.6" stroke="#241C00" stroke-width="1.2" stroke-linecap="round"/></svg>
+                Buy me a coffee
+              </button>
+            </div>
+          </figure>
+          <figure class="fo-panel">
+            <figcaption><span>Option 2</span><span>sheen only</span></figcaption>
+            <div class="fo-stage fo-center">
+              <button type="button" class="bmc">
+                <span class="sheen" aria-hidden="true"></span>
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 6h8v4a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6Z" fill="#241C00"/><path d="M11 7h1.2a1.8 1.8 0 0 1 0 3.6H11" stroke="#241C00" stroke-width="1.3"/><path d="M5.2 4.2c0-.8.8-.8.8-1.6M8 4.2c0-.8.8-.8.8-1.6" stroke="#241C00" stroke-width="1.2" stroke-linecap="round"/></svg>
+                Buy me a coffee
+              </button>
+            </div>
+          </figure>
+          <figure class="fo-panel">
+            <figcaption><span>Option 3</span><span>today — plain</span></figcaption>
+            <div class="fo-stage fo-center">
+              <button type="button" class="bmc">
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 6h8v4a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6Z" fill="#241C00"/><path d="M11 7h1.2a1.8 1.8 0 0 1 0 3.6H11" stroke="#241C00" stroke-width="1.3"/><path d="M5.2 4.2c0-.8.8-.8.8-1.6M8 4.2c0-.8.8-.8.8-1.6" stroke="#241C00" stroke-width="1.2" stroke-linecap="round"/></svg>
+                Buy me a coffee
+              </button>
+            </div>
+          </figure>
+        </div>
+        <div class="pick" role="radiogroup" aria-label="Star shimmer pick">
+          <button type="button" role="radio" aria-checked="false" data-key="shimmer" data-val="both">Ship — stars + sheen</button>
+          <button type="button" role="radio" aria-checked="false" data-key="shimmer" data-val="sheen">Ship — sheen only</button>
+          <button type="button" role="radio" aria-checked="false" data-key="shimmer" data-val="none" class="pick-none">No change — plain button</button>
+        </div>
+      </div>
+
+      <!-- 2.6 Typography scale -->
+      <div class="fo">
+        <div class="fo-head">
+          <span class="fo-num">2.6</span>
+          <h3>Typography scale</h3>
+          <span class="fo-note">Shared by both directions (audit items 1–5): one stack, fixed sizes, weights 400/500/600 only, tabular numerals on counts.</span>
+        </div>
+        <div class="fo-grid">
+          <figure class="fo-panel">
+            <figcaption><span>Proposed</span><span>fixed 11 · 12 · 13 · 15 · 17 (+10 legal only)</span></figcaption>
+            <div class="fo-stage">
+              <div class="type-row"><span class="type-tag">15 / 600 — Title</span><span style="font-size:15px;font-weight:600;">Download Classroom</span></div>
+              <div class="type-row"><span class="type-tag">13 / 600 — Body-strong</span><span style="font-size:13px;font-weight:600;">Photosynthesis — deck + notes</span></div>
+              <div class="type-row"><span class="type-tag">13 / 400 — Body</span><span style="font-size:13px;color:var(--text2);">24 files across 4 posts</span></div>
+              <div class="type-row"><span class="type-tag">12 / 500 — Control</span><span style="font-size:12px;font-weight:500;">Legacy · New · API (beta)</span></div>
+              <div class="type-row"><span class="type-tag">11 / 400 — Micro</span><span style="font-size:11px;color:var(--text3);">New runs the rewritten engine…</span></div>
+              <div class="type-row"><span class="type-tag">10 / 400 — Legal only</span><span style="font-size:10px;color:var(--text3);">Not affiliated with Google.</span></div>
+            </div>
+          </figure>
+          <figure class="fo-panel">
+            <figcaption><span>Today</span><span>ad-hoc sizes, 700 weight in use</span></figcaption>
+            <div class="fo-stage">
+              <div class="type-row"><span class="type-tag">20 / 600 — heading</span><span style="font-size:20px;font-weight:600;">Settings</span></div>
+              <div class="type-row"><span class="type-tag">17 / 600 — heading</span><span style="font-size:17px;font-weight:600;">Engine</span></div>
+              <div class="type-row"><span class="type-tag">16 / 600 — card head</span><span style="font-size:16px;font-weight:600;">Recent downloads</span></div>
+              <div class="type-row"><span class="type-tag">15 / 600 — popup title</span><span style="font-size:15px;font-weight:600;">Download All</span></div>
+              <div class="type-row"><span class="type-tag">11 / 700 — pill</span><span style="font-size:11px;font-weight:700;">Download (3 files)</span></div>
+              <div class="type-row"><span class="type-tag">10/11/12 — micro mix</span><span style="font-size:11px;color:var(--text3);">three sizes for the same job</span></div>
+            </div>
+          </figure>
+        </div>
+        <div class="pick" role="radiogroup" aria-label="Typography pick">
+          <button type="button" role="radio" aria-checked="false" data-key="type" data-val="fixed">Adopt the fixed scale</button>
+          <button type="button" role="radio" aria-checked="false" data-key="type" data-val="none" class="pick-none">No change — type stays as-is</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= 03 · NAME PICKER ================= -->
+    <div class="sec" id="names">
+      <div class="sec-label">03 · Classroom action name — in context (task 2.7)</div>
+      <h2>"Download All" is retired — see each candidate where users will see it</h2>
+      <p class="desc">Each candidate is rendered on the light Classroom surface — the classroom-level action sits in the banner row, with the post-level <b>"Download All (3 files)"</b> pill right below on a post — and again as the popup hero (A) and action bar (B). If a name reads wrong anywhere, it's the wrong name. Rename later is a one-line constant change.</p>
+
+      <div class="name-grid" role="radiogroup" aria-label="Classroom action name">
+
+        <article class="name-card reco">
+          <span class="reco-tag">RECOMMENDED</span>
+          <div class="name-head"><h3>Candidate 1 — "Download Classroom"</h3><span class="chars">18 chars</span></div>
+          <div class="cr-surface" aria-label="Classroom surface with the Download Classroom action">
+            <div class="cr-top">
+              <span class="cr-banner"><span class="cr-ic" aria-hidden="true">B</span>Biology — Period 3</span>
+              <span class="cr-class-btn">Download Classroom<span class="cnt">24 files</span></span>
+            </div>
+            <div class="cr-post">
+              <div class="cr-post-title">Cell structures — homework</div>
+              <div class="cr-post-meta">Posted yesterday · 3 attachments</div>
+              <div class="cr-post-row">
+                <span class="att">slides.pdf</span>
+                <span class="att">notes.docx</span>
+                <span class="att">deck.pptx</span>
+                <span class="cr-post-btn">Download All (3 files)</span>
+              </div>
+            </div>
+          </div>
+          <div class="cr-caption">Classroom page · classroom-level action in the banner, post-level "Download All" on the post — no shared word, no confusion.</div>
+          <div class="fo-grid name-ctas">
+            <figure class="fo-panel">
+              <figcaption><span>A · popup hero</span><span>15 / 600</span></figcaption>
+              <div class="fo-stage">
+                <div class="ctaA">
+                  <span class="fill" aria-hidden="true"></span>
+                  <span class="row">
+                    <span class="ic" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0 3-3m-3 3L5 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 12.5h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+                    <span class="tt"><b>Download Classroom</b><small>24 files across 4 posts</small></span>
+                  </span>
+                </div>
+              </div>
+            </figure>
+            <figure class="fo-panel">
+              <figcaption><span>B · action bar</span><span>13 / 600</span></figcaption>
+              <div class="fo-stage">
+                <div class="ctaB">
+                  <span class="fill" aria-hidden="true"></span>
+                  <span class="t">Download Classroom</span>
+                  <span class="n">24 files</span>
+                </div>
+              </div>
+            </figure>
+          </div>
+          <p class="name-note">Names the object exactly; shortest; zero overlap with the post-level action. Con: slightly less explicit that it covers posted materials only — the sub-line covers that.</p>
+          <div class="pick" style="margin-top:12px;">
+            <button type="button" class="pick-one" role="radio" aria-checked="false" data-key="name" data-val="n1">Pick this name</button>
+          </div>
+        </article>
+
+        <article class="name-card">
+          <div class="name-head"><h3>Candidate 2 — "Download All Materials"</h3><span class="chars">21 chars</span></div>
+          <div class="cr-surface" aria-label="Classroom surface with the Download All Materials action">
+            <div class="cr-top">
+              <span class="cr-banner"><span class="cr-ic" aria-hidden="true">B</span>Biology — Period 3</span>
+              <span class="cr-class-btn">Download All Materials<span class="cnt">24 files</span></span>
+            </div>
+            <div class="cr-post">
+              <div class="cr-post-title">Cell structures — homework</div>
+              <div class="cr-post-meta">Posted yesterday · 3 attachments</div>
+              <div class="cr-post-row">
+                <span class="att">slides.pdf</span>
+                <span class="att">notes.docx</span>
+                <span class="att">deck.pptx</span>
+                <span class="cr-post-btn">Download All (3 files)</span>
+              </div>
+            </div>
+          </div>
+          <div class="cr-caption">Note the repeated "All" two rows apart — the word we are retiring, now doing double duty.</div>
+          <div class="fo-grid name-ctas">
+            <figure class="fo-panel">
+              <figcaption><span>A · popup hero</span><span>15 / 600</span></figcaption>
+              <div class="fo-stage">
+                <div class="ctaA">
+                  <span class="fill" aria-hidden="true"></span>
+                  <span class="row">
+                    <span class="ic" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0 3-3m-3 3L5 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 12.5h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+                    <span class="tt"><b>Download All Materials</b><small>24 files across 4 posts</small></span>
+                  </span>
+                </div>
+              </div>
+            </figure>
+            <figure class="fo-panel">
+              <figcaption><span>B · action bar</span><span>13 / 600</span></figcaption>
+              <div class="fo-stage">
+                <div class="ctaB">
+                  <span class="fill" aria-hidden="true"></span>
+                  <span class="t">Download All Materials</span>
+                  <span class="n">24 files</span>
+                </div>
+              </div>
+            </figure>
+          </div>
+          <p class="name-note">Most precise payload description, uses Classroom's own vocabulary. Con: 21 characters (truncates with the badge on narrow locales) and still contains "All".</p>
+          <div class="pick" style="margin-top:12px;">
+            <button type="button" class="pick-one" role="radio" aria-checked="false" data-key="name" data-val="n2">Pick this name</button>
+          </div>
+        </article>
+
+        <article class="name-card">
+          <div class="name-head"><h3>Candidate 3 — "Download Everything"</h3><span class="chars">19 chars</span></div>
+          <div class="cr-surface" aria-label="Classroom surface with the Download Everything action">
+            <div class="cr-top">
+              <span class="cr-banner"><span class="cr-ic" aria-hidden="true">B</span>Biology — Period 3</span>
+              <span class="cr-class-btn">Download Everything<span class="cnt">24 files</span></span>
+            </div>
+            <div class="cr-post">
+              <div class="cr-post-title">Cell structures — homework</div>
+              <div class="cr-post-meta">Posted yesterday · 3 attachments</div>
+              <div class="cr-post-row">
+                <span class="att">slides.pdf</span>
+                <span class="att">notes.docx</span>
+                <span class="att">deck.pptx</span>
+                <span class="cr-post-btn">Download All (3 files)</span>
+              </div>
+            </div>
+          </div>
+          <div class="cr-caption">Reads as "the big one" — but "everything" overclaims: nothing touches announcements or grades.</div>
+          <div class="fo-grid name-ctas">
+            <figure class="fo-panel">
+              <figcaption><span>A · popup hero</span><span>15 / 600</span></figcaption>
+              <div class="fo-stage">
+                <div class="ctaA">
+                  <span class="fill" aria-hidden="true"></span>
+                  <span class="row">
+                    <span class="ic" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0 3-3m-3 3L5 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 12.5h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+                    <span class="tt"><b>Download Everything</b><small>24 files across 4 posts</small></span>
+                  </span>
+                </div>
+              </div>
+            </figure>
+            <figure class="fo-panel">
+              <figcaption><span>B · action bar</span><span>13 / 600</span></figcaption>
+              <div class="fo-stage">
+                <div class="ctaB">
+                  <span class="fill" aria-hidden="true"></span>
+                  <span class="t">Download Everything</span>
+                  <span class="n">24 files</span>
+                </div>
+              </div>
+            </figure>
+          </div>
+          <p class="name-note">Energetic and unmistakably the big one. Con: overclaims scope — a trust risk and a support-ticket generator.</p>
+          <div class="pick" style="margin-top:12px;">
+            <button type="button" class="pick-one" role="radio" aria-checked="false" data-key="name" data-val="n3">Pick this name</button>
+          </div>
+        </article>
+
+      </div>
+    </div>
+
+    <!-- ================= 04 · LEGAL APPROVAL ================= -->
+    <div class="sec" id="legal">
+      <div class="sec-label">04 · Legal &amp; trust approval — six surfaces</div>
+      <h2>Approve each as prototyped, or flag it for edits</h2>
+      <p class="desc">The six trust surfaces from <a href="legal.html">legal.html</a>, labeled REQUIRED vs RECOMMENDED per Chrome Web Store policy. "Edit later" doesn't block 1.8.9 — it lands in the ballot so the edit is tracked.</p>
+
+      <div class="legal-tools">
+        <button type="button" id="legal-approve-all">Approve all as prototyped</button>
+        <span id="legal-status">0 of 6 reviewed</span>
+      </div>
+
+      <div class="lg-row">
+        <div class="lg-main">
+          <div class="lg-head"><span class="req required">REQUIRED · store + dashboard</span><h3>Privacy &amp; data summary row</h3></div>
+          <p>Popup footer row expanding in place — reads the pages you open, stores settings only, sends nothing to the developer. Same three lines in Options and on first run.</p>
+          <a href="legal.html#surface-privacy">View surface →</a>
+        </div>
+        <div class="lg-pick">
+          <div class="pick" role="radiogroup" aria-label="Privacy row approval">
+            <button type="button" role="radio" aria-checked="false" data-key="legal1" data-val="approve">Approve</button>
+            <button type="button" role="radio" aria-checked="false" data-key="legal1" data-val="edit">Edit later</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="lg-row">
+        <div class="lg-main">
+          <div class="lg-head"><span class="req required">REQUIRED · dashboard</span><h3>Permissions explainer</h3></div>
+          <p>One row per permission, verb-first ("Saves…", "Remembers…", "Lets…"); identity row scoped to the API beta. Reused verbatim in the store listing justifications.</p>
+          <a href="legal.html#surface-permissions">View surface →</a>
+        </div>
+        <div class="lg-pick">
+          <div class="pick" role="radiogroup" aria-label="Permissions explainer approval">
+            <button type="button" role="radio" aria-checked="false" data-key="legal2" data-val="approve">Approve</button>
+            <button type="button" role="radio" aria-checked="false" data-key="legal2" data-val="edit">Edit later</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="lg-row">
+        <div class="lg-main">
+          <div class="lg-head"><span class="req required">REQUIRED · mitigation</span><h3>"Not affiliated with Google" notice</h3></div>
+          <p>Standing footer line — the first sentence is the disclaimer itself, never buried; same sentence leads the store listing description.</p>
+          <a href="legal.html#surface-affiliation">View surface →</a>
+        </div>
+        <div class="lg-pick">
+          <div class="pick" role="radiogroup" aria-label="Affiliation notice approval">
+            <button type="button" role="radio" aria-checked="false" data-key="legal3" data-val="approve">Approve</button>
+            <button type="button" role="radio" aria-checked="false" data-key="legal3" data-val="edit">Edit later</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="lg-row">
+        <div class="lg-main">
+          <div class="lg-head"><span class="req recommended">RECOMMENDED</span><h3>API (beta) risk warning</h3></div>
+          <p>Names the risk ("experimental"), the mechanism ("Google's official API"), and ends with the rollback promise. Shows at beta selection and in Options.</p>
+          <a href="legal.html#surface-api-warning">View surface →</a>
+        </div>
+        <div class="lg-pick">
+          <div class="pick" role="radiogroup" aria-label="API beta warning approval">
+            <button type="button" role="radio" aria-checked="false" data-key="legal4" data-val="approve">Approve</button>
+            <button type="button" role="radio" aria-checked="false" data-key="legal4" data-val="edit">Edit later</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="lg-row">
+        <div class="lg-main">
+          <div class="lg-head"><span class="req recommended">RECOMMENDED · strongly advised</span><h3>Copyright / ToS one-time dialog</h3></div>
+          <p>Checkbox-gated reminder before the first classroom-wide run ("I'll use these files responsibly"); after that, a standing footer echo — no dialogs again.</p>
+          <a href="legal.html#surface-copyright">View surface →</a>
+        </div>
+        <div class="lg-pick">
+          <div class="pick" role="radiogroup" aria-label="Copyright dialog approval">
+            <button type="button" role="radio" aria-checked="false" data-key="legal5" data-val="approve">Approve</button>
+            <button type="button" role="radio" aria-checked="false" data-key="legal5" data-val="edit">Edit later</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="lg-row">
+        <div class="lg-main">
+          <div class="lg-head"><span class="req required">REQUIRED · store + dashboard</span><h3>Limited Use affirmation</h3></div>
+          <p>The exact policy sentence in the dashboard + privacy policy, with a plain-language line above it and a one-line echo in the Options API section.</p>
+          <a href="legal.html#surface-limited-use">View surface →</a>
+        </div>
+        <div class="lg-pick">
+          <div class="pick" role="radiogroup" aria-label="Limited Use approval">
+            <button type="button" role="radio" aria-checked="false" data-key="legal6" data-val="approve">Approve</button>
+            <button type="button" role="radio" aria-checked="false" data-key="legal6" data-val="edit">Edit later</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="page-end">
+      Classroom Quick Downloader · decision center for 1.8.9 · picks stay in this browser (localStorage) and leave with the "Copy my choices" button · nothing on this page ships.
+    </footer>
+
+  </main>
+</div>
+
+<script>
+  /* ============ Shared state ============ */
+  var STORE_KEY = 'cqd-189-decide';
+  var state = {
+    direction: null, name: null,
+    engine: null, flags: null, mode: null,
+    water: null, waterIntensity: 'subtle', shimmer: null, type: null,
+    legal1: null, legal2: null, legal3: null, legal4: null, legal5: null, legal6: null,
+    notes: ''
+  };
+  var VALS = {
+    direction: { a: 'A Stillwater', b: 'B Gridline', hybrid: 'Hybrid (see notes)' },
+    name: { n1: 'Download Classroom', n2: 'Download All Materials', n3: 'Download Everything' },
+    engine: { a: 'A — segmented + caption', b: 'B — compact row', none: 'no change' },
+    flags: { a: 'A — pills + gradient dot', b: 'B — switches + counts', none: 'no change' },
+    mode: { a: 'A — card row', b: 'B — settings row', none: 'no change' },
+    water: { a: 'A — continuous liquid', b: 'B — per-file ticks', none: 'no change' },
+    shimmer: { both: 'stars + sheen', sheen: 'sheen only', none: 'no change' },
+    type: { fixed: 'fixed 11·12·13·15·17', none: 'no change' }
+  };
+  var LEGAL_KEYS = ['legal1', 'legal2', 'legal3', 'legal4', 'legal5', 'legal6'];
+  var LEGAL_SHORT = {
+    legal1: 'privacy row', legal2: 'permissions explainer', legal3: 'affiliation notice',
+    legal4: 'API-beta warning', legal5: 'copyright dialog', legal6: 'Limited Use'
+  };
+  var DECIDE_KEYS = ['direction', 'name', 'engine', 'flags', 'mode', 'water', 'shimmer', 'type'].concat(LEGAL_KEYS);
+
+  function save() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* private mode etc. */ }
+  }
+
+  /* ============ Ballot rendering ============ */
+  function shipTokens() {
+    var t = [];
+    if (state.engine === 'a') t.push('engine selector (A segmented)');
+    if (state.engine === 'b') t.push('engine selector (B row)');
+    if (state.flags === 'a') t.push('both-flag card (A pills)');
+    if (state.flags === 'b') t.push('both-flag card (B switches)');
+    if (state.mode === 'a' || state.mode === 'b') t.push('seq/parallel row');
+    if (state.water === 'a' || state.water === 'b') {
+      t.push('water effect (' + state.waterIntensity + ' · ' + (state.water === 'a' ? 'A liquid' : 'B ticks') + ')');
+      t.push('reduce-motion setting');
+    }
+    if (state.shimmer === 'both') t.push('star shimmer (stars + sheen)');
+    if (state.shimmer === 'sheen') t.push('star shimmer (sheen only)');
+    if (state.type === 'fixed') t.push('typography fixes (fixed scale)');
+    return t;
+  }
+  function noChangeTokens() {
+    var map = {
+      engine: 'engine selector stays as-is',
+      flags: '"Both" flag stays Options-only',
+      mode: 'downloadConcurrency stays unexposed',
+      water: 'plain progress bar stays',
+      shimmer: 'BMC button stays plain',
+      type: 'type stays as-is'
+    };
+    return Object.keys(map).filter(function (k) { return state[k] === 'none'; }).map(function (k) { return map[k]; });
+  }
+  function legalSummary() {
+    var approved = LEGAL_KEYS.filter(function (k) { return state[k] === 'approve'; });
+    var edits = LEGAL_KEYS.filter(function (k) { return state[k] === 'edit'; });
+    var untouched = LEGAL_KEYS.filter(function (k) { return !state[k]; });
+    if (!approved.length && !edits.length) return 'not yet reviewed';
+    if (approved.length === 6) return 'approved as prototyped';
+    var out = ['approved ' + approved.length + '/6'];
+    if (edits.length) out.push('edit later: ' + edits.map(function (k) { return LEGAL_SHORT[k]; }).join(', '));
+    if (untouched.length) out.push('unreviewed: ' + untouched.map(function (k) { return LEGAL_SHORT[k]; }).join(', '));
+    return out.join(' · ');
+  }
+  function buildMarkdown() {
+    var L = [];
+    L.push('PHASE 4 BALLOT');
+    L.push('direction: ' + (state.direction ? VALS.direction[state.direction] : '—'));
+    L.push('classroom action name: ' + (state.name ? VALS.name[state.name] : '—'));
+    var ship = shipTokens();
+    L.push('ship: ' + (ship.length ? ship.join(', ') : '—'));
+    L.push('legal: ' + legalSummary());
+    var nc = noChangeTokens();
+    if (nc.length) L.push('no change: ' + nc.join(', '));
+    if (state.notes.trim()) L.push('notes: ' + state.notes.trim());
+    return L.join('\n');
+  }
+  function renderBallot() {
+    var rows = [
+      ['Direction', state.direction ? VALS.direction[state.direction] : null],
+      ['Classroom action name', state.name ? VALS.name[state.name] : null],
+      ['Engine selector', state.engine ? VALS.engine[state.engine] : null],
+      ['Flag cards w/ Both', state.flags ? VALS.flags[state.flags] : null],
+      ['Seq / parallel row', state.mode ? VALS.mode[state.mode] : null],
+      ['Water effect', state.water ? (VALS.water[state.water] + (state.water === 'none' ? '' : ' · ' + state.waterIntensity)) : null],
+      ['BMC star shimmer', state.shimmer ? VALS.shimmer[state.shimmer] : null],
+      ['Typography scale', state.type ? VALS.type[state.type] : null],
+      ['Legal surfaces', (state.legal1 || state.legal2 || state.legal3 || state.legal4 || state.legal5 || state.legal6) ? legalSummary() : null]
+    ];
+    document.getElementById('ballot-list').innerHTML = rows.map(function (r) {
+      var cls = !r[1] ? '' : (r[1] === 'no change' ? 'none' : 'set');
+      return '<div class="bl-row"><dt>' + r[0] + '</dt><dd class="' + cls + '">' + (r[1] || '—') + '</dd></div>';
+    }).join('');
+    var decided = DECIDE_KEYS.filter(function (k) { return state[k]; }).length;
+    document.getElementById('ballot-progress').textContent = decided + ' of ' + DECIDE_KEYS.length + ' decided';
+    var lgDone = LEGAL_KEYS.filter(function (k) { return state[k]; }).length;
+    document.getElementById('legal-status').textContent = lgDone + ' of 6 reviewed';
+    document.getElementById('ballot-md').textContent = buildMarkdown();
+  }
+
+  /* ============ Pick controls (radio pills) ============ */
+  function syncWaterIntensity() {
+    var demos = document.getElementById('water-demos');
+    demos.classList.toggle('int-subtle', state.waterIntensity !== 'pronounced');
+    demos.classList.toggle('int-pronounced', state.waterIntensity === 'pronounced');
+    var off = state.water === 'none';
+    var pick = document.getElementById('intensity-pick');
+    pick.classList.toggle('disabled', off);
+    pick.setAttribute('aria-disabled', String(off));
+  }
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('button[role="radio"][data-key]');
+    if (!btn) return;
+    state[btn.dataset.key] = btn.dataset.val;
+    document.querySelectorAll('button[role="radio"][data-key="' + btn.dataset.key + '"]').forEach(function (b) {
+      b.setAttribute('aria-checked', String(b === btn));
+    });
+    syncWaterIntensity();
+    renderBallot(); save();
+  });
+  // Arrow-key navigation inside a radio group
+  document.addEventListener('keydown', function (e) {
+    if (['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].indexOf(e.key) === -1) return;
+    var btn = e.target.closest ? e.target.closest('button[role="radio"][data-key]') : null;
+    if (!btn) return;
+    var group = Array.prototype.slice.call(document.querySelectorAll('button[role="radio"][data-key="' + btn.dataset.key + '"]'));
+    var idx = group.indexOf(btn);
+    var next = (idx + (e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : -1) + group.length) % group.length;
+    group[next].focus(); group[next].click();
+    e.preventDefault();
+  });
+
+  /* ============ Approve-all legal ============ */
+  document.getElementById('legal-approve-all').addEventListener('click', function () {
+    LEGAL_KEYS.forEach(function (k) { state[k] = 'approve'; });
+    document.querySelectorAll('button[role="radio"][data-key^="legal"]').forEach(function (b) {
+      b.setAttribute('aria-checked', String(b.dataset.val === 'approve'));
+    });
+    renderBallot(); save();
+  });
+
+  /* ============ Notes ============ */
+  document.getElementById('ballot-notes').addEventListener('input', function () {
+    state.notes = this.value;
+    document.getElementById('ballot-md').textContent = buildMarkdown();
+    save();
+  });
+
+  /* ============ Copy + reset ============ */
+  function flashCopied() {
+    var b = document.getElementById('ballot-copy');
+    b.textContent = 'Copied to clipboard ✓'; b.classList.add('copied');
+    setTimeout(function () { b.textContent = 'Copy my choices'; b.classList.remove('copied'); }, 2200);
+  }
+  function fallbackCopy(text, done) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+    if (ok) done();
+    else {
+      document.querySelector('.ballot-preview').open = true;
+      alert('Clipboard blocked — the ballot is shown under "Preview markdown"; select and copy it there.');
+    }
+  }
+  document.getElementById('ballot-copy').addEventListener('click', function () {
+    var md = buildMarkdown();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(md).then(flashCopied, function () { fallbackCopy(md, flashCopied); });
+    } else {
+      fallbackCopy(md, flashCopied);
+    }
+  });
+  (function () {
+    var btn = document.getElementById('ballot-reset'), armed = false, t = null;
+    btn.addEventListener('click', function () {
+      if (!armed) {
+        armed = true; btn.textContent = 'Click again to confirm';
+        t = setTimeout(function () { armed = false; btn.textContent = 'Reset all picks'; }, 3000);
+        return;
+      }
+      clearTimeout(t); armed = false; btn.textContent = 'Reset all picks';
+      Object.keys(state).forEach(function (k) { state[k] = (k === 'waterIntensity' ? 'subtle' : (k === 'notes' ? '' : null)); });
+      document.querySelectorAll('button[role="radio"][data-key]').forEach(function (b) {
+        b.setAttribute('aria-checked', String(b.dataset.key === 'waterIntensity' && b.dataset.val === 'subtle'));
+      });
+      document.getElementById('ballot-notes').value = '';
+      try { localStorage.removeItem(STORE_KEY); } catch (e) {}
+      syncWaterIntensity(); renderBallot();
+    });
+  })();
+
+  /* ============ Ballot collapse ============ */
+  (function () {
+    var panel = document.getElementById('ballot'), btn = document.getElementById('ballot-collapse');
+    function set(collapsed) {
+      panel.classList.toggle('collapsed', collapsed);
+      btn.textContent = collapsed ? 'Show' : 'Hide';
+      btn.setAttribute('aria-expanded', String(!collapsed));
+    }
+    btn.addEventListener('click', function () { set(!panel.classList.contains('collapsed')); });
+    if (window.innerWidth < 1121) set(true);
+  })();
+
+  /* ============ Demo controls inside the page ============ */
+  // Segmented groups + toggles (mirror source-page behavior)
+  document.querySelectorAll('.seg, .mini-seg').forEach(function (seg) {
+    seg.addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b || b.disabled) return;
+      seg.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', 'false'); });
+      b.setAttribute('aria-pressed', 'true');
+    });
+  });
+  document.querySelectorAll('.flag, .switch').forEach(function (el) {
+    el.addEventListener('click', function () {
+      el.setAttribute('aria-pressed', el.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+    });
+  });
+  // Water demos
+  (function () {
+    var a = document.getElementById('water-a'), at = document.getElementById('wa-t'), as = document.getElementById('wa-s');
+    var b = document.getElementById('water-b'), bt = document.getElementById('wb-t'), bs = document.getElementById('wb-s');
+    var ivA = null, ivB = null;
+    function runA() {
+      clearInterval(ivA);
+      a.classList.add('loading'); a.classList.remove('is-success', 'is-error');
+      a.style.setProperty('--fill', '0%');
+      var n = 0;
+      ivA = setInterval(function () {
+        n += 2;
+        if (n >= 24) {
+          clearInterval(ivA);
+          a.classList.remove('loading'); a.classList.add('is-success');
+          a.style.setProperty('--fill', '100%');
+          at.textContent = 'Done — 24 files'; as.textContent = '18.4 MB · in your Downloads folder';
+          setTimeout(function () {
+            a.classList.remove('is-success'); a.style.setProperty('--fill', '0%');
+            at.textContent = 'Download Classroom'; as.textContent = '24 files across 4 posts';
+          }, 2000);
+        } else {
+          a.style.setProperty('--fill', (n / 24 * 100) + '%');
+          at.textContent = 'Downloading…'; as.textContent = n + ' / 24 files';
+        }
+      }, 110);
+    }
+    function runB() {
+      clearInterval(ivB);
+      b.classList.add('loading'); b.classList.remove('is-success', 'is-error');
+      b.style.setProperty('--fill', '0%');
+      var n = 0;
+      ivB = setInterval(function () {
+        n++;
+        if (n >= 24) {
+          clearInterval(ivB);
+          b.classList.remove('loading'); b.classList.add('is-success');
+          b.style.setProperty('--fill', '100%');
+          bt.textContent = 'Done — 24 files'; bs.textContent = '18.4 MB';
+          setTimeout(function () {
+            b.classList.remove('is-success'); b.style.setProperty('--fill', '0%');
+            bt.textContent = 'Download Classroom'; bs.textContent = '24 files';
+          }, 2000);
+        } else {
+          b.style.setProperty('--fill', (n / 24 * 100) + '%');
+          bt.textContent = 'Downloading…'; bs.textContent = n + ' / 24';
+        }
+      }, 110);
+    }
+    a.addEventListener('click', runA);
+    b.addEventListener('click', runB);
+    document.getElementById('water-run').addEventListener('click', function () { runA(); runB(); });
+  })();
+
+  /* ============ Frames: shared state switcher + reduce-motion sync ============ */
+  var frameA = document.getElementById('frame-a');
+  var frameB = document.getElementById('frame-b');
+  var currentState = 'idle';
+  var rmOn = false;
+  var STATE_DESC = {
+    idle: 'Idle: nothing running. A leads with the hero action; B answers "is anything running?" with the status strip first.',
+    loading: 'Loading: the CTA becomes the progress surface. Same geometry in both — A rises continuously, B ticks per file, the status strip keeps counting.',
+    success: 'Success: fill at 100%, count and destination swapped in. No layout shift in either direction.',
+    error: 'Error: partial failure keeps the fill at the point of failure and explains the fix — a row inside the popup, never a breakout banner.',
+    history: 'History: the running row plus done, failed and canceled entries — ambient cards in A, tabular with speeds and clock times in B.'
+  };
+  function eachFrame(fn) {
+    [frameA, frameB].forEach(function (f) {
+      try { if (f.contentWindow) fn(f.contentWindow); } catch (e) { /* frame not ready */ }
+    });
+  }
+  function sendState() {
+    eachFrame(function (w) { w.postMessage({ cqd: 'state', state: currentState }, '*'); });
+  }
+  function sendRM() {
+    eachFrame(function (w) { w.postMessage({ cqd: 'rm', on: rmOn }, '*'); });
+  }
+  document.querySelectorAll('#state-switch [role="radio"]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      currentState = b.dataset.state;
+      document.querySelectorAll('#state-switch [role="radio"]').forEach(function (x) {
+        x.setAttribute('aria-checked', String(x === b));
+      });
+      document.getElementById('state-desc').textContent = STATE_DESC[currentState];
+      document.getElementById('fs-a').textContent = currentState;
+      document.getElementById('fs-b').textContent = currentState;
+      sendState();
+    });
+  });
+  [frameA, frameB].forEach(function (f) {
+    f.addEventListener('load', function () {
+      sendState(); sendRM();
+      setTimeout(function () { sendState(); sendRM(); }, 300); // settle race
+    });
+  });
+
+  /* ============ Reduce-motion toggle (effects.html convention, broadcast to frames) ============ */
+  (function () {
+    var toggle = document.getElementById('rm-toggle'), label = document.getElementById('rm-state');
+    var mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    function apply(on, fromSystem) {
+      rmOn = on;
+      document.body.classList.toggle('reduce-motion', on);
+      toggle.setAttribute('aria-pressed', String(on));
+      label.textContent = on ? 'Reduced motion ON' : 'Standard motion';
+      label.style.color = on ? 'var(--trying)' : 'var(--text2)';
+      if (fromSystem) toggle.setAttribute('aria-label', 'Toggle reduced motion simulation (system preference detected)');
+      sendRM();
+    }
+    apply(mq.matches, true);
+    if (mq.addEventListener) mq.addEventListener('change', function (e) { apply(e.matches, true); });
+    toggle.addEventListener('click', function () { apply(toggle.getAttribute('aria-pressed') !== 'true', false); });
+  })();
+
+  /* ============ Restore persisted picks ============ */
+  (function () {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (raw) {
+        var saved = JSON.parse(raw);
+        Object.keys(state).forEach(function (k) {
+          if (saved[k] !== undefined && saved[k] !== null) state[k] = saved[k];
+        });
+      }
+    } catch (e) { /* corrupted store — start fresh */ }
+    document.querySelectorAll('button[role="radio"][data-key]').forEach(function (b) {
+      b.setAttribute('aria-checked', String(state[b.dataset.key] === b.dataset.val));
+    });
+    document.getElementById('ballot-notes').value = state.notes || '';
+    syncWaterIntensity();
+    renderBallot();
+  })();
+</script>
+</body>
+</html>

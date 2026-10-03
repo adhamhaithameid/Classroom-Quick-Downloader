@@ -75,6 +75,13 @@
     font-size: 12px; color: var(--text2); line-height: 1.6;
   }
   .note strong { color: var(--text); font-weight: 600; }
+  .card.card-start {
+    grid-column: 1 / -1;
+    border-color: rgba(143,123,255,.55);
+    background: linear-gradient(180deg, rgba(143,123,255,.12), rgba(20,21,28,.5));
+  }
+  .card.card-start:hover { border-color: rgba(143,123,255,.85); }
+  .card.card-start .num { color: var(--accent); }
 </style>
 </head>
 <body>
@@ -90,6 +97,12 @@
   </div>
 
   <div class="grid">
+    <a class="card card-start" href="decide.html">
+      <div class="num">Start here — make your picks</div>
+      <h2>Decision center — Phase 3/4 ballot</h2>
+      <p>Both directions side by side on one shared state switcher (idle / loading / success / error / history), every Phase-4 component as an A/B face-off with a pick control, the three classroom-action names rendered in context, and the six legal surfaces with per-item approval. Choices collect into a copy-ready ballot and persist on this device.</p>
+      <div class="go">Open the decision center →</div>
+    </a>
     <a class="card" href="popup-direction-a.html">
       <div class="num">Direction A</div>
       <h2>Stillwater — Calm Glass</h2>
@@ -129,7 +142,7 @@
   </div>
 
   <div class="note">
-    <strong>How to review:</strong> open both direction files first and pick one (or a hybrid). Then approve components and effects independently — they are direction-agnostic where possible. The classroom action name needs your pick at the Stop Gate (task 2.7). Nothing here ships; all files live under <code>/prototypes</code>.
+    <strong>How to review:</strong> start at <a href="decide.html">decide.html</a> — it puts both directions on the same state switcher and collects every pick into a copy-ready ballot. The pages below are the underlying studies; open them for full-width detail, then record your calls in the decision center. The classroom action name needs your pick at the Stop Gate (task 2.7). Nothing here ships; all files live under <code>/prototypes</code>.
   </div>
 
   <footer>

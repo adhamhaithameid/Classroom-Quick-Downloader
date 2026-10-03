@@ -286,6 +286,17 @@
     .wave { display: none; }
     .cta:hover, .bmc:hover { filter: none; transform: none; }
   }
+
+  /* ============ Embed mode + in-app reduce-motion (used by decide.html) ============ */
+  body.embed { padding: 0; }
+  body.embed .wrap { display: none; }
+  body.embed .popup-caption { display: none; }
+  body.reduce-motion *, body.reduce-motion *::before, body.reduce-motion *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  body.reduce-motion .wave { display: none !important; }
 </style>
 </head>
 <body>
@@ -618,6 +629,7 @@
   });
   // Per-file tick fill simulation
   function runWater(btn, titleEl, subEl, total) {
+    clearInterval(btn._waterIv);
     var n = 0;
     btn.style.setProperty('--fill', '0%');
     btn.classList.add('loading');
@@ -643,26 +655,90 @@
         subEl.textContent = n + ' / ' + total;
       }
     }, 110);
+    btn._waterIv = iv;
   }
   var cta = document.getElementById('cta');
   cta.addEventListener('click', function () {
-    if (cta.classList.contains('loading') || cta.classList.contains('is-success')) return;
+    if (cta.classList.contains('loading') || cta.classList.contains('is-success') || cta._stateLocked) return;
     runWater(cta, document.getElementById('cta-title'), document.getElementById('cta-sub'), 24);
   });
   var cta2 = document.getElementById('cta2');
   cta2.addEventListener('click', function () {
-    if (cta2.classList.contains('is-success')) return;
+    if (cta2.classList.contains('is-success') || cta2._stateLocked) return;
     runWater(cta2, document.getElementById('cta2-title'), document.getElementById('cta2-sub'), 24);
   });
-  // History running row
-  (function () {
-    var bar = document.getElementById('hist-bar'), cnt = document.getElementById('hist-count'), pct = document.getElementById('hist-pct'), n = 7;
-    setInterval(function () {
-      n = n >= 12 ? 1 : n + 1;
+  // History running row — exposed so decide.html's state switcher can freeze/resume it
+  window.__histCtl = (function () {
+    var bar = document.getElementById('hist-bar'), cnt = document.getElementById('hist-count'), pct = document.getElementById('hist-pct'), n = 7, iv = null;
+    function paint() {
       bar.style.setProperty('--fill', Math.round(n / 12 * 100) + '%');
       cnt.textContent = n + ' / 12 · 2.4 MB/s';
       pct.textContent = Math.round(n / 12 * 100) + '%';
-    }, 800);
+    }
+    function tick() { n = n >= 12 ? 1 : n + 1; paint(); }
+    function start() { stop(); iv = setInterval(tick, 800); }
+    function stop() { if (iv) { clearInterval(iv); iv = null; } }
+    function freeze(at) { stop(); n = at; paint(); }
+    return { start: start, stop: stop, freeze: freeze };
+  })();
+  window.__histCtl.start();
+  // ---- decide.html integration: embed mode, state deep-link, message sync ----
+  (function () {
+    var params = {};
+    location.hash.replace(/^#/, '').split('&').forEach(function (p) {
+      var kv = p.split('=');
+      if (kv[0]) params[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || '');
+    });
+    if (params.embed === '1') {
+      document.body.classList.add('embed');
+      var shell = document.querySelector('.popup-shell');
+      if (shell) document.body.appendChild(shell);
+    }
+    var cta = document.getElementById('cta');
+    if (!cta) return;
+    var t = document.getElementById('cta-title'), s = document.getElementById('cta-sub');
+    var histList = document.querySelector('.popup .h-list');
+    var strip = document.querySelector('.popup .status-strip');
+    var STRIPS = {
+      idle: '<span class="st"><i class="i-run" aria-hidden="true"></i>1 running</span><span class="st"><i class="i-ok" aria-hidden="true"></i>12 today</span><span class="st"><i class="i-bad" aria-hidden="true"></i>1 failed</span><span style="margin-left:auto; color:var(--text3);">Parallel · 3 at a time</span>',
+      loading: '<span class="st"><i class="i-run" aria-hidden="true"></i>1 running</span><span class="st"><i class="i-ok" aria-hidden="true"></i>12 today</span><span class="st"><i class="i-bad" aria-hidden="true"></i>1 failed</span><span style="margin-left:auto; color:var(--text3);">Parallel · 3 at a time</span>',
+      success: '<span class="st"><i class="i-ok" aria-hidden="true"></i>0 running</span><span class="st"><i class="i-ok" aria-hidden="true"></i>13 today</span><span class="st"><i class="i-ok" aria-hidden="true"></i>0 failed</span><span style="margin-left:auto; color:var(--text3);">Parallel · 3 at a time</span>',
+      error: '<span class="st"><i class="i-ok" aria-hidden="true"></i>0 running</span><span class="st"><i class="i-ok" aria-hidden="true"></i>12 today</span><span class="st"><i class="i-bad" aria-hidden="true"></i>3 failed</span><span style="margin-left:auto; color:var(--text3);">Parallel · 3 at a time</span>',
+      history: '<span class="st"><i class="i-run" aria-hidden="true"></i>1 running</span><span class="st"><i class="i-ok" aria-hidden="true"></i>12 today</span><span class="st"><i class="i-bad" aria-hidden="true"></i>1 failed</span><span style="margin-left:auto; color:var(--text3);">Parallel · 3 at a time</span>'
+    };
+    var CANCELED = '<div class="h-row cqd-canceled">' +
+      '<span class="h-txt"><b>Biology — week 9 pack</b><small>Canceled at 4 / 9</small></span>' +
+      '<span class="h-bar"><i style="--fill:44%; background:var(--cancel);"></i></span>' +
+      '<span class="h-pct" style="color:#FF9A4D;">44%</span></div>';
+    function idleCta() {
+      clearInterval(cta._waterIv);
+      cta.classList.remove('loading', 'is-success', 'is-error');
+      cta.style.setProperty('--fill', '0%');
+      t.textContent = 'Download Classroom';
+      s.textContent = '24 files';
+    }
+    function cancelRow(add) {
+      var row = histList.querySelector('.cqd-canceled');
+      if (add && !row) histList.insertAdjacentHTML('beforeend', CANCELED);
+      if (!add && row) row.remove();
+    }
+    function applyState(st) {
+      window.__histCtl.freeze(7);
+      if (strip && STRIPS[st]) strip.innerHTML = STRIPS[st];
+      cta._stateLocked = (st !== 'idle' && st !== 'history');
+      cancelRow(st === 'history');
+      if (st === 'idle') { idleCta(); window.__histCtl.start(); }
+      else if (st === 'loading') { idleCta(); cta.style.setProperty('--fill', '38%'); cta.classList.add('loading'); t.textContent = 'Downloading…'; s.textContent = '9 / 24'; }
+      else if (st === 'success') { idleCta(); cta.style.setProperty('--fill', '100%'); cta.classList.add('is-success'); t.textContent = 'Done — 24 files'; s.textContent = '18.4 MB'; }
+      else if (st === 'error') { idleCta(); cta.style.setProperty('--fill', '87%'); cta.classList.add('is-error'); t.textContent = '3 of 24 failed'; s.textContent = 'retry'; }
+      else if (st === 'history') { idleCta(); }
+    }
+    window.addEventListener('message', function (e) {
+      if (!e.data) return;
+      if (e.data.cqd === 'state' && e.data.state) applyState(e.data.state);
+      if (e.data.cqd === 'rm') document.body.classList.toggle('reduce-motion', !!e.data.on);
+    });
+    if (params.state) applyState(params.state);
   })();
 </script>
 </body>
