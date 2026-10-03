@@ -1543,8 +1543,12 @@
   on:pointercancel={onEditPointerUp}
 />
 
+<!-- SERP guard: the previous 59-char title ("…Google Classroom Bulk
+     Download") exceeded Google's ~580px title display width and truncated
+     mid-word ("Bulk …"). This 51-char variant keeps the brand first, keeps
+     "Google Classroom", and swaps the cut-off tail for a benefit keyword. -->
 <SeoMeta
-  title="Classroom Quick Downloader — Google Classroom Bulk Download"
+  title="Classroom Quick Downloader — Google Classroom Files"
   description="Bulk download all Google Classroom attachments in one click. Free browser extension for Chrome, Firefox, and Edge, built for students and teachers."
   path={seoPath}
   keywords="download all google classroom files, bulk download google classroom attachments, google classroom extension"
