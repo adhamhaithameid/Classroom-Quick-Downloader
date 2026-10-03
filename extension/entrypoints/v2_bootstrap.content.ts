@@ -141,20 +141,22 @@ export default defineContentScript({
         });
       }
 
-      // 3f. Keyboard route (bug 2.1): Alt+Shift+D is relayed by the
-      //     background as CQD_RUN_DOWNLOAD_ALL. In v2 mode the V1
-      //     entrypoint's handler has no V1 groups to run, so the v2 group
-      //     controller answers here; legacy/shadow modes keep the V1
-      //     handler (this listener ignores the message there).
+      // 3f. Keyboard route (bug 2.1 + hotkey follow-up): Alt+Shift+D is
+      //     relayed by the background as CQD_RUN_DOWNLOAD_ALL. Modes whose
+      //     DOM engine is EngineV2 — v2 AND v3 (EngineV3 delegates its DOM
+      //     to EngineV2, so the group buttons are identical there) — are
+      //     answered by the v2 group controller via
+      //     runDownloadAllForActiveMode(); legacy/shadow modes keep the V1
+      //     entrypoint handler (this listener ignores the message there).
       if (typeof chrome !== 'undefined' && chrome?.runtime?.onMessage) {
-        const { handleRunDownloadAllRequest } = await import(
+        const { runDownloadAllForActiveMode } = await import(
           '../src/v2/render/download-all-controller'
         );
         chrome.runtime.onMessage.addListener(
           (message: { type?: string }, _sender: unknown, sendResponse: (r: unknown) => void) => {
             if (!message || message.type !== 'CQD_RUN_DOWNLOAD_ALL') return;
-            if (engineRegistry.getMode() !== 'v2') return; // V1 entrypoint owns legacy/shadow
-            const handled = handleRunDownloadAllRequest();
+            const handled = runDownloadAllForActiveMode();
+            if (handled === null) return; // legacy/shadow — the V1 entrypoint owns it
             // Synchronous response + no `true` return — the same contract
             // the V1 entrypoint's own CQD_RUN_DOWNLOAD_ALL handler uses.
             sendResponse(handled ? { ok: true } : { ok: false, reason: 'no-group' });

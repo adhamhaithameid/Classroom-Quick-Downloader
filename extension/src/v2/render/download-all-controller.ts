@@ -27,6 +27,7 @@
  */
 
 import type { RequestId, AcquireOutcome } from '../../contracts/topics';
+import { engineRegistry } from '../../engines/engine-registry';
 import { getButtonStateV2, setButtonStateV2 } from './button-state';
 import {
   handleSingleDownloadClickV2,
@@ -185,6 +186,25 @@ export function handleRunDownloadAllRequest(): boolean {
     // eligible group, exactly like V1's first-eligible scan.
   }
   return false;
+}
+
+/**
+ * CQD_RUN_DOWNLOAD_ALL for the ACTIVE engine mode — the bootstrap's
+ * onMessage listener delegates here so the mode gate is testable.
+ *
+ * Modes whose DOM engine is EngineV2 answer the hotkey: 'v2', and 'v3' too
+ * (EngineV3 delegates all DOM work to EngineV2, so v3 renders the very same
+ * group buttons and this same controller drives them — the old v2-only gate
+ * left Alt+Shift+D dead in v3). 'legacy'/'shadow' return null: the V1
+ * entrypoint's own CQD_RUN_DOWNLOAD_ALL handler owns those modes.
+ *
+ * @returns true when a group was started, false when the mode is ours but
+ *   no group was eligible, null when the mode is not ours.
+ */
+export function runDownloadAllForActiveMode(): boolean | null {
+  const mode = engineRegistry.getMode();
+  if (mode !== 'v2' && mode !== 'v3') return null;
+  return handleRunDownloadAllRequest();
 }
 
 function startRun(postId: string, groupButton: HTMLButtonElement): boolean {

@@ -280,14 +280,31 @@ export function computeDownloadAllPlacement(
 // ============================================================================
 
 /**
- * Signals that mark a DOM node as an attachment chip (bug 2.1).
+ * Signals that mark a DOM node as an attachment-chip CANDIDATE (bug 2.1).
  *
- * V1 parity — the same signal family `hasAttachmentSignals` /
- * ATTACHMENT_CONTAINER_SELECTOR use in the legacy stack: data-* attachment
- * attributes and the golden chip classes. Deliberately NOT included: bare
- * Drive anchors (a post body can link a Drive file without it being an
- * attachment) and `.z3vRcc` (it doubles as the comment container — counting
- * it would inflate the threshold on commented stream posts).
+ * Membership vs V1's legacy signals — entrypoints/content/observers.ts
+ * `hasAttachmentSignals` + entrypoints/content/state.ts
+ * ATTACHMENT_CONTAINER_SELECTOR. Included here: the same data-* attachment
+ * attributes, the `[data-id][data-item-id]` combo, and the golden chip
+ * classes .luto0c / .KlRXdf / .VfPpkd-aPP78e. V1 members deliberately NOT
+ * in this selector:
+ * - `.nQ1Fvb` / `.ndfuHe` — V1's Student Work card selectors (V1 groups
+ *   downloads on the submissions page through them); this counter is
+ *   scoped to classwork/stream post chips, where discovery + the signals
+ *   below already carry the downloadable cases;
+ * - the weaker `[data-id][data-tooltip]` pairing (V1 accepts it in
+ *   addition to `[data-id][data-item-id]` — kept out to avoid counting
+ *   tooltip-carrying non-chips);
+ * - V1's attachment-icon `<img>` heuristic.
+ * `.z3vRcc` stays excluded for both (it doubles as the comment container —
+ * counting it would inflate the threshold on commented stream posts), as
+ * do bare Drive anchors (a post body can link a Drive file without it
+ * being an attachment).
+ *
+ * Matching this selector makes a node a CANDIDATE only: since the
+ * downloadable-count follow-up, countAttachmentNodes counts a candidate
+ * when it carries a downloadable target (see carriesDownloadableTarget) —
+ * link/video chips match this selector but never reach the threshold.
  */
 const ATTACHMENT_NODE_SELECTOR = [
   '[data-attachment-id]',
