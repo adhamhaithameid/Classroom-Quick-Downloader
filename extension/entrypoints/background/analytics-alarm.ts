@@ -1,9 +1,9 @@
 // filepath: extension/entrypoints/background/analytics-alarm.ts
 /**
- * Analytics alarm setup for periodic flush and config refresh.
+ * Analytics alarm setup for periodic flush and changelog refresh.
  */
 
-import { Analytics, refreshRemoteAnalyticsConfig } from '../utils/analytics';
+import { Analytics } from '../utils/analytics';
 import { fetchChangelogDetailed } from '../utils/changelog';
 import { IS_FIREFOX, recentDownloads } from './state';
 
@@ -12,8 +12,12 @@ let analyticsAlarmInitialized = false;
 /**
  * Set up Chrome alarms for periodic analytics operations.
  * - Flush events every 5 minutes
- * - Refresh remote config once a day
  * - Refresh changelog once/day at 6pm UTC
+ *
+ * Remote-config refresh is intentionally NOT scheduled: on the free model the
+ * extension never fetches /config (it drove ~95% of the Worker's API traffic
+ * and exhausted the free-plan quota). Re-introduce it behind a Pro
+ * entitlement gate — see the analytics remote-config module.
  */
 export function ensureAnalyticsAlarm(): void {
   if (analyticsAlarmInitialized) return;
@@ -22,7 +26,6 @@ export function ensureAnalyticsAlarm(): void {
 
   try {
     chrome.alarms.create('CQD_ANALYTICS_FLUSH', { periodInMinutes: 5 });
-    chrome.alarms.create('CQD_ANALYTICS_CONFIG', { periodInMinutes: 1440 });
 
     // Changelog: once/day at 6pm UTC
     const now = new Date();
@@ -44,8 +47,6 @@ export function ensureAnalyticsAlarm(): void {
     chrome.alarms.onAlarm.addListener((alarm) => {
       if (alarm.name === 'CQD_ANALYTICS_FLUSH') {
         Analytics.flush();
-      } else if (alarm.name === 'CQD_ANALYTICS_CONFIG') {
-        refreshRemoteAnalyticsConfig().catch(() => {});
       } else if (alarm.name === 'CQD_CHANGELOG_DAILY') {
         fetchChangelogDetailed(true).catch(() => {});
       }
