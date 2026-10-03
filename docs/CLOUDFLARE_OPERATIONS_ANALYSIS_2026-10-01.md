@@ -85,3 +85,29 @@ Worker: `forwardArchivedBatchToOracle` + `oracleDeadLetters` (inert, `ORACLE_END
 5. Add `ADMIN_CORS_ALLOWED_ORIGINS` to wrangler.toml or drop the code path.
 6. Extract dashboard hardcoded URLs to vars; prune dead code in a cleanup PR.
 7. Owner decisions pending: DO RPC migration (e4v.2), Cloudflare paid plan (declined for now), secret rotation (DO_SHARED_SECRET + the chat-exposed credentials).
+
+## 8. Addendum — 2026-10-03 (owner decisions applied)
+
+- **Free tier confirmed**; flush landed at 00:15 UTC (Q1 done, PR #815).
+- **Free model hardened beyond Q2:** the extension no longer fetches `/config`
+  at all (owner decision) — the daily config alarm and the service-worker
+  start fetch are removed; the extension runs on built-in defaults. Free-fleet
+  `/config` traffic drops to **zero**. `refreshRemoteAnalyticsConfig` remains
+  implemented (24h staleness gate, tested) for the Pro re-enable behind a
+  license gate. Trade-off accepted: the remote kill-switch no longer reaches
+  free clients.
+- **Q3 done:** the website now skips its force-refresh second fetch when the
+  cached snapshot is fresh and non-bootstrap.
+- **Cron/hour-set mismatch fixed (§2.1):** hourly cron; each hour-set gates
+  its own ticks.
+- **Deployment hygiene:** the nightly flush now self-heals through quota
+  days (00:15 post-reset + retry ladder), `pipeline-health` shows a cosmetic
+  `warn: flush_delayed` between daily flushes, and the stale-alarm deadlock
+  class is fixed at the scheduler level.
+- **Pro note:** re-enabling remote config for Pro requires the entitlement
+  gate (Phase 2, `0h4d.2.2`/`0h4d.2.3`) — until then free clients are
+  intentionally config-free.
+- **Operational workflow:** the rtk CLI (rtk-ai/rtk) is adopted for the
+  maintainer's AI-assisted workflow (output compression for LLM context);
+  ZCode has no plugin so integration is command-prefix based.
+
