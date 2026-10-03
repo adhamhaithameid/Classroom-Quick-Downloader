@@ -42,7 +42,6 @@ import {
   type InsertionPoint,
   getRecipe,
 } from './placement-recipes';
-import { validateDownloadUrl } from './download-validator';
 
 // Import the ScannedPost and ScannedFile types from dom-scanner
 import type { ScannedPost, ScannedFile } from '../model/dom-scanner';
@@ -176,15 +175,22 @@ export function computePlacement(
   }
 
   // Compute Download All placement if enough files. The threshold counts
-  // DOWNLOADABLE attachment nodes in the post — V1's group machine counts
-  // registered single buttons only, and V1 injects those for Drive/Docs
-  // targets alone ("External links never get download buttons",
-  // entrypoints/content/state.ts). So a post mixing link/video attachments
-  // with fewer downloadable ones stays below the >=2 threshold, exactly like
-  // V1 — and the run, label, and hotkey all act on that same set.
-  // max() guarantees the threshold never counts FEWER files than discovery
-  // did (nested-merge can drop a discovered file nested inside another chip).
-  const attachmentCount = Math.max(post.files.length, countAttachmentNodes(post));
+  // EXACTLY the single-button set (countSingleButtonEligibleFiles): a node
+  // counts iff the placement pipeline would place (or has placed) a single
+  // download button for it — the same eligibility the group run resolves to
+  // when it enumerates the post's .cqd-download-btn buttons. The previous
+  // counter (attachment-chip signal scan + download validator) was a
+  // SUPERSET of that set: it counted drive.usercontent.google.com /
+  // doc-XX-docs.googleusercontent.com anchors that discovery never
+  // canonicalizes into buttons, so a label could say N while the run did
+  // fewer. The unified predicate keeps the decision, its "N files" label,
+  // the group run, and the hotkey on one set, and keeps the 2.1 promise
+  // honest: "Download All appears on every post with two or more
+  // downloadable attachments" where downloadable = would-get-a-single-
+  // button. The collapse gate stays exempt (bug 2.1): the header-mounted
+  // group button is visible on folded classwork items and expanding re-runs
+  // placement.
+  const attachmentCount = countSingleButtonEligibleFiles(post, recipe);
   if (attachmentCount >= recipe.downloadAll.minFilesForDownloadAll) {
     const downloadAllId = `download-all:${post.id}`;
 
@@ -245,7 +251,9 @@ export function computeDownloadAllPlacement(
 ): PlacementDecision | null {
   const recipe = getRecipe(viewKind);
 
-  const attachmentCount = Math.max(post.files.length, countAttachmentNodes(post));
+  // Same contract as computePlacement: the threshold counts exactly the
+  // single-button set (count/run parity — see the comment there).
+  const attachmentCount = countSingleButtonEligibleFiles(post, recipe);
   if (attachmentCount < recipe.downloadAll.minFilesForDownloadAll) {
     return null;
   }
@@ -276,123 +284,56 @@ export function computeDownloadAllPlacement(
 }
 
 // ============================================================================
-// ATTACHMENT COUNTING — the group threshold counts every attachment node
+// ATTACHMENT COUNTING — the group threshold counts the single-button set
 // ============================================================================
 
 /**
- * Signals that mark a DOM node as an attachment-chip CANDIDATE (bug 2.1).
+ * The Download All threshold counts EXACTLY the single-button set (round-1
+ * count/run parity): a node counts if and only if the placement pipeline
+ * would place (or has placed) a single download button for it.
  *
- * Membership vs V1's legacy signals — entrypoints/content/observers.ts
- * `hasAttachmentSignals` + entrypoints/content/state.ts
- * ATTACHMENT_CONTAINER_SELECTOR. Included here: the same data-* attachment
- * attributes, the `[data-id][data-item-id]` combo, and the golden chip
- * classes .luto0c / .KlRXdf / .VfPpkd-aPP78e. V1 members deliberately NOT
- * in this selector:
- * - `.nQ1Fvb` / `.ndfuHe` — V1's Student Work card selectors (V1 groups
- *   downloads on the submissions page through them); this counter is
- *   scoped to classwork/stream post chips, where discovery + the signals
- *   below already carry the downloadable cases;
- * - the weaker `[data-id][data-tooltip]` pairing (V1 accepts it in
- *   addition to `[data-id][data-item-id]` — kept out to avoid counting
- *   tooltip-carrying non-chips);
- * - V1's attachment-icon `<img>` heuristic.
- * `.z3vRcc` stays excluded for both (it doubles as the comment container —
- * counting it would inflate the threshold on commented stream posts), as
- * do bare Drive anchors (a post body can link a Drive file without it
- * being an attachment).
+ * Final membership:
+ * - the node is a DISCOVERED file — engine-v2 discovery (selector-registry
+ *   FILE_ANCHOR_CANDIDATES + extractFileNode's canonical-id chain) handed it
+ *   to placement as a post.files entry; and
+ * - the single loop's gates hold — `post.files.length >=
+ *   recipe.singleButton.minFilesForButton` (would place: once the post
+ *   clears the minimum, computePlacement's single loop emits a decision for
+ *   EVERY file — findAnchorForFile always resolves, worst case the post-root
+ *   fallback), or a button for its canonical id is already in the post
+ *   (has placed: the run enumerates the existing button as-is).
  *
- * Matching this selector makes a node a CANDIDATE only: since the
- * downloadable-count follow-up, countAttachmentNodes counts a candidate
- * when it carries a downloadable target (see carriesDownloadableTarget) —
- * link/video chips match this selector but never reach the threshold.
+ * Deliberately NOT counted — the removed counter's superset: attachment
+ * chips found by a V1 signal scan (data-attachment-id / .KlRXdf / .luto0c /
+ * …) whose anchors merely pass the download validator. URL families like
+ * drive.usercontent.google.com and doc-XX-docs.googleusercontent.com pass
+ * validateDownloadUrl but match no discovery candidate, so the pipeline
+ * never canonicalizes them into buttons — counting them let the label say N
+ * while the run did fewer. Discovery is the eligibility source: a chip that
+ * never reaches post.files can neither get a single button nor join the
+ * group run, so it must not reach the threshold.
+ *
+ * The collapse gate is NOT part of eligibility: bug 2.1 exempts the group
+ * decision from it (the header-mounted group button stays visible on folded
+ * classwork items, and expanding re-runs placement), so single-button
+ * eligibility is a discovery-level property, not a render-level one.
  */
-const ATTACHMENT_NODE_SELECTOR = [
-  '[data-attachment-id]',
-  '[data-drive-id]',
-  '[data-resource-id]',
-  '[data-submission-attachment-id]',
-  '[data-id][data-item-id]',
-  '.KlRXdf',
-  '.VfPpkd-aPP78e',
-  '.luto0c',
-].join(', ');
-
-/**
- * Count the DISTINCT DOWNLOADABLE attachment nodes in a post.
- *
- * V1's group machine counts registered single download buttons, and V1 only
- * injects those for Drive/Docs targets ("External links never get download
- * buttons" — entrypoints/content/state.ts DRIVE_URL_PATTERNS). Link/YouTube
- * attachments never join V1's group: not counted, not run. This counter
- * mirrors that set so the Download All decision, its "N files" label, the
- * group run, and the hotkey all agree:
- *
- * - discovered files always count (the run's own set), and
- * - any other attachment-signal node counts only when it carries a
- *   downloadable target — a data-drive-id (V1's findDriveUrl builds a Drive
- *   download URL from it) or an anchor whose href passes the download
- *   validator (the same URL family V1's DRIVE_URL_PATTERNS accepts).
- *
- * Nested candidates (a chip container and the anchor it wraps) merge into
- * ONE attachment: only outermost candidates are counted.
- */
-export function countAttachmentNodes(
+export function countSingleButtonEligibleFiles(
   post: Pick<ScannedPost, 'element' | 'files'>,
+  recipe: PlacementRecipe,
 ): number {
-  const candidates = new Set<HTMLElement>();
-
-  // Discovered files are attachments by definition — and the run's set.
-  for (const file of post.files) {
-    candidates.add(file.element);
-  }
-
-  // Attachment chips carrying V1's container signals.
-  for (const el of post.element.querySelectorAll<HTMLElement>(ATTACHMENT_NODE_SELECTOR)) {
-    candidates.add(el);
-  }
-
-  // Link/video attachments: Classroom labels their anchors "Attachment: …".
-  for (const anchor of post.element.querySelectorAll<HTMLAnchorElement>('a[aria-label]')) {
-    if (/^attachment:/i.test((anchor.getAttribute('aria-label') || '').trim())) {
-      candidates.add(anchor);
-    }
-  }
-
-  // Merge nested chains: drop any candidate that sits inside another one,
-  // then keep only nodes with a downloadable target. A nested DISCOVERED
-  // file can be dropped here — the caller's max() with post.files.length
-  // keeps the threshold honest.
   let count = 0;
-  for (const el of candidates) {
-    let nested = false;
-    for (const other of candidates) {
-      if (other !== el && other.contains(el)) {
-        nested = true;
-        break;
-      }
+  for (const file of post.files) {
+    if (post.files.length >= recipe.singleButton.minFilesForButton) {
+      // Would place — same gate computePlacement's single loop applies.
+      count++;
+      continue;
     }
-    if (nested) continue;
-    if (carriesDownloadableTarget(el)) count++;
+    // Below the single-button minimum nothing new is placed, but an
+    // already-placed button still joins the run (has placed).
+    if (isAlreadyPlaced(file.canonicalId, post.element)) count++;
   }
   return count;
-}
-
-/**
- * Whether an attachment node carries a target V1's group machine would run:
- * a data-drive-id (self or descendant — V1 builds a Drive download URL from
- * it) or an anchor (self or descendant) whose href the download validator
- * accepts (Drive / Classroom drive-proxy / Docs viewers — the same URL
- * family V1's DRIVE_URL_PATTERNS gate single buttons on).
- */
-function carriesDownloadableTarget(el: HTMLElement): boolean {
-  if (el.hasAttribute('data-drive-id') || el.querySelector('[data-drive-id]')) {
-    return true;
-  }
-  const anchors =
-    el.tagName === 'A'
-      ? [el as HTMLAnchorElement]
-      : Array.from(el.querySelectorAll<HTMLAnchorElement>('a[href]'));
-  return anchors.some((a) => validateDownloadUrl(a.href).valid);
 }
 
 // ============================================================================

@@ -383,6 +383,65 @@ export function renderDownloadAllButton(
 }
 
 /**
+ * Sync an already-placed Download All button with a FRESH decision count
+ * (round-1 stale-count fix): data-cqd-group-count used to be written once at
+ * render, and the placement engine's isAlreadyPlaced check blocks re-render,
+ * so a post whose attachments changed kept the old count — the button label,
+ * its aria/title, and the hotkey's eligibility all read it.
+ *
+ * Called from the engine's render seam (cleanupAndWirePosts) with the same
+ * count the placement decision uses (countSingleButtonEligibleFiles), so the
+ * label and eligibility stay truthful after every scan. Mirrors V1's
+ * updateGroupState (src/download-all/refresh.ts): below the threshold the
+ * group button is REMOVED; otherwise the count surfaces are rewritten.
+ *
+ * Never CREATES a button — the no-duplicates guarantee is untouched; a
+ * removed group button returns only when placement emits a fresh decision.
+ *
+ * @param postEl - The post root to search for the group button
+ * @param postId - The post id (button file id is `download-all:{postId}`)
+ * @param count - The fresh decision count
+ * @param minFilesForDownloadAll - The recipe's group threshold
+ * @param deferVisuals - True while a group run is busy: the sub-text is
+ *   owned by the run machine (progress / cancel affordance), so only the
+ *   dataset is updated — the post-run reset restores the idle label from
+ *   it. aria-label and title are never run-owned and stay truthful.
+ */
+export function syncDownloadAllCount(
+  postEl: HTMLElement,
+  postId: string,
+  count: number,
+  minFilesForDownloadAll: number,
+  deferVisuals: boolean = false,
+): void {
+  const escapedId = safeCssEscape(`download-all:${postId}`);
+  const btn = postEl.querySelector<HTMLButtonElement>(
+    `[${getInjectedAttr()}][${getFileIdAttr()}="${escapedId}"]`,
+  );
+  if (!btn) return;
+
+  // V1 refresh parity: below the threshold the group button goes away.
+  if (count < minFilesForDownloadAll) {
+    btn.remove();
+    return;
+  }
+
+  const recorded = Number(btn.getAttribute('data-cqd-group-count'));
+  if (recorded === count) return;
+
+  // The dataset is the hotkey's eligibility record AND the post-run reset's
+  // label source — always kept fresh.
+  btn.dataset.cqdGroupCount = String(count);
+
+  if (!deferVisuals) {
+    const subEl = btn.querySelector<HTMLElement>('.cqd-download-all-sub');
+    if (subEl) subEl.textContent = `${count} ${count === 1 ? 'file' : 'files'}`;
+  }
+  btn.setAttribute('aria-label', `Download all ${count} files`);
+  btn.title = `Download All (${count} files)`;
+}
+
+/**
  * Remove stale buttons from a post.
  *
  * Called when files are removed or when a post is re-scanned.

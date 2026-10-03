@@ -502,3 +502,16 @@ function getRuntime(): GroupRuntime | null {
 export function getRunFor(postId: string): Readonly<GroupRun> | undefined {
   return runs.get(postId);
 }
+
+/**
+ * Whether a group run for this post is mid-flight (started, not settled).
+ *
+ * The render seam consults this before rewriting the group button's
+ * sub-text: during a run that text is the run machine's progress display
+ * (updateRunUI), so a stale-count sync must defer to it — the dataset
+ * update alone keeps the post-run reset truthful.
+ */
+export function isGroupRunBusy(postId: string): boolean {
+  const run = runs.get(postId);
+  return run !== undefined && !isRunSettled(run);
+}

@@ -23,6 +23,7 @@ import {
   setupDelegatedClickHandler,
   resetTemplates,
   detectDarkMode,
+  syncDownloadAllCount,
 } from '../src/v2/render/button-renderer';
 import { getFileIdAttr, getInjectedAttr } from '../src/v2/decision/file-placement';
 
@@ -607,5 +608,109 @@ describe('Button Renderer: Dark Mode Detection', () => {
     document.body.classList.add('dark-theme');
     expect(detectDarkMode()).toBe(true);
     document.body.classList.remove('dark-theme');
+  });
+});
+
+// ============================================================================
+// DOWNLOAD ALL COUNT SYNC — stale count on edited posts (round 1)
+// ============================================================================
+
+describe('Button Renderer: syncDownloadAllCount', () => {
+  const MIN_FILES = 2;
+
+  /** Render a group button into `post` and return it. */
+  function seedGroupButton(post: HTMLElement, count: number): HTMLButtonElement {
+    const target = document.createElement('div');
+    post.appendChild(target);
+    const btn = renderDownloadAllButton(
+      { ...mockDecision(`download-all:post-sync`, target), attachmentCount: count },
+      [],
+    )!;
+    return btn;
+  }
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    resetTemplates();
+  });
+
+  it('updates dataset, sub-text, aria-label and title when the count changed', () => {
+    const post = document.createElement('article');
+    document.body.appendChild(post);
+    const btn = seedGroupButton(post, 3);
+    expect(btn.dataset.cqdGroupCount).toBe('3');
+
+    syncDownloadAllCount(post, 'post-sync', 2, MIN_FILES);
+
+    expect(btn.isConnected).toBe(true);
+    expect(btn.dataset.cqdGroupCount).toBe('2');
+    expect(btn.querySelector('.cqd-download-all-sub')?.textContent).toBe('2 files');
+    expect(btn.getAttribute('aria-label')).toBe('Download all 2 files');
+    expect(btn.title).toBe('Download All (2 files)');
+  });
+
+  it('uses the singular label for a count of 1', () => {
+    const post = document.createElement('article');
+    document.body.appendChild(post);
+    const btn = seedGroupButton(post, 3);
+
+    // Below-threshold removal is guarded by minFiles=1 here so the update
+    // path itself is exercised at count 1.
+    syncDownloadAllCount(post, 'post-sync', 1, 1);
+
+    expect(btn.dataset.cqdGroupCount).toBe('1');
+    expect(btn.querySelector('.cqd-download-all-sub')?.textContent).toBe('1 file');
+    expect(btn.getAttribute('aria-label')).toBe('Download all 1 files');
+    expect(btn.title).toBe('Download All (1 files)');
+  });
+
+  it('removes the group button when the count drops below the threshold (V1 refresh parity)', () => {
+    const post = document.createElement('article');
+    document.body.appendChild(post);
+    const btn = seedGroupButton(post, 2);
+    expect(btn.isConnected).toBe(true);
+
+    syncDownloadAllCount(post, 'post-sync', 1, MIN_FILES);
+
+    expect(post.querySelector('.cqd-download-all-btn')).toBeNull();
+  });
+
+  it('leaves the button untouched when the recorded count already matches', () => {
+    const post = document.createElement('article');
+    document.body.appendChild(post);
+    const btn = seedGroupButton(post, 2);
+    const subBefore = btn.querySelector('.cqd-download-all-sub')?.textContent;
+
+    syncDownloadAllCount(post, 'post-sync', 2, MIN_FILES);
+
+    expect(btn.isConnected).toBe(true);
+    expect(btn.dataset.cqdGroupCount).toBe('2');
+    expect(btn.querySelector('.cqd-download-all-sub')?.textContent).toBe(subBefore);
+  });
+
+  it('does not create a second group button when none exists (no-duplicates guarantee)', () => {
+    const post = document.createElement('article');
+    document.body.appendChild(post);
+
+    syncDownloadAllCount(post, 'post-sync', 2, MIN_FILES);
+
+    expect(post.querySelectorAll('.cqd-download-all-btn')).toHaveLength(0);
+  });
+
+  it('defers the visual rewrite while a run is busy but still records the count', () => {
+    const post = document.createElement('article');
+    document.body.appendChild(post);
+    const btn = seedGroupButton(post, 3);
+    btn.querySelector<HTMLElement>('.cqd-download-all-sub')!.textContent = '1 → 3';
+
+    syncDownloadAllCount(post, 'post-sync', 2, MIN_FILES, true);
+
+    // dataset updated — the post-run reset restores the idle label from it.
+    expect(btn.dataset.cqdGroupCount).toBe('2');
+    // progress text owned by the run machine stays untouched
+    expect(btn.querySelector('.cqd-download-all-sub')?.textContent).toBe('1 → 3');
+    // aria/title are not run-owned — kept truthful immediately
+    expect(btn.getAttribute('aria-label')).toBe('Download all 2 files');
+    expect(btn.title).toBe('Download All (2 files)');
   });
 });

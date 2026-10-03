@@ -664,15 +664,64 @@ describe('File Placement: collapsed classwork keeps Download All (bug 2.1)', () 
     expect(all[0].attachmentCount).toBe(2);
   });
 
-  it('download-all decision still counts downloadable attachment nodes discovery misses', () => {
-    // 1 discovered Drive file + 1 chip whose Classroom drive-proxy anchor
-    // discovery cannot canonicalize (no /d/<id> in the href, no drive-id
-    // data attribute). V1 downloads it (DRIVE_URL_PATTERNS matches
-    // classroom.google.com/drive/), so the threshold holds and the decision
-    // carries the true downloadable count.
+  it('a chip placement would not give a single button does not count toward the decision (count/run parity)', () => {
+    // Round-1 parity fix: the decision count is EXACTLY the single-button
+    // set. This chip's drive.usercontent.google.com anchor passes the
+    // download validator, but engine-v2 discovery has no candidate for that
+    // host (FILE_ANCHOR_CANDIDATES matches drive.google.com / docs viewer /
+    // classroom drive hrefs, data-drive-id, data-id+item-id, golden chip
+    // classes with a canonicalizable anchor) — so placement would never
+    // place a single button for it and the run could never download it.
+    // Counting it made the label say 2 while the run did 1. Under the
+    // unified predicate the count is 1: below the threshold, no decision
+    // (conservative — label <= what can run).
     const drive = mockFile('missMixA_20chars_pad');
     const postEl = document.createElement('div');
     postEl.setAttribute('data-stream-item-id', 'link-mix-3');
+
+    const driveChip = document.createElement('div');
+    driveChip.className = 'KlRXdf';
+    driveChip.appendChild(drive.element);
+    postEl.appendChild(driveChip);
+
+    const usercontentChip = document.createElement('div');
+    usercontentChip.setAttribute('data-attachment-id', 'att-1');
+    const usercontent = document.createElement('a');
+    usercontent.href = 'https://drive.usercontent.google.com/download?id=abc123def456&export=download';
+    usercontent.textContent = 'Slides.pdf';
+    usercontentChip.appendChild(usercontent);
+    postEl.appendChild(usercontentChip);
+
+    document.body.appendChild(postEl);
+
+    const post: ScannedPost = {
+      id: 'link-mix-3',
+      element: postEl,
+      fingerprint: 'link-mix-3',
+      files: [drive],
+      isExpanded: true,
+      isConnected: true,
+    };
+
+    const decisions = computePlacement(post, ViewKind.STREAM);
+    const all = decisions.filter((d) => d.fileId === 'download-all:link-mix-3');
+    expect(all).toHaveLength(0);
+
+    // Single-download placement must NOT change: still only the Drive file.
+    const single = decisions.filter((d) => !d.fileId.startsWith('download-all:'));
+    expect(single).toHaveLength(1);
+    expect(single[0].fileId).toBe(drive.canonicalId);
+  });
+
+  it('a discovered classroom drive-proxy chip still counts toward the decision', () => {
+    // Positive control for the unified predicate: when discovery DOES hand
+    // the drive-proxy anchor to placement (it is a post.files entry —
+    // file-l2-classroom-drive matches its href), it gets a single button,
+    // joins the run, and counts. Same chip DOM as the excluded case above;
+    // the only difference is the discovered-file set.
+    const drive = mockFile('proxyMixA_20chars_pad');
+    const postEl = document.createElement('div');
+    postEl.setAttribute('data-stream-item-id', 'link-mix-4');
 
     const driveChip = document.createElement('div');
     driveChip.className = 'KlRXdf';
@@ -689,17 +738,26 @@ describe('File Placement: collapsed classwork keeps Download All (bug 2.1)', () 
 
     document.body.appendChild(postEl);
 
+    const proxyFile: ScannedFile = {
+      canonicalId: 'url-https://classroom.google.com/drive/attachment/abc123',
+      element: proxy,
+      idSource: 'url-hash',
+      name: 'Slides.pdf',
+      ext: 'pdf',
+      downloadUrl: proxy.href,
+    };
+
     const post: ScannedPost = {
-      id: 'link-mix-3',
+      id: 'link-mix-4',
       element: postEl,
-      fingerprint: 'link-mix-3',
-      files: [drive],
+      fingerprint: 'link-mix-4',
+      files: [drive, proxyFile],
       isExpanded: true,
       isConnected: true,
     };
 
     const decisions = computePlacement(post, ViewKind.STREAM);
-    const all = decisions.filter((d) => d.fileId === 'download-all:link-mix-3');
+    const all = decisions.filter((d) => d.fileId === 'download-all:link-mix-4');
     expect(all).toHaveLength(1);
     expect(all[0].attachmentCount).toBe(2);
   });
