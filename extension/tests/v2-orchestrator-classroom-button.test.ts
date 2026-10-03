@@ -220,4 +220,21 @@ describe('orchestrator-driven classroom button (bug 2.2)', () => {
 
     o.stop();
   });
+
+  it('zero active engines on an accepted classroom view removes a stale button (engines-empty early return)', async () => {
+    // Zero engines: the orchestrator's engines-empty early return fires
+    // BEFORE syncClassroomButton, so the removal must live on that early
+    // return itself — nothing else on this path touches the button.
+    registryState.primary = null;
+    const stale = document.createElement('button');
+    stale.id = BUTTON_ID;
+    document.body.appendChild(stale);
+
+    const o = new Orchestrator();
+    o.start();
+    await driveTo(o, ViewKind.CLASSWORK_LIST, CLASSWORK_URL);
+    expect(classroomButtons()).toBe(0);
+
+    o.stop();
+  });
 });

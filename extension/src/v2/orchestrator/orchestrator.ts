@@ -293,6 +293,10 @@ export class Orchestrator {
 
     if (this.activeEngines.length === 0) {
       console.warn('[CQD Orchestrator] No active engines! Check registry setup.');
+      // Zero engines means nothing may own the classroom-wide button either —
+      // this early return exits BEFORE syncClassroomButton, so drop any stale
+      // one here, matching the non-classroom/unknown early return above.
+      removeClassroomButton();
       return;
     }
 

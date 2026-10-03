@@ -129,7 +129,7 @@ export function resetClassroomDownloadController(): void {
 }
 
 // ============================================================================
-// BUTTON LIFECYCLE — driven by EngineV3 (init + fullScan)
+// BUTTON LIFECYCLE — driven by the orchestrator (syncClassroomButton on view change)
 // ============================================================================
 
 /** The shared csaa.5 budget — one window for every v3 API caller. */
