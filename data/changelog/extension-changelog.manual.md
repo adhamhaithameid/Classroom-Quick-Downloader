@@ -1,3 +1,19 @@
+## v1.8.9
+### Summary
+The New engine grows up: post-level and classroom-wide downloads work, highlights ring the right post, and the popup gains history, settings, and diagnostics.
+### Added
+- Download history in the popup, with one-click re-download.
+- A full options page for every setting.
+- Alt+Shift+D starts a Download All from the keyboard.
+- A diagnostics page that copies or downloads a private-by-default report.
+- A smarter download queue: pacing, size checks, clearer failure reasons, and automatic retries.
+### Changed
+- The extension now runs on built-in defaults — it no longer downloads a daily settings file, which makes it lighter on the network.
+### Fixed
+- Download All now appears on every post with two or more attachments — including collapsed posts — and counts that post's own files.
+- Change highlights ring the changed post, not the whole classroom.
+- Classroom-wide download works on the New and API engines; the API engine asks for permission once when needed.
+
 ## v1.8.7
 ### Summary
 Downloads survive browser service-worker restarts — nothing gets stuck or lost mid-download.
