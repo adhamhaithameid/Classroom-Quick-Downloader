@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Direction B — Gridline (Compact Utility) · CQD 1.8.9</title>
+<style>
+  /* ============ Demo page shell (not part of the popup) ============ */
+  :root {
+    --bg: #0B0C10;
+    --panel: #14151C;
+    --surface: rgba(255,255,255,.04);
+    --surface2: rgba(255,255,255,.08);
+    --border: rgba(255,255,255,.10);
+    --border2: rgba(255,255,255,.20);
+    --text: #F3F4F8;
+    --text2: #A7ACBD;
+    --text3: #767C90;
+    --accent: #8F7BFF;
+    --accent2: #6E5BFF;
+    --success: #07DA3F;
+    --success-text: #4AE376;
+    --success-soft: rgba(7,218,63,.12);
+    --error: #FF4036;
+    --error-text: #FF7A72;
+    --error-soft: rgba(255,64,54,.12);
+    --trying: #FFD93D;
+    --cancel: #EC6300;
+    --comment-text: #B983FF;
+    --edited-text: #00D6EE;
+    --bmc: #FFDD00;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --ease: cubic-bezier(0.2, 0, 0, 1); /* Gridline: snappy, no overshoot */
+    --fast: 90ms; --mid: 140ms; --slow: 200ms;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--font);
+    font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased;
+    padding: 48px 24px 96px;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+  a { color: var(--accent); }
+  button { font-family: inherit; cursor: pointer; }
+  button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+  .crumb { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--text3); margin-bottom: 8px; }
+  .crumb a { color: var(--accent); text-decoration: none; }
+  .crumb a:hover { text-decoration: underline; }
+  h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.25; }
+  .lede { color: var(--text2); font-size: 15px; margin-top: 8px; max-width: 62ch; }
+  .identity { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .identity span {
+    font-size: 11px; font-weight: 500; color: var(--text2);
+    border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; background: var(--surface);
+  }
+  .sec { margin-top: 56px; }
+  .sec-label { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+  .sec h2 { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+  .sec p.desc { font-size: 13px; color: var(--text2); max-width: 70ch; margin-bottom: 20px; }
+
+  /* ============ Popup frame ============ */
+  .stage { display: flex; gap: 32px; flex-wrap: wrap; align-items: flex-start; }
+  .popup-shell { flex: 0 0 auto; }
+  .popup-caption { font-size: 11px; color: var(--text3); margin-top: 12px; text-align: center; }
+  .popup {
+    width: 360px; height: 600px;
+    background: #15161B;
+    border: 1px solid rgba(255,255,255,.15);
+    border-radius: 12px;
+    box-shadow: 0 24px 80px rgba(0,0,0,.55);
+    display: flex; flex-direction: column;
+    overflow: hidden; color: var(--text); font-size: 13px;
+  }
+
+  /* -- header -- */
+  .p-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; border-bottom: 1px solid var(--border);
+    background: #1A1B22;
+  }
+  .p-head .logo {
+    width: 22px; height: 22px; border-radius: 6px; flex: 0 0 auto;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: grid; place-items: center;
+  }
+  .p-head .brand { flex: 1; min-width: 0; }
+  .p-head .brand b { display: block; font-size: 12px; font-weight: 600; line-height: 1.2; letter-spacing: .01em; }
+  .p-head .brand small { font-size: 10px; font-weight: 500; color: var(--text3); letter-spacing: .04em; text-transform: uppercase; }
+  .icon-btn {
+    width: 24px; height: 24px; border: 1px solid transparent; border-radius: 6px;
+    background: transparent; color: var(--text3); display: grid; place-items: center;
+    transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+  }
+  .icon-btn:hover { background: var(--surface2); color: var(--text); }
+
+  /* -- status strip -- */
+  .status-strip {
+    display: flex; align-items: center; gap: 12px;
+    padding: 6px 12px; border-bottom: 1px solid var(--border);
+    background: rgba(0,0,0,.22);
+    font-size: 11px; color: var(--text2); font-variant-numeric: tabular-nums;
+  }
+  .status-strip .st { display: inline-flex; align-items: center; gap: 5px; }
+  .status-strip i { width: 6px; height: 6px; border-radius: 2px; display: inline-block; }
+  .i-run { background: var(--accent); }
+  .i-ok { background: var(--success); }
+  .i-bad { background: var(--error); }
+
+  .p-body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* -- settings rows -- */
+  .rows { padding: 4px 0; border-bottom: 1px solid var(--border); }
+  .row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px; min-height: 32px;
+    transition: background var(--fast) var(--ease);
+  }
+  .row:hover { background: var(--surface); }
+  .row + .row { border-top: 1px solid rgba(255,255,255,.05); }
+  .row .r-label { font-size: 12px; font-weight: 500; color: var(--text); }
+  .row .r-hint { font-size: 10px; color: var(--text3); line-height: 1.35; margin-top: 1px; }
+  .row .r-main { flex: 1; min-width: 0; }
+  .row .r-side { flex: 0 0 auto; }
+
+  /* mini segmented (engine) */
+  .mini-seg { display: inline-flex; background: rgba(0,0,0,.3); border: 1px solid var(--border); border-radius: 7px; padding: 1px; gap: 1px; }
+  .mini-seg button {
+    border: none; background: transparent; color: var(--text2);
+    font-size: 11px; font-weight: 500; padding: 4px 9px; border-radius: 5px;
+    transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+  }
+  .mini-seg button:hover { color: var(--text); }
+  .mini-seg button[aria-pressed="true"] { background: var(--accent); color: #14121F; font-weight: 600; }
+  .mini-seg .beta { font-size: 9px; vertical-align: super; }
+
+  /* switches for flags */
+  .switch {
+    position: relative; width: 30px; height: 17px; border-radius: 999px;
+    border: 1px solid var(--border2); background: rgba(0,0,0,.35);
+    transition: background var(--fast) var(--ease), border-color var(--fast) var(--ease);
+  }
+  .switch::after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 11px; height: 11px; border-radius: 50%; background: var(--text3);
+    transition: transform var(--fast) var(--ease), background var(--fast) var(--ease);
+  }
+  .switch[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); }
+  .switch[aria-pressed="true"]::after { transform: translateX(13px); background: #14121F; }
+  .switch.c-comment[aria-pressed="true"] { background: var(--comment-text); border-color: var(--comment-text); }
+  .switch.c-edited[aria-pressed="true"] { background: var(--edited-text); border-color: var(--edited-text); }
+  .flag-count {
+    font-size: 10px; color: var(--text3); font-variant-numeric: tabular-nums;
+    border: 1px solid var(--border); border-radius: 5px; padding: 1px 5px;
+  }
+  .row-copy {
+    padding: 5px 12px 8px; font-size: 10px; color: var(--text3); line-height: 1.45;
+    border-top: 1px solid rgba(255,255,255,.05);
+  }
+  .row-copy strong { color: var(--text2); font-weight: 600; }
+
+  /* download mode row uses same mini-seg */
+
+  /* -- main action -- */
+  .cta-wrap { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .cta {
+    position: relative; overflow: hidden; width: 100%;
+    display: flex; align-items: center; gap: 8px;
+    border: none; border-radius: 8px;
+    background: linear-gradient(180deg, var(--accent), var(--accent2));
+    color: #14121F; padding: 0 12px; height: 44px;
+    box-shadow: 0 2px 10px rgba(110,91,255,.3);
+    transition: filter var(--fast) var(--ease), transform var(--fast) var(--ease);
+  }
+  .cta:hover { filter: brightness(1.08); }
+  .cta:active { transform: translateY(1px); }
+  .cta .t { flex: 1; min-width: 0; text-align: left; font-size: 13px; font-weight: 600; letter-spacing: .01em; position: relative; z-index: 2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cta .n {
+    position: relative; z-index: 2;
+    font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums;
+    background: rgba(0,0,0,.22); color: #EDEBFF;
+    border-radius: 5px; padding: 2px 7px;
+  }
+  .cta .n.ok { background: rgba(0,0,0,.32); color: #B9FFCB; }
+  .cta .n.bad { background: rgba(0,0,0,.32); color: #FFC9C4; }
+  .cta-fill {
+    position: absolute; left: 0; top: 0; bottom: 0; width: var(--fill, 0%);
+    background: rgba(0,0,0,.30);
+    transition: width var(--slow) steps(6, end); /* Gridline: progress ticks per file */
+    z-index: 1;
+  }
+  .wave {
+    position: absolute; left: calc(var(--fill, 0%) - 3px); top: -50%; height: 200%; width: 6px;
+    z-index: 1; opacity: 0; transition: opacity var(--mid) var(--ease);
+  }
+  .wave svg { display: block; width: 100%; height: 100%; }
+  .cta.loading .wave { opacity: .8; animation: wave-slide-y 1.8s linear infinite; }
+  @keyframes wave-slide-y { from { transform: translateY(0); } to { transform: translateY(50%); } }
+  .cta.is-success { background: linear-gradient(180deg, #0BCE44, #08A837); color: #06210F; box-shadow: 0 2px 10px rgba(7,218,63,.25); }
+  .cta.is-success .t { color: #06210F; }
+  .cta.is-success .n { background: rgba(0,0,0,.22); color: #D6FFE2; }
+  .cta.is-success .cta-fill { background: rgba(255,255,255,.18); }
+  .cta.is-error { background: linear-gradient(180deg, #FF5A50, #E6342A); color: #2B0503; box-shadow: 0 2px 10px rgba(255,64,54,.25); }
+  .cta.is-error .t { color: #2B0503; }
+  .cta.is-error .n { background: rgba(0,0,0,.25); color: #FFD9D6; }
+  .cta.is-error .cta-fill { background: rgba(0,0,0,.28); }
+
+  /* -- history -- */
+  .history { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .h-list { flex: 1; overflow: hidden; }
+  .h-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px; min-height: 32px;
+    border-top: 1px solid rgba(255,255,255,.05);
+    transition: background var(--fast) var(--ease);
+    font-variant-numeric: tabular-nums;
+  }
+  .h-row:hover { background: var(--surface); }
+  .h-txt { flex: 1; min-width: 0; }
+  .h-txt b { display: block; font-size: 12px; font-weight: 500; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .h-txt small { display: block; font-size: 10px; color: var(--text3); line-height: 1.3; }
+  .h-txt small.run { color: var(--accent); }
+  .h-txt small.bad { color: var(--error-text); }
+  .h-pct { flex: 0 0 auto; font-size: 11px; font-weight: 600; color: var(--text2); width: 34px; text-align: right; }
+  .h-pct.ok { color: var(--success-text); }
+  .h-pct.bad { color: var(--error-text); }
+  .h-bar {
+    flex: 0 0 48px; height: 3px; border-radius: 2px; background: rgba(255,255,255,.08);
+    overflow: hidden;
+  }
+  .h-bar i { display: block; height: 100%; width: var(--fill, 0%); background: var(--accent); transition: width var(--mid) var(--ease); }
+  .h-bar.ok i { background: var(--success); }
+  .h-bar.bad i { background: var(--error); }
+
+  /* -- footer -- */
+  .p-foot {
+    padding: 8px 12px 10px; border-top: 1px solid var(--border);
+    background: #1A1B22;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .bmc {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--bmc); color: #241C00;
+    border: none; border-radius: 6px;
+    font-size: 11px; font-weight: 600; padding: 5px 10px;
+    transition: filter var(--fast) var(--ease);
+  }
+  .bmc:hover { filter: brightness(1.06); }
+  .p-foot .legal-links { margin-left: auto; display: flex; gap: 10px; }
+  .p-foot .legal-links a { font-size: 10px; color: var(--text3); text-decoration: none; }
+  .p-foot .legal-links a:hover { color: var(--text); }
+  .affil { flex-basis: 100%; font-size: 10px; color: var(--text3); line-height: 1.4; }
+
+  /* ============ State matrix ============ */
+  .matrix { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+  .cell-label { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
+  .cell { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+  .cell .cta-wrap { padding: 0; border: none; }
+  .cell .h-row { border-top: none; padding: 6px 8px; background: rgba(255,255,255,.02); }
+
+  /* ============ Type + spacing specs ============ */
+  .spec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .spec-grid { grid-template-columns: 1fr; } }
+  .spec { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .spec h3 { font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+  .type-row { display: flex; align-items: baseline; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+  .type-row:last-child { border-bottom: none; }
+  .type-tag { flex: 0 0 108px; font-size: 11px; color: var(--text3); font-variant-numeric: tabular-nums; }
+  .sp-row { display: flex; align-items: center; gap: 12px; padding: 6px 0; }
+  .sp-bar { height: 8px; border-radius: 2px; background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+  .sp-tag { font-size: 11px; color: var(--text2); }
+
+  .motion-note { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 20px; font-size: 13px; color: var(--text2); line-height: 1.6; }
+  .motion-note b { color: var(--text); }
+  .motion-note ul { margin: 8px 0 0 18px; }
+  .motion-note li { margin-bottom: 4px; }
+
+  /* ============ Reduced motion ============ */
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+    .wave { display: none; }
+    .cta:hover, .bmc:hover { filter: none; transform: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="crumb"><a href="index.html">← All prototypes</a> · Direction B</div>
+  <h1>Gridline — Compact Utility</h1>
+  <p class="lede">The popup as an instrument panel: everything is a row, every number is tabular, every state has a dot. Settings live in a dense list, the action is a slim filled bar, and motion is 90–200ms with hard stops — built for daily batch users who glance, not gaze.</p>
+  <div class="identity">
+    <span>Hierarchy: status first, action always visible</span>
+    <span>Density: compact · 12px gutters · 32–36px rows</span>
+    <span>Motion: snappy · 90–200ms · cubic-bezier(0.2, 0, 0, 1)</span>
+    <span>Type: 10 / 11 / 12 / 13, weights 400–600, tabular numerals</span>
+  </div>
+
+  <!-- ================= MAIN POPUP ================= -->
+  <div class="sec">
+    <div class="sec-label">01 · The popup, fully assembled</div>
+    <h2>360 × 600 — instrument-panel composite with live states inside</h2>
+    <p class="desc">Click the mini-segments, flip the switches, and click <b>Download Classroom</b> — progress fills in discrete per-file ticks, the utility spin on the water effect. The status strip under the header summarizes the queue at a glance.</p>
+    <div class="stage">
+      <div class="popup-shell">
+      <div class="popup" role="group" aria-label="Popup mockup, direction B">
+
+        <header class="p-head">
+          <span class="logo" aria-hidden="true">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+              <path d="M8 2v8m0 0 3-3m-3 3L5 7" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M2.5 12.5h11" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span class="brand">
+            <b>Classroom Quick Downloader</b>
+            <small>v1.8.9 · utility</small>
+          </span>
+          <button class="icon-btn" aria-label="Settings" title="Settings">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="2.2" stroke="currentColor" stroke-width="1.4"/>
+              <path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M12.4 3.6 11 5M5 11l-1.4 1.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </header>
+
+        <div class="status-strip" role="status">
+          <span class="st"><i class="i-run" aria-hidden="true"></i>1 running</span>
+          <span class="st"><i class="i-ok" aria-hidden="true"></i>12 today</span>
+          <span class="st"><i class="i-bad" aria-hidden="true"></i>1 failed</span>
+          <span style="margin-left:auto; color:var(--text3);">Parallel · 3 at a time</span>
+        </div>
+
+        <div class="p-body">
+
+          <!-- Settings rows: engine + mode + flags -->
+          <div class="rows">
+            <div class="row">
+              <span class="r-main">
+                <span class="r-label">Engine</span>
+              </span>
+              <span class="r-side">
+                <span class="mini-seg" role="group" aria-label="Engine selector">
+                  <button type="button" aria-pressed="false">Legacy</button>
+                  <button type="button" aria-pressed="true">New</button>
+                  <button type="button" aria-pressed="false">API<span class="beta">β</span></button>
+                </span>
+              </span>
+            </div>
+            <div class="row-copy"><strong>New</strong> runs the rewritten engine. Switch back to Legacy any time — one click rolls everything back.</div>
+            <div class="row">
+              <span class="r-main">
+                <span class="r-label">Download mode</span>
+              </span>
+              <span class="r-side">
+                <span class="mini-seg" role="group" aria-label="Download mode">
+                  <button type="button" aria-pressed="false">Seq · 1</button>
+                  <button type="button" aria-pressed="true">Parallel · 3</button>
+                </span>
+              </span>
+            </div>
+            <div class="row">
+              <span class="r-main">
+                <span class="r-label" style="color:var(--comment-text);">Comment highlights</span>
+              </span>
+              <span class="flag-count">12 posts</span>
+              <button type="button" class="switch c-comment" aria-pressed="true" aria-label="Comment highlights"></button>
+            </div>
+            <div class="row">
+              <span class="r-main">
+                <span class="r-label" style="color:var(--edited-text);">Edited highlights</span>
+              </span>
+              <span class="flag-count">3 posts</span>
+              <button type="button" class="switch" aria-pressed="false" aria-label="Edited highlights"></button>
+            </div>
+            <div class="row">
+              <span class="r-main">
+                <span class="r-label">Both (comment + edited)</span>
+              </span>
+              <span class="flag-count">2 posts</span>
+              <button type="button" class="switch" aria-pressed="true" aria-label="Both flag"></button>
+            </div>
+          </div>
+
+          <!-- Main action -->
+          <div class="cta-wrap">
+            <button type="button" class="cta" id="cta" style="--fill:0%">
+              <span class="cta-fill" aria-hidden="true"></span>
+              <span class="wave" aria-hidden="true">
+                <svg viewBox="0 0 6 120" preserveAspectRatio="none"><path d="M3 0 Q 6 5 3 10 T 3 20 T 3 30 T 3 40 T 3 50 T 3 60 T 3 70 T 3 80 T 3 90 T 3 100 T 3 110 T 3 120 H0 Z" fill="rgba(20,18,31,.55)"/></svg>
+              </span>
+              <span class="t" id="cta-title">Download Classroom</span>
+              <span class="n" id="cta-sub">24 files</span>
+            </button>
+          </div>
+
+          <!-- History -->
+          <section class="history" aria-label="Recent downloads">
+            <div class="h-list">
+              <div class="h-row">
+                <span class="h-txt">
+                  <b>Chapter 4 — worksheets</b>
+                  <small class="run" id="hist-count">7 / 12 · 2.4 MB/s</small>
+                </span>
+                <span class="h-bar"><i id="hist-bar" style="--fill:58%"></i></span>
+                <span class="h-pct" id="hist-pct">58%</span>
+              </div>
+              <div class="h-row">
+                <span class="h-txt">
+                  <b>Photosynthesis — deck + notes</b>
+                  <small>6 files · 2.1 MB · done 14:02</small>
+                </span>
+                <span class="h-bar ok"><i style="--fill:100%"></i></span>
+                <span class="h-pct ok">100</span>
+              </div>
+              <div class="h-row">
+                <span class="h-txt">
+                  <b>Lab rubric.pdf</b>
+                  <small class="bad">Failed — link expired</small>
+                </span>
+                <span class="h-bar bad"><i style="--fill:100%"></i></span>
+                <span class="h-pct bad">ERR</span>
+              </div>
+            </div>
+          </section>
+
+        </div>
+
+        <footer class="p-foot">
+          <button type="button" class="bmc">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M3 6h8v4a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6Z" fill="#241C00"/>
+              <path d="M11 7h1.2a1.8 1.8 0 0 1 0 3.6H11" stroke="#241C00" stroke-width="1.3"/>
+              <path d="M5.2 4.2c0-.8.8-.8.8-1.6M8 4.2c0-.8.8-.8.8-1.6" stroke="#241C00" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
+            Buy me a coffee
+          </button>
+          <span class="legal-links">
+            <a href="legal.html">Privacy</a>
+            <a href="legal.html">Permissions</a>
+          </span>
+          <span class="affil">Not affiliated with Google. Downloads belong to their owners — follow your school's policies.</span>
+        </footer>
+
+      </div>
+      <div class="popup-caption">360 × 600 · Gridline idle composite (interactive)</div>
+      </div>
+
+      <!-- Rationale column -->
+      <div style="flex:1 1 320px; min-width:300px; display:flex; flex-direction:column; gap:16px;">
+      <div class="motion-note">
+        <b>Why it feels fast</b>
+        <ul>
+          <li><b>Status before action.</b> The strip under the header answers "is anything running?" before you read a single label.</li>
+          <li><b>Everything is a row.</b> Engine, mode, and flags share one 32px row system with switches and inline mini-segments — no cards, no nesting.</li>
+          <li><b>Numbers are data.</b> All counts use tabular numerals so columns don't jitter while updating.</li>
+          <li><b>Progress ticks.</b> The fill advances in discrete per-file steps (steps(6)) — it reads as work completed, not decoration.</li>
+          <li><b>No travel.</b> Hover is background/border only; nothing lifts, nothing bounces. 90ms in, out before you notice.</li>
+        </ul>
+      </div>
+      <div class="motion-note">
+        <b>Direction-specific decisions</b>
+        <ul>
+          <li>Engine rollback copy sits directly under the engine row — one line, always visible, 10px.</li>
+          <li>Flags are switches with live post counts, not pills — the count is the feedback ("12 posts" recalculates as you toggle).</li>
+          <li>"Both" listed as its own row with a combined gradient label treatment (see components.html for the card treatment).</li>
+          <li>History shows speed (2.4 MB/s) and clock times — utility users reconcile against their file manager.</li>
+        </ul>
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= STATE MATRIX ================= -->
+  <div class="sec">
+    <div class="sec-label">02 · State matrix — idle / loading / success / error / cancel</div>
+    <h2>Main action + history row states</h2>
+    <p class="desc">Same geometry in all states; only fill, color, and badge swap. The loading cell is live — click it.</p>
+    <div class="matrix">
+      <div class="cell">
+        <div class="cell-label">CTA · Idle</div>
+        <div class="cta-wrap">
+          <button type="button" class="cta" style="--fill:0%">
+            <span class="cta-fill" aria-hidden="true"></span>
+            <span class="t">Download Classroom</span>
+            <span class="n">24 files</span>
+          </button>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cell-label">CTA · Loading (live)</div>
+        <div class="cta-wrap">
+          <button type="button" class="cta loading" id="cta2" style="--fill:0%">
+            <span class="cta-fill" aria-hidden="true"></span>
+            <span class="wave" aria-hidden="true">
+              <svg viewBox="0 0 6 120" preserveAspectRatio="none"><path d="M3 0 Q 6 5 3 10 T 3 20 T 3 30 T 3 40 T 3 50 T 3 60 T 3 70 T 3 80 T 3 90 T 3 100 T 3 110 T 3 120 H0 Z" fill="rgba(20,18,31,.55)"/></svg>
+            </span>
+            <span class="t" id="cta2-title">Downloading…</span>
+            <span class="n" id="cta2-sub">0 / 24</span>
+          </button>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cell-label">CTA · Success</div>
+        <div class="cta-wrap">
+          <div class="cta is-success" style="--fill:100%" role="status">
+            <span class="cta-fill" aria-hidden="true"></span>
+            <span class="t">Done — 24 files</span>
+            <span class="n ok">18.4 MB</span>
+          </div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cell-label">CTA · Error (partial)</div>
+        <div class="cta-wrap">
+          <div class="cta is-error" style="--fill:87%" role="alert">
+            <span class="cta-fill" aria-hidden="true"></span>
+            <span class="t">3 of 24 failed</span>
+            <span class="n bad">retry</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="matrix" style="margin-top:16px;">
+      <div class="cell">
+        <div class="cell-label">History row · running</div>
+        <div class="h-row">
+          <span class="h-txt"><b>Chapter 4 — worksheets</b><small class="run">7 / 12 · 2.4 MB/s</small></span>
+          <span class="h-bar"><i style="--fill:58%"></i></span>
+          <span class="h-pct">58%</span>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cell-label">History row · success</div>
+        <div class="h-row">
+          <span class="h-txt"><b>Photosynthesis — deck</b><small>6 files · 2.1 MB · done 14:02</small></span>
+          <span class="h-bar ok"><i style="--fill:100%"></i></span>
+          <span class="h-pct ok">100</span>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cell-label">History row · error</div>
+        <div class="h-row">
+          <span class="h-txt"><b>Lab rubric.pdf</b><small class="bad">Failed — link expired</small></span>
+          <span class="h-bar bad"><i style="--fill:100%"></i></span>
+          <span class="h-pct bad">ERR</span>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cell-label">History row · canceled</div>
+        <div class="h-row">
+          <span class="h-txt"><b>Biology — week 9 pack</b><small>Canceled at 4 / 9</small></span>
+          <span class="h-bar"><i style="--fill:44%; background:var(--cancel);"></i></span>
+          <span class="h-pct" style="color:#FF9A4D;">44%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= TYPE + SPACING ================= -->
+  <div class="sec">
+    <div class="sec-label">03 · Typography &amp; spacing</div>
+    <h2>The only scale used in this direction</h2>
+    <div class="spec-grid">
+      <div class="spec">
+        <h3>Type scale — one stack (system-ui), weights 400 / 500 / 600 only</h3>
+        <div class="type-row"><span class="type-tag">13 / 600 — CTA</span><span style="font-size:13px;font-weight:600;">Download Classroom</span></div>
+        <div class="type-row"><span class="type-tag">12 / 500 — Row label</span><span style="font-size:12px;font-weight:500;">Engine · Comment highlights</span></div>
+        <div class="type-row"><span class="type-tag">12 / 500 — History title</span><span style="font-size:12px;font-weight:500;">Photosynthesis — deck + notes</span></div>
+        <div class="type-row"><span class="type-tag">11 / 600 — Data</span><span style="font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;">7 / 12 · 58% · 2.4 MB/s</span></div>
+        <div class="type-row"><span class="type-tag">10 / 500 — Hint</span><span style="font-size:10px;color:var(--text3);">Parallel · 3 at a time</span></div>
+        <div class="type-row"><span class="type-tag">10 / 400 — Legal</span><span style="font-size:10px;color:var(--text3);">Not affiliated with Google.</span></div>
+      </div>
+      <div class="spec">
+        <h3>Spacing — 4 / 8 grid, nothing else</h3>
+        <div class="sp-row"><span class="sp-bar" style="width:4px"></span><span class="sp-tag">4 — icon gaps, switch travel</span></div>
+        <div class="sp-row"><span class="sp-bar" style="width:8px"></span><span class="sp-tag">8 — row internal gaps, CTA padding</span></div>
+        <div class="sp-row"><span class="sp-bar" style="width:12px"></span><span class="sp-tag">12 — gutters, row padding</span></div>
+        <div class="sp-row"><span class="sp-bar" style="width:16px"></span><span class="sp-tag">16 — section rhythm (via row groups)</span></div>
+        <div class="sp-row"><span class="sp-bar" style="width:24px"></span><span class="sp-tag">24 — not used; density is the point</span></div>
+        <h3 style="margin-top:16px;">Radii</h3>
+        <div class="sp-row"><span class="sp-bar" style="width:10px; border-radius:2px;"></span><span class="sp-tag">8 — CTA · 7 — segments · 6 — switches · 2 — bars</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MOTION ================= -->
+  <div class="sec">
+    <div class="sec-label">04 · Motion personality</div>
+    <div class="motion-note">
+      <b>Gridline moves like a cursor, not a wave.</b> Durations: 90ms (hover/switch), 140ms (row state), 200ms (fill ticks). One ease: <code>cubic-bezier(0.2, 0, 0, 1)</code>. No lifts, no glows-on-hover; feedback is instant surface change. The water crest is a single low wave riding per-file ticks. Under <code>prefers-reduced-motion: reduce</code>: waves hide, fills and counters remain. Full studies in <a href="effects.html">effects.html</a>.
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Mini segments (engine + mode)
+  document.querySelectorAll('.mini-seg').forEach(function (seg) {
+    seg.querySelectorAll('button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        seg.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', 'false'); });
+        b.setAttribute('aria-pressed', 'true');
+      });
+    });
+  });
+  // Switches
+  document.querySelectorAll('.switch').forEach(function (s) {
+    s.addEventListener('click', function () {
+      s.setAttribute('aria-pressed', s.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+    });
+  });
+  // Per-file tick fill simulation
+  function runWater(btn, titleEl, subEl, total) {
+    var n = 0;
+    btn.style.setProperty('--fill', '0%');
+    btn.classList.add('loading');
+    btn.classList.remove('is-success', 'is-error');
+    var iv = setInterval(function () {
+      n++;
+      if (n >= total) {
+        clearInterval(iv);
+        btn.style.setProperty('--fill', '100%');
+        btn.classList.remove('loading');
+        btn.classList.add('is-success');
+        titleEl.textContent = 'Done — ' + total + ' files';
+        subEl.textContent = '18.4 MB';
+        setTimeout(function () {
+          btn.classList.remove('is-success');
+          btn.style.setProperty('--fill', '0%');
+          titleEl.textContent = 'Download Classroom';
+          subEl.textContent = '24 files';
+        }, 2200);
+      } else {
+        btn.style.setProperty('--fill', (n / total * 100) + '%');
+        titleEl.textContent = 'Downloading…';
+        subEl.textContent = n + ' / ' + total;
+      }
+    }, 110);
+  }
+  var cta = document.getElementById('cta');
+  cta.addEventListener('click', function () {
+    if (cta.classList.contains('loading') || cta.classList.contains('is-success')) return;
+    runWater(cta, document.getElementById('cta-title'), document.getElementById('cta-sub'), 24);
+  });
+  var cta2 = document.getElementById('cta2');
+  cta2.addEventListener('click', function () {
+    if (cta2.classList.contains('is-success')) return;
+    runWater(cta2, document.getElementById('cta2-title'), document.getElementById('cta2-sub'), 24);
+  });
+  // History running row
+  (function () {
+    var bar = document.getElementById('hist-bar'), cnt = document.getElementById('hist-count'), pct = document.getElementById('hist-pct'), n = 7;
+    setInterval(function () {
+      n = n >= 12 ? 1 : n + 1;
+      bar.style.setProperty('--fill', Math.round(n / 12 * 100) + '%');
+      cnt.textContent = n + ' / 12 · 2.4 MB/s';
+      pct.textContent = Math.round(n / 12 * 100) + '%';
+    }, 800);
+  })();
+</script>
+</body>
+</html>
