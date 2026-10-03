@@ -140,7 +140,9 @@
     about: {
       '@type': 'SoftwareApplication',
       name: SITE_NAME,
-      applicationCategory: 'BrowserExtension'
+      // 'BrowserApplication' is the schema.org enum value; 'BrowserExtension' is not.
+      applicationCategory: 'BrowserApplication',
+      browserRequirements: 'Requires Chrome, Firefox, Edge, or any Chromium-based desktop browser.'
     },
     primaryImageOfPage: {
       '@type': 'ImageObject',

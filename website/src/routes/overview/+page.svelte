@@ -141,8 +141,11 @@
     name: 'Classroom Quick Downloader',
     description:
       'Free browser extension that lets students download Google Classroom assignment attachments in one click.',
-    applicationCategory: 'BrowserExtension',
+    // 'BrowserApplication' is the schema.org software category enum value for
+    // browser software; 'BrowserExtension' is not in the vocabulary.
+    applicationCategory: 'BrowserApplication',
     operatingSystem: 'Chrome, Firefox, Edge, Chromium browsers',
+    browserRequirements: 'Requires Chrome, Firefox, Edge, or any Chromium-based desktop browser.',
     image: `${SITE_URL}/images/cqd-social-card.png`,
     screenshot: `${SITE_URL}/images/solution-flags.webp`,
     isAccessibleForFree: true,
