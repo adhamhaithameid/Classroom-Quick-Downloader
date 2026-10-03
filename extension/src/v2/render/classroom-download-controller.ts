@@ -34,6 +34,7 @@ import type {
   RequestId,
 } from '../../contracts/topics';
 import { findHeaderContainer } from '../../download-all/button-controller';
+import { CLASSROOM_ACTION_LABEL } from './classroom-action-label';
 import {
   CourseInventoryService,
   GoogleClassroomApiClient,
@@ -171,7 +172,7 @@ export function ensureClassroomButton(href: string = window.location.href): void
   button.className = 'cqd-classroom-dl';
   button.dataset.cqdCourseId = context.courseId;
   button.setAttribute('aria-live', 'polite');
-  button.textContent = 'Download all classroom files';
+  button.textContent = CLASSROOM_ACTION_LABEL;
   button.addEventListener('click', () => {
     void handleClassroomClick();
   });
@@ -298,7 +299,7 @@ function scheduleReset(currentRun: ClassroomRun): void {
   currentRun.resetTimer = setTimeoutFn(() => {
     if (run === currentRun) {
       currentRun.button.classList.remove('cqd-classroom-dl-busy');
-      setLabel('Download all classroom files');
+      setLabel(CLASSROOM_ACTION_LABEL);
       run = null;
     }
   }, CLASSROOM_FEEDBACK_MS);

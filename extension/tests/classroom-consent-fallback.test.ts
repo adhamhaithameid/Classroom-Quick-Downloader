@@ -29,6 +29,7 @@ import {
   resetClassroomDownloadController,
   uninstallClassroomDownloadController,
 } from '../src/v2/render/classroom-download-controller';
+import { CLASSROOM_ACTION_LABEL } from '../src/v2/render/classroom-action-label';
 import type { CourseInventoryService } from '../src/engines/v3/api/course-inventory';
 import type { PageTopicMap } from '../src/contracts/topics';
 
@@ -209,7 +210,7 @@ describe('classroom click with interactive consent fallback (bug 2.5)', () => {
 
     // The transient state resets after the feedback window.
     await ctx.timers.flushAll();
-    expect(button.textContent).toBe('Download all classroom files');
+    expect(button.textContent).toBe(CLASSROOM_ACTION_LABEL);
   });
 
   it('a cached token skips the prompt entirely and proceeds non-interactively', async () => {

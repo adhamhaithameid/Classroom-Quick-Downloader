@@ -7,6 +7,7 @@ import {
   resetClassroomDownloadController,
   uninstallClassroomDownloadController,
 } from '../src/v2/render/classroom-download-controller';
+import { CLASSROOM_ACTION_LABEL } from '../src/v2/render/classroom-action-label';
 import type { CourseInventoryService } from '../src/engines/v3/api/course-inventory';
 import type { PageTopicMap } from '../src/contracts/topics';
 
@@ -130,7 +131,7 @@ describe('classroom download controller', () => {
 
     // Terminal state resets after the feedback window.
     await ctx.timers.flushAll();
-    expect(button.textContent).toBe('Download all classroom files');
+    expect(button.textContent).toBe(CLASSROOM_ACTION_LABEL);
     expect(CLASSROOM_FEEDBACK_MS).toBe(3000);
     await click;
   });
@@ -159,7 +160,7 @@ describe('classroom download controller', () => {
     await click;
 
     expect(ctx.published).toHaveLength(1);
-    expect(button.textContent).toBe('Download all classroom files');
+    expect(button.textContent).toBe(CLASSROOM_ACTION_LABEL);
   });
 
   it('reports an empty course and an inventory failure without throwing', async () => {
