@@ -13,11 +13,14 @@
  * exactly like any other CQD download (browser-session Drive fetches — zero
  * Classroom API quota per file).
  *
- * Gating is structural, not checked here: the ONLY caller of
- * ensureClassroomButton is EngineV3 (v3 mode ⇒ configured ⇒ consented), and
- * resolveClassroomApiRouteContext supplies the courseId only on classwork
- * routes. Firefox/unconfigured installs never construct EngineV3, never see
- * the button, and their DOM features are untouched.
+ * Gating: the orchestrator drives ensureClassroomButton on every view
+ * change (bug 2.2 — see orchestrator.syncClassroomButton) for every mode
+ * whose DOM engine is EngineV2 (v2 mode; v3 mode whose EngineV3 delegates
+ * DOM to V2), gated on isApiConfigured() + the primary engine. The
+ * controller itself honors only the route shape: resolveClassroomApiRoute
+ * Context supplies the courseId on classwork routes, and the button is
+ * removed everywhere else. Firefox/unconfigured installs are gated off by
+ * the orchestrator and never see the button.
  *
  * Failure contract (R7): inventory failure → transient "Couldn't list
  * files" state, DOM untouched. A click mid-run is a stop — no new requests
@@ -119,8 +122,9 @@ const limiter = sharedClassroomRateLimiter;
 /**
  * Ensure the button exists on the current classwork page, and remove it when
  * the route is no longer classwork. Idempotent; safe to call every scan.
- * Called ONLY by EngineV3 (see the gating note in the header). The href
- * parameter is a test seam — production resolves the live location.
+ * Called ONLY by the orchestrator (syncClassroomButton on the view-change
+ * path — see the gating note in the header). The href parameter is a test
+ * seam — production resolves the live location.
  */
 export function ensureClassroomButton(href: string = window.location.href): void {
   if (!deps) return;

@@ -118,10 +118,11 @@ export default defineContentScript({
         m.installDownloadAllController(),
       );
 
-      // 3d-2. Classroom-wide download (csaa.6): the "Download all classroom
-      //     files" button for v3 mode on classwork routes. Rendering is gated
-      //     structurally — only EngineV3 calls ensureClassroomButton, and v3
-      //     mode already implies isApiConfigured + explicit API-beta consent.
+      // 3d-2. Classroom-wide download (csaa.6, bug 2.2): the "Download all
+      //     classroom files" button on classwork routes. Rendering is driven
+      //     by the orchestrator (syncClassroomButton on every view change)
+      //     for every mode whose DOM engine is EngineV2 — v2 AND v3 — gated
+      //     on isApiConfigured() and the primary engine.
       await import('../src/v2/render/classroom-download-controller').then((m) =>
         m.installClassroomDownloadController({ bus: orchestrator.getBus() }),
       );

@@ -50,6 +50,11 @@
 
 import { ViewKind, type CQDEngine } from '../../engines/types';
 import { engineRegistry } from '../../engines/engine-registry';
+import { isApiConfigured } from '../../engines/v3/api/config';
+import {
+  ensureClassroomButton,
+  removeClassroomButton,
+} from '../render/classroom-download-controller';
 import { RouteWatcher, isClassroomUrl } from '../context/route-classifier';
 import { ShadowComparator, type ShadowCompareResult } from '../compat/shadow-compare';
 import { createEventBus, type EventBus } from '../../bus/event-bus';
@@ -219,8 +224,12 @@ export class Orchestrator {
     }
     this.activeEngines = [];
 
+    // 4b. The classroom-wide button is orchestrator-driven (bug 2.2), so a
+    //     full teardown must leave the page without it.
+    removeClassroomButton();
+
     // 5. Drop the S5 roles — rebuilt by the next start(). They are stateless
-    // over the bus, so page navigations (abortCurrentPage) leave them alive.
+    //    over the bus, so page navigations (abortCurrentPage) leave them alive.
     this.roles = null;
 
     this.currentView = null;
@@ -258,6 +267,9 @@ export class Orchestrator {
     if (!isClassroomUrl(url) || newView === ViewKind.UNKNOWN) {
       console.log(`[CQD Orchestrator] Ignoring view: ${newView} (${url})`);
       this.abortCurrentPage();
+      // No classroom route here — the classroom-wide button can never be
+      // valid on this page; drop it if a previous view left one behind.
+      removeClassroomButton();
       return;
     }
 
@@ -302,6 +314,44 @@ export class Orchestrator {
     // 6. Start shadow comparison if in shadow mode
     if (!signal.aborted && engineRegistry.getMode() === 'shadow') {
       this.startShadowComparison();
+    }
+
+    // 7. Classroom-wide download button (bug 2.2) — driven here, at the
+    //    orchestrator, for every mode whose DOM engine is EngineV2 (v2
+    //    mode; v3 mode whose EngineV3 delegates DOM to V2). See
+    //    syncClassroomButton for the gating and the ownership rationale.
+    if (!signal.aborted) {
+      this.syncClassroomButton(url);
+    }
+  }
+
+  /**
+   * Sync the classroom-wide download button with the current route (bug 2.2).
+   *
+   * The button renders for every mode whose DOM engine is EngineV2 — v2
+   * mode directly, v3 mode through EngineV3's delegation to V2 — AND only
+   * when the install can actually obtain a token (isApiConfigured: identity
+   * permission + oauth2 client_id). Gating on the PRIMARY engine (not the
+   * mode string and not raw active-engine membership) keeps shadow mode
+   * button-free: there V2 runs silently while V1 renders.
+   *
+   * The orchestrator is the SINGLE driver — EngineV3.init/fullScan no longer
+   * call ensureClassroomButton. handleViewChange is the one choke point that
+   * already runs on initial load, every SPA navigation, AND live mode
+   * changes (the registry callback re-enters it), so all transitions that
+   * could leave a stale button pass through here. The controller's
+   * ensureClassroomButton is idempotent and removes the button itself when
+   * `url` is not a classwork route; non-classroom/unknown views and stop()
+   * remove it directly.
+   */
+  private syncClassroomButton(url: string): void {
+    const primary = engineRegistry.getPrimaryEngine();
+    const domEngineIsV2 =
+      primary?.name === 'engine-v2' || primary?.name === 'engine-v3';
+    if (domEngineIsV2 && isApiConfigured()) {
+      ensureClassroomButton(url);
+    } else {
+      removeClassroomButton();
     }
   }
 
