@@ -93,8 +93,11 @@ Workflow facts:
 - Long-running or background commands: redirect output to a file and poll
   the file. Never pipe through `tail` — it buffers until EOF (a 12-minute
   idle wait once) and its exit code masks the real one.
-- Pre-push gate PATH (the hook needs arm64 openssl, pnpm, go):
+- Pre-push gate PATH — the hook self-heals this into its own environment, but
+  for manual gate runs export:
   `export PATH="/opt/homebrew/opt/openssl/bin:$HOME/.local/bin:/usr/local/opt/go/bin:$PATH"`
+  The gate is scoped: it runs only the workspaces your push touches
+  (`tools/pre-push-scope.mjs`); full gate for main pushes or `CQD_FULL_GATE=1`.
 - Commits are commitlint-checked (conventional): subject lowercase after
   the type, body lines ≤ 100 chars.
 - Escalating retries on a blocked action (Mimosa hook, commitlint) are a
