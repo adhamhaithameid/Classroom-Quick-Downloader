@@ -138,7 +138,9 @@ describe('background/index', () => {
     await flushAsyncWork();
 
     expect(ensureAnalyticsAlarm).toHaveBeenCalledTimes(1);
-    expect(refreshRemoteAnalyticsConfig).toHaveBeenCalledTimes(1);
+    // Free model: the startup remote-config fetch is removed entirely
+    // (free-fleet /config traffic dropped to zero; Pro re-enables later).
+    expect(refreshRemoteAnalyticsConfig).not.toHaveBeenCalled();
     expect(updateGlobalIcon).toHaveBeenCalledWith(false);
     // W3: the URL is set once directly and once after the startup flush
     // resolves (post-flush stats refresh); the last setUninstallURL call wins.
