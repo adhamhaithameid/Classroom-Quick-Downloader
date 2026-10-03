@@ -102,7 +102,7 @@ Downloading class files one-by-one wastes time and focus. CQD makes the common s
 ## 🛠️ Ops Status
 
 - Extension release line: `1.8.0` (2026-09-17) — the resilience release: full interrupt taxonomy, stall deadline, completion verification, and an adversarial test program. See the [Changelog](./CHANGELOG.md).
-- Security & dependency posture: 2026-09 security quality pass merged (deps updated, CodeQL warnings resolved); latest major scan: [docs/MAJOR_SCAN_2026-03-17.md](docs/MAJOR_SCAN_2026-03-17.md).
+- Security & dependency posture: 2026-09 security quality pass merged (deps updated, CodeQL warnings resolved); latest major scan: [docs/archive/MAJOR_SCAN_2026-03-17.md](docs/archive/MAJOR_SCAN_2026-03-17.md).
 - Websites: the marketing site deploys to Cloudflare Pages on every push to `main`, and an interactive codebase knowledge graph deploys to [GitHub Pages](https://adhamhaithameid.github.io/Classroom-Quick-Downloader/).
 - Deployment operations: [docs/DEPLOYMENT_RUNBOOK.md](docs/DEPLOYMENT_RUNBOOK.md).
 
