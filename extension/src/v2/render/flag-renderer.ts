@@ -122,10 +122,10 @@ export function removeAllV2Badges(scope?: HTMLElement): void {
   const root = scope || document.body;
   if (!root) return;
   const artifacts = Array.from(root.querySelectorAll<HTMLElement>(`[${V2_FLAG_ATTR}]`));
-  for (const el of artifacts) {
-    el.remove();
-  }
-  // Restore inline anchoring we added on cards whose artifacts are all gone.
+  // Resolve each artifact's anchored host BEFORE detaching it: once removed,
+  // parentElement is null and the walk up would find nothing — the destroy
+  // path (every SPA navigation) would leave cards we anchored inline-
+  // positioned with stale anchoredPosts entries.
   const hosts = new Set<HTMLElement>();
   for (const el of artifacts) {
     let node: HTMLElement | null = el.parentElement;
@@ -136,7 +136,10 @@ export function removeAllV2Badges(scope?: HTMLElement): void {
       }
       node = node.parentElement;
     }
+    el.remove();
   }
+  // Restore inline anchoring we added on cards whose artifacts are all gone
+  // (restorePostAnchoring re-checks for surviving artifacts per host).
   for (const host of hosts) restorePostAnchoring(host);
 }
 

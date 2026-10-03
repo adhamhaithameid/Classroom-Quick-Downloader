@@ -381,6 +381,69 @@ describe('post anchoring (bug 2.4)', () => {
 
     expect(post.style.position).toBe('absolute');
   });
+
+  it('restores the added inline position on engine destroy (removeAllV2Badges)', () => {
+    // destroy() runs on every SPA navigation — the walk up to anchored hosts
+    // must resolve BEFORE the artifacts are detached from the DOM.
+    const post = createStaticPost();
+    renderFlagBadge(makeDecision({
+      finalVerdict: 'comment',
+      commentScore: 80,
+      commentCount: 3,
+    }), post);
+    expect(post.style.position).toBe('relative');
+
+    removeAllV2Badges();
+
+    expect(document.querySelectorAll('[data-cqd-v2-flag]')).toHaveLength(0);
+    expect(post.style.position).toBe('');
+  });
+
+  it('clears anchoring bookkeeping on destroy so a fresh render re-anchors from scratch', () => {
+    // 'both' renders two artifacts per card (overlay + pill) — both must
+    // resolve to the same host pre-detach, and the card must be deletable
+    // from anchoredPosts so the next render anchors it again.
+    const post = createStaticPost();
+    renderFlagBadge(makeDecision({
+      finalVerdict: 'both',
+      commentScore: 80,
+      editedScore: 50,
+      commentCount: 2,
+    }), post);
+    expect(post.querySelectorAll('[data-cqd-v2-flag]')).toHaveLength(2);
+    expect(post.style.position).toBe('relative');
+
+    removeAllV2Badges();
+    expect(post.style.position).toBe('');
+
+    // Stale bookkeeping would make ensurePostAnchored early-return here and
+    // leave the card static under the new artifacts.
+    renderFlagBadge(makeDecision({
+      finalVerdict: 'comment',
+      commentScore: 80,
+      commentCount: 1,
+    }), post);
+    expect(post.style.position).toBe('relative');
+
+    removeAllV2Badges();
+    expect(post.style.position).toBe('');
+  });
+
+  it('engine destroy leaves author-supplied positioning untouched', () => {
+    const post = createStaticPost();
+    post.style.position = 'absolute';
+
+    renderFlagBadge(makeDecision({
+      finalVerdict: 'comment',
+      commentScore: 80,
+      commentCount: 3,
+    }), post);
+    expect(post.style.position).toBe('absolute');
+
+    removeAllV2Badges();
+
+    expect(post.style.position).toBe('absolute');
+  });
 });
 
 // ============================================================================
