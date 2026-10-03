@@ -37,10 +37,12 @@ import { findHeaderContainer } from '../../download-all/button-controller';
 import {
   CourseInventoryService,
   GoogleClassroomApiClient,
+  InteractiveConsentTokenProvider,
   sharedClassroomRateLimiter,
   ChromeIdentityTokenProvider,
   resolveClassroomApiRouteContext,
 } from '../../engines/v3/api';
+import type { ClassroomApiTokenProvider } from '../../engines/v3/api';
 import { ViewKind } from '../../engines/types';
 
 /** Per-file pacing — v2 group parity (PER_FILE_STAGGER_MS). */
@@ -55,6 +57,12 @@ export interface ClassroomDownloadDeps {
   clearTimeoutFn?: typeof clearTimeout;
   /** Test seam: override the inventory service (production builds the real one). */
   createInventory?: () => CourseInventoryService;
+  /**
+   * Test seam: override the token provider the inventory client uses
+   * (production wraps the Chrome identity one with the interactive-consent
+   * escalation — bug 2.5, user-gesture-scoped).
+   */
+  createTokenProvider?: () => ClassroomApiTokenProvider;
 }
 
 interface ClassroomRun {
@@ -85,10 +93,17 @@ export function installClassroomDownloadController(
   injectedDeps: ClassroomDownloadDeps,
 ): () => void {
   deps = injectedDeps;
+  // Bug 2.5: the click is a user gesture, so the inventory client's token
+  // provider may escalate a non-interactive miss to ONE interactive consent
+  // prompt. Scoped to this client only — student-work discovery keeps the
+  // strictly non-interactive provider.
+  const tokenProvider: ClassroomApiTokenProvider = injectedDeps.createTokenProvider
+    ? injectedDeps.createTokenProvider()
+    : new InteractiveConsentTokenProvider(new ChromeIdentityTokenProvider());
   inventory = injectedDeps.createInventory
     ? injectedDeps.createInventory()
     : new CourseInventoryService(
-        new GoogleClassroomApiClient(new ChromeIdentityTokenProvider(), {
+        new GoogleClassroomApiClient(tokenProvider, {
           beforeCall: () => limiter.acquire(),
         }),
       );
