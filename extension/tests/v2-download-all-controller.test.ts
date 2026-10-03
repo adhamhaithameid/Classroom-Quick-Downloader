@@ -23,6 +23,7 @@ import {
   uninstallDownloadAllController,
   resetDownloadAllController,
   handleDownloadAllClickV2,
+  handleRunDownloadAllRequest,
   getRunFor,
   PER_FILE_STAGGER_MS,
   GROUP_FEEDBACK_MS,
@@ -299,5 +300,63 @@ describe('v2 Download All group machine (z57 S3)', () => {
     }
     expect(group.classList.contains('cqd-all-success')).toBe(true);
     expect(group.querySelector('.cqd-download-all-main')?.textContent).toBe('Downloaded');
+  });
+});
+
+// ===========================================================================
+// Bug 2.1 — the Alt+Shift+D keyboard path. The background relays
+// CQD_RUN_DOWNLOAD_ALL to the tab; in v2 mode the group controller runs the
+// first eligible (≥2 files, not busy) group — V1's download_all.content.ts
+// handler keeps owning legacy/shadow modes.
+// ===========================================================================
+describe('CQD_RUN_DOWNLOAD_ALL shortcut (v2 hotkey path)', () => {
+  let bus: ReturnType<typeof createEventBus<PageTopicMap>>;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    document.body.innerHTML = '';
+    requested.length = 0;
+    sendMessage.mockClear();
+    resetDownloadController();
+    resetDownloadAllController();
+    uninstallDownloadAllController();
+    bus = createEventBus<PageTopicMap>();
+    wireDownloadPath(bus, runtime);
+    installDownloadAllController(runtime);
+    bus.subscribe('download:requested', (p) => requested.push(p));
+  });
+
+  afterEach(() => {
+    uninstallDownloadAllController();
+    resetDownloadController();
+    vi.useRealTimers();
+  });
+
+  it('runs the first eligible group (≥2 files, idle)', () => {
+    makePost(3, 'post-1');
+    makePost(2, 'post-2');
+
+    expect(handleRunDownloadAllRequest()).toBe(true);
+    expect(getRunFor('post-1')).toBeDefined();
+    expect(requested).toHaveLength(1); // first file enters on the run start
+  });
+
+  it('returns false (and starts nothing) when no group is eligible', () => {
+    makePost(1, 'post-1'); // below the ≥2-files threshold
+
+    expect(handleRunDownloadAllRequest()).toBe(false);
+    expect(requested).toHaveLength(0);
+    expect(getRunFor('post-1')).toBeUndefined();
+  });
+
+  it('skips a busy group and does not restart it', () => {
+    const { group } = makePost(2, 'post-1');
+    handleDownloadAllClickV2('post-1', group);
+    const started = requestedPayloads().length;
+    expect(started).toBe(1);
+
+    expect(handleRunDownloadAllRequest()).toBe(false);
+    expect(requestedPayloads().length).toBe(1); // no new request issued
+    expect(getRunFor('post-1')).toBeDefined();
   });
 });

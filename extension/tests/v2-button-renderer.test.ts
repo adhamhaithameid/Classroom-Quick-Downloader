@@ -284,6 +284,52 @@ describe('Button Renderer: renderBatch', () => {
     const rendered = renderBatch(decisions, new Map());
     expect(rendered).toHaveLength(0);
   });
+
+  it('feeds each Download All decision its OWN post files, not the page map (bug 2.1)', () => {
+    // Two posts on one page: the group button's "N files" label must reflect
+    // the post's own attachments, not the page-wide file map.
+    const headerA = document.createElement('div');
+    const postA = document.createElement('article');
+    postA.setAttribute('data-stream-item-id', 'post-a');
+    postA.appendChild(headerA);
+    document.body.appendChild(postA);
+
+    const headerB = document.createElement('div');
+    const postB = document.createElement('article');
+    postB.setAttribute('data-stream-item-id', 'post-b');
+    postB.appendChild(headerB);
+    document.body.appendChild(postB);
+
+    const filesA = [mockFile('postA1_20chars_padd'), mockFile('postA2_20chars_padd')];
+    const filesB = [
+      mockFile('postB1_20chars_padd'),
+      mockFile('postB2_20chars_padd'),
+      mockFile('postB3_20chars_padd'),
+    ];
+    const pageFiles = new Map<string, ScannedFile>();
+    for (const f of [...filesA, ...filesB]) pageFiles.set(f.canonicalId, f);
+
+    const postFilesById = new Map<string, ScannedFile[]>([
+      ['post-a', filesA],
+      ['post-b', filesB],
+    ]);
+
+    const decisions: PlacementDecision[] = [
+      mockDecision('download-all:post-a', headerA),
+      mockDecision('download-all:post-b', headerB),
+    ];
+
+    const rendered = renderBatch(decisions, pageFiles, postFilesById);
+    expect(rendered).toHaveLength(2);
+
+    const btnA = rendered[0]!;
+    expect(btnA.querySelector('.cqd-download-all-sub')?.textContent).toBe('2 files');
+    expect(btnA.dataset.cqdGroupCount).toBe('2');
+
+    const btnB = rendered[1]!;
+    expect(btnB.querySelector('.cqd-download-all-sub')?.textContent).toBe('3 files');
+    expect(btnB.dataset.cqdGroupCount).toBe('3');
+  });
 });
 
 // ============================================================================

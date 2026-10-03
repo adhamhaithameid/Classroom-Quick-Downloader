@@ -352,14 +352,17 @@ describe('File Placement: Download All', () => {
     expect(result!.fileId).toBe('download-all:dl-only-2');
   });
 
-  it('computeDownloadAllPlacement returns null for collapsed classwork', () => {
+  it('computeDownloadAllPlacement returns a header decision for collapsed classwork (bug 2.1)', () => {
+    // V1 parity: the group button lives on the post header, which stays
+    // visible when a classwork item is folded — the decision must survive.
     const post = mockPost('dl-collapsed', [
       mockFile('dlColl1_20chars_padd'),
       mockFile('dlColl2_20chars_padd'),
     ], false);
 
     const result = computeDownloadAllPlacement(post, ViewKind.CLASSWORK_LIST);
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(result!.fileId).toBe('download-all:dl-collapsed');
   });
 });
 
@@ -501,5 +504,151 @@ describe('computePlacement: Download All post-root fallback insertion (z57)', ()
     expect(all).toBeDefined();
     expect(all!.targetElement).toBe(postEl);
     expect(all!.insertionPoint).toBe('append');
+  });
+});
+
+// ===========================================================================
+// Bug 2.1 — collapsed classwork posts keep the header-mounted Download All
+// (V1 parity: V1 mounts its group button on the post header row via
+// findHeaderContainer .N5dSp/.JZicYb, which stays visible when a classwork
+// item is folded). The hideWhenCollapsed gate must keep SINGLE-file buttons
+// hidden while still emitting the group decision.
+// ===========================================================================
+describe('File Placement: collapsed classwork keeps Download All (bug 2.1)', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  /**
+   * A realistic collapsed classwork item: the header toggle + three-dots
+   * menu stay in the DOM, and so do the (hidden) attachment chips.
+   */
+  function buildCollapsedClasswork(postId: string, files: ScannedFile[]) {
+    const li = document.createElement('li');
+    li.setAttribute('data-stream-item-id', postId);
+    li.classList.add('AZd1I'); // Classroom golden class: folded item
+
+    const toggle = document.createElement('div');
+    toggle.setAttribute('role', 'button');
+    toggle.setAttribute('aria-expanded', 'false');
+    li.appendChild(toggle);
+
+    const menu = document.createElement('span');
+    menu.setAttribute('aria-haspopup', 'menu');
+    li.appendChild(menu);
+
+    for (const f of files) {
+      const chip = document.createElement('div');
+      chip.className = 'KlRXdf'; // attachment chip container
+      chip.appendChild(f.element);
+      li.appendChild(chip);
+    }
+
+    document.body.appendChild(li);
+
+    const post: ScannedPost = {
+      id: postId,
+      element: li,
+      fingerprint: `${postId}-collapsed`,
+      files,
+      isExpanded: false,
+      isConnected: true,
+    };
+    return { li, toggle, menu, post };
+  }
+
+  it('collapsed classwork post with 2+ attachments yields a download-all decision anchored at the header', () => {
+    const files = [mockFile('collAllA_20chars_pad'), mockFile('collAllB_20chars_pad')];
+    const { li, menu, post } = buildCollapsedClasswork('collapsed-all-1', files);
+
+    const decisions = computePlacement(post, ViewKind.CLASSWORK_LIST);
+
+    // Single-file buttons STAY hidden when collapsed.
+    const single = decisions.filter((d) => !d.fileId.startsWith('download-all:'));
+    expect(single).toHaveLength(0);
+
+    // …but the Download All decision is emitted, anchored at the header.
+    const all = decisions.filter((d) => d.fileId === 'download-all:collapsed-all-1');
+    expect(all).toHaveLength(1);
+    expect(all[0].reasonCodes).toContain('DOWNLOAD_ALL_BUTTON');
+    expect(li.contains(all[0].targetElement)).toBe(true);
+    expect(all[0].targetElement).not.toBe(li);
+    expect(all[0].fallbackUsed).toBe(false);
+    expect(all[0].targetElement).toBe(menu);
+  });
+
+  it('download-all decision counts link attachments (V1 grouping parity)', () => {
+    // 1 Drive file + 1 link attachment (YouTube). Discovery only yields the
+    // Drive file, but the group decision must see BOTH attachment nodes —
+    // a post mixing kinds still gets its Download All button.
+    const drive = mockFile('linkMixA_20chars_pad');
+    const postEl = document.createElement('div');
+    postEl.setAttribute('data-stream-item-id', 'link-mix-1');
+
+    const driveChip = document.createElement('div');
+    driveChip.className = 'KlRXdf';
+    driveChip.appendChild(drive.element);
+    postEl.appendChild(driveChip);
+
+    const link = document.createElement('a');
+    link.href = 'https://www.youtube.com/watch?v=cqd-test';
+    link.setAttribute('aria-label', 'Attachment: Lecture video');
+    const linkChip = document.createElement('div');
+    linkChip.className = 'KlRXdf';
+    linkChip.appendChild(link);
+    postEl.appendChild(linkChip);
+
+    document.body.appendChild(postEl);
+
+    const post: ScannedPost = {
+      id: 'link-mix-1',
+      element: postEl,
+      fingerprint: 'link-mix-1',
+      files: [drive],
+      isExpanded: true,
+      isConnected: true,
+    };
+
+    const decisions = computePlacement(post, ViewKind.STREAM);
+
+    const all = decisions.filter((d) => d.fileId === 'download-all:link-mix-1');
+    expect(all).toHaveLength(1);
+
+    // Single-download placement must NOT change: still only the Drive file.
+    const single = decisions.filter((d) => !d.fileId.startsWith('download-all:'));
+    expect(single).toHaveLength(1);
+    expect(single[0].fileId).toBe(drive.canonicalId);
+  });
+
+  it('plain page links without attachment signals do not trigger the decision', () => {
+    const drive = mockFile('noMixA_20chars_pad');
+    const postEl = document.createElement('div');
+    postEl.setAttribute('data-stream-item-id', 'no-mix-1');
+
+    const chip = document.createElement('div');
+    chip.className = 'KlRXdf';
+    chip.appendChild(drive.element);
+    postEl.appendChild(chip);
+
+    // A bare external link in the post body — not an attachment chip.
+    const plain = document.createElement('a');
+    plain.href = 'https://example.com/some-page';
+    plain.setAttribute('aria-label', 'Some site');
+    postEl.appendChild(plain);
+
+    document.body.appendChild(postEl);
+
+    const post: ScannedPost = {
+      id: 'no-mix-1',
+      element: postEl,
+      fingerprint: 'no-mix-1',
+      files: [drive],
+      isExpanded: true,
+      isConnected: true,
+    };
+
+    const decisions = computePlacement(post, ViewKind.STREAM);
+    expect(decisions.filter((d) => d.fileId.startsWith('download-all:'))).toHaveLength(0);
+    expect(decisions.filter((d) => !d.fileId.startsWith('download-all:'))).toHaveLength(1);
   });
 });

@@ -140,6 +140,27 @@ export default defineContentScript({
         });
       }
 
+      // 3f. Keyboard route (bug 2.1): Alt+Shift+D is relayed by the
+      //     background as CQD_RUN_DOWNLOAD_ALL. In v2 mode the V1
+      //     entrypoint's handler has no V1 groups to run, so the v2 group
+      //     controller answers here; legacy/shadow modes keep the V1
+      //     handler (this listener ignores the message there).
+      if (typeof chrome !== 'undefined' && chrome?.runtime?.onMessage) {
+        const { handleRunDownloadAllRequest } = await import(
+          '../src/v2/render/download-all-controller'
+        );
+        chrome.runtime.onMessage.addListener(
+          (message: { type?: string }, _sender: unknown, sendResponse: (r: unknown) => void) => {
+            if (!message || message.type !== 'CQD_RUN_DOWNLOAD_ALL') return;
+            if (engineRegistry.getMode() !== 'v2') return; // V1 entrypoint owns legacy/shadow
+            const handled = handleRunDownloadAllRequest();
+            // Synchronous response + no `true` return — the same contract
+            // the V1 entrypoint's own CQD_RUN_DOWNLOAD_ALL handler uses.
+            sendResponse(handled ? { ok: true } : { ok: false, reason: 'no-group' });
+          },
+        );
+      }
+
       // 4. Initialize debug panel (Ctrl+Shift+D to toggle)
       try {
         const { initDebugPanel } = await import('../src/v2/debug/debug-panel');

@@ -45,6 +45,8 @@ export const PER_FILE_STAGGER_MS = 1000;
 export const GROUP_FEEDBACK_MS = 3000;
 /** V1's post-cancel reset delay. */
 export const GROUP_CANCELLED_RESET_MS = 1500;
+/** V1 parity (src/download-all/state.ts): minimum attachments for a group. */
+export const MIN_FILES_FOR_DOWNLOAD_ALL = 2;
 
 // ============================================================================
 // TYPES
@@ -129,6 +131,53 @@ export function handleDownloadAllClickV2(postId: string, groupButton: HTMLButton
     runs.delete(postId);
   }
   startRun(postId, groupButton);
+}
+
+/**
+ * CQD_RUN_DOWNLOAD_ALL entry (bug 2.1): the Alt+Shift+D keyboard path.
+ *
+ * The background relays the command to the active tab; in v2 mode the V1
+ * entrypoint's handler has no V1 groups to run (the v2 engine renders), so
+ * the v2 controller answers instead — mirroring V1's eligibility: the first
+ * group in document order that is NOT busy and holds ≥2 files wins.
+ *
+ * Runs from the v2 bootstrap's onMessage listener (mode-gated to 'v2');
+ * legacy/shadow modes keep the V1 entrypoint handler.
+ *
+ * @returns true when a group was started (the caller answers the runtime
+ *   message with { ok: true }); false when no group was eligible.
+ */
+export function handleRunDownloadAllRequest(): boolean {
+  const buttons = Array.from(
+    document.querySelectorAll<HTMLButtonElement>('.cqd-download-all-btn'),
+  );
+
+  for (const button of buttons) {
+    const fileId = button.getAttribute('data-cqd-file-id') || '';
+    if (!fileId.startsWith('download-all:')) continue;
+    const postId = fileId.slice('download-all:'.length);
+
+    // Busy group — skip it (V1 parity: only idle groups are eligible).
+    const run = runs.get(postId);
+    if (run && !isRunSettled(run)) continue;
+
+    // Eligibility is read from the DOM (self-contained, like startRun):
+    // the post must hold at least MIN_FILES_FOR_DOWNLOAD_ALL single-file
+    // buttons, deduped by canonical file id.
+    const root =
+      button.closest<HTMLElement>('[data-stream-item-id]') ?? button.parentElement;
+    if (!root) continue;
+    const seen = new Set<string>();
+    for (const fileBtn of root.querySelectorAll<HTMLButtonElement>('.cqd-download-btn')) {
+      const id = fileBtn.getAttribute('data-cqd-file-id');
+      if (id) seen.add(id);
+    }
+    if (seen.size < MIN_FILES_FOR_DOWNLOAD_ALL) continue;
+
+    handleDownloadAllClickV2(postId, button);
+    return true;
+  }
+  return false;
 }
 
 function startRun(postId: string, groupButton: HTMLButtonElement): void {

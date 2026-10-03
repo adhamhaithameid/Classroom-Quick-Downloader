@@ -108,6 +108,22 @@ import type { PerformanceSummary, TimingPercentiles } from '../../v2/telemetry/p
  */
 export const TARGETED_SCAN_MAX_POSTS = 8;
 
+/**
+ * Pure FileNode → ScannedFile projection — one shared mapping for every
+ * consumer that hands engine files to the v2 placement/renderer seam
+ * (planPlacementForPost, buildFileMap, buildPostFilesMap).
+ */
+function toScannedFile(file: FileNode): ScannedFile {
+  return {
+    canonicalId: file.canonicalId,
+    element: file.element,
+    idSource: file.idSource,
+    name: file.name,
+    ext: file.ext,
+    downloadUrl: file.downloadUrl,
+  };
+}
+
 // ============================================================================
 // V2 ENGINE CLASS
 // ============================================================================
@@ -534,7 +550,7 @@ export class EngineV2 implements CQDEngine {
     // renderPlacedButtons), then scoped stale-button cleanup + click wiring.
     if (freshDecisions.length > 0) {
       const fileMap = this.buildFileMap();
-      renderBatch(freshDecisions, fileMap);
+      renderBatch(freshDecisions, fileMap, this.buildPostFilesMap());
       this.recordRenderedButtons(freshDecisions);
     }
     this.cleanupAndWirePosts(affectedNodes);
@@ -1121,14 +1137,7 @@ export class EngineV2 implements CQDEngine {
       id: post.id,
       element: post.element,
       fingerprint: `${post.id}-${post.files.length}-${post.lastScannedAt}`,
-      files: post.files.map((f): ScannedFile => ({
-        canonicalId: f.canonicalId,
-        element: f.element,
-        idSource: f.idSource,
-        name: f.name,
-        ext: f.ext,
-        downloadUrl: f.downloadUrl,
-      })),
+      files: post.files.map(toScannedFile),
       isExpanded: true, // Default to expanded — accordion check done by recipe
       isConnected: post.element.isConnected,
     };
@@ -1161,7 +1170,7 @@ export class EngineV2 implements CQDEngine {
 
     // Render all buttons in one batch
     const fileMap = this.buildFileMap();
-    renderBatch(this.placementDecisions, fileMap);
+    renderBatch(this.placementDecisions, fileMap, this.buildPostFilesMap());
 
     // S5 additive: record what the batch applied (see recordRenderedButtons).
     this.recordRenderedButtons(this.placementDecisions);
@@ -1179,17 +1188,23 @@ export class EngineV2 implements CQDEngine {
     const fileMap = new Map<string, ScannedFile>();
     for (const post of this.postMap.values()) {
       for (const file of post.files) {
-        fileMap.set(file.canonicalId, {
-          canonicalId: file.canonicalId,
-          element: file.element,
-          idSource: file.idSource,
-          name: file.name,
-          ext: file.ext,
-          downloadUrl: file.downloadUrl,
-        });
+        fileMap.set(file.canonicalId, toScannedFile(file));
       }
     }
     return fileMap;
+  }
+
+  /**
+   * Build the post-id → that post's own files map (bug 2.1): the batch
+   * renderer resolves Download All decisions through it so each group button
+   * reports ITS post's file count, not the page-wide total.
+   */
+  private buildPostFilesMap(): Map<string, ScannedFile[]> {
+    const map = new Map<string, ScannedFile[]>();
+    for (const post of this.postMap.values()) {
+      map.set(post.id, post.files.map(toScannedFile));
+    }
+    return map;
   }
 
   /**

@@ -131,46 +131,58 @@ export function computePlacement(
   const recipe = getRecipe(viewKind);
   const decisions: PlacementDecision[] = [];
 
-  // If accordion-based and post is collapsed, skip placement entirely
-  // The renderer won't inject buttons for collapsed posts
-  if (recipe.hideWhenCollapsed && !post.isExpanded) {
-    return decisions;
-  }
+  // Collapsed accordion posts keep their SINGLE-file buttons hidden (the
+  // attachment area is not visible). Bug 2.1: the Download All decision is
+  // exempt — V1 mounts its group button on the post header (findHeaderContainer
+  // .N5dSp/.JZicYb), which stays visible when a classwork item is folded, so
+  // the group decision must survive the collapse. Classwork items are collapsed
+  // by default, so gating the group decision here hid post-level Download All
+  // on the New engine entirely.
+  const hideSingleWhenCollapsed = recipe.hideWhenCollapsed && !post.isExpanded;
 
   // Find the anchor for single-file buttons
   // (usually the file element itself, sometimes the header)
-  for (const file of post.files) {
-    // Skip if a button for this file already exists
-    if (isAlreadyPlaced(file.canonicalId, post.element)) {
-      continue;
+  if (!hideSingleWhenCollapsed) {
+    for (const file of post.files) {
+      // Skip if a button for this file already exists
+      if (isAlreadyPlaced(file.canonicalId, post.element)) {
+        continue;
+      }
+
+      // Skip if below the minimum file count threshold
+      // (some recipes might require 2+ files before showing individual buttons)
+      if (post.files.length < recipe.singleButton.minFilesForButton) {
+        continue;
+      }
+
+      const anchor = findAnchorForFile(
+        post.element,
+        file,
+        recipe.singleButton.anchorStrategy,
+        viewKind,
+      );
+
+      decisions.push({
+        fileId: file.canonicalId,
+        targetElement: anchor.element,
+        insertionPoint: recipe.singleButton.insertionPoint,
+        anchorSelector: anchor.selectorUsed,
+        confidence: anchor.confidence,
+        reasonCodes: buildReasonCodes(anchor, 'single', recipe),
+        fallbackUsed: anchor.isFallback,
+      });
     }
-
-    // Skip if below the minimum file count threshold
-    // (some recipes might require 2+ files before showing individual buttons)
-    if (post.files.length < recipe.singleButton.minFilesForButton) {
-      continue;
-    }
-
-    const anchor = findAnchorForFile(
-      post.element,
-      file,
-      recipe.singleButton.anchorStrategy,
-      viewKind,
-    );
-
-    decisions.push({
-      fileId: file.canonicalId,
-      targetElement: anchor.element,
-      insertionPoint: recipe.singleButton.insertionPoint,
-      anchorSelector: anchor.selectorUsed,
-      confidence: anchor.confidence,
-      reasonCodes: buildReasonCodes(anchor, 'single', recipe),
-      fallbackUsed: anchor.isFallback,
-    });
   }
 
-  // Compute Download All placement if enough files
-  if (post.files.length >= recipe.downloadAll.minFilesForDownloadAll) {
+  // Compute Download All placement if enough files. The threshold counts ALL
+  // attachment nodes in the post — discovery only yields Drive/Docs anchors,
+  // so a post mixing link/video attachments would otherwise fall below the
+  // >=2 threshold (bug 2.1). max() guarantees the threshold never counts FEWER
+  // files than discovery did.
+  if (
+    Math.max(post.files.length, countAttachmentNodes(post)) >=
+    recipe.downloadAll.minFilesForDownloadAll
+  ) {
     const downloadAllId = `download-all:${post.id}`;
 
     if (!isAlreadyPlaced(downloadAllId, post.element)) {
@@ -217,6 +229,9 @@ function downloadAllInsertionPoint(
  *
  * Used when we already have individual buttons placed but need to
  * add/update the Download All button (e.g., after file count changes).
+ *
+ * Bug 2.1: exempt from the collapsed gate — the group button lives on the
+ * post header (V1 parity), which stays visible on folded classwork items.
  */
 export function computeDownloadAllPlacement(
   post: ScannedPost,
@@ -224,11 +239,10 @@ export function computeDownloadAllPlacement(
 ): PlacementDecision | null {
   const recipe = getRecipe(viewKind);
 
-  if (post.files.length < recipe.downloadAll.minFilesForDownloadAll) {
-    return null;
-  }
-
-  if (recipe.hideWhenCollapsed && !post.isExpanded) {
+  if (
+    Math.max(post.files.length, countAttachmentNodes(post)) <
+    recipe.downloadAll.minFilesForDownloadAll
+  ) {
     return null;
   }
 
@@ -253,6 +267,79 @@ export function computeDownloadAllPlacement(
     reasonCodes: buildReasonCodes(anchor, 'download-all', recipe),
     fallbackUsed: anchor.isFallback,
   };
+}
+
+// ============================================================================
+// ATTACHMENT COUNTING — the group threshold counts every attachment node
+// ============================================================================
+
+/**
+ * Signals that mark a DOM node as an attachment chip (bug 2.1).
+ *
+ * V1 parity — the same signal family `hasAttachmentSignals` /
+ * ATTACHMENT_CONTAINER_SELECTOR use in the legacy stack: data-* attachment
+ * attributes and the golden chip classes. Deliberately NOT included: bare
+ * Drive anchors (a post body can link a Drive file without it being an
+ * attachment) and `.z3vRcc` (it doubles as the comment container — counting
+ * it would inflate the threshold on commented stream posts).
+ */
+const ATTACHMENT_NODE_SELECTOR = [
+  '[data-attachment-id]',
+  '[data-drive-id]',
+  '[data-resource-id]',
+  '[data-submission-attachment-id]',
+  '[data-id][data-item-id]',
+  '.KlRXdf',
+  '.VfPpkd-aPP78e',
+  '.luto0c',
+].join(', ');
+
+/**
+ * Count the DISTINCT attachment nodes in a post, including the kinds file
+ * discovery does not carry (link / YouTube attachments — Classroom labels
+ * them `aria-label="Attachment: …"`).
+ *
+ * Nested candidates (a chip container and the anchor it wraps) merge into
+ * ONE attachment: only outermost candidates are counted.
+ *
+ * Bug 2.1: the Download All decision uses this so a post mixing attachment
+ * kinds still reaches the >=2 threshold, exactly like V1's grouping.
+ */
+export function countAttachmentNodes(
+  post: Pick<ScannedPost, 'element' | 'files'>,
+): number {
+  const candidates = new Set<HTMLElement>();
+
+  // Discovered files are attachments by definition.
+  for (const file of post.files) {
+    candidates.add(file.element);
+  }
+
+  // Attachment chips carrying V1's container signals.
+  for (const el of post.element.querySelectorAll<HTMLElement>(ATTACHMENT_NODE_SELECTOR)) {
+    candidates.add(el);
+  }
+
+  // Link/video attachments: Classroom labels their anchors "Attachment: …".
+  for (const anchor of post.element.querySelectorAll<HTMLAnchorElement>('a[aria-label]')) {
+    if (/^attachment:/i.test((anchor.getAttribute('aria-label') || '').trim())) {
+      candidates.add(anchor);
+    }
+  }
+
+  // Merge nested chains: drop any candidate that sits inside another one.
+  let count = 0;
+  for (const el of candidates) {
+    let nested = false;
+    for (const other of candidates) {
+      if (other !== el && other.contains(el)) {
+        nested = true;
+        break;
+      }
+    }
+    if (!nested) count++;
+  }
+  return count;
 }
 
 // ============================================================================

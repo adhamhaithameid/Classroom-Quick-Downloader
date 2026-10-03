@@ -276,12 +276,18 @@ export function renderButton(
  * 3. Uses DocumentFragment for batched DOM insertion where possible
  *
  * @param decisions - Placement decisions from file-placement.ts
- * @param files - Map of canonical file ID → ScannedFile
+ * @param files - Map of canonical file ID → ScannedFile (page-wide)
+ * @param postFilesById - Optional map of post ID → that post's own files.
+ *   Download All decisions resolve their file list/count through it so the
+ *   button reflects THE POST, not the page (bug 2.1: the page-wide map made
+ *   every group button report the whole page's file count). Callers that
+ *   don't supply it keep the legacy page-wide behavior.
  * @returns Array of created button elements
  */
 export function renderBatch(
   decisions: PlacementDecision[],
   files: Map<string, ScannedFile>,
+  postFilesById?: Map<string, ScannedFile[]>,
 ): HTMLButtonElement[] {
   if (decisions.length === 0) return [];
 
@@ -299,7 +305,7 @@ export function renderBatch(
 
     if (isDownloadAll) {
       const postId = decision.fileId.replace('download-all:', '');
-      const postFiles = Array.from(files.values());
+      const postFiles = postFilesById?.get(postId) ?? Array.from(files.values());
       const btn = renderDownloadAllButton(decision, postFiles, isDark);
       if (btn) rendered.push(btn);
     } else {
