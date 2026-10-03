@@ -1,0 +1,1445 @@
+{
+ "generated_at": "2026-10-03T19:07:49.908Z",
+ "db": "/Users/adhamhaithameid/.zcode/cli/db/db.sqlite",
+ "project_id": "proj_users-adhamhaithameid-desktop-code-classroom-quick-downloader",
+ "excluded_current_session": [
+  "sess_d46a1936-9922-4854-b917-a438bd28a37f"
+ ],
+ "sessions_analyzed": 30,
+ "window_days": 21.8,
+ "model_mix": [
+  {
+   "model": "GLM-5.3-Flash",
+   "agent": "zcode-agent",
+   "n": 8621,
+   "in_t": 2308428387,
+   "out_t": 4939699,
+   "reason_t": 0,
+   "cache_r": 2251589824,
+   "cache_w": 0
+  }
+ ],
+ "totals": {
+  "sessions": 30,
+  "window_days": 21.8,
+  "turns": 336,
+  "in_t": 2306511963,
+  "fresh_in_t": 56823003,
+  "out_t": 4935242,
+  "reason_t": 0,
+  "cache_r": 2249688960,
+  "cache_w": 0,
+  "total_t": 2311447205,
+  "model_requests": 8582,
+  "model_retries": 410,
+  "wall_hours": 1052.8,
+  "tool_calls": 9259,
+  "failed_calls": 338,
+  "edits": 2444,
+  "collapses": 11,
+  "collapse_fresh_in_t": 2708867,
+  "compactions": 2,
+  "bash_result_bytes": 4464046,
+  "unbounded_bash_results": 1,
+  "unbounded_bash_bytes": 24293,
+  "ansi_colored_outputs": 216,
+  "tool_result_bytes": 15931672,
+  "reads": 985,
+  "noisy_reads": 4,
+  "prose_bytes": 10956284,
+  "tool_arg_bytes": 8175632,
+  "test_runs": 681
+ },
+ "per_week_projection": {
+  "turns": 108,
+  "model_requests": 2755,
+  "fresh_in_t": 18243573,
+  "out_t": 1584507,
+  "reason_t": 0,
+  "cache_r": 722284336,
+  "cache_w": 0,
+  "total_t": 742112416,
+  "tool_calls": 2973,
+  "tool_result_bytes": 5115017
+ },
+ "per_session": [
+  {
+   "id": "sess_e1e14e51-9b93-42f3-b25b-21ee1fcbf9de",
+   "started": 1791021629883,
+   "wall_s": 2503,
+   "turns": 2,
+   "in_t": 694644,
+   "out_t": 17121,
+   "reason_t": 0,
+   "cache_r": 554880,
+   "cache_w": 0,
+   "total_t": 711765,
+   "cache_ratio": 0.799,
+   "collapses": 0,
+   "collapse_fresh_in_t": 0,
+   "ctx100k_turn": 1,
+   "compactions": 0,
+   "tool_calls": 13,
+   "failed_calls": 0,
+   "edits": 1,
+   "calls_before_first_edit": 12,
+   "calls_per_edit": 13,
+   "tool_result_bytes": 69327
+  },
+  {
+   "id": "sess_11c9cb83-5b57-4643-9372-1ef27eac6ed9",
+   "started": 1791021529136,
+   "wall_s": 254,
+   "turns": 1,
+   "in_t": 212064,
+   "out_t": 10286,
+   "reason_t": 0,
+   "cache_r": 152576,
+   "cache_w": 0,
+   "total_t": 222350,
+   "cache_ratio": 0.719,
+   "collapses": 0,
+   "collapse_fresh_in_t": 0,
+   "ctx100k_turn": 1,
+   "compactions": 0,
+   "tool_calls": 6,
+   "failed_calls": 0,
+   "edits": 0,
+   "calls_before_first_edit": 6,
+   "calls_per_edit": null,
+   "tool_result_bytes": 40794
+  },
+  {
+   "id": "sess_36967053-90e0-4dbf-91b9-b6c16a0b4c4a",
+   "started": 1791021450477,
+   "wall_s": 5276,
+   "turns": 3,
+   "in_t": 19414867,
+   "out_t": 69816,
+   "reason_t": 0,
+   "cache_r": 19212032,
+   "cache_w": 0,
+   "total_t": 19484683,
+   "cache_ratio": 0.99,
+   "collapses": 0,
+   "collapse_fresh_in_t": 0,
+   "ctx100k_turn": 1,
+   "compactions": 0,
+   "tool_calls": 145,
+   "failed_calls": 4,
+   "edits": 30,
+   "calls_before_first_edit": 52,
+   "calls_per_edit": 4.8,
+   "tool_result_bytes": 296343
+  },
+  {
+   "id": "sess_46b2cf81-6757-4f86-9f44-cd10a44389d2",
+   "started": 1790753013978,
+   "wall_s": 269851,
+   "turns": 20,
+   "in_t": 243785335,
+   "out_t": 271585,
+   "reason_t": 0,
+   "cache_r": 240151552,
+   "cache_w": 0,
+   "total_t": 244056920,
+   "cache_ratio": 0.985,
+   "collapses": 0,
+   "collapse_fresh_in_t": 0,
+   "ctx100k_turn": 3,
+   "compactions": 0,
+   "tool_calls": 758,
+   "failed_calls": 27,
+   "edits": 108,
+   "calls_before_first_edit": 66,
+   "calls_per_edit": 7,
+   "tool_result_bytes": 762854
+  },
+  {
+   "id": "sess_c6af7767-5fdf-4e61-8aa8-32ada93c28f3",
+   "started": 1790420383776,
+   "wall_s": 603683,
+   "turns": 50,
+   "in_t": 539875448,
+   "out_t": 489382,
+   "reason_t": 0,
+   "cache_r": 525414208,
+   "cache_w": 0,
+   "total_t": 540364830,
+   "cache_ratio": 0.973,
+   "collapses": 1,
+   "collapse_fresh_in_t": 109257,
+   "ctx100k_turn": 3,
+   "compactions": 0,
+   "tool_calls": 1384,
+   "failed_calls": 47,
+   "edits": 357,
+   "calls_before_first_edit": 39,
+   "calls_per_edit": 3.9,
+   "tool_result_bytes": 4513782
+  },
+  {
+   "id": "sess_430f9368-2453-41eb-9913-c7382a166a0d",
+   "started": 1790234193704,
+   "wall_s": 156287,
+   "turns": 9,
+   "in_t": 119784391,
+   "out_t": 223312,
+   "reason_t": 0,
+   "cache_r": 117734208,
+   "cache_w": 0,
+   "total_t": 120007703,
+   "cache_ratio": 0.983,
+   "collapses": 0,
+   "collapse_fresh_in_t": 0,
+   "ctx100k_turn": 1,
+   "compactions": 0,
+   "tool_calls": 497,
+   "failed_calls": 19,
+   "edits": 122,
+   "calls_before_first_edit": 62,
+   "calls_per_edit": 4.1,
+   "tool_result_bytes": 730485
+  },
+  {
+   "id": "sess_b8a0cb5a-4c61-47ce-9803-0f2bfaaf2628",
+   "started": 1790232666993,
+   "wall_s": 187640,
+   "turns": 20,
+   "in_t": 53840610,
+   "out_t": 128188,
+   "reason_t": 0,
+   "cache_r": 53007872,
+   "cache_w": 0,
+   "total_t": 53968798,
+   "cache_ratio": 0.985,
+   "collapses": 2,
+   "collapse_fresh_in_t": 519055,
+   "ctx100k_turn": 1,
+   "compactions": 0,
+   "tool_calls": 326,
+   "failed_calls": 6,
+   "edits": 59,
+   "calls_before_first_edit": 10,
+   "calls_per_edit": 5.5,
+   "tool_result_bytes": 382786
+  },
+  {
+   "id": "sess_6b9c3109-5b25-4b40-8dc0-cb45b984db89",
+   "started": 1790063507906,
+   "wall_s": 168691,
+   "turns": 10,
+   "in_t": 55382300,
+   "out_t": 160868,
+   "reason_t": 0,
+   "cache_r": 53994176,
+   "cache_w": 0,
+   "total_t": 55543168,
+   "cache_ratio": 0.975,
+   "collapses": 1,
+   "collapse_fresh_in_t": 85031,
+   "ctx100k_turn": 1,
+   "compactions": 0,
+   "tool_calls": 282,
+   "failed_calls": 11,
+   "edits": 60,
+   "calls_before_first_edit": 6,
+   "calls_per_edit": 4.7,
+   "tool_result_bytes": 397187
+  },
+  {
+   "id": "sess_74acd52a-7f51-4b61-b3df-5b804fd20f29",
+   "started": 1790063383993,
+   "wall_s": 463,
+   "turns": 1,
+   "in_t": 178488,
+   "out_t": 5743,
+   "reason_t": 0,
+   "cache_r": 150016,
+   "cache_w": 0,
+   "total_t": 184231,
+   "cache_ratio": 0.84,
+   "collapses": 0,
+   "collapse_fresh_in_t": 0,
+   "ctx100k_turn": 1,
+   "compactions": 0,
+   "tool_calls": 8,
+   "failed_calls": 3,
+   "edits": 0,
+   "calls_before_first_edit": 8,
+   "calls_per_edit": null,
+   "tool_result_bytes": 35842
+  },
+  {
+   "id": "sess_d3010263-9a7e-4bd5-a71b-2bd3913bec0d",
+   "started": 1789929217736,
+   "wall_s": 145928,
+   "turns": 10,
+   "in_t": 40033731,
+   "out_t": 129449,
+   "reason_t": 0,
+   "cache_r": 38448000,
+   "cache_w": 0,
+   "total_t": 40163180,
+   "cache_ratio": 0.96,
+   "collapses": 0,
+   "collapse_fresh_in_t": 0,
+   "ctx100k_turn": 1,
+   "compactions": 0,
+   "tool_calls": 248,
+   "failed_calls": 7,
+   "edits": 62,
+   "calls_before_first_edit": 52,
+   "calls_per_edit": 4,
+   "tool_result_bytes": 341492
+  },
+  {
+   "id": "sess_977570dd-6a67-4ce0-b11e-2784d1fea9c1",
+   "started": 1789918406228,
+   "wall_s": 14968,
+   "turns": 3,
+   "in_t": 16621133,
+   "out_t": 92778,
+   "reason_t": 0,
+   "cache_r": 15902976,
+   "cache_w": 0,
+   "total_t": 16713911,
+   "cache_ratio": 0.957,
+   "collapses": 0,
+   "collapse_fresh_in_t": 0,
+   "ctx100k_turn": 1,
+   "compactions": 0,
+   "tool_calls": 121,
+   "failed_calls": 2,
+   "edits": 33,
+   "calls_before_first_edit": 32,
+   "calls_per_edit": 3.7,
+   "tool_result_bytes": 250319
+  },
+  {
+   "id": "sess_ba8801f4-7439-4857-be5b-c808204571c9",
+   "started": 1789864844414,
+   "wall_s": 91185,
+   "turns": 13,
+   "in_t": 155521093,
+   "out_t": 256255,
+   "reason_t": 0,
+   "cache_r": 153210816,
+   "cache_w": 0,
+   "total_t": 155777348,
+   "cache_ratio": 0.985,
+   "collapses": 0,
+   "collapse_fresh_in_t": 0,
+   "ctx100k_turn": 5,
+   "compactions": 0,
+   "tool_calls": 613,
+   "failed_calls": 28,
+   "edits": 160,
+   "calls_before_first_edit": 64,
+   "calls_per_edit": 3.8,
+   "tool_result_bytes": 675857
+  },
+  {
+   "id": "sess_e89af8ac-4015-4725-8682-b61540a4e610",
+   "started": 1789840897460,
+   "wall_s": 882058,
+   "turns": 61,
+   "in_t": 163192242,
+   "out_t": 409617,
+   "reason_t": 0,
+   "cache_r": 156515008,
+   "cache_w": 0,
+   "total_t": 163601859,
+   "cache_ratio": 0.959,
+   "collapses": 4,
+   "collapse_fresh_in_t": 1014094,
+   "ctx100k_turn": 1,
+   "compactions": 0,
+   "tool_calls": 620,
+   "failed_calls": 46,
+   "edits": 219,
+   "calls_before_first_edit": 11,
+   "calls_per_edit": 2.8,
+   "tool_result_bytes": 451713
+  },
+  {
+   "id": "sess_33488f8b-48e1-4d29-966d-4f4911107d46",
+   "started": 1789772283273,
+   "wall_s": 72179,
+   "turns": 4,
+   "in_t": 21453631,
+   "out_t": 106377,
+   "reason_t": 0,
+   "cache_r": 21009024,
+   "cache_w": 0,
+   "total_t": 21560008,
+   "cache_ratio": 0.979,
+   "collapses": 0,
+   "collapse_fresh_in_t": 0,
+   "ctx100k_turn": 1,
+   "compactions": 0,
+   "tool_calls": 172,
+   "failed_calls": 9,
+   "edits": 61,
+   "calls_before_first_edit": 23,
+   "calls_per_edit": 2.8,
+   "tool_result_bytes": 228224
+  },
+  {
+   "id": "sess_6ed59070-07d5-4512-ad7f-47bb1ce78b7b",
+   "started": 1789769883471,
+   "wall_s": 70972,
+   "turns": 4,
+   "in_t": 28471433,
+   "out_t": 115767,
+   "reason_t": 0,
+   "cache_r": 27723904,
+   "cache_w": 0,
+   "total_t": 28587200,
+   "cache_ratio": 0.974,
+   "collapses": 0,
+   "collapse_fresh_in_t": 0,
+   "ctx100k_turn": 1,
+   "compactions": 0,
+   "tool_calls": 228,
+   "failed_calls": 5,
+   "edits": 63,
+   "calls_before_first_edit": 18,
+   "calls_per_edit": 3.6,
+   "tool_result_bytes": 268834
+  },
+  {
+   "id": "sess_9556f5b9-dd16-484e-b7a6-eea703e96b0c",
+   "started": 1789769755013,
+   "wall_s": 161840,
+   "turns": 13,
+   "in_t": 174941701,
+   "out_t": 290721,
+   "reason_t": 0,
+   "cache_r": 171740288,
+   "cache_w": 0,
+   "total_t": 175232422,
+   "cache_ratio": 0.982,
+   "collapses": 0,
+   "collapse_fresh_in_t": 0,
+   "ctx100k_turn": 1,
+   "compactions": 0,
+   "tool_calls": 491,
+   "failed_calls": 13,
+   "edits": 132,
+   "calls_before_first_edit": 30,
+   "calls_per_edit": 3.7,
+   "tool_result_bytes": 810398
+  },
+  {
+   "id": "sess_5d8d7271-7d87-4a41-8b53-c71679338c41",
+   "started": 1789768926780,
+   "wall_s": 42001,
+   "turns": 4,
+   "in_t": 16517344,
+   "out_t": 94397,
+   "reason_t": 0,
+   "cache_r": 16085056,
+   "cache_w": 0,
+   "total_t": 16611741,
+   "cache_ratio": 0.974,
+   "collapses": 0,
+   "collapse_fresh_in_t": 0,
+   "ctx100k_turn": 1,
+   "compactions": 0,
+   "tool_calls": 125,
+   "failed_calls": 2,
+   "edits": 33,
+   "calls_before_first_edit": 17,
+   "calls_per_edit": 3.8,
+   "tool_result_bytes": 182521
+  },
+  {
+   "id": "sess_ce33b6ba-97f6-4b4d-9645-d59260ef05ce",
+   "started": 1789768340807,
+   "wall_s": 160597,
+   "turns": 18,
+   "in_t": 110385280,
+   "out_t": 208827,
+   "reason_t": 0,
+   "cache_r": 107295040,
+   "cache_w": 0,
+   "total_t": 110594107,
+   "cache_ratio": 0.972,
+   "collapses": 0,
+   "collapse_fresh_in_t": 0,
+   "ctx100k_turn": 1,
+   "compactions": 0,
+   "tool_calls": 374,
+   "failed_calls": 11,
+   "edits": 88,
+   "calls_before_first_edit": 86,
+   "calls_per_edit": 4.3,
+   "tool_result_bytes": 608430
+  },
+  {
+   "id": "sess_fe499ced-810d-4473-a023-45f686c668ea",
+   "started": 1789768263527,
+   "wall_s": 75377,
+   "turns": 4,
+   "in_t": 1100170,
+   "out_t": 11484,
+   "reason_t": 0,
+   "cache_r": 982848,
+   "cache_w": 0,
+   "total_t": 1111654,
+   "cache_ratio": 0.893,
+   "collapses": 0,
+   "collapse_fresh_in_t": 0,
+   "ctx100k_turn": 1,
+   "compactions": 0,
+   "tool_calls": 22,
+   "failed_calls": 1,
+   "edits": 7,
+   "calls_before_first_edit": 10,
+   "calls_per_edit": 3.1,
+   "tool_result_bytes": 44515
+  },
+  {
+   "id": "sess_2d63024b-ed4e-4ecf-9c85-848fef884692",
+   "started": 1789761404941,
+   "wall_s": 8759,
+   "turns": 4,
+   "in_t": 16953854,
+   "out_t": 74987,
+   "reason_t": 0,
+   "cache_r": 16592256,
+   "cache_w": 0,
+   "total_t": 17028841,
+   "cache_ratio": 0.979,
+   "collapses": 0,
+   "collapse_fresh_in_t": 0,
+   "ctx100k_turn": 1,
+   "compactions": 0,
+   "tool_calls": 148,
+   "failed_calls": 6,
+   "edits": 53,
+   "calls_before_first_edit": 20,
+   "calls_per_edit": 2.8,
+   "tool_result_bytes": 300522
+  },
+  {
+   "id": "sess_fd32c0a9-ed18-43f0-a3c8-8dc4dab333b4",
+   "started": 1789761331441,
+   "wall_s": 13108,
+   "turns": 4,
+   "in_t": 48962074,
+   "out_t": 132409,
+   "reason_t": 0,
+   "cache_r": 48386560,
+   "cache_w": 0,
+   "total_t": 49094483,
+   "cache_ratio": 0.988,
+   "collapses": 0,
+   "collapse_fresh_in_t": 0,
+   "ctx100k_turn": 1,
+   "compactions": 0,
+   "tool_calls": 286,
+   "failed_calls": 6,
+   "edits": 101,
+   "calls_before_first_edit": 23,
+   "calls_per_edit": 2.8,
+   "tool_result_bytes": 572504
+  },
+  {
+   "id": "sess_af95cfc4-0d78-4fa7-b522-c7babf6baaf0",
+   "started": 1789761262024,
+   "wall_s": 105467,
+   "turns": 23,
+   "in_t": 177870329,
+   "out_t": 577620,
+   "reason_t": 0,
+   "cache_r": 173284608,
+   "cache_w": 0,
+   "total_t": 178447949,
+   "cache_ratio": 0.974,
+   "collapses": 1,
+   "collapse_fresh_in_t": 520803,
+   "ctx100k_turn": 1,
+   "compactions": 2,
+   "tool_calls": 623,
+   "failed_calls": 27,
+   "edits": 198,
+   "calls_before_first_edit": 17,
+   "calls_per_edit": 3.1,
+   "tool_result_bytes": 873757
+  },
+  {
+   "id": "sess_3e888efe-31e8-41e2-8202-6a6eecbe0ad0",
+   "started": 1789761211964,
+   "wall_s": 8184,
+   "turns": 1,
+   "in_t": 34264492,
+   "out_t": 104960,
+   "reason_t": 0,
+   "cache_r": 34033728,
+   "cache_w": 0,
+   "total_t": 34369452,
+   "cache_ratio": 0.993,
+   "collapses": 0,
+   "collapse_fresh_in_t": 0,
+   "ctx100k_turn": 1,
+   "compactions": 0,
+   "tool_calls": 226,
+   "failed_calls": 6,
+   "edits": 22,
+   "calls_before_first_edit": 54,
+   "calls_per_edit": 10.3,
+   "tool_result_bytes": 363131
+  },
+  {
+   "id": "sess_9578117e-1b95-405f-9fa3-3cecdf870c8d",
+   "started": 1789701212083,
+   "wall_s": 133536,
+   "turns": 12,
+   "in_t": 80165353,
+   "out_t": 192667,
+   "reason_t": 0,
+   "cache_r": 78198976,
+   "cache_w": 0,
+   "total_t": 80358020,
+   "cache_ratio": 0.975,
+   "collapses": 0,
+   "collapse_fresh_in_t": 0,
+   "ctx100k_turn": 1,
+   "compactions": 0,
+   "tool_calls": 351,
+   "failed_calls": 10,
+   "edits": 122,
+   "calls_before_first_edit": 14,
+   "calls_per_edit": 2.9,
+   "tool_result_bytes": 420510
+  },
+  {
+   "id": "sess_7385061e-8051-4155-8fa6-8f5e786eb93b",
+   "started": 1789698496569,
+   "wall_s": 6452,
+   "turns": 2,
+   "in_t": 28133596,
+   "out_t": 132237,
+   "reason_t": 0,
+   "cache_r": 27416960,
+   "cache_w": 0,
+   "total_t": 28265833,
+   "cache_ratio": 0.975,
+   "collapses": 0,
+   "collapse_fresh_in_t": 0,
+   "ctx100k_turn": 1,
+   "compactions": 0,
+   "tool_calls": 167,
+   "failed_calls": 4,
+   "edits": 80,
+   "calls_before_first_edit": 16,
+   "calls_per_edit": 2.1,
+   "tool_result_bytes": 295657
+  },
+  {
+   "id": "sess_789281de-34fa-46c3-ad9e-ef27b8c1e372",
+   "started": 1789612539501,
+   "wall_s": 58667,
+   "turns": 9,
+   "in_t": 31882355,
+   "out_t": 142621,
+   "reason_t": 0,
+   "cache_r": 31019840,
+   "cache_w": 0,
+   "total_t": 32024976,
+   "cache_ratio": 0.973,
+   "collapses": 0,
+   "collapse_fresh_in_t": 0,
+   "ctx100k_turn": 1,
+   "compactions": 0,
+   "tool_calls": 185,
+   "failed_calls": 6,
+   "edits": 49,
+   "calls_before_first_edit": 23,
+   "calls_per_edit": 3.8,
+   "tool_result_bytes": 333111
+  },
+  {
+   "id": "sess_4d62008c-533b-4fbd-b5da-69d84233f97a",
+   "started": 1789608917704,
+   "wall_s": 3175,
+   "turns": 4,
+   "in_t": 13101849,
+   "out_t": 61382,
+   "reason_t": 0,
+   "cache_r": 12809024,
+   "cache_w": 0,
+   "total_t": 13163231,
+   "cache_ratio": 0.978,
+   "collapses": 0,
+   "collapse_fresh_in_t": 0,
+   "ctx100k_turn": 1,
+   "compactions": 0,
+   "tool_calls": 137,
+   "failed_calls": 7,
+   "edits": 39,
+   "calls_before_first_edit": 38,
+   "calls_per_edit": 3.5,
+   "tool_result_bytes": 233437
+  },
+  {
+   "id": "sess_0745b469-db6d-4d25-8c70-646419f0a982",
+   "started": 1789412729804,
+   "wall_s": 239494,
+   "turns": 14,
+   "in_t": 54784857,
+   "out_t": 154876,
+   "reason_t": 0,
+   "cache_r": 52004160,
+   "cache_w": 0,
+   "total_t": 54939733,
+   "cache_ratio": 0.949,
+   "collapses": 2,
+   "collapse_fresh_in_t": 460627,
+   "ctx100k_turn": 1,
+   "compactions": 0,
+   "tool_calls": 278,
+   "failed_calls": 10,
+   "edits": 63,
+   "calls_before_first_edit": 39,
+   "calls_per_edit": 4.4,
+   "tool_result_bytes": 590122
+  },
+  {
+   "id": "sess_1a39cc04-1dca-4ecf-98b9-06507248b6fe",
+   "started": 1789236591186,
+   "wall_s": 12015,
+   "turns": 7,
+   "in_t": 43529313,
+   "out_t": 169361,
+   "reason_t": 0,
+   "cache_r": 42218816,
+   "cache_w": 0,
+   "total_t": 43698674,
+   "cache_ratio": 0.97,
+   "collapses": 0,
+   "collapse_fresh_in_t": 0,
+   "ctx100k_turn": 1,
+   "compactions": 0,
+   "tool_calls": 305,
+   "failed_calls": 14,
+   "edits": 99,
+   "calls_before_first_edit": 29,
+   "calls_per_edit": 3.1,
+   "tool_result_bytes": 578023
+  },
+  {
+   "id": "sess_a102f3cb-1c1f-4447-b24d-20d48f0485ac",
+   "started": 1789142964342,
+   "wall_s": 89344,
+   "turns": 6,
+   "in_t": 15457986,
+   "out_t": 100149,
+   "reason_t": 0,
+   "cache_r": 14439552,
+   "cache_w": 0,
+   "total_t": 15558135,
+   "cache_ratio": 0.934,
+   "collapses": 0,
+   "collapse_fresh_in_t": 0,
+   "ctx100k_turn": 2,
+   "compactions": 0,
+   "tool_calls": 120,
+   "failed_calls": 1,
+   "edits": 23,
+   "calls_before_first_edit": 13,
+   "calls_per_edit": 5.2,
+   "tool_result_bytes": 279195
+  }
+ ],
+ "tool_totals": {
+  "Bash": {
+   "calls": 4848,
+   "failed": 108,
+   "bytes": 4464046,
+   "retries": 0,
+   "truncated": 0
+  },
+  "Edit": {
+   "calls": 1994,
+   "failed": 186,
+   "bytes": 372954,
+   "retries": 0,
+   "truncated": 0
+  },
+  "Read": {
+   "calls": 985,
+   "failed": 5,
+   "bytes": 3386428,
+   "retries": 0,
+   "truncated": 0
+  },
+  "Write": {
+   "calls": 450,
+   "failed": 16,
+   "bytes": 86294,
+   "retries": 0,
+   "truncated": 0
+  },
+  "mcp__node_repl__js": {
+   "calls": 406,
+   "failed": 3,
+   "bytes": 4164856,
+   "retries": 0,
+   "truncated": 0
+  },
+  "Skill": {
+   "calls": 208,
+   "failed": 1,
+   "bytes": 2494810,
+   "retries": 0,
+   "truncated": 0
+  },
+  "TaskOutput": {
+   "calls": 169,
+   "failed": 2,
+   "bytes": 122105,
+   "retries": 0,
+   "truncated": 0
+  },
+  "Agent": {
+   "calls": 103,
+   "failed": 9,
+   "bytes": 636029,
+   "retries": 0,
+   "truncated": 0
+  },
+  "WebSearch": {
+   "calls": 18,
+   "failed": 2,
+   "bytes": 64196,
+   "retries": 0,
+   "truncated": 0
+  },
+  "AskUserQuestion": {
+   "calls": 16,
+   "failed": 0,
+   "bytes": 3978,
+   "retries": 0,
+   "truncated": 0
+  },
+  "TaskStop": {
+   "calls": 11,
+   "failed": 2,
+   "bytes": 5527,
+   "retries": 0,
+   "truncated": 0
+  },
+  "ExitPlanMode": {
+   "calls": 10,
+   "failed": 2,
+   "bytes": 39545,
+   "retries": 0,
+   "truncated": 0
+  },
+  "SendMessage": {
+   "calls": 8,
+   "failed": 0,
+   "bytes": 2440,
+   "retries": 0,
+   "truncated": 0
+  },
+  "mcp__plugin_mimosa_mimosa__security_scan_start": {
+   "calls": 8,
+   "failed": 0,
+   "bytes": 5499,
+   "retries": 0,
+   "truncated": 0
+  },
+  "mcp__plugin_mimosa_mimosa__security_scan_status": {
+   "calls": 8,
+   "failed": 0,
+   "bytes": 8691,
+   "retries": 0,
+   "truncated": 0
+  },
+  "WebFetch": {
+   "calls": 5,
+   "failed": 0,
+   "bytes": 9534,
+   "retries": 0,
+   "truncated": 0
+  },
+  "EnterPlanMode": {
+   "calls": 4,
+   "failed": 0,
+   "bytes": 2324,
+   "retries": 0,
+   "truncated": 0
+  },
+  "ReadSessionContext": {
+   "calls": 3,
+   "failed": 0,
+   "bytes": 56136,
+   "retries": 0,
+   "truncated": 0
+  },
+  "CronCreate": {
+   "calls": 3,
+   "failed": 2,
+   "bytes": 3805,
+   "retries": 0,
+   "truncated": 0
+  },
+  "TodoWrite": {
+   "calls": 2,
+   "failed": 0,
+   "bytes": 2475,
+   "retries": 0,
+   "truncated": 0
+  }
+ },
+ "top_tool_results": [
+  {
+   "session": "sess_c6af7767-5fdf-4",
+   "tool": "mcp__node_repl__js",
+   "bytes": 128692,
+   "status": "completed",
+   "ident": "const root =\n  process.env.ZCODE_CUA_PLUGIN_ROOT ??\n  process.env.ZCODE_PLUGIN_ROOT ??\n  process.env.CLAUDE_PLUGIN_ROOT;"
+  },
+  {
+   "session": "sess_c6af7767-5fdf-4",
+   "tool": "mcp__node_repl__js",
+   "bytes": 127996,
+   "status": "completed",
+   "ident": "const root =\n  process.env.ZCODE_CUA_PLUGIN_ROOT ??\n  process.env.ZCODE_PLUGIN_ROOT ??\n  process.env.CLAUDE_PLUGIN_ROOT;"
+  },
+  {
+   "session": "sess_c6af7767-5fdf-4",
+   "tool": "mcp__node_repl__js",
+   "bytes": 118863,
+   "status": "completed",
+   "ident": "const root =\n  process.env.ZCODE_CUA_PLUGIN_ROOT ??\n  process.env.ZCODE_PLUGIN_ROOT ??\n  process.env.CLAUDE_PLUGIN_ROOT;"
+  },
+  {
+   "session": "sess_c6af7767-5fdf-4",
+   "tool": "mcp__node_repl__js",
+   "bytes": 110524,
+   "status": "completed",
+   "ident": "const root =\n  process.env.ZCODE_CUA_PLUGIN_ROOT ??\n  process.env.ZCODE_PLUGIN_ROOT ??\n  process.env.CLAUDE_PLUGIN_ROOT;"
+  },
+  {
+   "session": "sess_c6af7767-5fdf-4",
+   "tool": "mcp__node_repl__js",
+   "bytes": 110144,
+   "status": "completed",
+   "ident": "const root =\n  process.env.ZCODE_CUA_PLUGIN_ROOT ??\n  process.env.ZCODE_PLUGIN_ROOT ??\n  process.env.CLAUDE_PLUGIN_ROOT;"
+  },
+  {
+   "session": "sess_c6af7767-5fdf-4",
+   "tool": "mcp__node_repl__js",
+   "bytes": 110140,
+   "status": "completed",
+   "ident": "const root =\n  process.env.ZCODE_CUA_PLUGIN_ROOT ??\n  process.env.ZCODE_PLUGIN_ROOT ??\n  process.env.CLAUDE_PLUGIN_ROOT;"
+  },
+  {
+   "session": "sess_c6af7767-5fdf-4",
+   "tool": "mcp__node_repl__js",
+   "bytes": 104237,
+   "status": "completed",
+   "ident": "const root =\n  process.env.ZCODE_CUA_PLUGIN_ROOT ??\n  process.env.ZCODE_PLUGIN_ROOT ??\n  process.env.CLAUDE_PLUGIN_ROOT;"
+  },
+  {
+   "session": "sess_c6af7767-5fdf-4",
+   "tool": "mcp__node_repl__js",
+   "bytes": 102300,
+   "status": "completed",
+   "ident": "const root =\n  process.env.ZCODE_CUA_PLUGIN_ROOT ??\n  process.env.ZCODE_PLUGIN_ROOT ??\n  process.env.CLAUDE_PLUGIN_ROOT;"
+  },
+  {
+   "session": "sess_c6af7767-5fdf-4",
+   "tool": "mcp__node_repl__js",
+   "bytes": 98323,
+   "status": "completed",
+   "ident": "const root =\n  process.env.ZCODE_CUA_PLUGIN_ROOT ??\n  process.env.ZCODE_PLUGIN_ROOT ??\n  process.env.CLAUDE_PLUGIN_ROOT;"
+  },
+  {
+   "session": "sess_c6af7767-5fdf-4",
+   "tool": "mcp__node_repl__js",
+   "bytes": 95945,
+   "status": "completed",
+   "ident": "const root =\n  process.env.ZCODE_CUA_PLUGIN_ROOT ??\n  process.env.ZCODE_PLUGIN_ROOT ??\n  process.env.CLAUDE_PLUGIN_ROOT;"
+  },
+  {
+   "session": "sess_c6af7767-5fdf-4",
+   "tool": "mcp__node_repl__js",
+   "bytes": 94853,
+   "status": "completed",
+   "ident": "const root =\n  process.env.ZCODE_CUA_PLUGIN_ROOT ??\n  process.env.ZCODE_PLUGIN_ROOT ??\n  process.env.CLAUDE_PLUGIN_ROOT;"
+  },
+  {
+   "session": "sess_c6af7767-5fdf-4",
+   "tool": "mcp__node_repl__js",
+   "bytes": 93590,
+   "status": "completed",
+   "ident": "const root =\n  process.env.ZCODE_CUA_PLUGIN_ROOT ??\n  process.env.ZCODE_PLUGIN_ROOT ??\n  process.env.CLAUDE_PLUGIN_ROOT;"
+  },
+  {
+   "session": "sess_c6af7767-5fdf-4",
+   "tool": "mcp__node_repl__js",
+   "bytes": 93586,
+   "status": "completed",
+   "ident": "const root =\n  process.env.ZCODE_CUA_PLUGIN_ROOT ??\n  process.env.ZCODE_PLUGIN_ROOT ??\n  process.env.CLAUDE_PLUGIN_ROOT;"
+  },
+  {
+   "session": "sess_c6af7767-5fdf-4",
+   "tool": "mcp__node_repl__js",
+   "bytes": 91010,
+   "status": "completed",
+   "ident": "const root =\n  process.env.ZCODE_CUA_PLUGIN_ROOT ??\n  process.env.ZCODE_PLUGIN_ROOT ??\n  process.env.CLAUDE_PLUGIN_ROOT;"
+  },
+  {
+   "session": "sess_c6af7767-5fdf-4",
+   "tool": "mcp__node_repl__js",
+   "bytes": 90878,
+   "status": "completed",
+   "ident": "const root =\n  process.env.ZCODE_CUA_PLUGIN_ROOT ??\n  process.env.ZCODE_PLUGIN_ROOT ??\n  process.env.CLAUDE_PLUGIN_ROOT;"
+  },
+  {
+   "session": "sess_c6af7767-5fdf-4",
+   "tool": "mcp__node_repl__js",
+   "bytes": 90535,
+   "status": "completed",
+   "ident": "const root =\n  process.env.ZCODE_CUA_PLUGIN_ROOT ??\n  process.env.ZCODE_PLUGIN_ROOT ??\n  process.env.CLAUDE_PLUGIN_ROOT;"
+  },
+  {
+   "session": "sess_c6af7767-5fdf-4",
+   "tool": "mcp__node_repl__js",
+   "bytes": 90531,
+   "status": "completed",
+   "ident": "const root =\n  process.env.ZCODE_CUA_PLUGIN_ROOT ??\n  process.env.ZCODE_PLUGIN_ROOT ??\n  process.env.CLAUDE_PLUGIN_ROOT;"
+  },
+  {
+   "session": "sess_c6af7767-5fdf-4",
+   "tool": "mcp__node_repl__js",
+   "bytes": 89648,
+   "status": "completed",
+   "ident": "const root =\n  process.env.ZCODE_CUA_PLUGIN_ROOT ??\n  process.env.ZCODE_PLUGIN_ROOT ??\n  process.env.CLAUDE_PLUGIN_ROOT;"
+  },
+  {
+   "session": "sess_9556f5b9-dd16-4",
+   "tool": "Read",
+   "bytes": 87996,
+   "status": "completed",
+   "ident": "~/Desktop/code/Classroom-Quick-Downloader/extension/entrypoints/content/i18n.ts"
+  },
+  {
+   "session": "sess_2d63024b-ed4e-4",
+   "tool": "Skill",
+   "bytes": 87181,
+   "status": "completed",
+   "ident": ""
+  }
+ ],
+ "unbounded_bash": [
+  {
+   "bytes": 24293,
+   "cmd": "cd /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/website && npx vitest run src/routes/style-c"
+  }
+ ],
+ "retry_loops": [
+  {
+   "cmd": "node -e \"\nconst { chromium } = require('@playwright/test');\n(async () => {\n  const b = await chromiu",
+   "n": 11,
+   "bytes": 5694
+  },
+  {
+   "cmd": "sleep 570; curl -s --max-time 10 -o /dev/null -w \"%{http_code}\" \"https://cqd-analytics.adhamhaithame",
+   "n": 7,
+   "bytes": 112
+  },
+  {
+   "cmd": "cd /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader && pnpm -C website check 2>&1 | ta",
+   "n": 5,
+   "bytes": 2279
+  },
+  {
+   "cmd": "node .superpowers/tmp/shoot2.mjs && ls -la /tmp/grid-bend-proto2/",
+   "n": 4,
+   "bytes": 2690
+  },
+  {
+   "cmd": "pnpm -C website dev --port 5199 --strictPort",
+   "n": 4,
+   "bytes": 1300
+  },
+  {
+   "cmd": "source /opt/homebrew/opt/nvm/nvm.sh 2>/dev/null; cd /Users/adhamhaithameid/Desktop/code/Classroom-Qu",
+   "n": 4,
+   "bytes": 2616
+  },
+  {
+   "cmd": "node tools/verify-analytics-contract.mjs; echo \"exit=$?\"",
+   "n": 3,
+   "bytes": 1288
+  },
+  {
+   "cmd": "cd /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/extension && pnpm run test:coverag",
+   "n": 3,
+   "bytes": 1826
+  },
+  {
+   "cmd": "node /tmp/nav-audit.mjs",
+   "n": 3,
+   "bytes": 2962
+  },
+  {
+   "cmd": "bash /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/output/split-prs.sh 2>&1 | tail ",
+   "n": 3,
+   "bytes": 1072
+  },
+  {
+   "cmd": "node -e \"\nconst { chromium } = require('@playwright/test');\n(async () => {\n  const b = await chromiu",
+   "n": 3,
+   "bytes": 297
+  },
+  {
+   "cmd": "ls /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader && cat /Users/adhamhaithameid/Desk",
+   "n": 3,
+   "bytes": 15792
+  },
+  {
+   "cmd": "node tools/capture-classroom-post-strings.mjs --sweep-only --settle 11000 2>&1",
+   "n": 3,
+   "bytes": 975
+  },
+  {
+   "cmd": "npx vitest run src/lib/cursor/cursorStates.test.ts 2>&1 | grep -E \"Tests \"",
+   "n": 3,
+   "bytes": 155
+  },
+  {
+   "cmd": "curl -s -o /dev/null -w \"%{http_code}\" --max-time 2 http://localhost:5199/ >/dev/null 2>&1 || (npx v",
+   "n": 3,
+   "bytes": 191
+  }
+ ],
+ "hot_files_within_session": [
+  {
+   "file": "~/code/Classroom-Quick-Downloader/cloudflare-worker/src/downloads_do.ts",
+   "n": 64
+  },
+  {
+   "file": "~/code/Classroom-Quick-Downloader/website/src/routes/+layout.svelte",
+   "n": 51
+  },
+  {
+   "file": "~/code/Classroom-Quick-Downloader/cloudflare-worker/src/index.ts",
+   "n": 35
+  },
+  {
+   "file": "~/code/Classroom-Quick-Downloader/website/src/routes/overview/+page.svelte",
+   "n": 34
+  },
+  {
+   "file": "~/code/Classroom-Quick-Downloader/website/src/lib/components/SiteFooter.svelte",
+   "n": 28
+  },
+  {
+   "file": "~/.zcode/cli/memories/projects/classroom-quick-downloader-89e2c8caf3abddfd/memory/MEMORY.md",
+   "n": 23
+  },
+  {
+   "file": "~/code/Classroom-Quick-Downloader/extension/entrypoints/popup/App.tsx",
+   "n": 14
+  },
+  {
+   "file": "~/code/Classroom-Quick-Downloader/extension/entrypoints/background/download-handler.ts",
+   "n": 12
+  },
+  {
+   "file": "~/code/Classroom-Quick-Downloader/extension/entrypoints/background/index.ts",
+   "n": 12
+  },
+  {
+   "file": "~/code/Classroom-Quick-Downloader/package.json",
+   "n": 11
+  },
+  {
+   "file": "~/.zcode/cli/memories/projects/classroom-quick-downloader-89e2c8caf3abddfd/memory/figma-mcp-wiring.md",
+   "n": 11
+  },
+  {
+   "file": "~/code/Classroom-Quick-Downloader/website/src/app.css",
+   "n": 10
+  },
+  {
+   "file": "~/code/Classroom-Quick-Downloader/website/src/lib/scroll/magneticPin.ts",
+   "n": 9
+  },
+  {
+   "file": "~/code/Classroom-Quick-Downloader/website/src/lib/types/public.ts",
+   "n": 8
+  },
+  {
+   "file": "~/code/Classroom-Quick-Downloader/website/src/lib/api/publicSite.ts",
+   "n": 8
+  }
+ ],
+ "files_read_5plus_sessions": [
+  {
+   "file": "website/src/routes/+layout.svelte",
+   "sessions": 9
+  },
+  {
+   "file": "~/.zcode/cli/memories/projects/classroom-quick-downloader-89e2c8caf3abddfd/memory/MEMORY.md",
+   "sessions": 8
+  },
+  {
+   "file": "website/src/app.css",
+   "sessions": 7
+  },
+  {
+   "file": "website/src/routes/overview/+page.svelte",
+   "sessions": 7
+  },
+  {
+   "file": "package.json",
+   "sessions": 7
+  },
+  {
+   "file": "website/src/lib/components/SiteFooter.svelte",
+   "sessions": 7
+  },
+  {
+   "file": "cloudflare-worker/src/index.ts",
+   "sessions": 6
+  },
+  {
+   "file": "extension/entrypoints/background/index.ts",
+   "sessions": 6
+  },
+  {
+   "file": "extension/wxt.config.ts",
+   "sessions": 5
+  },
+  {
+   "file": "website/src/routes/faq/+page.svelte",
+   "sessions": 5
+  }
+ ],
+ "noisy_read_targets": [
+  {
+   "file": "website/src/lib/stores/websiteSnapshot.test.ts",
+   "n": 1
+  },
+  {
+   "file": "~/.zcode/cli/memories/projects/classroom-quick-downloader-89e2c8caf3abddfd/memory/cqd-edge-selfserve-snapshot.md",
+   "n": 1
+  },
+  {
+   "file": ".github/workflows/extension-distribution.yml",
+   "n": 1
+  },
+  {
+   "file": "website/src/lib/stores/websiteSnapshot.ts",
+   "n": 1
+  }
+ ],
+ "test_commands": [
+  {
+   "cmd": "cd /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/extension && pnpm run te",
+   "n": 3
+  },
+  {
+   "cmd": "npx vitest run src/lib/cursor/cursorStates.test.ts 2>&1 | grep -E \"Tests \"",
+   "n": 3
+  },
+  {
+   "cmd": "npx vitest run tests/do-rpc-origin.test.ts 2>&1 | grep -E \"✓|×|Tests \" | head -5 && npx vi",
+   "n": 2
+  },
+  {
+   "cmd": "npx vitest run tests/core/name/property.test.ts 2>&1 | tail -4",
+   "n": 2
+  },
+  {
+   "cmd": "E2E_HEADED=1 npx playwright test tests/e2e/console-hygiene.spec.ts tests/e2e/download-star",
+   "n": 2
+  },
+  {
+   "cmd": "cd /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/website && pnpm test:rou",
+   "n": 2
+  },
+  {
+   "cmd": "cd /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/extension && timeout 900",
+   "n": 2
+  },
+  {
+   "cmd": "npx vitest run src/lib/cursor/cursorStates.test.ts 2>&1 | tail -3",
+   "n": 2
+  }
+ ],
+ "top_tool_sequences": [
+  {
+   "seq": "bash > bash > bash",
+   "n": 2501
+  },
+  {
+   "seq": "bash > bash > bash > bash",
+   "n": 1947
+  },
+  {
+   "seq": "edit > edit > edit",
+   "n": 584
+  },
+  {
+   "seq": "edit > bash > bash",
+   "n": 399
+  },
+  {
+   "seq": "edit > edit > edit > edit",
+   "n": 376
+  },
+  {
+   "seq": "mcp__node_repl__js > mcp__node_repl__js > mcp__node_repl__js",
+   "n": 295
+  },
+  {
+   "seq": "edit > edit > bash",
+   "n": 294
+  },
+  {
+   "seq": "bash > bash > edit",
+   "n": 285
+  },
+  {
+   "seq": "mcp__node_repl__js > mcp__node_repl__js > mcp__node_repl__js > mcp__node_repl__js",
+   "n": 267
+  },
+  {
+   "seq": "edit > bash > bash > bash",
+   "n": 263
+  }
+ ],
+ "top_bash_families": {
+  "cd /Users/adhamhaithameid/Desktop/code/C": {
+   "n": 1261,
+   "bytes": 1398931
+  },
+  "sed -n": {
+   "n": 213,
+   "bytes": 403054
+  },
+  "grep -n": {
+   "n": 357,
+   "bytes": 257513
+  },
+  "npx vitest": {
+   "n": 132,
+   "bytes": 128986
+  },
+  "ls /Users/adhamhaithameid/Desktop/code/C": {
+   "n": 54,
+   "bytes": 80791
+  },
+  "grep -rn": {
+   "n": 102,
+   "bytes": 78101
+  },
+  "python3 -": {
+   "n": 137,
+   "bytes": 77921
+  },
+  "gh run": {
+   "n": 44,
+   "bytes": 63772
+  },
+  "R=/Users/adhamhaithameid/Desktop/code/Cl": {
+   "n": 46,
+   "bytes": 62419
+  },
+  "node -e": {
+   "n": 57,
+   "bytes": 51920
+  },
+  "cat >": {
+   "n": 61,
+   "bytes": 51354
+  },
+  "find /Users/adhamhaithameid/Desktop/code": {
+   "n": 16,
+   "bytes": 49331
+  }
+ },
+ "verbosity": {
+  "prose_bytes": 10956284,
+  "tool_arg_bytes": 8175632,
+  "prose_share": 0.573,
+  "method": "bytes/4 proxy for output composition"
+ },
+ "sinks": [
+  {
+   "id": "d",
+   "name": "Verbose assistant prose",
+   "evidence": "10,956,284B prose vs 8,175,632B tool args (bytes/4 proxy)",
+   "est_wk": 879405,
+   "fix": "6-line final report rule; caveman A/B (2J)",
+   "effort": "S"
+  },
+  {
+   "id": "e",
+   "name": "Cache-busting (collapses + context>100k)",
+   "evidence": "11 collapsed turns paying 2,708,867 fresh input tok (cr<40% of input)",
+   "est_wk": 869708,
+   "fix": "Stable prefix: no mid-session AGENTS.md/MCP edits (2F)",
+   "effort": "S"
+  },
+  {
+   "id": "f",
+   "name": "Over-exploration (calls before first edit; calls/edit)",
+   "evidence": "890 pre-edit calls; 9259 calls / 2444 edits",
+   "est_wk": 639377,
+   "fix": "scripts/orient + REPO_MAP.md; read ranges (2D/2E)",
+   "effort": "M"
+  },
+  {
+   "id": "a",
+   "name": "Re-deriving repo facts (files read 5+ sessions, hot files)",
+   "evidence": "10 files in 5+ sessions; 15 files read 3+ times; 4 noisy reads",
+   "est_wk": 237183,
+   "fix": "docs/INDEX.md pointers + .rgignore for lock/dist (2C/2D)",
+   "effort": "S"
+  },
+  {
+   "id": "h",
+   "name": "Per-turn fixed tax (AGENTS.md 1.5k tok + ~290 skill names + 5 MCP tool schemas)",
+   "evidence": "336 turns in window; AGENTS.md 5926B measured",
+   "est_wk": 159872,
+   "fix": "Trim AGENTS.md <150 lines; prune unused skills/plugins/MCP (2D/2G)",
+   "effort": "M"
+  },
+  {
+   "id": "c",
+   "name": "Retry loops (identical cmd 3+)",
+   "evidence": "15 commands; 338 failed calls; 0 harness retries",
+   "est_wk": 111668,
+   "fix": "scripts/check; stop on repeated failure (2E)",
+   "effort": "M"
+  },
+  {
+   "id": "g",
+   "name": "Redundant verification (full test runs)",
+   "evidence": "681 test-suite invocations",
+   "est_wk": 44696,
+   "fix": "scripts/check --changed (vitest related) (2E)",
+   "effort": "M"
+  },
+  {
+   "id": "b",
+   "name": "Unbounded bash output (>20KB, no head/limit)",
+   "evidence": "1 results, 24,293B; ANSI in 216 outputs",
+   "est_wk": 1950,
+   "fix": "rtk hook + NO_COLOR/quiet reporters + head caps (2A/2B)",
+   "effort": "S"
+  }
+ ],
+ "fingerprint": "ef6ddcf4a339"
+}
