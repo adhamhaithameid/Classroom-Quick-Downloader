@@ -160,8 +160,12 @@
     font-weight: 600; box-shadow: inset 0 0 0 1px rgba(143,123,255,.4);
   }
   .pick button.pick-none[aria-checked="true"] { border-color: rgba(255,255,255,.32); background: var(--surface2); box-shadow: none; }
-  .pick.disabled { opacity: .45; }
-  .pick.disabled button { pointer-events: none; }
+  /* "Disabled" applies to the pick's RADIOS (and label) only — a pick may
+     also host an action button (the water row's "Run both" demo), which
+     must stay live and full-strength when the choice is "No change". */
+  .pick.disabled .pick-label,
+  .pick.disabled button[role="radio"] { opacity: .45; }
+  .pick.disabled button[role="radio"] { pointer-events: none; }
 
   /* ============ 02 · Face-off cards ============ */
   .fo { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 20px; margin-top: 16px; }
@@ -1335,7 +1339,11 @@
     var off = state.water === 'none';
     var pick = document.getElementById('intensity-pick');
     pick.classList.toggle('disabled', off);
-    pick.setAttribute('aria-disabled', String(off));
+    // aria-disabled marks the intensity RADIOS, not the whole group: the
+    // "Run both" demo shares this row and stays usable for "No change".
+    pick.querySelectorAll('button[role="radio"]').forEach(function (b) {
+      b.setAttribute('aria-disabled', String(off));
+    });
   }
   document.addEventListener('click', function (e) {
     var btn = e.target.closest('button[role="radio"][data-key]');
