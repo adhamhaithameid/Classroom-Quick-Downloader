@@ -82,6 +82,10 @@
   }
   .card.card-start:hover { border-color: rgba(143,123,255,.85); }
   .card.card-start .num { color: var(--accent); }
+  .card.card-fresh { border-color: rgba(143,123,255,.4); }
+  .card.card-fresh:hover { border-color: rgba(143,123,255,.7); }
+  .card.card-fresh .num { color: var(--accent); }
+  .card .verdict { margin-top: 8px; font-size: 11px; font-weight: 600; color: var(--trying); }
 </style>
 </head>
 <body>
@@ -131,7 +135,14 @@
       <div class="num">Trust surfaces</div>
       <h2>Legal &amp; policy prototypes</h2>
       <p>Privacy disclosure row, permissions explainer, "Not affiliated with Google" notice, API-beta risk warning, and the copyright reminder — each labeled REQUIRED vs RECOMMENDED per Chrome Web Store policy.</p>
+      <p class="verdict">1/6 approved 2026-10-04; 5 surfaces in round 2 ↓</p>
       <div class="go">Open legal surfaces →</div>
+    </a>
+    <a class="card card-fresh" href="legal-round2.html">
+      <div class="num">Trust surfaces · Round 2</div>
+      <h2>Legal round 2 — five surfaces, two treatments each</h2>
+      <p>The five surfaces that went back for redesign, rebuilt in the winning Stillwater language. Each surface gets two genuinely different treatments (placement, verbosity, tone differ — not wording swaps), rendered at 360px popup width or in an Options context, with a per-surface ballot and a copy-ready "LEGAL ROUND 2 BALLOT" block.</p>
+      <div class="go">Open legal round 2 →</div>
     </a>
     <a class="card" href="AUDIT.md">
       <div class="num">Document</div>
