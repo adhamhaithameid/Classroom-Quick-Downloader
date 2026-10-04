@@ -352,6 +352,36 @@ const V2_BUTTON_CSS = `
 .cqd-download-btn.cqd-theme-dark .cqd-v2-count {
   background: rgba(255, 255, 255, 0.12);
 }
+
+/* ====================================================================
+   REDUCE MOTION (Phase 4 batch D1)
+   Two independent gates, same outcome:
+     1. OS-level prefers-reduced-motion — always holds.
+     2. In-app setting — the .cqd-reduce-motion class on <html> mirrors
+        the flat reducedMotionPreferred key (src/ui/settings/store.ts),
+        applied by entrypoints/content/reduce-motion.ts.
+   Scoped to CQD's own buttons only — the host page's motion is never
+   touched. Durations collapse to ~0; state and progress stay visible.
+   ==================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .cqd-download-btn,
+  .cqd-download-btn *,
+  .cqd-download-all-btn,
+  .cqd-download-all-btn * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+html.cqd-reduce-motion .cqd-download-btn,
+html.cqd-reduce-motion .cqd-download-btn *,
+html.cqd-reduce-motion .cqd-download-all-btn,
+html.cqd-reduce-motion .cqd-download-all-btn * {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
 `;
 
 // ============================================================================

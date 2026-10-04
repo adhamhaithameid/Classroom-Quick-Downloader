@@ -77,13 +77,18 @@ describe('options page (0h4d.1.8)', () => {
     render();
     await settle();
     const rows = [...container.querySelectorAll('.cqd-options-row')];
-    expect(rows).toHaveLength(5);
+    expect(rows).toHaveLength(6);
     const labels = [...container.querySelectorAll('.cqd-options-label')].map((l) => l.textContent);
     expect(labels).toContain('Enable Extension');
     expect(labels).toContain('Comment flags');
+    expect(labels).toContain('Reduce motion');
     const switches = [...container.querySelectorAll('[role="switch"]')];
-    expect(switches).toHaveLength(5);
-    expect(switches.every((s) => s.getAttribute('aria-checked') === 'true')).toBe(true);
+    expect(switches).toHaveLength(6);
+    // Every legacy key is on by default; reduce motion is opt-IN (false).
+    const reduceMotion = container.querySelector('[aria-label="Reduce motion"]');
+    expect(reduceMotion?.getAttribute('aria-checked')).toBe('false');
+    const others = switches.filter((s) => s !== reduceMotion);
+    expect(others.every((s) => s.getAttribute('aria-checked') === 'true')).toBe(true);
   });
 
   it('clicking a toggle flips storage and re-renders (live apply)', async () => {

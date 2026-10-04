@@ -141,6 +141,18 @@ export default defineContentScript({
         });
       }
 
+      // 3e-2. In-app reduce motion (Phase 4 batch D1): mirrors the flat
+      //     reducedMotionPreferred key onto <html> as .cqd-reduce-motion
+      //     and follows storage changes live — a popup/options toggle
+      //     reaches this tab without a reload (same settings-read spirit
+      //     as 3e). Cosmetic: failures here never block the engine.
+      try {
+        const { installReduceMotion } = await import('./content/reduce-motion');
+        installReduceMotion();
+      } catch {
+        // Motion mirror is cosmetic — engine bootstrap continues.
+      }
+
       // 3f. Keyboard route (bug 2.1 + hotkey follow-up): Alt+Shift+D is
       //     relayed by the background as CQD_RUN_DOWNLOAD_ALL. Modes whose
       //     DOM engine is EngineV2 — v2 AND v3 (EngineV3 delegates its DOM

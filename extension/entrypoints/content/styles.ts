@@ -1,5 +1,6 @@
 // filepath: entrypoints/content/styles.ts
 import { DOWNLOAD_ICON_SVG_URL, SUCCESS_ICON_SVG_URL, CANCEL_ICON_SVG_URL } from './icons';
+import { installReduceMotion } from './reduce-motion';
 
 const STYLE_ID = 'cqd-style';
 const STYLE_ID_STUDENT_WORK = 'cqd-sw-style';
@@ -1067,6 +1068,62 @@ export const SHARED_BUTTON_SHEET = `    %CQD_BTN% {
       opacity: 0.9;
       max-width: 100px;
       margin-left: 4px;
+    }
+
+    /* ===============================
+     * REDUCE MOTION (Phase 4 batch D1)
+     * Two independent gates, same outcome:
+     *   1. OS-level prefers-reduced-motion — always holds.
+     *   2. In-app setting — the .cqd-reduce-motion class on <html>
+     *      mirrors the flat reducedMotionPreferred key
+     *      (src/ui/settings/store.ts), applied by
+     *      entrypoints/content/reduce-motion.ts.
+     * The %CQD_*% placeholders keep the student-work sheet scoped (qa-06):
+     * in SW, %CQD_BTN% renders as the :is(...[data-cqd-sw]) scope, so the
+     * collapse never hits V2-owned shared buttons. Durations collapse to
+     * ~0; state and progress stay fully visible (spinners stop on their
+     * end frame).
+     * =============================== */
+    @media (prefers-reduced-motion: reduce) {
+      %CQD_BTN%,
+      %CQD_BTN% *,
+      %CQD_ALL%,
+      %CQD_ALL% *,
+      .cqd-flag,
+      .cqd-flag *,
+      .cqd-both-badge,
+      .cqd-both-badge *,
+      .cqd-overlay-container,
+      .cqd-permanent-bold-comment,
+      .cqd-permanent-bold-edited,
+      %CQD_D%.cqd-download-icon,
+      %CQD_D%.cqd-spinner,
+      %CQD_D%.cqd-error-detail,
+      %CQD_BTN% .cqd-label {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    html.cqd-reduce-motion %CQD_BTN%,
+    html.cqd-reduce-motion %CQD_BTN% *,
+    html.cqd-reduce-motion %CQD_ALL%,
+    html.cqd-reduce-motion %CQD_ALL% *,
+    html.cqd-reduce-motion .cqd-flag,
+    html.cqd-reduce-motion .cqd-flag *,
+    html.cqd-reduce-motion .cqd-both-badge,
+    html.cqd-reduce-motion .cqd-both-badge *,
+    html.cqd-reduce-motion .cqd-overlay-container,
+    html.cqd-reduce-motion .cqd-permanent-bold-comment,
+    html.cqd-reduce-motion .cqd-permanent-bold-edited,
+    html.cqd-reduce-motion %CQD_D%.cqd-download-icon,
+    html.cqd-reduce-motion %CQD_D%.cqd-spinner,
+    html.cqd-reduce-motion %CQD_D%.cqd-error-detail,
+    html.cqd-reduce-motion %CQD_BTN% .cqd-label {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
     }`;
 
 interface SharedButtonVars {
@@ -1123,6 +1180,10 @@ const SW_SHEET_BUTTONS: SharedButtonVars = {
 export function injectStyles(): void {
   if (typeof document === 'undefined') return;
   if (document.getElementById(STYLE_ID)) return;
+
+  // Phase 4 D1: any surface that injects CQD styles also installs the
+  // in-app reduce-motion mirror (idempotent — module-level guard).
+  installReduceMotion();
 
   const style = document.createElement('style');
   style.id = STYLE_ID;
@@ -1259,6 +1320,9 @@ ${renderSharedButtonSheet(FULL_SHEET_BUTTONS)}
 export function injectStudentWorkStyles(): void {
   if (typeof document === 'undefined') return;
   if (document.getElementById(STYLE_ID_STUDENT_WORK)) return;
+
+  // Phase 4 D1: same mirror contract as injectStyles — idempotent.
+  installReduceMotion();
 
   const style = document.createElement('style');
   style.id = STYLE_ID_STUDENT_WORK;

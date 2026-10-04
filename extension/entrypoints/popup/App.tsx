@@ -710,6 +710,15 @@ function App() {
     void saveSetting('extensionEnabled', nextState);
   }
 
+  // In-app reduce motion (Stillwater, audit finding 9): optimistic save only —
+  // every surface (content scripts included) watches the flat storage key.
+  function handleToggleReduceMotion() {
+    if (!settings) return;
+    const nextState = !settings.reducedMotionPreferred;
+    setSettings({ ...settings, reducedMotionPreferred: nextState });
+    void saveSetting('reducedMotionPreferred', nextState);
+  }
+
   function handleToggleSettingsCollapse() {
     const next = !settingsCollapsed;
     setSettingsCollapsed(next);
@@ -898,7 +907,7 @@ function App() {
   const logoToUse = isClassroomTab ? logoSrc : logoGraySrc;
 
   return (
-    <main className="cqd-app">
+    <main className={`cqd-app ${settings?.reducedMotionPreferred ? 'cqd-reduce-motion' : ''}`}>
       <div className="cqd-scroll-container" ref={scrollRef}>
         {/* HEADER – always visible */}
         <header
@@ -1405,6 +1414,14 @@ function App() {
                             onToggle={handleToggleExtension}
                             disabled={isLoadingSettings}
                             primary
+                          />
+                          <ToggleRow
+                            label="Reduce motion"
+                            description="Minimize animations across the extension."
+                            checked={settings?.reducedMotionPreferred ?? false}
+                            loading={isLoadingSettings}
+                            onToggle={handleToggleReduceMotion}
+                            disabled={isLoadingSettings}
                           />
                         </div>
                       </div>

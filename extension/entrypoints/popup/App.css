@@ -2038,3 +2038,34 @@ body {
   background: transparent;
   cursor: pointer;
 }
+
+/* ── In-app reduce motion (Phase 4 batch D1) ──────────────────────────────
+   The root class mirrors reducedMotionPreferred from the shared settings
+   store; App.tsx (popup) and OptionsApp.tsx (options) put it on their root
+   element. Everything inside .cqd-app / .cqd-options is CQD's own surface,
+   so the collapse is universal within it. Progress and state stay readable:
+   durations collapse to ~0 — nothing hides. */
+.cqd-reduce-motion *,
+.cqd-reduce-motion *::before,
+.cqd-reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* OS-level preference: holds on every CQD surface, independent of the
+   in-app setting (the setting can only ADD calm, never remove it). */
+@media (prefers-reduced-motion: reduce) {
+  .cqd-app *,
+  .cqd-app *::before,
+  .cqd-app *::after,
+  .cqd-options *,
+  .cqd-options *::before,
+  .cqd-options *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

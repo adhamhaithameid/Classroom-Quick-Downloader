@@ -49,6 +49,11 @@ const ROWS: Row[] = [
     label: 'Combined flags',
     description: 'Merge comment and edited markers into one flag.',
   },
+  {
+    key: 'reducedMotionPreferred',
+    label: 'Reduce motion',
+    description: 'Minimize animations across the extension.',
+  },
 ];
 
 export function OptionsApp() {
@@ -79,7 +84,7 @@ export function OptionsApp() {
   };
 
   return (
-    <main className="cqd-options">
+    <main className={`cqd-options ${settings.reducedMotionPreferred ? 'cqd-reduce-motion' : ''}`}>
       <header className="cqd-options-header">
         <h1>Classroom Quick Downloader</h1>
         <p className="cqd-options-sub">Settings apply immediately — no save button needed.</p>

@@ -11,7 +11,7 @@ import {
 // ============================================================================
 // SETTINGS STORE (bead 0h4d.1.8, plan
 // docs/superpowers/plans/2026-09-28-options-page.md). One load/save/watch
-// API shared by popup + options. COMPAT CONSTRAINT: the five keys stay FLAT
+// API shared by popup + options. COMPAT CONSTRAINT: the keys stay FLAT
 // in chrome.storage.local — content scripts and the background read them
 // directly (v2_bootstrap.content, flags.ts, global-state.ts, index.ts).
 // v2 = the same flat keys + a cqdSettingsSchemaVersion marker, with explicit
@@ -46,13 +46,14 @@ describe('settings store (0h4d.1.8)', () => {
     (chrome.storage.onChanged as any) = { addListener: vi.fn(), removeListener: vi.fn() };
   });
 
-  it('exposes the five flat keys (compat: content scripts read them directly)', () => {
+  it('exposes the flat keys (compat: content scripts read them directly)', () => {
     expect([...SETTINGS_KEYS].sort()).toEqual([
       'combinedFlagEnabled',
       'commentsFlagEnabled',
       'downloadAllEnabled',
       'editedFlagEnabled',
       'extensionEnabled',
+      'reducedMotionPreferred',
     ]);
     expect(DEFAULT_SETTINGS).toEqual({
       extensionEnabled: true,
@@ -60,7 +61,18 @@ describe('settings store (0h4d.1.8)', () => {
       commentsFlagEnabled: true,
       editedFlagEnabled: true,
       combinedFlagEnabled: true,
+      reducedMotionPreferred: false,
     });
+  });
+
+  it('reducedMotionPreferred defaults to false — opt-IN, unlike the five on-by-default keys', async () => {
+    // Missing/garbage values must not coerce to true like the legacy keys.
+    installStorage();
+    const settings = await loadSettings();
+    expect(settings.reducedMotionPreferred).toBe(false);
+    const { settings: migrated } = migrateRawSettings({ extensionEnabled: 'garbage' });
+    expect(migrated.extensionEnabled).toBe(true);
+    expect(migrated.reducedMotionPreferred).toBe(false);
   });
 
   it('migrateRawSettings fills missing keys from defaults and stamps schema v2', () => {
@@ -72,6 +84,7 @@ describe('settings store (0h4d.1.8)', () => {
     expect(migrationWrites!.downloadAllEnabled).toBe(true);
     expect(migrationWrites!.editedFlagEnabled).toBe(true);
     expect(migrationWrites!.combinedFlagEnabled).toBe(true);
+    expect(migrationWrites!.reducedMotionPreferred).toBe(false);
   });
 
   it('migrateRawSettings passes a complete v2 payload through without writes', () => {
@@ -81,12 +94,21 @@ describe('settings store (0h4d.1.8)', () => {
       commentsFlagEnabled: true,
       editedFlagEnabled: true,
       combinedFlagEnabled: false,
+      reducedMotionPreferred: true,
       cqdSettingsSchemaVersion: 2,
     };
     const { settings, migrationWrites } = migrateRawSettings(full);
     expect(settings.extensionEnabled).toBe(false);
     expect(settings.combinedFlagEnabled).toBe(false);
+    expect(settings.reducedMotionPreferred).toBe(true);
     expect(migrationWrites).toBeNull();
+  });
+
+  it('saveSetting writes the reducedMotionPreferred key and watch normalizes it', async () => {
+    installStorage();
+    await saveSetting('reducedMotionPreferred', true);
+    const settings = await loadSettings();
+    expect(settings.reducedMotionPreferred).toBe(true);
   });
 
   it('loadSettings reads and normalizes storage (false respected, missing defaulted)', async () => {

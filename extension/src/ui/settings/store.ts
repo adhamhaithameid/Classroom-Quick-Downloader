@@ -4,7 +4,7 @@
  * (bead 0h4d.1.8, plan docs/superpowers/plans/2026-09-28-options-page.md)
  * ============================================================================
  *
- * COMPAT CONSTRAINT: the five keys stay FLAT in chrome.storage.local —
+ * COMPAT CONSTRAINT: the keys stay FLAT in chrome.storage.local —
  * content scripts (v2_bootstrap.content, comment_frame.content,
  * edited_frame.content, content/flags.ts) and the background (index.ts,
  * utils/global-state.ts, src/v2/render/flag-renderer.ts) read them directly.
@@ -23,7 +23,8 @@ export type SettingsKey =
   | 'downloadAllEnabled'
   | 'commentsFlagEnabled'
   | 'editedFlagEnabled'
-  | 'combinedFlagEnabled';
+  | 'combinedFlagEnabled'
+  | 'reducedMotionPreferred';
 
 export type Settings = Record<SettingsKey, boolean>;
 
@@ -33,6 +34,7 @@ export const SETTINGS_KEYS: readonly SettingsKey[] = [
   'commentsFlagEnabled',
   'editedFlagEnabled',
   'combinedFlagEnabled',
+  'reducedMotionPreferred',
 ];
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -41,14 +43,24 @@ export const DEFAULT_SETTINGS: Settings = {
   commentsFlagEnabled: true,
   editedFlagEnabled: true,
   combinedFlagEnabled: true,
+  // Opt-IN (Stillwater, audit finding 9): motion stays on unless the user
+  // asks for calm. Every other key is on-unless-explicitly-false.
+  reducedMotionPreferred: false,
 };
 
 export const SETTINGS_SCHEMA_VERSION = 2;
 export const SETTINGS_SCHEMA_KEY = 'cqdSettingsSchemaVersion';
 
-/** The storage value is "on" unless explicitly false (the popup's `!== false`). */
-function coerce(value: unknown): boolean {
-  return value !== false;
+/**
+ * Normalize one storage value against its key's default: a real boolean
+ * wins; anything else (missing, removed, corrupt) falls back to the key's
+ * default — so the on-by-default keys keep the popup's `!== false`
+ * semantics, and reducedMotionPreferred (default false) cannot coerce a
+ * missing value into ON.
+ */
+function coerce(key: SettingsKey, value: unknown): boolean {
+  if (typeof value === 'boolean') return value;
+  return DEFAULT_SETTINGS[key];
 }
 
 export interface MigrationResult {
@@ -65,7 +77,7 @@ export interface MigrationResult {
 export function migrateRawSettings(raw: Record<string, unknown>): MigrationResult {
   const missing = SETTINGS_KEYS.filter((k) => typeof raw[k] !== 'boolean');
   const settings = {} as Settings;
-  for (const k of SETTINGS_KEYS) settings[k] = coerce(raw[k]);
+  for (const k of SETTINGS_KEYS) settings[k] = coerce(k, raw[k]);
   if (missing.length > 0 || raw[SETTINGS_SCHEMA_KEY] !== SETTINGS_SCHEMA_VERSION) {
     const writes: Record<string, unknown> = {};
     for (const k of missing) writes[k] = settings[k];
@@ -151,7 +163,7 @@ export function watchSettings(cb: (settings: Settings) => void): () => void {
     const relevant = SETTINGS_KEYS.filter((k) => k in changes);
     if (relevant.length === 0) return;
     cb(relevant.reduce(
-      (acc, k) => ({ ...acc, [k]: coerce(changes[k].newValue) }),
+      (acc, k) => ({ ...acc, [k]: coerce(k, changes[k].newValue) }),
       { ...DEFAULT_SETTINGS },
     ) as Settings);
   };

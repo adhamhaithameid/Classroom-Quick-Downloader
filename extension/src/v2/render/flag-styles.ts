@@ -221,6 +221,38 @@ body[data-cqd-dir="rtl"] .cqd-both-badge {
 .cqd-flag.cqd-theme-dark {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
+
+/* ====================================================================
+   REDUCE MOTION (Phase 4 batch D1)
+   Two independent gates, same outcome:
+     1. OS-level prefers-reduced-motion — always holds.
+     2. In-app setting — the .cqd-reduce-motion class on <html> mirrors
+        the flat reducedMotionPreferred key (src/ui/settings/store.ts),
+        applied by entrypoints/content/reduce-motion.ts.
+   Scoped to CQD's own badges only — the host page's motion is never
+   touched. Durations collapse to ~0; the badges keep their final look.
+   ==================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .cqd-flag,
+  .cqd-flag *,
+  .cqd-both-badge,
+  .cqd-both-badge *,
+  .cqd-overlay-container {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+html.cqd-reduce-motion .cqd-flag,
+html.cqd-reduce-motion .cqd-flag *,
+html.cqd-reduce-motion .cqd-both-badge,
+html.cqd-reduce-motion .cqd-both-badge *,
+html.cqd-reduce-motion .cqd-overlay-container {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
 `;
 
 // ============================================================================
