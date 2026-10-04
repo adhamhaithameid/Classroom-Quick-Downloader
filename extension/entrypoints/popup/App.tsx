@@ -347,8 +347,10 @@ function App() {
   const [changelogStatus, setChangelogStatus] = useState<'loading' | 'ready' | 'offline' | 'error'>('loading');
   const [changelogStatusMessage, setChangelogStatusMessage] = useState<string | null>(null);
 
-  // ENGINE MODE STATE
-  const [engineMode, setEngineMode] = useState<string>('legacy');
+  // ENGINE MODE STATE — the initial value mirrors the runtime default
+  // (mode-controller.ts DEFAULT_MODE 'v2'): fresh installs run v2, so the
+  // control must render New selected, not Legacy (audit finding 12).
+  const [engineMode, setEngineMode] = useState<string>('v2');
   const [engineModeLoading, setEngineModeLoading] = useState(true);
   // S13: read once — the manifest's identity/oauth2 setup does not change
   // while the popup is open (a reload picks up a redelivered manifest).
@@ -752,7 +754,9 @@ function App() {
       return;
     }
     browserApi.storage.local.get('cqdV2Mode', (res: { cqdV2Mode?: string }) => {
-      setEngineMode(res.cqdV2Mode || 'legacy');
+      // Same source of truth as the runtime (mode-controller.ts readMode):
+      // a saved mode wins, no/invalid saved value falls back to DEFAULT_MODE.
+      setEngineMode(resolveEngineMode(res.cqdV2Mode));
       setEngineModeLoading(false);
     });
 
@@ -760,7 +764,7 @@ function App() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const listener = (changes: any, area: string) => {
       if (area === 'local' && changes.cqdV2Mode) {
-        setEngineMode(changes.cqdV2Mode.newValue || 'legacy');
+        setEngineMode(resolveEngineMode(changes.cqdV2Mode.newValue));
       }
     };
     if (browserApi.storage.onChanged) {
@@ -1699,6 +1703,23 @@ function App() {
  *  selecting it while enabled is the user's explicit consent that sets
  *  cqdV2Mode 'v3'. */
 export type PopupEngineMode = 'legacy' | 'v2' | 'v3';
+
+/**
+ * Resolve the popup's engine-mode display from raw storage — the same
+ * fallback the runtime applies (mode-controller.ts readMode): a saved mode
+ * wins; a missing, empty or invalid value (fresh install, corruption, key
+ * removal) falls back to DEFAULT_MODE 'v2'. 'shadow' is not a popup mode
+ * (the selector never offered it), so it resolves to the default too.
+ * The old `res.cqdV2Mode || 'legacy'` read showed Legacy selected on fresh
+ * installs while the runtime ran v2 — the documented label quirk (audit
+ * finding 12).
+ */
+export function resolveEngineMode(stored: unknown): PopupEngineMode {
+  if (stored === 'legacy' || stored === 'v2' || stored === 'v3') {
+    return stored;
+  }
+  return 'v2';
+}
 
 /** Tooltip shown while the API option is disabled — the owner setup path. */
 const API_SETUP_TOOLTIP = 'Requires OAuth setup (see docs)';

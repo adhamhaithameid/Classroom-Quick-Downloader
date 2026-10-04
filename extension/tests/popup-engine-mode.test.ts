@@ -15,7 +15,7 @@ import { createElement } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { EngineModeRow } from '../entrypoints/popup/App';
+import { EngineModeRow, resolveEngineMode } from '../entrypoints/popup/App';
 
 describe('popup engine mode control (#684, #398)', () => {
   let container: HTMLDivElement;
@@ -42,7 +42,11 @@ describe('popup engine mode control (#684, #398)', () => {
     flushSync(() => {
       root.render(
         createElement(EngineModeRow, {
-          mode: props.mode ?? 'legacy',
+          // The default mirrors the runtime: no saved value resolves to
+          // DEFAULT_MODE 'v2' (mode-controller.ts readMode), so the control
+          // renders New selected on fresh installs. The old pin here was
+          // 'legacy' — the fresh-install label quirk (audit finding 12).
+          mode: props.mode ?? 'v2',
           loading: props.loading ?? false,
           apiConfigured: props.apiConfigured ?? false,
           onSelect,
@@ -52,7 +56,16 @@ describe('popup engine mode control (#684, #398)', () => {
     return { onSelect };
   };
 
-  it('renders Legacy, New and API options with the current mode marked selected', () => {
+  it('renders New selected by default (fresh install: no saved mode)', () => {
+    renderRow();
+
+    const v2 = container.querySelector<HTMLButtonElement>('[data-mode="v2"]');
+    expect(v2?.getAttribute('aria-pressed')).toBe('true');
+    const legacy = container.querySelector<HTMLButtonElement>('[data-mode="legacy"]');
+    expect(legacy?.getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('a saved legacy value still renders Legacy selected (one-click rollback intact)', () => {
     renderRow({ mode: 'legacy' });
 
     const group = container.querySelector('.cqd-engine-mode') as HTMLElement | null;
@@ -64,10 +77,25 @@ describe('popup engine mode control (#684, #398)', () => {
     expect(buttons.find((b) => b.dataset.mode === 'v3')?.getAttribute('aria-pressed')).toBe('false');
   });
 
-  it('marks v2 selected when the stored mode is v2', () => {
+  it('a saved v2 value renders New selected', () => {
     renderRow({ mode: 'v2' });
     const v2 = container.querySelector<HTMLButtonElement>('[data-mode="v2"]');
     expect(v2?.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('resolveEngineMode mirrors readMode(): missing/invalid storage falls back to v2', () => {
+    // No saved value (fresh install), empty string, corruption, removal.
+    expect(resolveEngineMode(undefined)).toBe('v2');
+    expect(resolveEngineMode(null)).toBe('v2');
+    expect(resolveEngineMode('')).toBe('v2');
+    expect(resolveEngineMode('shadow')).toBe('v2'); // not a popup mode
+    expect(resolveEngineMode(42)).toBe('v2');
+  });
+
+  it('resolveEngineMode passes saved modes through unchanged', () => {
+    expect(resolveEngineMode('legacy')).toBe('legacy');
+    expect(resolveEngineMode('v2')).toBe('v2');
+    expect(resolveEngineMode('v3')).toBe('v3');
   });
 
   it('selecting an option calls onSelect with the exact mode value', () => {
