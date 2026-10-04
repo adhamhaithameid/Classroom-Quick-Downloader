@@ -1759,7 +1759,10 @@ interface EngineModeRowProps {
 
 /** Separate Engine Mode control (#684 decision: not folded into flag
  *  toggles — engine selection changes the whole page pipeline, flags tune
- *  one feature). Segmented control, aria-pressed marks the active mode.
+ *  one feature). Stillwater SEGMENTED control (prototypes/components.html
+ *  option 1, owner-approved): a radiogroup whose three segments carry
+ *  role="radio" + aria-checked, roving tabindex, and arrow-key selection —
+ *  selection follows focus, ←/→/↑/↓ wrap and skip the disabled API segment.
  *  Labels resolve via chrome.i18n with en fallback (bead 770).
  *  The API (beta) option is disabled-with-tooltip until OAuth is configured
  *  (S13) — a hidden option is not a shipped option, and neither is an
@@ -1848,22 +1851,49 @@ export function EngineModeRow({ mode, loading, apiConfigured, onSelect }: Engine
       title: apiConfigured ? API_PRIVACY_TOOLTIP : API_SETUP_TOOLTIP,
     },
   ];
+
+  /** Arrow-key selection (radio pattern): ←/↑ step back, →/↓ step forward,
+   *  wrapping; disabled segments are skipped. Selection follows focus. */
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'ArrowUp' && e.key !== 'ArrowDown') {
+      return;
+    }
+    const enabled = options.filter((option) => !option.disabled);
+    if (enabled.length === 0) return;
+    const delta = e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 1;
+    const next = (enabled.findIndex((option) => option.value === mode) + delta + enabled.length) % enabled.length;
+    const target = enabled[next];
+    e.preventDefault();
+    e.currentTarget.querySelector<HTMLButtonElement>(`[data-mode="${target.value}"]`)?.focus();
+    onSelect(target.value);
+  };
+
   return (
-    <div className="cqd-engine-mode" role="group" aria-label={popupMessage('popupEngineMode')}>
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          className="cqd-engine-mode-option"
-          data-mode={option.value}
-          aria-pressed={mode === option.value}
-          disabled={!!loading || option.disabled}
-          title={option.title || undefined}
-          onClick={() => { if (!option.disabled) onSelect(option.value); }}
-        >
-          {option.label}
-        </button>
-      ))}
+    <div
+      className="cqd-engine-mode"
+      role="radiogroup"
+      aria-label={popupMessage('popupEngineMode')}
+      onKeyDown={handleKeyDown}
+    >
+      {options.map((option) => {
+        const checked = mode === option.value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            className="cqd-engine-mode-option"
+            data-mode={option.value}
+            aria-checked={checked}
+            tabIndex={checked ? 0 : -1}
+            disabled={!!loading || option.disabled}
+            title={option.title || undefined}
+            onClick={() => { if (!option.disabled) onSelect(option.value); }}
+          >
+            {option.label}
+          </button>
+        );
+      })}
     </div>
   );
 }

@@ -1,15 +1,21 @@
 // filepath: extension/tests/popup-engine-mode.test.ts
 /**
  * S6/G2 T4 — the Engine Mode control (#684); S13 T3 adds the API option.
+ * Phase 4 batch D2 (Stillwater) re-presents it as the approved SEGMENTED
+ * control (prototypes/components.html option 1): three equal segments, the
+ * selection marked with role="radio" + aria-checked inside a radiogroup,
+ * arrow keys move the selection, focus stays visible.
  * Decisions pinned here:
  *   - Placement: a SEPARATE settings control (not folded into flag toggles).
- *   - Options: Legacy / New / API (beta). The API option is the S13 consent
- *     surface: DISABLED with a setup tooltip while the install lacks OAuth
- *     config (identity permission + oauth2 client_id — isApiConfigured()),
- *     enabled only when configured. Selecting it is the explicit consent
- *     that sets cqdV2Mode 'v3' (#398).
- *   - Selecting an option calls onSelect with the exact EngineMode value;
- *     persistence + live-switch messages stay the App wiring's job.
+ *   - Options: Legacy / New / API (beta). New renders SELECTED by default
+ *     (fresh installs run DEFAULT_MODE 'v2' — the marked default).
+ *   - The API option is the S13 consent surface: DISABLED with a setup
+ *     tooltip while the install lacks OAuth config (identity permission +
+ *     oauth2 client_id — isApiConfigured()), enabled only when configured.
+ *     Selecting it is the explicit consent that sets cqdV2Mode 'v3' (#398).
+ *   - Selecting an option (click or arrow key) calls onSelect with the exact
+ *     EngineMode value; persistence + live-switch messages stay the App
+ *     wiring's job.
  */
 import { createElement } from 'react';
 import { flushSync } from 'react-dom';
@@ -56,31 +62,47 @@ describe('popup engine mode control (#684, #398)', () => {
     return { onSelect };
   };
 
-  it('renders New selected by default (fresh install: no saved mode)', () => {
+  function radios(): HTMLButtonElement[] {
+    return [...container.querySelectorAll<HTMLButtonElement>('[role="radio"]')];
+  }
+
+  it('renders a radiogroup of three radio segments, New checked by default', () => {
     renderRow();
 
-    const v2 = container.querySelector<HTMLButtonElement>('[data-mode="v2"]');
-    expect(v2?.getAttribute('aria-pressed')).toBe('true');
-    const legacy = container.querySelector<HTMLButtonElement>('[data-mode="legacy"]');
-    expect(legacy?.getAttribute('aria-pressed')).toBe('false');
+    const group = container.querySelector('[role="radiogroup"]') as HTMLElement | null;
+    expect(group).not.toBeNull();
+    expect(group?.classList.contains('cqd-engine-mode')).toBe(true);
+    expect(group?.getAttribute('aria-label')).toBe('Engine Mode');
+
+    const buttons = radios();
+    expect(buttons.map((b) => b.dataset.mode)).toEqual(['legacy', 'v2', 'v3']);
+    expect(buttons.find((b) => b.dataset.mode === 'v2')?.getAttribute('aria-checked')).toBe('true');
+    expect(buttons.find((b) => b.dataset.mode === 'legacy')?.getAttribute('aria-checked')).toBe('false');
+    expect(buttons.find((b) => b.dataset.mode === 'v3')?.getAttribute('aria-checked')).toBe('false');
   });
 
-  it('a saved legacy value still renders Legacy selected (one-click rollback intact)', () => {
+  it('a saved legacy value still renders Legacy checked (one-click rollback intact)', () => {
     renderRow({ mode: 'legacy' });
 
-    const group = container.querySelector('.cqd-engine-mode') as HTMLElement | null;
-    expect(group).not.toBeNull();
-    const buttons = [...container.querySelectorAll<HTMLButtonElement>('.cqd-engine-mode-option')];
-    expect(buttons.map((b) => b.dataset.mode)).toEqual(['legacy', 'v2', 'v3']);
-    expect(buttons.find((b) => b.dataset.mode === 'legacy')?.getAttribute('aria-pressed')).toBe('true');
-    expect(buttons.find((b) => b.dataset.mode === 'v2')?.getAttribute('aria-pressed')).toBe('false');
-    expect(buttons.find((b) => b.dataset.mode === 'v3')?.getAttribute('aria-pressed')).toBe('false');
+    const buttons = radios();
+    expect(buttons.find((b) => b.dataset.mode === 'legacy')?.getAttribute('aria-checked')).toBe('true');
+    expect(buttons.find((b) => b.dataset.mode === 'v2')?.getAttribute('aria-checked')).toBe('false');
+    expect(buttons.find((b) => b.dataset.mode === 'v3')?.getAttribute('aria-checked')).toBe('false');
   });
 
-  it('a saved v2 value renders New selected', () => {
+  it('a saved v2 value renders New checked', () => {
     renderRow({ mode: 'v2' });
     const v2 = container.querySelector<HTMLButtonElement>('[data-mode="v2"]');
-    expect(v2?.getAttribute('aria-pressed')).toBe('true');
+    expect(v2?.getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('uses roving tabindex: only the checked segment is tabbable', () => {
+    renderRow({ mode: 'legacy' });
+
+    const buttons = radios();
+    expect(buttons.find((b) => b.dataset.mode === 'legacy')?.tabIndex).toBe(0);
+    expect(buttons.find((b) => b.dataset.mode === 'v2')?.tabIndex).toBe(-1);
+    expect(buttons.find((b) => b.dataset.mode === 'v3')?.tabIndex).toBe(-1);
   });
 
   it('resolveEngineMode mirrors readMode(): missing/invalid storage falls back to v2', () => {
@@ -98,7 +120,7 @@ describe('popup engine mode control (#684, #398)', () => {
     expect(resolveEngineMode('v3')).toBe('v3');
   });
 
-  it('selecting an option calls onSelect with the exact mode value', () => {
+  it('clicking a segment calls onSelect with the exact mode value', () => {
     const { onSelect } = renderRow({ mode: 'legacy', apiConfigured: true });
 
     const v2 = container.querySelector<HTMLButtonElement>('[data-mode="v2"]')!;
@@ -120,6 +142,41 @@ describe('popup engine mode control (#684, #398)', () => {
     expect(onSelect).toHaveBeenCalledWith('legacy');
   });
 
+  it('ArrowRight moves the selection to the next segment (selection follows focus)', () => {
+    const { onSelect } = renderRow({ mode: 'legacy', apiConfigured: true });
+
+    const legacy = container.querySelector<HTMLButtonElement>('[data-mode="legacy"]')!;
+    legacy.focus();
+    const event = new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true });
+    legacy.dispatchEvent(event);
+
+    expect(onSelect).toHaveBeenCalledWith('v2');
+    expect(document.activeElement).toBe(container.querySelector('[data-mode="v2"]'));
+  });
+
+  it('ArrowLeft wraps backwards from Legacy to the last segment', () => {
+    const { onSelect } = renderRow({ mode: 'legacy', apiConfigured: true });
+
+    const legacy = container.querySelector<HTMLButtonElement>('[data-mode="legacy"]')!;
+    legacy.focus();
+    legacy.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+
+    expect(onSelect).toHaveBeenCalledWith('v3');
+    expect(document.activeElement).toBe(container.querySelector('[data-mode="v3"]'));
+  });
+
+  it('arrow navigation skips the disabled API segment and wraps to Legacy', () => {
+    const { onSelect } = renderRow({ mode: 'v2', apiConfigured: false });
+
+    const v2 = container.querySelector<HTMLButtonElement>('[data-mode="v2"]')!;
+    v2.focus();
+    v2.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+
+    expect(onSelect).toHaveBeenCalledWith('legacy');
+    expect(onSelect).not.toHaveBeenCalledWith('v3');
+    expect(document.activeElement).toBe(container.querySelector('[data-mode="legacy"]'));
+  });
+
   it('the API option renders DISABLED with the setup tooltip when OAuth is not configured', () => {
     renderRow({ apiConfigured: false });
 
@@ -129,8 +186,8 @@ describe('popup engine mode control (#684, #398)', () => {
 
     // Disabled is the consent gate: clicking must not request the mode.
     api.click();
-    const buttons = [...container.querySelectorAll<HTMLButtonElement>('.cqd-engine-mode-option')];
-    expect(buttons.find((b) => b.dataset.mode === 'v3')?.getAttribute('aria-pressed')).toBe('false');
+    const buttons = radios();
+    expect(buttons.find((b) => b.dataset.mode === 'v3')?.getAttribute('aria-checked')).toBe('false');
   });
 
   it('the API option is enabled when the API is configured; selecting it requests v3 (explicit consent)', () => {
@@ -142,15 +199,15 @@ describe('popup engine mode control (#684, #398)', () => {
     expect(onSelect).toHaveBeenCalledWith('v3');
   });
 
-  it('marks v3 selected when the stored mode is v3 (configured world)', () => {
+  it('marks v3 checked when the stored mode is v3 (configured world)', () => {
     renderRow({ mode: 'v3', apiConfigured: true });
     const v3 = container.querySelector<HTMLButtonElement>('[data-mode="v3"]');
-    expect(v3?.getAttribute('aria-pressed')).toBe('true');
+    expect(v3?.getAttribute('aria-checked')).toBe('true');
   });
 
   it('is disabled while loading', () => {
     renderRow({ loading: true, apiConfigured: true });
-    const buttons = [...container.querySelectorAll<HTMLButtonElement>('.cqd-engine-mode-option')];
+    const buttons = radios();
     expect(buttons.every((b) => b.disabled)).toBe(true);
   });
 });
