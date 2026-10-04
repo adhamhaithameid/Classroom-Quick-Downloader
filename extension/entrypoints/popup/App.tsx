@@ -1445,27 +1445,15 @@ function App() {
                       <div className="cqd-settings-section">
                         <div className="cqd-settings-section-label">{popupMessage('popupSettingsSectionFlags')}</div>
                         <div className="cqd-toggle-group">
-                          <div className="cqd-flag-toggle-row cqd-flag-toggle-comment">
-                            <ToggleRow
-                              label="Comment Flags"
-                              description="Badges for posts with comments."
-                              checked={settings?.commentsFlagEnabled ?? true}
-                              loading={isLoadingSettings}
-                              onToggle={() => handleToggleFlag('commentsFlagEnabled')}
-                              disabled={isLoadingSettings}
-                            />
-                          </div>
-
-                          <div className="cqd-flag-toggle-row cqd-flag-toggle-edited">
-                            <ToggleRow
-                              label="Edited Flags"
-                              description="Badges for edited posts."
-                              checked={settings?.editedFlagEnabled ?? true}
-                              loading={isLoadingSettings}
-                              onToggle={() => handleToggleFlag('editedFlagEnabled')}
-                              disabled={isLoadingSettings}
-                            />
-                          </div>
+                          {/* Stillwater pills (A design): one pill per flat
+                              flag key — Comment / Edited / Both. */}
+                          <FlagPills
+                            comments={settings?.commentsFlagEnabled ?? true}
+                            edited={settings?.editedFlagEnabled ?? true}
+                            combined={settings?.combinedFlagEnabled ?? true}
+                            disabled={isLoadingSettings}
+                            onToggle={handleToggleFlag}
+                          />
                         </div>
                         <div className="cqd-settings-section-note">Flag detection is experimental and may not always be accurate.</div>
                       </div>
@@ -1894,6 +1882,84 @@ export function EngineModeRow({ mode, loading, apiConfigured, onSelect }: Engine
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/** The popup's flag-selection pills (Stillwater, direction A "pills",
+ *  owner-approved incl. the new Both card). Each pill IS one flat store
+ *  key — Comment -> commentsFlagEnabled, Edited -> editedFlagEnabled,
+ *  Both -> combinedFlagEnabled — an independent aria-pressed toggle, the
+ *  combinations the prototype allows (no pill forces another). The mini
+ *  before/after stage previews the flag's treatment; its cycle freezes on
+ *  the AFTER state under reduced motion (batch D1 conventions). */
+export type FlagPillKey = 'commentsFlagEnabled' | 'editedFlagEnabled' | 'combinedFlagEnabled';
+
+const FLAG_PILLS: ReadonlyArray<{
+  key: FlagPillKey;
+  label: string;
+  variant: 'comment' | 'edited' | 'both';
+  title: string;
+}> = [
+  {
+    key: 'commentsFlagEnabled',
+    label: 'Comment',
+    variant: 'comment',
+    title: 'Highlight posts with teacher comments.',
+  },
+  {
+    key: 'editedFlagEnabled',
+    label: 'Edited',
+    variant: 'edited',
+    title: 'Highlight posts edited after publishing.',
+  },
+  {
+    key: 'combinedFlagEnabled',
+    label: 'Both',
+    variant: 'both',
+    title: 'Comment and edited highlights in one combined flag.',
+  },
+];
+
+export function FlagPills({
+  comments,
+  edited,
+  combined,
+  disabled,
+  onToggle,
+}: {
+  comments: boolean;
+  edited: boolean;
+  combined: boolean;
+  disabled?: boolean;
+  onToggle: (key: FlagPillKey) => void;
+}) {
+  const values: Record<FlagPillKey, boolean> = {
+    commentsFlagEnabled: comments,
+    editedFlagEnabled: edited,
+    combinedFlagEnabled: combined,
+  };
+  return (
+    <div className="cqd-flag-pills" role="group" aria-label="Highlight changes">
+      {FLAG_PILLS.map((pill) => (
+        <button
+          key={pill.key}
+          type="button"
+          className={`cqd-flag-pill cqd-flag-pill-${pill.variant}`}
+          data-flag={pill.key}
+          aria-pressed={values[pill.key]}
+          disabled={!!disabled}
+          title={pill.title}
+          onClick={() => onToggle(pill.key)}
+        >
+          <span className="cqd-flag-pill-stage" aria-hidden="true">
+            <span className="cqd-flag-pill-post" />
+            <span className="cqd-flag-pill-ring" />
+            <span className="cqd-flag-pill-badge" />
+          </span>
+          {pill.label}
+        </button>
+      ))}
     </div>
   );
 }

@@ -30,6 +30,10 @@
   --cqd-fs-body: 13px;
   --cqd-fs-title: 15px;
   --cqd-fs-heading: 17px;
+
+  /* Stillwater motion: one soft ease, settles rather than snaps
+     (prototypes/popup-direction-a.html). */
+  --cqd-ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* ===============================
@@ -1828,38 +1832,172 @@ body {
   outline-offset: -2px; /* inside the segment so the track never clips it */
 }
 
-/* ============================================================================
-   FLAG TOGGLE COLORED BORDERS
-   ============================================================================ */
+/* ── Flag preview pills (Stillwater, direction A "pills" + components.html
+   preview cards). One pill per flat flag key; the mini stage plays the
+   prototype's before/after cycle (5.2s): the plain post is the before,
+   the ring + badge (the flagged result) are the after. Colors are the
+   prototype palette's light-surface tones: comment #9B00FF, edited
+   #007F8D, Both = the purple→cyan gradient. ───────────────────────────── */
+.cqd-flag-pills {
+  display: flex;
+  gap: 6px;
+}
 
-.cqd-flag-toggle-row {
+.cqd-flag-pill {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   border: 1px solid var(--cqd-border-subtle);
-  border-left: 3px solid transparent;
-  border-radius: 14px;
-  gap: 0px;
-  margin: 0px;
-  padding: 0px;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  border-radius: 999px;
+  background: var(--cqd-surface);
+  color: var(--cqd-text-muted);
+  font-family: var(--cqd-font);
+  font-size: var(--cqd-fs-caption);
+  font-weight: 500;
+  padding: 8px 4px;
+  cursor: pointer;
+  transition: border-color var(--cqd-transition-fast), background var(--cqd-transition-fast),
+    color var(--cqd-transition-fast), box-shadow var(--cqd-transition-fast);
 }
 
-/* Comment flags — blue (matches comment badge color) */
-.cqd-flag-toggle-comment {
-  border-left-color: #9B00FF;
-  border-color: #9B00FF;
+.cqd-flag-pill:hover:not(:disabled) {
+  border-color: var(--cqd-text-muted);
+  color: var(--cqd-text-main);
 }
 
-/* Edited flags — orange/amber (matches edited badge color) */
-.cqd-flag-toggle-edited {
-  border-left-color: #007F8D;
-  border-color: #007F8D;
+.cqd-flag-pill:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-/* Both flags — red/pink (matches both badge color) */
-.cqd-flag-toggle-both {
-  border-left-color: #FF4036;
-  border-color: #FF4036;
+.cqd-flag-pill:focus-visible {
+  outline: 2px solid var(--cqd-blue);
+  outline-offset: 2px;
 }
 
+/* Selected pills — the prototype's pressed affordance per variant. */
+.cqd-flag-pill-comment[aria-pressed='true'] {
+  border-color: rgba(155, 0, 255, 0.55);
+  background: rgba(155, 0, 255, 0.06);
+  color: var(--cqd-text-main);
+  box-shadow: inset 0 0 0 1px rgba(155, 0, 255, 0.3);
+}
+
+.cqd-flag-pill-edited[aria-pressed='true'] {
+  border-color: rgba(0, 127, 141, 0.55);
+  background: rgba(0, 127, 141, 0.06);
+  color: var(--cqd-text-main);
+  box-shadow: inset 0 0 0 1px rgba(0, 127, 141, 0.3);
+}
+
+.cqd-flag-pill-both[aria-pressed='true'] {
+  border-color: rgba(155, 0, 255, 0.55);
+  background: linear-gradient(90deg, rgba(155, 0, 255, 0.06), rgba(0, 127, 141, 0.08));
+  color: var(--cqd-text-main);
+  box-shadow: inset 0 0 0 1px rgba(0, 127, 141, 0.35);
+}
+
+/* Mini before/after stage. */
+.cqd-flag-pill-stage {
+  position: relative;
+  width: 14px;
+  height: 10px;
+  flex: 0 0 auto;
+}
+
+.cqd-flag-pill-post {
+  position: absolute;
+  inset: 2px 1px;
+  border-radius: 3px;
+  background: rgba(15, 23, 42, 0.16);
+}
+
+.cqd-flag-pill-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.cqd-flag-pill-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.cqd-flag-pill-comment .cqd-flag-pill-ring {
+  box-shadow: 0 0 0 2px rgba(155, 0, 255, 0.75);
+}
+.cqd-flag-pill-comment .cqd-flag-pill-badge {
+  background: #9b00ff;
+}
+
+.cqd-flag-pill-edited .cqd-flag-pill-ring {
+  box-shadow: 0 0 0 2px rgba(0, 127, 141, 0.75);
+}
+.cqd-flag-pill-edited .cqd-flag-pill-badge {
+  background: #007f8d;
+}
+
+/* Both: gradient ring (padding-box/border-box mask trick) + gradient dot. */
+.cqd-flag-pill-both .cqd-flag-pill-ring {
+  border: 1.5px solid transparent;
+  background: linear-gradient(135deg, rgba(155, 0, 255, 0.8), rgba(0, 127, 141, 0.8)) border-box;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+.cqd-flag-pill-both .cqd-flag-pill-badge {
+  background: linear-gradient(135deg, #9b00ff, #007f8d);
+}
+
+/* Before/after cycle (components.html ring-cycle/badge-cycle, 5.2s). */
+@keyframes cqd-flag-pill-ring-cycle {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  74% { opacity: 1; }
+  88% { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+@keyframes cqd-flag-pill-badge-cycle {
+  0% { opacity: 0; transform: scale(0.6); }
+  10% { opacity: 1; transform: scale(1.04); }
+  14% { transform: scale(1); }
+  74% { opacity: 1; transform: scale(1); }
+  88% { opacity: 0; transform: scale(0.9); }
+  100% { opacity: 0; transform: scale(0.6); }
+}
+
+.cqd-flag-pill .cqd-flag-pill-ring {
+  animation: cqd-flag-pill-ring-cycle 5.2s var(--cqd-ease) infinite;
+}
+
+.cqd-flag-pill .cqd-flag-pill-badge {
+  animation: cqd-flag-pill-badge-cycle 5.2s var(--cqd-ease) infinite;
+}
+
+/* Reduced motion: stop the cycle and hold the AFTER state — the flagged
+   result stays readable (prototype convention; batch 1's global 0.01ms
+   collapse only shortens the loop, which would end on the empty frame). */
+.cqd-reduce-motion .cqd-flag-pill-ring,
+.cqd-reduce-motion .cqd-flag-pill-badge {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cqd-app .cqd-flag-pill-ring,
+  .cqd-app .cqd-flag-pill-badge {
+    animation: none;
+  }
+}
 
 /* ── Queue panel (0h4d.1.2) ─────────────────────────────────────────────── */
 .cqd-card-queue { padding: 12px 14px; }
