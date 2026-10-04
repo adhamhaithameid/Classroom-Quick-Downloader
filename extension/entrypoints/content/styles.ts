@@ -90,7 +90,7 @@ const FULL_SHEET_BETWEEN = `
     /* PERMANENT BOLD styling (always applied to marked elements) */
     .cqd-permanent-bold-comment,
     .cqd-permanent-bold-edited {
-      font-weight: 900 !important;
+      font-weight: 600 !important;
       transition: color 0.3s ease, text-shadow 0.3s ease;
     }
 
@@ -269,9 +269,9 @@ const FULL_SHEET_BETWEEN = `
       opacity: 0;
       max-height: 0;
       overflow: hidden;
-      font-family: system-ui, -apple-system, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       font-size: 13px;
-      font-weight: 700;
+      font-weight: 600;
       margin-top: 0;
       text-align: center;
       transition: 
@@ -390,8 +390,8 @@ const FULL_SHEET_BETWEEN = `
     === END NUMBER HOVER ANIMATION === */
 
     .cqd-diff-val {
-      font-family: system-ui, -apple-system, sans-serif;
-      font-weight: 700;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-weight: 600;
       font-size: 13px;
     }
 
@@ -443,8 +443,8 @@ const FULL_SHEET_BETWEEN = `
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 14px;
-      font-weight: 700;
+      font-size: 13px;
+      font-weight: 600;
       opacity: 0.8;
       padding: 2px 0;
     }
@@ -454,9 +454,9 @@ const FULL_SHEET_BETWEEN = `
       opacity: 0;
       max-height: 0;
       overflow: hidden;
-      font-family: system-ui, -apple-system, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       font-size: 12px;
-      font-weight: 700;
+      font-weight: 600;
       text-align: center;
       white-space: nowrap;
       transition: 
@@ -502,8 +502,8 @@ const FULL_SHEET_BETWEEN = `
     }
 
     .cqd-both-plus {
-      font-size: 14px;
-      font-weight: 700;
+      font-size: 13px;
+      font-weight: 600;
       line-height: 1;
       margin: 1px 0; /* Compact spacing */
       height: 10px;
@@ -525,9 +525,9 @@ const FULL_SHEET_BETWEEN = `
     }
 
     .cqd-both-value {
-      font-family: system-ui, -apple-system, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       font-size: 11px;
-      font-weight: 700;
+      font-weight: 600;
       text-align: center;
     }
 
@@ -581,7 +581,7 @@ export const SHARED_BUTTON_SHEET = `    %CQD_BTN% {
       box-shadow: var(--cqd-shadow-base);
       cursor: pointer;
       transform: translateY(-50%) scale(1);
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       font-size: 13px;
       font-weight: 600;
       white-space: nowrap;
@@ -863,7 +863,7 @@ export const SHARED_BUTTON_SHEET = `    %CQD_BTN% {
       background-color: var(--cqd-color-normal);
       color: #ffffff;
       box-shadow: var(--cqd-shadow-normal);
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;

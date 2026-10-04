@@ -91,7 +91,7 @@ const V2_BUTTON_CSS = `
   background: var(--cqd-btn-bg);
   color: var(--cqd-btn-text);
   font-size: var(--cqd-btn-font-size);
-  font-family: 'Google Sans', Roboto, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-weight: 500;
   cursor: pointer;
   user-select: none;
@@ -220,7 +220,7 @@ const V2_BUTTON_CSS = `
   border-radius: 18px;
   background: var(--cqd-btn-bg);
   color: var(--cqd-btn-text);
-  font-family: 'Google Sans', Roboto, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   cursor: pointer;
   user-select: none;
   transition: var(--cqd-btn-transition);

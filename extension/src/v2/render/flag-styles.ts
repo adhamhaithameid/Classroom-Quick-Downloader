@@ -90,9 +90,9 @@ body.cqd-theme-dark {
   opacity: 0;
   max-height: 0;
   overflow: hidden;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   text-align: center;
   transition: opacity 0.25s ease, max-height 0.25s ease;
 }
@@ -205,16 +205,16 @@ body[data-cqd-dir="rtl"] .cqd-both-badge {
 }
 
 .cqd-both-value {
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   margin-inline-start: 2px;
 }
 
 .cqd-both-plus {
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 /* --- Dark theme (badges carry .cqd-theme-dark) --- */
