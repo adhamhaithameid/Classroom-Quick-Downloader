@@ -1559,11 +1559,62 @@ function App() {
                   aria-label="Support the developer on Buy Me a Coffee"
                   title="Support the developer on Buy Me a Coffee"
                 >
-                  <img
-                    src={bmcLogoSrc}
-                    alt="Buy Me a Coffee"
-                    className="cqd-coffee-icon"
-                  />
+                  {/* Stillwater star shimmer (Phase 4 D3, effects.html B):
+                      five staggered stars + one periodic sheen pass, purely
+                      decorative — the button's a11y surface is unchanged. */}
+                  <svg
+                    className="cqd-coffee-star"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 12 12"
+                    aria-hidden="true"
+                  >
+                    <path d="M6 0 7.2 4.8 12 6 7.2 7.2 6 12 4.8 7.2 0 6 4.8 4.8Z" fill="#FFE566" />
+                  </svg>
+                  <svg
+                    className="cqd-coffee-star"
+                    width="10"
+                    height="10"
+                    viewBox="0 0 12 12"
+                    aria-hidden="true"
+                  >
+                    <path d="M6 0 7.2 4.8 12 6 7.2 7.2 6 12 4.8 7.2 0 6 4.8 4.8Z" fill="#FFF3B0" />
+                  </svg>
+                  <svg
+                    className="cqd-coffee-star"
+                    width="13"
+                    height="13"
+                    viewBox="0 0 12 12"
+                    aria-hidden="true"
+                  >
+                    <path d="M6 0 7.2 4.8 12 6 7.2 7.2 6 12 4.8 7.2 0 6 4.8 4.8Z" fill="#FFE566" />
+                  </svg>
+                  <svg
+                    className="cqd-coffee-star"
+                    width="9"
+                    height="9"
+                    viewBox="0 0 12 12"
+                    aria-hidden="true"
+                  >
+                    <path d="M6 0 7.2 4.8 12 6 7.2 7.2 6 12 4.8 7.2 0 6 4.8 4.8Z" fill="#FFF3B0" />
+                  </svg>
+                  <svg
+                    className="cqd-coffee-star"
+                    width="11"
+                    height="11"
+                    viewBox="0 0 12 12"
+                    aria-hidden="true"
+                  >
+                    <path d="M6 0 7.2 4.8 12 6 7.2 7.2 6 12 4.8 7.2 0 6 4.8 4.8Z" fill="#FFE566" />
+                  </svg>
+                  <span className="cqd-coffee-sheen" aria-hidden="true" />
+                  <span className="cqd-coffee-icon-clip">
+                    <img
+                      src={bmcLogoSrc}
+                      alt="Buy Me a Coffee"
+                      className="cqd-coffee-icon"
+                    />
+                  </span>
                 </button>
 
                 <button

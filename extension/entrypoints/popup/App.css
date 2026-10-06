@@ -825,7 +825,121 @@ body {
   transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
     box-shadow 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   box-shadow: 0 4px 15px rgba(255, 221, 0, 0.3);
+  /* Stillwater D3: relative + visible so the decorative stars may break
+     the edge; the logo keeps its own clip via .cqd-coffee-icon-clip. */
+  position: relative;
+  overflow: visible;
+}
+
+.cqd-coffee-icon-clip {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
   overflow: hidden;
+}
+
+/* ===============================
+ * STAR SHIMMER (Stillwater Phase 4 batch D3, effects.html B)
+ * Attention by sparkle, not by pulse: five four-point stars on staggered
+ * 4.8s cycles (each visible ~25% of the time) plus one sheen pass every
+ * 6.5s. Nothing loops fast, nothing scales past the button, everything is
+ * aria-hidden and pointer-events: none — the label contrast is untouched.
+ * =============================== */
+.cqd-coffee-star {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(0.4) rotate(0deg);
+  animation: cqd-twinkle 4.8s ease-in-out infinite;
+}
+
+/* The prototype's five star anchors (0s … 4.1s stagger). */
+.cqd-coffee-star:nth-of-type(1) { top: -9px; left: 14%; animation-delay: 0s; }
+.cqd-coffee-star:nth-of-type(2) { top: -12px; left: 46%; animation-delay: 1.4s; }
+.cqd-coffee-star:nth-of-type(3) { top: -6px; right: 16%; animation-delay: 2.6s; }
+.cqd-coffee-star:nth-of-type(4) { bottom: -9px; left: 28%; animation-delay: 3.4s; }
+.cqd-coffee-star:nth-of-type(5) { bottom: -11px; right: 34%; animation-delay: 4.1s; }
+
+@keyframes cqd-twinkle {
+  0% { opacity: 0; transform: scale(0.3) rotate(0deg); }
+  8% { opacity: 0.9; transform: scale(1) rotate(24deg); }
+  16% { opacity: 0.35; transform: scale(0.7) rotate(40deg); }
+  26% { opacity: 0; transform: scale(0.3) rotate(60deg); }
+  100% { opacity: 0; transform: scale(0.3) rotate(60deg); }
+}
+
+.cqd-coffee-sheen {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 60%;
+  border-radius: 999px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.cqd-coffee-sheen::before {
+  content: '';
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: 0;
+  width: 60%;
+  background: linear-gradient(
+    105deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 80%
+  );
+  transform: translateX(-160%) skewX(-12deg);
+  animation: cqd-sheen-pass 6.5s ease-in-out infinite;
+  animation-delay: 1.2s;
+}
+
+@keyframes cqd-sheen-pass {
+  0% { transform: translateX(-160%) skewX(-12deg); }
+  16% { transform: translateX(340%) skewX(-12deg); }
+  100% { transform: translateX(340%) skewX(-12deg); }
+}
+
+/* Reduced motion: motion off is not emphasis off — the stars hold a
+   static 30% opacity and the sheen parks off-canvas (effects.html B),
+   under BOTH gates. The generic duration-collapse blocks already exist;
+   these statics restore the frozen state the collapse would blank out. */
+.cqd-reduce-motion .cqd-coffee-star {
+  animation: none !important;
+  opacity: 0.3;
+  transform: scale(0.8);
+}
+
+.cqd-reduce-motion .cqd-coffee-sheen::before {
+  animation: none !important;
+  transform: translateX(-160%) skewX(-12deg);
+}
+
+.cqd-reduce-motion .cqd-coffee-button:hover {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cqd-app .cqd-coffee-star {
+    animation: none !important;
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+
+  .cqd-app .cqd-coffee-sheen::before {
+    animation: none !important;
+    transform: translateX(-160%) skewX(-12deg);
+  }
+
+  .cqd-app .cqd-coffee-button:hover {
+    transform: none;
+  }
 }
 
 .cqd-coffee-icon {

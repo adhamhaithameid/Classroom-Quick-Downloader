@@ -216,7 +216,12 @@ describe('flag pill preview collapses under reduced motion (batch D1 conventions
 
   it('the OS prefers-reduced-motion media query freezes the preview too', () => {
     const css = popupCss();
-    const media = css.indexOf('@media (prefers-reduced-motion: reduce)');
+    // Anchor at the flag-pill section itself: App.css now carries several
+    // media-query blocks (Stillwater D3 added the coffee shimmer's), so
+    // "first block in the file" is no longer the flag block.
+    const flagSection = css.indexOf('.cqd-flag-pill-ring');
+    expect(flagSection).toBeGreaterThan(-1);
+    const media = css.indexOf('@media (prefers-reduced-motion: reduce)', flagSection);
     expect(media).toBeGreaterThan(-1);
     const mediaBlock = css.slice(media, css.indexOf('}', css.indexOf('.cqd-flag-pill', media)));
     expect(mediaBlock).toContain('.cqd-flag-pill-ring');
