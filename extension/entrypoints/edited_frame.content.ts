@@ -321,6 +321,12 @@ function scanForEditedPosts() {
 
         if (!post.hasAttribute(EDITED_ATTR)) {
           post.setAttribute(EDITED_ATTR, 'true');
+          // Refreshes (combined-flag toggles, cross-flag messages) clear
+          // EDITED_ATTR but can leave an older single badge attached. Sweep
+          // every stale copy first — same querySelectorAll dedupe as the
+          // merge cleanup in both-badge.ts — so a post carries at most ONE
+          // edited badge across any number of toggle cycles and rescans.
+          post.querySelectorAll('.cqd-edited-badge').forEach((el) => el.remove());
           // Use factory to create the expanding badge - pass diffValue not tooltipText!
           const badge = createEditedBadge(post, diffValue);
           post.appendChild(badge);
