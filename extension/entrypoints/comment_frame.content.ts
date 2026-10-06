@@ -43,6 +43,9 @@ let settleScanId: number | null = null;
 
 // Flag toggle state (controlled from popup)
 let commentsFlagEnabled = true;
+// The popup's "Both" pill: gates ONLY the merge into the combined badge —
+// single Comment/Edited badges render exactly as before either way.
+let combinedFlagEnabled = true;
 
 function isStudentWorkPage(): boolean {
   return isStudentWorkRoute(window.location.pathname);
@@ -81,6 +84,34 @@ function applyCommentsFlagState(enabled: boolean): void {
   }
 }
 
+/**
+ * Strip merged combined pills + revert their red-frame overlay class, so the
+ * refresh scan below re-renders the standalone singles (createOverlay
+ * early-returns while a .cqd-both-badge exists). Same DOM contract as the
+ * teardown inside both-badge.ts.
+ */
+function stripCombinedMerges(): void {
+  document.querySelectorAll<HTMLElement>('.cqd-both-badge').forEach((el) => el.remove());
+  document
+    .querySelectorAll<HTMLElement>('.cqd-overlay-container.cqd-both')
+    .forEach((el) => el.classList.remove('cqd-both'));
+}
+
+// Live toggle of the "Both" pill: off → strip the merged pill, then the
+// refresh re-renders the standalone singles; on → the refresh re-merges.
+function applyCombinedFlagState(enabled: boolean): void {
+  const wasEnabled = combinedFlagEnabled;
+  combinedFlagEnabled = enabled;
+
+  if (wasEnabled === enabled) return;
+  if (!running || !commentsFlagEnabled) return;
+
+  if (!enabled) {
+    stripCombinedMerges();
+  }
+  requestCommentRefresh();
+}
+
 // Load flag state from storage
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const _browserApi = (globalThis as any).chrome;
@@ -88,9 +119,15 @@ if (_browserApi?.storage?.local) {
   _browserApi.storage.local.get('commentsFlagEnabled', (res: { commentsFlagEnabled?: boolean }) => {
     commentsFlagEnabled = res.commentsFlagEnabled !== false; // default true
   });
+  _browserApi.storage.local.get('combinedFlagEnabled', (res: { combinedFlagEnabled?: boolean }) => {
+    combinedFlagEnabled = res.combinedFlagEnabled !== false; // default true
+  });
   _browserApi.storage.onChanged.addListener((changes: any, area: string) => {
     if (area === 'local' && 'commentsFlagEnabled' in changes) {
       applyCommentsFlagState(changes.commentsFlagEnabled.newValue !== false);
+    }
+    if (area === 'local' && 'combinedFlagEnabled' in changes) {
+      applyCombinedFlagState(changes.combinedFlagEnabled.newValue !== false);
     }
   });
 }
@@ -104,7 +141,12 @@ if (_browserApi?.runtime?.onMessage) {
       return;
     }
 
-    if ((message.flag === 'editedFlagEnabled' || message.flag === 'combinedFlagEnabled') && running && commentsFlagEnabled) {
+    if (message.flag === 'combinedFlagEnabled') {
+      applyCombinedFlagState(message.enabled !== false);
+      return;
+    }
+
+    if (message.flag === 'editedFlagEnabled' && running && commentsFlagEnabled) {
       window.setTimeout(() => requestCommentRefresh(), 0);
     }
   });
@@ -289,7 +331,8 @@ function scanForComments() {
       }
 
       // 2. Always attempt to merge/upgrade to "Both" badge if data exists
-      upgradeCombinedBadge(post);
+      // (suppressed while the popup's "Both" pill is off)
+      upgradeCombinedBadge(post, combinedFlagEnabled);
     });
   } catch (err) {
     console.warn('CQD Scan Error:', err);

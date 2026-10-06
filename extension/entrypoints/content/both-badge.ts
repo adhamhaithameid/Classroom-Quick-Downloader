@@ -37,8 +37,28 @@ export function triggerPostClick(post: HTMLElement) {
  * - Read values from data-attributes (Source of Truth)
  * - Create Smart Pill with vertical expansion
  * - Show "{count} • {diffString}" on hover
+ *
+ * `combinedEnabled` is the popup's "Both" pill (combinedFlagEnabled), loaded
+ * by both frames from storage and threaded into every scan. When false the
+ * merge is suppressed and any merged pill is torn down (same teardown as the
+ * missing-data path) — the standalone singles render untouched. The default
+ * (true) keeps the historic always-merge behavior, so rendering with the
+ * shipped defaults is unchanged.
  */
-export function upgradeCombinedBadge(post: HTMLElement): void {
+export function upgradeCombinedBadge(post: HTMLElement, combinedEnabled = true): void {
+  // 0. Flag gate: the merged pill exists only while "Both" is enabled.
+  if (!combinedEnabled) {
+    const existingBoth = post.querySelector('.cqd-both-badge');
+    if (existingBoth) {
+      existingBoth.remove();
+      const overlay = post.querySelector('.cqd-overlay-container');
+      if (overlay) {
+        overlay.classList.remove('cqd-both');
+      }
+    }
+    return;
+  }
+
   // 1. Read the Source of Truth
   const rawCount = post.getAttribute(ATTR_COMMENT_COUNT);
   const rawDiff = post.getAttribute(ATTR_EDIT_DIFF);
@@ -62,9 +82,12 @@ export function upgradeCombinedBadge(post: HTMLElement): void {
   const commentCount = rawCount || '0';
   const diffText = rawDiff || '';
 
-  // Remove separate badges (cleanup)
-  post.querySelector('.cqd-comment-badge')?.remove();
-  post.querySelector('.cqd-edited-badge')?.remove();
+  // Remove separate badges (cleanup). querySelectorAll: a refresh scan can
+  // re-create a single before this merge runs (EDITED_ATTR/PROCESSED_ATTR
+  // are cleared by the refresh), so EVERY stale copy must go — not just the
+  // first in document order.
+  post.querySelectorAll('.cqd-comment-badge').forEach((el) => el.remove());
+  post.querySelectorAll('.cqd-edited-badge').forEach((el) => el.remove());
 
   // Ensure overlay exists
   let finalOverlay = overlay;

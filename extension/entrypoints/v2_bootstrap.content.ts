@@ -129,13 +129,20 @@ export default defineContentScript({
 
       // 3e. Live flag toggles (z57 S4): the popup's cqd-flag-toggle message
       //     flips badge visibility without a reload (qa-03 golden rule 8).
-      //     Inert in non-v2 modes — the badge registry is empty when V2
-      //     doesn't render, so V1's own listeners stay the only handlers.
+      //     All three flag keys — comments, edited AND the "Both" pill
+      //     (combined) — reach applyFlagToggle, so a runtime toggle updates
+      //     already-rendered badges. Inert in non-v2 modes — the badge
+      //     registry is empty when V2 doesn't render, so V1's own listeners
+      //     stay the only handlers.
       if (typeof chrome !== 'undefined' && chrome?.runtime?.onMessage) {
         const { applyFlagToggle } = await import('../src/v2/render/flag-renderer');
         chrome.runtime.onMessage.addListener((message: { type?: string; flag?: string; enabled?: boolean }) => {
           if (!message || message.type !== 'cqd-flag-toggle') return;
-          if (message.flag === 'commentsFlagEnabled' || message.flag === 'editedFlagEnabled') {
+          if (
+            message.flag === 'commentsFlagEnabled' ||
+            message.flag === 'editedFlagEnabled' ||
+            message.flag === 'combinedFlagEnabled'
+          ) {
             applyFlagToggle(message.flag, message.enabled !== false);
           }
         });
