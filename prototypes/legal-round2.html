@@ -43,9 +43,20 @@
   }
   code { font-size: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1px 5px; font-family: var(--mono); }
 
-  .layout { max-width: 1140px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; }
+  .layout {
+    max-width: 1140px; margin: 0 auto; display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "ballot" "main"; /* narrow: stacked, ballot first (DOM order) */
+    gap: 28px;
+  }
+  .layout > .ballot { grid-area: ballot; }
+  .layout > main { grid-area: main; }
   @media (min-width: 1161px) {
-    .layout { grid-template-columns: minmax(0, 1fr) 300px; align-items: start; }
+    .layout {
+      grid-template-columns: minmax(0, 1fr) 300px;
+      grid-template-areas: "main ballot"; /* desktop: content wide, ballot rail */
+      align-items: start;
+    }
   }
 
   .crumb { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--text3); margin-bottom: 8px; }
@@ -421,11 +432,14 @@
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
+      transition-delay: 0s !important; /* visibility flips instantly, no 280ms hold */
     }
     .bmc:hover, .cta:hover { transform: none; }
   }
+  html.reduce-motion { scroll-behavior: auto; }
   body.reduce-motion *, body.reduce-motion *::before, body.reduce-motion *::after {
     transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
@@ -1047,6 +1061,7 @@
     var btn = document.getElementById('rm-toggle'), label = document.getElementById('rm-state');
     function apply(on) {
       document.body.classList.toggle('reduce-motion', on);
+      document.documentElement.classList.toggle('reduce-motion', on); /* mirrors media query: scroll-behavior auto */
       btn.setAttribute('aria-pressed', String(on));
       label.textContent = on ? 'Reduced motion' : 'Standard motion';
     }
