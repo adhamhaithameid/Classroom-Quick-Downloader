@@ -126,7 +126,11 @@ describe('v2 Download All group machine (z57 S3)', () => {
     vi.advanceTimersByTime(PER_FILE_STAGGER_MS * 3);
     expect(requested).toHaveLength(2);
     expect(group.querySelector('.cqd-download-all-sub')?.textContent).toBe('0 → 2');
-    expect(group.className).not.toContain('cqd-all-');
+    // Busy carries the water-fill hook (Stillwater D3) — no terminal class yet.
+    expect(group.classList.contains('cqd-all-busy')).toBe(true);
+    expect(group.className).not.toContain('cqd-all-success');
+    expect(group.className).not.toContain('cqd-all-error');
+    expect(group.className).not.toContain('cqd-all-cancel');
 
     // Both settle saved.
     for (const p of requestedPayloads()) {
@@ -141,6 +145,37 @@ describe('v2 Download All group machine (z57 S3)', () => {
     vi.advanceTimersByTime(GROUP_FEEDBACK_MS + 10);
     expect(group.classList.contains('cqd-all-success')).toBe(false);
     expect(group.querySelector('.cqd-download-all-sub')?.textContent).toBe('2 files');
+  });
+
+  it('feeds the water fill: cqd-all-busy + --cqd-progress = done ÷ total, reset on settle', () => {
+    const { group } = makePost(2, 'post-water');
+    handleDownloadAllClickV2('post-water', group);
+    vi.advanceTimersByTime(PER_FILE_STAGGER_MS * 3);
+
+    // Busy: the tank level starts at zero and the busy class is on.
+    expect(group.classList.contains('cqd-all-busy')).toBe(true);
+    expect(group.style.getPropertyValue('--cqd-progress')).toBe('0%');
+
+    // One of two saved → fill rises to 50%.
+    const payloads = requestedPayloads();
+    bus.publish('download:settled', {
+      requestId: payloads[0].requestId,
+      outcome: { status: 'saved' },
+    });
+    expect(group.style.getPropertyValue('--cqd-progress')).toBe('50%');
+    expect(group.classList.contains('cqd-all-busy')).toBe(true);
+
+    // Terminal: the water leaves with the busy class and the level resets.
+    bus.publish('download:settled', {
+      requestId: payloads[1].requestId,
+      outcome: { status: 'saved' },
+    });
+    expect(group.classList.contains('cqd-all-busy')).toBe(false);
+    expect(group.style.getPropertyValue('--cqd-progress')).toBe('0%');
+
+    // Post-feedback reset restores the idle button with the level still at 0.
+    vi.advanceTimersByTime(GROUP_FEEDBACK_MS + 10);
+    expect(group.style.getPropertyValue('--cqd-progress')).toBe('0%');
   });
 
   it('drives cqd-all-error only when ALL files fail; partial failure is a success state', () => {

@@ -966,24 +966,192 @@ export const SHARED_BUTTON_SHEET = `    %CQD_BTN% {
       min-width: 140px; /* Match cancel state width */
     }
 
-    /* PROGRESS BAR OVERLAY (Fills up) */
-    %CQD_ALL%::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      bottom: 0;
-      z-index: 0;
-      background-color: var(--cqd-color-success);
-      /* Width controlled by JS */
-      width: var(--cqd-progress);
-      transition: width 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
-      opacity: 1;
+    /* ===============================
+     * WATER FILL (Stillwater Phase 4 batch D3)
+     * The approved liquid loading treatment (prototypes/effects.html
+     * A1-A3) as CSS-only pseudo-element layers, fed by the EXISTING
+     * plumbing — no new state machine:
+     *   - singles: indeterminate slosh under .cqd-loading (registered
+     *     --cqd-fill, the prototype's 0.8s 18%-32% token); determinate
+     *     rise under .cqd-trying from the byte-level --cqd-progress the
+     *     message handler already feeds via setPillProgress.
+     *   - Download All (the tank): fill height = files done / files total
+     *     via --cqd-progress (setProgressVisual), busy-gated by the group
+     *     root's existing [data-cqd-group-active] mark. This supersedes
+     *     the legacy horizontal width-bar ::after (direction A: the
+     *     button IS the progress bar) — busy states only.
+     * ::before = the rising fill, ::after = the drifting SVG crest.
+     * Terminal states are excluded — success/error/cancelled keep today's
+     * backgrounds and icons; the wash is white on the solid pills.
+     * =============================== */
+    @property --cqd-fill {
+      syntax: '<percentage>';
+      inherits: true;
+      initial-value: 0%;
     }
 
-    %CQD_ALL%.cqd-all-success::after {
+    @keyframes %CQD_KF_WATER%Slosh {
+      0% { --cqd-fill: 18%; }
+      50% { --cqd-fill: 32%; }
+      100% { --cqd-fill: 18%; }
+    }
+
+    @keyframes %CQD_KF_WATER%Wave {
+      from { transform: translateX(0); }
+      to { transform: translateX(50%); }
+    }
+
+    /* Content rides above the water layers */
+    %CQD_BTN% > * {
+      position: relative;
+      z-index: 2;
+    }
+
+    /* --- Single pill: indeterminate slosh while the file is in flight --- */
+    %CQD_BTN%.cqd-loading {
+      animation: %CQD_KF_WATER%Slosh 0.8s ease-in-out infinite;
+    }
+
+    %CQD_BTN%.cqd-loading::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 0;
+      height: var(--cqd-fill, 24%);
+      border-radius: inherit;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.45));
+      transition: height 260ms cubic-bezier(0.22, 1, 0.36, 1);
+      pointer-events: none;
+    }
+
+    %CQD_BTN%.cqd-loading::after {
+      content: '';
+      position: absolute;
+      left: -50%;
+      width: 200%;
+      height: 8px;
+      z-index: 1;
+      bottom: calc(var(--cqd-fill, 24%) - 4px);
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 15 8' preserveAspectRatio='none'%3E%3Cpath d='M0 5Q3.75 0 7.5 5T15 5V8H0Z' fill='rgba(255,255,255,0.55)'/%3E%3C/svg%3E") repeat-x;
+      background-size: 25% 100%;
+      animation: %CQD_KF_WATER%Wave 2.2s linear infinite;
+      pointer-events: none;
+    }
+
+    /* --- Determinate rise: byte-level progress already reporting --- */
+    %CQD_BTN%.cqd-trying::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 0;
+      height: var(--cqd-progress, 26%);
+      border-radius: inherit;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.45));
+      transition: height 260ms cubic-bezier(0.22, 1, 0.36, 1);
+      pointer-events: none;
+    }
+
+    %CQD_BTN%.cqd-trying::after {
+      content: '';
+      position: absolute;
+      left: -50%;
+      width: 200%;
+      height: 8px;
+      z-index: 1;
+      bottom: calc(var(--cqd-progress, 26%) - 4px);
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 15 8' preserveAspectRatio='none'%3E%3Cpath d='M0 5Q3.75 0 7.5 5T15 5V8H0Z' fill='rgba(255,255,255,0.55)'/%3E%3C/svg%3E") repeat-x;
+      background-size: 25% 100%;
+      animation: %CQD_KF_WATER%Wave 2.2s linear infinite;
+      pointer-events: none;
+    }
+
+    /* Hover-to-cancel replaces the liquid with the cancel affordance */
+    %CQD_BTN%.cqd-cancel::before,
+    %CQD_BTN%.cqd-cancel::after {
       opacity: 0;
     }
+
+    /* --- Download All tank: busy-only, every terminal class excluded --- */
+    [data-cqd-group-active="1"] %CQD_ALL%:not(.cqd-all-success):not(.cqd-all-error):not(.cqd-all-cancel):not(.cqd-all-cancelled)::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 0;
+      height: var(--cqd-progress, 0%);
+      border-radius: inherit;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.45));
+      transition: height 300ms cubic-bezier(0.22, 1, 0.36, 1);
+      pointer-events: none;
+    }
+
+    [data-cqd-group-active="1"] %CQD_ALL%:not(.cqd-all-success):not(.cqd-all-error):not(.cqd-all-cancel):not(.cqd-all-cancelled)::after {
+      content: '';
+      position: absolute;
+      left: -50%;
+      width: 200%;
+      height: 10px;
+      z-index: 1;
+      bottom: calc(var(--cqd-progress, 0%) - 5px);
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 15 10' preserveAspectRatio='none'%3E%3Cpath d='M0 6Q3.75 0 7.5 6T15 6V10H0Z' fill='rgba(255,255,255,0.55)'/%3E%3C/svg%3E") repeat-x;
+      background-size: 25% 100%;
+      animation: %CQD_KF_WATER%Wave 2.6s linear infinite;
+      pointer-events: none;
+    }
+
+    /* --- Reduced-motion statics (both gates). The crest dies and the
+       slosh freezes at its mid level (24%) so a loading pill never
+       renders blank; the determinate fills keep tracking --cqd-progress —
+       progress is content, not decoration. These pseudo-elements sit
+       outside the batch-D1 collapse's element selectors, so the water
+       carries its own gates. --- */
+    @media (prefers-reduced-motion: reduce) {
+      %CQD_BTN%.cqd-loading::before,
+      %CQD_BTN%.cqd-trying::before,
+      [data-cqd-group-active="1"] %CQD_ALL%::before {
+        transition-duration: 0.01ms !important;
+      }
+
+      %CQD_BTN%.cqd-loading {
+        animation: none !important;
+      }
+
+      %CQD_BTN%.cqd-loading::before {
+        height: 24% !important;
+      }
+
+      %CQD_BTN%.cqd-loading::after,
+      %CQD_BTN%.cqd-trying::after,
+      [data-cqd-group-active="1"] %CQD_ALL%::after {
+        display: none !important;
+      }
+    }
+
+    html.cqd-reduce-motion %CQD_BTN%.cqd-loading::before,
+    html.cqd-reduce-motion %CQD_BTN%.cqd-trying::before,
+    html.cqd-reduce-motion [data-cqd-group-active="1"] %CQD_ALL%::before {
+      transition-duration: 0.01ms !important;
+    }
+
+    html.cqd-reduce-motion %CQD_BTN%.cqd-loading {
+      animation: none !important;
+    }
+
+    html.cqd-reduce-motion %CQD_BTN%.cqd-loading::before {
+      height: 24% !important;
+    }
+
+    html.cqd-reduce-motion %CQD_BTN%.cqd-loading::after,
+    html.cqd-reduce-motion %CQD_BTN%.cqd-trying::after,
+    html.cqd-reduce-motion [data-cqd-group-active="1"] %CQD_ALL%::after {
+      display: none !important;
+    }
+    /* END WATER FILL */
 
     /* Content layers */
     %CQD_ALL% .cqd-download-all-main,
@@ -1135,6 +1303,9 @@ interface SharedButtonVars {
   kfClick: string;
   /** Pulse keyframe name (FULL: 'cancelPulse'; SW: 'cqdSwCancelPulse'). */
   kfPulse: string;
+  /** Water keyframe prefix (FULL: 'cqdWater'; SW: 'cqdSwWater') — the
+   * coexisting sheets keep distinct keyframe namespaces, like kfClick. */
+  kfWater: string;
   /** Descendant prefix for bare helper classes (FULL: ''; SW: button + ' '). */
   descendant: string;
   /** FULL-only icon-size utilities; '' in the scoped sheet. */
@@ -1148,6 +1319,7 @@ function renderSharedButtonSheet(v: SharedButtonVars): string {
     .replaceAll('%CQD_ALL%', v.all)
     .replaceAll('%CQD_KF_CLICK%', v.kfClick)
     .replaceAll('%CQD_KF_PULSE%', v.kfPulse)
+    .replaceAll('%CQD_KF_WATER%', v.kfWater)
     .replaceAll('%CQD_D%', v.descendant)
     .replaceAll('%CQD_ICON_SIZES%', v.iconSizes)
     .replaceAll('%CQD_BETWEEN%', v.between);
@@ -1162,6 +1334,7 @@ const FULL_SHEET_BUTTONS: SharedButtonVars = {
   all: '.cqd-download-all-btn',
   kfClick: 'cancelClick',
   kfPulse: 'cancelPulse',
+  kfWater: 'cqdWater',
   descendant: '',
   iconSizes: FULL_SHEET_ICON_SIZES,
   between: FULL_SHEET_BETWEEN,
@@ -1172,6 +1345,7 @@ const SW_SHEET_BUTTONS: SharedButtonVars = {
   all: SW_ALL_SELECTOR,
   kfClick: 'cqdSwCancelClick',
   kfPulse: 'cqdSwCancelPulse',
+  kfWater: 'cqdSwWater',
   descendant: `${SW_BTN_SELECTOR} `,
   iconSizes: '',
   between: SW_BETWEEN_HEADER,
