@@ -10,9 +10,10 @@ All branches sit on top of origin/main at 232d6f0c. Push and merge in this order
 | 4 | `chore/token-diet` | 0fe8fcc9, 960c577e | tools/agent-audit/, docs/agent-audit/ | None |
 | 5 | `fix/engine-bugs-1.8.9` | 9a6fe5ac, c446f765, f0fc594c, 1c446564, bdf7b5e2, 728bcbe9, 44297052, f259ec30, 5fa82866, 7b226a7c (10) | extension/ only | None (no other branch touches extension/) |
 | 6 | `website/seo-branding` | 6f9ab9eb, 10d9faa2, 3f57b74f, a6551d7e (4) | website/ | None |
-| 7 | `docs/ste100-rule` | d1a1c6d7 | AGENTS.md (pointer at file end), docs/ASD_STE100_RULES.md | AGENTS.md vs day 2 — rebase onto it if git does not auto-merge; the pointer block appends at the end, so the rebase is trivial |
-| 8 | `prototypes/1.8.9` | 256d9fab, 8be45bac, 437f3afc (3) | prototypes/ only (does not ship; decide.html is the approval ballot) | None |
-| 9 | `release/1.8.9` | 155a9739, 00b80f1e, 95434e05 (3) | CHANGELOG.md, extension/package.json, data/changelog/*, generated files, user-friendly-changelog.md, docs/ | Low. Merge AFTER day 5 so the 1.8.9 changelog describes merged code |
+| 7 | `feat/ui-stillwater-1.8.9` | 22f0def1..2da5c3d8 (16) | extension/ only — popup UI, settings, content-sheet CSS | None alone — merge AFTER day 5 (stacked on fix/engine-bugs-1.8.9); extension/ overlaps only that branch |
+| 8 | `docs/ste100-rule` | d1a1c6d7 | AGENTS.md (pointer at file end), docs/ASD_STE100_RULES.md | AGENTS.md vs day 2 — rebase onto it if git does not auto-merge; the pointer block appends at the end, so the rebase is trivial |
+| 9 | `prototypes/1.8.9` | 256d9fab, 8be45bac, 437f3afc, c59351a3, c50e87fe (5) | prototypes/ only (does not ship; decide.html + legal-round2.html are approval ballots) | None |
+| 10 | `release/1.8.9` | 155a9739, 00b80f1e, 95434e05, fcb8679c (4) | CHANGELOG.md, extension/package.json, data/changelog/*, generated files, user-friendly-changelog.md, docs/ | Low. Merge LAST so the 1.8.9 changelog describes all merged code; consider appending the UI wave (selector, pills, water, shimmer, rename) to the 1.8.9 entries before tagging |
 
 ## After the merges
 
