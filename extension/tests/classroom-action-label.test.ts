@@ -4,13 +4,12 @@
  * CLASSROOM_ACTION_LABEL — single source for the classroom action copy (2.7)
  * ============================================================================
  *
- * The classroom-wide action must not be permanently named "Download all
- * classroom files": a rename is pending the owner's finalist pick. Task 2.7
- * extracts the copy into ONE exported constant that every render site must
- * read, so the eventual rename is a one-line change. These tests pin the
- * CURRENT value (renaming happens later, deliberately not here) and that
- * both render sites — initial button text and the post-run terminal reset —
- * use the constant.
+ * Task 2.7 extracted the copy into ONE exported constant that every render
+ * site must read, so any rename is a one-line change. Phase 4 (direction A,
+ * owner ballot) adopted the owner's pick "Download Classroom"
+ * (prototypes/components.html section D, candidate 1). These tests pin the
+ * ADOPTED value and that both render sites — initial button text and the
+ * post-run terminal reset — use the constant.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CLASSROOM_ACTION_LABEL } from '../src/v2/render/classroom-action-label';
@@ -96,9 +95,9 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
-describe('CLASSROOM_ACTION_LABEL (task 2.7)', () => {
-  it('pins the current copy — the rename is pending, not done here', () => {
-    expect(CLASSROOM_ACTION_LABEL).toBe('Download all classroom files');
+describe('CLASSROOM_ACTION_LABEL (task 2.7 + Phase 4 rename)', () => {
+  it('pins the adopted copy — the owner pick from components.html candidate 1', () => {
+    expect(CLASSROOM_ACTION_LABEL).toBe('Download Classroom');
   });
 
   it('is the label the initial render uses', () => {

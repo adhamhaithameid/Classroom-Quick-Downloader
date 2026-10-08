@@ -4,15 +4,19 @@
  * CLASSROOM_ACTION_LABEL — single source for the classroom action copy (2.7)
  * ============================================================================
  *
- * The classroom-wide action must not be permanently named "Download all
- * classroom files": the action's scope is set to change, and a rename is
- * pending the owner's finalist pick. Until that decision lands, THIS
- * constant is the only place the copy is written — every render site
- * (initial button text, terminal-state reset) must read it so the eventual
- * rename is a one-line change, pinned by tests/classroom-action-label.test.ts.
+ * The classroom-wide action's copy lives in THIS constant only — every
+ * render site (initial button text, terminal-state reset) reads it, so any
+ * future rename stays a one-line change, pinned by
+ * tests/classroom-action-label.test.ts.
  *
- * Do NOT inline this string anywhere else and do NOT rename it here.
+ * Phase 4 (direction A, owner ballot): the pending rename LANDED. The owner
+ * picked "Download Classroom" (prototypes/components.html section D,
+ * candidate 1 — names the object exactly, no shared word with the
+ * post-level "Download All (N files)").
+ *
+ * Do NOT inline this string anywhere else. A future rename edits ONLY this
+ * constant and its pin test.
  */
 
-/** The CURRENT rendered copy of the classroom-wide action (rename pending). */
-export const CLASSROOM_ACTION_LABEL = 'Download all classroom files';
+/** The rendered copy of the classroom-wide action (owner pick, "Download Classroom"). */
+export const CLASSROOM_ACTION_LABEL = 'Download Classroom';

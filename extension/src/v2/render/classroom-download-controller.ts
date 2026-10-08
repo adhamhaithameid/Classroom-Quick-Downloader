@@ -1,7 +1,7 @@
 // filepath: extension/src/v2/render/classroom-download-controller.ts
 /**
  * ============================================================================
- * CLASSROOM DOWNLOAD CONTROLLER — "Download All Classroom" (csaa.6, v1)
+ * CLASSROOM DOWNLOAD CONTROLLER — "Download Classroom" (csaa.6, v1)
  * ============================================================================
  *
  * The whole-classroom download button: rendered on classwork routes
