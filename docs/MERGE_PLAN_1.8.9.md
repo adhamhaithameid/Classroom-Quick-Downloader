@@ -13,7 +13,7 @@ All branches sit on top of origin/main at 232d6f0c. Push and merge in this order
 | 7 | `feat/ui-stillwater-1.8.9` | 22f0def1..2da5c3d8 (16) | extension/ only — popup UI, settings, content-sheet CSS | None alone — merge AFTER day 5 (stacked on fix/engine-bugs-1.8.9); extension/ overlaps only that branch |
 | 8 | `docs/ste100-rule` | d1a1c6d7 | AGENTS.md (pointer at file end), docs/ASD_STE100_RULES.md | AGENTS.md vs day 2 — rebase onto it if git does not auto-merge; the pointer block appends at the end, so the rebase is trivial |
 | 9 | `prototypes/1.8.9` | 256d9fab, 8be45bac, 437f3afc, c59351a3, c50e87fe (5) | prototypes/ only (does not ship; decide.html + legal-round2.html are approval ballots) | None |
-| 10 | `release/1.8.9` | 155a9739, 00b80f1e, 95434e05, fcb8679c (4) | CHANGELOG.md, extension/package.json, data/changelog/*, generated files, user-friendly-changelog.md, docs/ | Low. Merge LAST so the 1.8.9 changelog describes all merged code; consider appending the UI wave (selector, pills, water, shimmer, rename) to the 1.8.9 entries before tagging |
+| 10 | `release/1.8.9` | 155a9739, 00b80f1e, 95434e05, fcb8679c, d88210a4, a927fc6a (6) | CHANGELOG.md, extension/package.json, data/changelog/*, generated files, user-friendly-changelog.md, docs/ | Low. Merge LAST; the 1.8.9 entries already include the Stillwater UI wave, so tag v1.8.9 only after day 7 (UI branch) is merged |
 
 ## After the merges
 
