@@ -1,60 +1,14 @@
  /* filepath: entrypoints/popup/App.css */
 
-:root {
-  --cqd-blue: #005dd7;
-  --cqd-blue-hover: #004bb0;
-  --cqd-blue-soft: #e3edff;
-  --cqd-blue-soft-border: #c4d5ff;
-  --cqd-bg: #ffffff;
-  --cqd-shell-bg: #f3f4f6;
-  --cqd-surface: #f9fafb;
-  --cqd-border-subtle: #e5e7eb;
-  --cqd-text-main: #0f172a;
-  --cqd-text-muted: #6b7280;
-  --cqd-radius-xl: 14px;
-  --cqd-shadow-soft: 0 2px 8px rgba(15, 23, 42, 0.05);
-  --cqd-shadow-hover: 0 6px 16px rgba(15, 23, 42, 0.1);
-  --cqd-transition-fast: 200ms cubic-bezier(0.22, 1, 0.36, 1);
-  --cqd-yellow-bg: #fefce8;
-  --cqd-yellow-border: #fde047;
-  --cqd-yellow-text: #854d0e;
-  --cqd-red: #ef4444;
-
-  /* Stillwater type scale (prototypes/popup-direction-a.html §03):
-     ONE stack, weights 400/500/600 only. 10px is reserved for the legal
-     line — no legal line ships in the popup yet, so nothing uses it. */
-  --cqd-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --cqd-fs-legal: 10px;
-  --cqd-fs-micro: 11px;
-  --cqd-fs-caption: 12px;
-  --cqd-fs-body: 13px;
-  --cqd-fs-title: 15px;
-  --cqd-fs-heading: 17px;
-
-  /* Stillwater motion: one soft ease, settles rather than snaps
-     (prototypes/popup-direction-a.html). */
-  --cqd-ease: cubic-bezier(0.22, 1, 0.36, 1);
-}
+/* The Stillwater foundation — the --cqd-* tokens, the universal box-sizing
+   reset, the global focus ring and the reduce-motion collapse — lives in
+   src/ui/stillwater.css, ONE copy shared with the options page (q320).
+   This sheet keeps the popup's surface rules only; App.tsx imports the
+   foundation sheet first. */
 
 /* ===============================
- * Popup Shell Sizing & Reset
+ * Popup Shell Sizing
  * =============================== */
-
-html {
-  box-sizing: border-box;
-}
-
-*, *::before, *::after {
-  box-sizing: inherit;
-  /* outline: none !important; */
-}
-
-/* Global focus */
-:focus-visible {
-  outline: 2px solid var(--cqd-blue);
-  outline-offset: 2px;
-  border-radius: 2px;
-}
 
 /* Rounded Buttons Focus */
 .cqd-button:focus-visible,
@@ -2383,75 +2337,8 @@ body {
 }
 .cqd-settings-options-link:hover { background: rgba(0, 0, 0, 0.04); }
 
-/* ── Options page (0h4d.1.8) ────────────────────────────────────────────── */
-.cqd-options {
-  max-width: 560px;
-  margin: 0 auto;
-  padding: 32px 20px;
-  font-family: var(--cqd-font);
-  font-size: var(--cqd-fs-body);
-  color: #1f2937;
-}
-.cqd-options-header h1 { font-size: var(--cqd-fs-heading); margin: 0 0 4px; }
-.cqd-options-sub { font-size: var(--cqd-fs-body); opacity: 0.65; margin: 0 0 20px; }
-.cqd-options-card {
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 12px;
-  padding: 6px 16px;
-  background: #fff;
-}
-.cqd-options-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 0;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-}
-.cqd-options-row:last-child { border-bottom: none; }
-.cqd-options-row-text { display: grid; gap: 2px; }
-.cqd-options-label { font-size: var(--cqd-fs-body); font-weight: 600; }
-.cqd-options-label-primary { color: #1a73e8; }
-.cqd-options-description { font-size: var(--cqd-fs-caption); opacity: 0.65; }
-.cqd-options-toggle {
-  width: 42px;
-  height: 24px;
-  border-radius: 999px;
-  border: none;
-  position: relative;
-  cursor: pointer;
-  flex: none;
-  transition: background 0.15s ease;
-}
-.cqd-options-toggle.on { background: #34a853; }
-.cqd-options-toggle.off { background: rgba(0, 0, 0, 0.25); }
-.cqd-options-knob {
-  position: absolute;
-  top: 3px;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #fff;
-  transition: left 0.15s ease;
-}
-.cqd-options-toggle.on .cqd-options-knob { left: 21px; }
-.cqd-options-toggle.off .cqd-options-knob { left: 3px; }
-.cqd-options-note { font-size: var(--cqd-fs-caption); opacity: 0.55; margin-top: 16px; }
-
-/* The approved affiliation notice (options consistency surface) — same
-   copy and 10px legal step as the popup footer. Lives with the other
-   .cqd-options-* rules in this sheet. */
-.cqd-options-affil {
-  font-size: var(--cqd-fs-legal);
-  color: #4b5563;
-  line-height: 1.5;
-  margin: 16px 0 0;
-}
-
-.cqd-options-affil strong {
-  font-weight: 600;
-  color: #1f2937;
-}
+/* The options page's own rules live in entrypoints/options/options.css on
+   the shared foundation sheet (q320) — this sheet no longer carries them. */
 
 /* ── Settings links row (0h4d.1.7/1.8) ─────────────────────────────────── */
 .cqd-settings-links { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -2488,43 +2375,7 @@ body {
 }
 .cqd-diag-btn-primary { background: #1a73e8; border-color: #1a73e8; color: #fff; }
 .cqd-diag-btn:disabled { opacity: 0.5; cursor: default; }
-.cqd-options-diag-link {
-  margin-top: 12px;
-  font-size: var(--cqd-fs-caption);
-  padding: 8px 14px;
-  border-radius: 8px;
-  border: 1px solid rgba(0, 0, 0, 0.15);
-  background: transparent;
-  cursor: pointer;
-}
 
-/* ── In-app reduce motion (Phase 4 batch D1) ──────────────────────────────
-   The root class mirrors reducedMotionPreferred from the shared settings
-   store; App.tsx (popup) and OptionsApp.tsx (options) put it on their root
-   element. Everything inside .cqd-app / .cqd-options is CQD's own surface,
-   so the collapse is universal within it. Progress and state stay readable:
-   durations collapse to ~0 — nothing hides. */
-.cqd-reduce-motion *,
-.cqd-reduce-motion *::before,
-.cqd-reduce-motion *::after {
-  animation-duration: 0.01ms !important;
-  animation-iteration-count: 1 !important;
-  transition-duration: 0.01ms !important;
-  scroll-behavior: auto !important;
-}
-
-/* OS-level preference: holds on every CQD surface, independent of the
-   in-app setting (the setting can only ADD calm, never remove it). */
-@media (prefers-reduced-motion: reduce) {
-  .cqd-app *,
-  .cqd-app *::before,
-  .cqd-app *::after,
-  .cqd-options *,
-  .cqd-options *::before,
-  .cqd-options *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-}
+/* The in-app reduce-motion collapse (root class + OS query) lives in
+   src/ui/stillwater.css so it holds on every CQD page surface; the popup's
+   surface-specific reduced-motion statics (shimmer, flag pills) stay here. */

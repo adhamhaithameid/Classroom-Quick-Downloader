@@ -1,6 +1,9 @@
 // filepath: entrypoints/popup/App.tsx
 
 import { useEffect, useId, useMemo, useRef, useState, useCallback, type KeyboardEvent, type MouseEvent } from 'react';
+// Stillwater foundation (tokens, reset, focus, motion collapse) — shared
+// with the options page; App.css keeps the popup's surface rules.
+import '../../src/ui/stillwater.css';
 import './App.css';
 import logoSrc from '../../assets/CQD.png';
 import logoGraySrc from '../../assets/CQD-gray.png';

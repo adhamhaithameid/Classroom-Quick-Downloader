@@ -45,23 +45,29 @@ function fontWeights(css: string): number[] {
   return [...css.matchAll(/font-weight:\s*(\d+)/g)].map((m) => Number.parseInt(m[1], 10));
 }
 
-describe('Stillwater type scale — popup + options (App.css)', () => {
+describe('Stillwater type scale — popup + options (stillwater.css + surface sheets)', () => {
+  // The token foundation moved to the shared sheet (q320); the popup and
+  // options surface rules live in their entrypoint sheets.
+  const stillwaterCss = read('src/ui/stillwater.css');
   const appCss = read('entrypoints/popup/App.css');
+  const optionsCss = read('entrypoints/options/options.css');
 
   it('declares the reconciled font stack and the full size ramp as tokens', () => {
-    expect(appCss).toContain('--cqd-font:');
+    expect(stillwaterCss).toContain('--cqd-font:');
     for (const token of SIZE_TOKENS) {
-      expect(appCss).toContain(token);
+      expect(stillwaterCss).toContain(token);
     }
   });
 
   it('every font-size goes through the tokens (no raw px sizes left)', () => {
     // The scale lives in the --cqd-fs-* tokens; declarations reference them.
     expect(fontSizes(appCss)).toEqual([]);
+    expect(fontSizes(optionsCss)).toEqual([]);
+    expect(fontSizes(stillwaterCss)).toEqual([]);
   });
 
   it('the token ramp is exactly the Stillwater scale (10 legal-only … 17 heading)', () => {
-    const defined = [...appCss.matchAll(/--cqd-fs-([a-z]+):\s*(\d+)px/g)].map(
+    const defined = [...stillwaterCss.matchAll(/--cqd-fs-([a-z]+):\s*(\d+)px/g)].map(
       (m) => `${m[1]}:${m[2]}`,
     );
     expect(defined.sort()).toEqual([
@@ -75,7 +81,13 @@ describe('Stillwater type scale — popup + options (App.css)', () => {
   });
 
   it('uses only the 400/500/600 weight ramp', () => {
-    const weights = [...new Set(fontWeights(appCss))].sort((a, b) => a - b);
+    const weights = [
+      ...new Set([
+        ...fontWeights(appCss),
+        ...fontWeights(optionsCss),
+        ...fontWeights(stillwaterCss),
+      ]),
+    ].sort((a, b) => a - b);
     for (const weight of weights) {
       expect([400, 500, 600]).toContain(weight);
     }

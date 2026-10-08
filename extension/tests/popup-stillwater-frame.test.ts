@@ -34,6 +34,9 @@ function block(css: string, selector: string): string {
 
 describe('stillwater popup frame (App.css)', () => {
   const css = read('entrypoints/popup/App.css');
+  // The token foundation moved to the shared sheet (q320) — one copy for
+  // the popup and the options page.
+  const tokens = read('src/ui/stillwater.css');
 
   it('opens the 360 x 600 stage from the prototype', () => {
     const body = block(css, 'body {');
@@ -65,7 +68,7 @@ describe('stillwater popup frame (App.css)', () => {
   it('cards keep soft depth (quiet shadow on the shared card)', () => {
     const card = block(css, '.cqd-card {');
     expect(card).toContain('var(--cqd-shadow-soft)');
-    expect(css).toMatch(/--cqd-shadow-soft: 0 2px 8px rgba\(15, 23, 42, 0\.05\);/);
+    expect(tokens).toMatch(/--cqd-shadow-soft: 0 2px 8px rgba\(15, 23, 42, 0\.05\);/);
   });
 
   it('history rows read as the bordered h-rows', () => {
@@ -99,7 +102,7 @@ describe('stillwater popup frame (App.css)', () => {
   });
 
   it('motion settles on the approved curve everywhere (one easing, 200ms)', () => {
-    expect(css).toContain('--cqd-transition-fast: 200ms cubic-bezier(0.22, 1, 0.36, 1);');
+    expect(tokens).toContain('--cqd-transition-fast: 200ms cubic-bezier(0.22, 1, 0.36, 1);');
   });
 });
 

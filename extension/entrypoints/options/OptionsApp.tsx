@@ -6,6 +6,10 @@
  * surfaces stay in sync via watchSettings.
  */
 import { useEffect, useState } from 'react';
+// Stillwater foundation (tokens, reset, focus, motion collapse) — the same
+// sheet the popup imports; this page's surface rules live in options.css.
+import '../../src/ui/stillwater.css';
+import './options.css';
 import {
   DEFAULT_SETTINGS,
   loadSettings,
@@ -128,7 +132,8 @@ export function OptionsApp() {
       {/* The approved affiliation notice, verbatim from the popup footer
           (legal.html surface 03). Same copy, same 10px legal step via the
           .cqd-options-affil rule that lives with the other options styles in
-          popup/App.css. Hardcoded English matches this page's convention. */}
+          the page's own options.css. Hardcoded English matches this page's
+          convention. */}
       <footer className="cqd-options-affil">
         <strong>Not affiliated with Google.</strong> Downloads belong to their
         owners — follow your school's policies.

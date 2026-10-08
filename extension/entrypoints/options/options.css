@@ -1,0 +1,190 @@
+/* filepath: entrypoints/options/options.css */
+/* ============================================================================
+ * Options page surface (0h4d.1.8; stillwater pass = D4 follow-up q320).
+ *
+ * The options entry imported no stylesheet, so the options rules sat dormant
+ * in popup/App.css and the page rendered unstyled. They now ship here on the
+ * approved tokens only: the --cqd-fs-* type scale, the popup card treatment
+ * (quiet card, 14px radius, soft shadow, hairline border), the translucent
+ * footer band and the one shared motion curve. Layout, DOM, order and the
+ * aria contract of every row are unchanged (options-page.test.ts pins
+ * behavior); the page reads as the same family as the popup.
+ * ========================================================================== */
+
+body {
+  margin: 0;
+  background: var(--cqd-shell-bg);
+  font-family: var(--cqd-font);
+  font-size: var(--cqd-fs-body);
+  color: var(--cqd-text-main);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Same band mechanics as the popup shell: flex column so the footer band
+   pins to the document bottom when the content runs short. */
+.cqd-options {
+  display: flex;
+  flex-direction: column;
+  max-width: 560px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 32px 20px 0;
+  font-family: var(--cqd-font);
+  font-size: var(--cqd-fs-body);
+  color: var(--cqd-text-main);
+}
+
+.cqd-options-header h1 {
+  font-size: var(--cqd-fs-heading);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 4px;
+}
+
+.cqd-options-sub {
+  font-size: var(--cqd-fs-caption);
+  color: var(--cqd-text-muted);
+  margin: 0 0 20px;
+}
+
+/* The popup card treatment (fc3404d6): quiet white card, 14px radius,
+   hairline border, soft depth. */
+.cqd-options-card {
+  border: 1px solid var(--cqd-border-subtle);
+  border-radius: var(--cqd-radius-xl);
+  box-shadow: var(--cqd-shadow-soft);
+  padding: 6px 16px;
+  background: #ffffff;
+}
+
+.cqd-options-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--cqd-border-subtle);
+}
+
+.cqd-options-row:last-child {
+  border-bottom: none;
+}
+
+.cqd-options-row-text {
+  display: grid;
+  gap: 2px;
+}
+
+.cqd-options-label {
+  font-size: var(--cqd-fs-body);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.cqd-options-label-primary {
+  color: var(--cqd-blue);
+}
+
+/* Row descriptions on the micro step, the popup toggle-row grammar. */
+.cqd-options-description {
+  font-size: var(--cqd-fs-micro);
+  color: var(--cqd-text-muted);
+  line-height: 1.45;
+}
+
+/* The labeled-row switch keeps its DOM and aria contract; colors keep the
+   established greens (no tokens exist for them), motion moves onto the
+   shared curve. */
+.cqd-options-toggle {
+  width: 42px;
+  height: 24px;
+  border-radius: 999px;
+  border: none;
+  position: relative;
+  cursor: pointer;
+  flex: none;
+  transition: background var(--cqd-transition-fast);
+}
+
+.cqd-options-toggle:focus-visible {
+  outline: 2px solid var(--cqd-blue);
+  outline-offset: 2px;
+}
+
+.cqd-options-toggle.on {
+  background: #34a853;
+}
+
+.cqd-options-toggle.off {
+  background: rgba(15, 23, 42, 0.25);
+}
+
+.cqd-options-knob {
+  position: absolute;
+  top: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.2);
+  transition: left var(--cqd-transition-fast);
+}
+
+.cqd-options-toggle.on .cqd-options-knob {
+  left: 21px;
+}
+
+.cqd-options-toggle.off .cqd-options-knob {
+  left: 3px;
+}
+
+.cqd-options-note {
+  font-size: var(--cqd-fs-caption);
+  color: var(--cqd-text-muted);
+  margin-top: 16px;
+}
+
+.cqd-options-diag-link {
+  margin: 12px 0 24px;
+  font-size: var(--cqd-fs-caption);
+  font-weight: 500;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--cqd-border-subtle);
+  background: transparent;
+  color: var(--cqd-text-main);
+  cursor: pointer;
+  font-family: var(--cqd-font);
+  transition:
+    background-color var(--cqd-transition-fast),
+    border-color var(--cqd-transition-fast);
+}
+
+.cqd-options-diag-link:hover {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.cqd-options-diag-link:focus-visible {
+  outline: 2px solid var(--cqd-blue);
+  outline-offset: 2px;
+}
+
+/* The approved affiliation notice in the popup's translucent .p-foot band:
+   hairline above, 10px legal step, column bleed via the same negative-margin
+   escape the popup band uses on its gutters; margin-top auto pins it to the
+   document bottom when the content runs short. */
+.cqd-options-affil {
+  margin: auto -20px 0;
+  padding: 10px 20px 12px;
+  border-top: 1px solid var(--cqd-border-subtle);
+  background: rgba(15, 23, 42, 0.03);
+  text-align: center;
+  font-size: var(--cqd-fs-legal);
+  color: var(--cqd-text-muted);
+  line-height: 1.45;
+}
+
+.cqd-options-affil strong {
+  font-weight: 600;
+  color: var(--cqd-text-main);
+}
