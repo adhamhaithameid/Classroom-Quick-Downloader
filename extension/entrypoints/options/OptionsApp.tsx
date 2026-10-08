@@ -125,6 +125,14 @@ export function OptionsApp() {
       >
         Diagnostics report
       </button>
+      {/* The approved affiliation notice, verbatim from the popup footer
+          (legal.html surface 03). Same copy, same 10px legal step via the
+          .cqd-options-affil rule that lives with the other options styles in
+          popup/App.css. Hardcoded English matches this page's convention. */}
+      <footer className="cqd-options-affil">
+        <strong>Not affiliated with Google.</strong> Downloads belong to their
+        owners — follow your school's policies.
+      </footer>
     </main>
   );
 }

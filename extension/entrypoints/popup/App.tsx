@@ -1771,6 +1771,15 @@ function App() {
                   Report it here
                 </a>
               </p>
+              {/* The ONLY approved legal surface (Phase 4 D4, legal.html
+                  surface 03 via legal-round2.html's footer composite): the
+                  affiliation notice on its own 10px legal line. Hardcoded
+                  English — the popup's current convention; i18n sweep will
+                  adopt it. */}
+              <p className="cqd-footer-affil">
+                <strong>Not affiliated with Google.</strong> Downloads belong
+                to their owners — follow your school's policies.
+              </p>
             </div>
           </footer>
 

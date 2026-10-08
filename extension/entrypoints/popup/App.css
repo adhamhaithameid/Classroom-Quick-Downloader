@@ -1045,6 +1045,21 @@ body {
   font-weight: 600;
 }
 
+/* The approved affiliation notice (legal.html surface 03): its own 10px
+   legal-only line under the footer text; the lead sentence carries the
+   weight (.foot-line b convention). */
+.cqd-footer-affil {
+  font-size: var(--cqd-fs-legal);
+  color: var(--cqd-text-muted);
+  line-height: 1.45;
+  margin: 4px 0 0;
+}
+
+.cqd-footer-affil strong {
+  color: var(--cqd-text-main);
+  font-weight: 600;
+}
+
 /* ===============================
  * Switch styling (Uiverse-inspired)
  * =============================== */
@@ -2422,6 +2437,21 @@ body {
 .cqd-options-toggle.on .cqd-options-knob { left: 21px; }
 .cqd-options-toggle.off .cqd-options-knob { left: 3px; }
 .cqd-options-note { font-size: var(--cqd-fs-caption); opacity: 0.55; margin-top: 16px; }
+
+/* The approved affiliation notice (options consistency surface) — same
+   copy and 10px legal step as the popup footer. Lives with the other
+   .cqd-options-* rules in this sheet. */
+.cqd-options-affil {
+  font-size: var(--cqd-fs-legal);
+  color: #4b5563;
+  line-height: 1.5;
+  margin: 16px 0 0;
+}
+
+.cqd-options-affil strong {
+  font-weight: 600;
+  color: #1f2937;
+}
 
 /* ── Settings links row (0h4d.1.7/1.8) ─────────────────────────────────── */
 .cqd-settings-links { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
