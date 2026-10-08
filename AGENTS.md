@@ -126,3 +126,12 @@ bd prime                # Refresh Beads context
 
 **Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/SYNC_CONCEPTS.md for details and anti-patterns.
 <!-- END BEADS CODEX SETUP -->
+
+## Agent efficiency
+
+- Start every session with `scripts/orient` (branch, dirty files, bd ready, last commit). Do not re-derive repo facts with exploration loops.
+- Verify with `scripts/check <workspace|--changed>` (affected typecheck, lint, tests only). Do not run the full monorepo suite for one change.
+- Cache hygiene: never edit files already loaded in context (AGENTS.md, docs, package.json) mid-session; batch such edits at session start. Prefer static reading (`rg`, ranged `Read`) over more calls.
+- Keep bash output bounded: pipe through `| head -30`, prefix with `rtk` where it helps (`rtk gain`), and source `scripts/agent-env.sh` for quiet, no-color output.
+- Final reports: at most 6 lines. State result, evidence, next step. No task restatement, no step-by-step narration.
+- Delegate broad searches to the built-in Explore subagent and reviews to the built-in code-reviewer; do not hand-roll custom equivalents.
