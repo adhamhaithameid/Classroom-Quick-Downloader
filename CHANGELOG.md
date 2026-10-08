@@ -24,10 +24,14 @@ Phase-1 feature completion plus the New-engine repair wave: post-level and class
 - Added specific failure-reason copy for every terminal download state (0h4d.1.4).
 - Added the reliability metric: download retry counts report to the worker (0h4d.1.10).
 - Added bounded exponential backoff for transient download failures (0h4d.1.3).
+- Added the approved Stillwater popup redesign: a segmented engine selector that shows the truthfully selected mode, change-detection pills with a gated combined flag, a liquid water loading effect with per-file progress on Download All, and a star shimmer on the support button.
+- Added an in-app reduce-motion setting; every surface also honors the OS prefers-reduced-motion.
 
 ### Changed
 - The extension no longer fetches remote configuration at startup or daily; it runs on built-in defaults, and the remote-config path returns behind the Pro license gate (free-plan quota mitigation).
-- The classroom-wide action label is centralized in one constant ahead of a rename decision.
+- The classroom-wide action is renamed to "Download Classroom".
+- Typography is unified on one scale across the popup and injected pills; the options page shares the same tokens.
+- A "Not affiliated with Google" notice ships in the popup and options footers.
 
 ### Fixed
 - New engine: the post-level Download All button now appears on collapsed classwork items, anchored at the post header, with per-post file counts; the decision counts every attachment type; Alt+Shift+D works on the New engine.

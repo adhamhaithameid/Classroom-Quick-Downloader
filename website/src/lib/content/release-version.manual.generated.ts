@@ -1,6 +1,6 @@
 /* AUTO-GENERATED FILE. DO NOT EDIT DIRECTLY. */
 export const WEBSITE_MANUAL_RELEASE_VERSION = {
-  "generatedAt": 1791062889008,
+  "generatedAt": 1791502903021,
   "extension": "1.8.9",
   "cloudflareWorker": "3.0.0",
   "oracleBackend": "6.0.0",

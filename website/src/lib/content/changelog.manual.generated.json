@@ -1,5 +1,5 @@
 {
-  "generatedAt": 1791062889008,
+  "generatedAt": 1791502903021,
   "source": "manual",
   "entries": [
     {
@@ -25,7 +25,7 @@
       "fixed": [
         "Fixed the support button rendering as an empty image in production (the SVG asset was referenced but never committed)."
       ],
-      "releasedAtUtc": 1791062889005
+      "releasedAtUtc": 1791502902982
     },
     {
       "id": "manual-1.8.1-2",
@@ -47,7 +47,7 @@
         "Fixed a duplicated static grid showing on the FAQ, Privacy, and Changelog pages.",
         "Fixed a slight horizontal scroll caused by decorative background glow bleeding past the screen edge."
       ],
-      "releasedAtUtc": 1790976489005
+      "releasedAtUtc": 1791416502982
     },
     {
       "id": "manual-1.8.0-3",
@@ -72,7 +72,7 @@
       "fixed": [
         "Fixed Sheets attachment downloads being rejected as invalid URLs."
       ],
-      "releasedAtUtc": 1790890089005
+      "releasedAtUtc": 1791330102982
     },
     {
       "id": "manual-1.7.9-4",
@@ -87,7 +87,7 @@
         "Firefox downloads report success only on actual completion — no more phantom successes that later vanish."
       ],
       "fixed": [],
-      "releasedAtUtc": 1790803689005
+      "releasedAtUtc": 1791243702982
     },
     {
       "id": "manual-1.7.8-5",
@@ -105,7 +105,7 @@
       "fixed": [
         "Fixed sign-in and error pages being saved as fake download files — they are now detected and reported as sign-in errors."
       ],
-      "releasedAtUtc": 1790717289005
+      "releasedAtUtc": 1791157302982
     },
     {
       "id": "manual-1.7.7-6",
@@ -125,7 +125,7 @@
       "fixed": [
         "Fixed cancellations made from the browser's own download panel showing as errors — they now correctly show as cancelled."
       ],
-      "releasedAtUtc": 1790630889005
+      "releasedAtUtc": 1791070902982
     },
     {
       "id": "manual-1.7.6-7",
@@ -136,7 +136,7 @@
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1790544489005
+      "releasedAtUtc": 1790984502982
     },
     {
       "id": "manual-1.7.5-8",
@@ -147,7 +147,7 @@
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1790458089005
+      "releasedAtUtc": 1790898102982
     },
     {
       "id": "manual-1.7.4-9",
@@ -158,7 +158,7 @@
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1790371689005
+      "releasedAtUtc": 1790811702982
     },
     {
       "id": "manual-1.7.3-10",
@@ -175,7 +175,7 @@
         "Fixed the root cause of Download All groups hanging on \"Downloading…\" forever.",
         "Fixed Download All progress not updating when the Classroom tab was in the background."
       ],
-      "releasedAtUtc": 1790285289005
+      "releasedAtUtc": 1790725302982
     },
     {
       "id": "manual-1.7.2-11",
@@ -186,7 +186,7 @@
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1790198889005
+      "releasedAtUtc": 1790638902982
     },
     {
       "id": "manual-1.7.1-12",
@@ -197,7 +197,7 @@
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1790112489005
+      "releasedAtUtc": 1790552502982
     },
     {
       "id": "manual-1.7.0-13",
@@ -208,7 +208,7 @@
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1790026089005
+      "releasedAtUtc": 1790466102982
     },
     {
       "id": "manual-1.6.9-14",
@@ -225,7 +225,7 @@
         "Fixed \"files start but fail\" reports on Firefox-family browsers (zen) and Brave.",
         "Fixed Download All groups with one broken file hanging instead of settling."
       ],
-      "releasedAtUtc": 1789939689005
+      "releasedAtUtc": 1790379702982
     },
     {
       "id": "manual-1.6.8-15",
@@ -236,7 +236,7 @@
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1789853289005
+      "releasedAtUtc": 1790293302982
     },
     {
       "id": "manual-1.6.7-16",
@@ -247,7 +247,7 @@
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1789766889005
+      "releasedAtUtc": 1790206902982
     },
     {
       "id": "manual-1.6.6-17",
@@ -266,7 +266,7 @@
         "Fixed download state races where concurrent downloads of the same file could cross wires.",
         "Fixed Google Sheets attachments not getting download buttons."
       ],
-      "releasedAtUtc": 1789680489005
+      "releasedAtUtc": 1790120502982
     },
     {
       "id": "manual-1.6.5-18",
@@ -277,7 +277,7 @@
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1789594089005
+      "releasedAtUtc": 1790034102982
     },
     {
       "id": "manual-1.6.4-19",
@@ -288,7 +288,7 @@
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1789507689005
+      "releasedAtUtc": 1789947702982
     },
     {
       "id": "manual-1.6.3-20",
@@ -299,7 +299,7 @@
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1789421289005
+      "releasedAtUtc": 1789861302982
     },
     {
       "id": "manual-1.6.2-21",
@@ -310,7 +310,7 @@
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1789334889005
+      "releasedAtUtc": 1789774902982
     },
     {
       "id": "manual-1.6.1-22",
@@ -327,7 +327,7 @@
       ],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1789248489005
+      "releasedAtUtc": 1789688502982
     },
     {
       "id": "manual-1.6.0-23",
@@ -351,7 +351,7 @@
         "Fixed a race condition where concurrent downloads of the same file could cross wires.",
         "Removed an unused browser permission (least privilege)."
       ],
-      "releasedAtUtc": 1789162089005
+      "releasedAtUtc": 1789602102982
     },
     {
       "id": "manual-1.5.9-24",
@@ -362,7 +362,7 @@
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1789075689005
+      "releasedAtUtc": 1789515702982
     },
     {
       "id": "manual-1.5.8-25",
@@ -377,7 +377,7 @@
         "Optimized DOM traversal with combined CSS selectors for faster scans on busy pages."
       ],
       "fixed": [],
-      "releasedAtUtc": 1788989289005
+      "releasedAtUtc": 1789429302982
     },
     {
       "id": "manual-1.5.7-26",
@@ -388,7 +388,7 @@
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1788902889005
+      "releasedAtUtc": 1789342902982
     },
     {
       "id": "manual-1.5.6-27",
@@ -399,7 +399,7 @@
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1788816489005
+      "releasedAtUtc": 1789256502982
     },
     {
       "id": "manual-1.5.5-28",
@@ -420,7 +420,7 @@
       "fixed": [
         "Fixed extension package bloat that increased install and update cost on slower networks."
       ],
-      "releasedAtUtc": 1788730089005
+      "releasedAtUtc": 1789170102982
     },
     {
       "id": "manual-1.5.4-29",
@@ -443,7 +443,7 @@
       "fixed": [
         "Fixed repeated heavy-pass work that could slow down larger Classroom pages."
       ],
-      "releasedAtUtc": 1788643689005
+      "releasedAtUtc": 1789083702982
     },
     {
       "id": "manual-1.5.3-30",
@@ -464,7 +464,7 @@
       "fixed": [
         "Fixed edge cases where shared wrappers could cause mis-scoped file or flag decisions."
       ],
-      "releasedAtUtc": 1788557289005
+      "releasedAtUtc": 1788997302982
     },
     {
       "id": "manual-1.5.2-31",
@@ -485,7 +485,7 @@
       "fixed": [
         "Fixed download-state and mapping regressions that could impact reliability under mixed attachment sets."
       ],
-      "releasedAtUtc": 1788470889005
+      "releasedAtUtc": 1788910902982
     },
     {
       "id": "manual-1.5.1-32",
@@ -506,7 +506,7 @@
       "fixed": [
         "Fixed early Student Work gaps where some submissions were not reachable through the normal download UX."
       ],
-      "releasedAtUtc": 1788384489005
+      "releasedAtUtc": 1788824502982
     },
     {
       "id": "manual-1.5.0-33",
@@ -537,7 +537,7 @@
         "Fixed duplicate or nested flag borders on some posts.",
         "Fixed download states that could stay stuck even after the browser finished the file."
       ],
-      "releasedAtUtc": 1788298089005
+      "releasedAtUtc": 1788738102982
     },
     {
       "id": "manual-1.4.0-34",
@@ -560,7 +560,7 @@
       "fixed": [
         "Fixed several fragile internal paths by giving the extension clearer runtime boundaries."
       ],
-      "releasedAtUtc": 1788211689005
+      "releasedAtUtc": 1788651702982
     },
     {
       "id": "manual-1.3.9-35",
@@ -587,7 +587,7 @@
         "Fixed issues where changelog visibility could be inconsistent across surfaces.",
         "Fixed multiple reliability edge cases in update-state handling."
       ],
-      "releasedAtUtc": 1788125289005
+      "releasedAtUtc": 1788565302982
     },
     {
       "id": "manual-1.3.8-36",
@@ -614,7 +614,7 @@
         "Fixed same-version publish cases where users could miss new changelog updates.",
         "Fixed stale version-pill and changelog content after changelog updates."
       ],
-      "releasedAtUtc": 1788038889005
+      "releasedAtUtc": 1788478902982
     },
     {
       "id": "manual-1.3.7-37",
@@ -641,7 +641,7 @@
         "Fixed cancelled-download accounting edge cases.",
         "Fixed intermittent long-run progress-state inconsistencies."
       ],
-      "releasedAtUtc": 1787952489005
+      "releasedAtUtc": 1788392502982
     },
     {
       "id": "manual-1.3.6-38",
@@ -668,7 +668,7 @@
         "Fixed stuck-progress scenarios during long runs.",
         "Fixed dependency-path compatibility friction."
       ],
-      "releasedAtUtc": 1787866089005
+      "releasedAtUtc": 1788306102982
     },
     {
       "id": "manual-1.3.0-39",
@@ -695,7 +695,7 @@
         "Fixed remote-config application issues on key limits and timing.",
         "Fixed queue integrity mismatch handling to avoid data drops."
       ],
-      "releasedAtUtc": 1787779689005
+      "releasedAtUtc": 1788219702982
     },
     {
       "id": "manual-1.2.7-40",
@@ -722,7 +722,7 @@
         "Fixed multiple reliability edge cases found during hardening.",
         "Fixed several production stability regressions."
       ],
-      "releasedAtUtc": 1787693289005
+      "releasedAtUtc": 1788133302982
     },
     {
       "id": "manual-1.2.3-41",
@@ -743,7 +743,7 @@
       "fixed": [
         "Fixed inconsistent telemetry fields in specific event paths."
       ],
-      "releasedAtUtc": 1787606889005
+      "releasedAtUtc": 1788046902982
     },
     {
       "id": "manual-1.2.2-42",
@@ -764,7 +764,7 @@
       "fixed": [
         "Fixed inconsistent cleanup after cancellation."
       ],
-      "releasedAtUtc": 1787520489005
+      "releasedAtUtc": 1787960502982
     },
     {
       "id": "manual-1.2.1-43",
@@ -785,7 +785,7 @@
       "fixed": [
         "Fixed slow cancel-state reflection edge cases."
       ],
-      "releasedAtUtc": 1787434089005
+      "releasedAtUtc": 1787874102982
     },
     {
       "id": "manual-1.2.0-44",
@@ -806,7 +806,7 @@
       "fixed": [
         "Fixed flow limitations where in-flight operations could not be interrupted."
       ],
-      "releasedAtUtc": 1787347689005
+      "releasedAtUtc": 1787787702982
     },
     {
       "id": "manual-1.1.10-45",
@@ -827,7 +827,7 @@
       "fixed": [
         "Fixed regressions discovered across prolonged usage sessions."
       ],
-      "releasedAtUtc": 1787261289005
+      "releasedAtUtc": 1787701302982
     },
     {
       "id": "manual-1.1.5-46",
@@ -848,7 +848,7 @@
       "fixed": [
         "Fixed minor behavior mismatches in repeated task flows."
       ],
-      "releasedAtUtc": 1787174889005
+      "releasedAtUtc": 1787614902982
     },
     {
       "id": "manual-1.1.1-47",
@@ -869,7 +869,7 @@
       "fixed": [
         "Fixed early 1.1 edge-case runtime failures."
       ],
-      "releasedAtUtc": 1787088489005
+      "releasedAtUtc": 1787528502982
     },
     {
       "id": "manual-1.1.0-48",
@@ -890,7 +890,7 @@
       "fixed": [
         "Fixed packaging and configuration mismatches."
       ],
-      "releasedAtUtc": 1787002089005
+      "releasedAtUtc": 1787442102982
     },
     {
       "id": "manual-1.0.1-49",
@@ -911,7 +911,7 @@
       "fixed": [
         "Fixed first-wave regressions after 1.0.0 rollout."
       ],
-      "releasedAtUtc": 1786915689005
+      "releasedAtUtc": 1787355702982
     },
     {
       "id": "manual-1.0.0-50",
@@ -932,7 +932,7 @@
       "fixed": [
         "Fixed pre-stable blockers before public release."
       ],
-      "releasedAtUtc": 1786829289005
+      "releasedAtUtc": 1787269302982
     }
   ]
 }
