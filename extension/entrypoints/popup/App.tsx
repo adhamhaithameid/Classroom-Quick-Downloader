@@ -1477,14 +1477,44 @@ function App() {
                   Open Google Classroom, then click the extension again from
                   that tab to see your download controls.
                 </p>
+                {/* Direction A main action: the ONE filled element — the
+                    prototype's .cta geometry (icon + title + sub). Same
+                    handler and truthful aria contract as before; the class
+                    cqd-button is dropped so the hero owns its geometry. */}
                 <button
                   type="button"
-                  className="cqd-button cqd-open-classroom-btn"
+                  className="cqd-open-classroom-btn"
                   onClick={handleOpenClassroomClick}
                   aria-label="Open Google Classroom in a new tab"
                   title="Open Google Classroom in a new tab"
                 >
-                  <span>Open Google Classroom</span>
+                  <span className="cqd-cta-icon" aria-hidden="true">
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M8 2v8m0 0 3-3m-3 3L5 7"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M2.5 12.5h11"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </span>
+                  <span className="cqd-cta-text">
+                    <span className="cqd-cta-title">Open Google Classroom</span>
+                    <span className="cqd-cta-sub">Opens in a new tab</span>
+                  </span>
                 </button>
               </div>
             </section>

@@ -11,10 +11,10 @@
   --cqd-border-subtle: #e5e7eb;
   --cqd-text-main: #0f172a;
   --cqd-text-muted: #6b7280;
-  --cqd-radius-xl: 18px;
-  --cqd-shadow-soft: 0 8px 24px rgba(15, 23, 42, 0.08);
-  --cqd-shadow-hover: 0 14px 34px rgba(15, 23, 42, 0.16);
-  --cqd-transition-fast: 180ms cubic-bezier(0.2, 0, 0, 1);
+  --cqd-radius-xl: 14px;
+  --cqd-shadow-soft: 0 2px 8px rgba(15, 23, 42, 0.05);
+  --cqd-shadow-hover: 0 6px 16px rgba(15, 23, 42, 0.1);
+  --cqd-transition-fast: 200ms cubic-bezier(0.22, 1, 0.36, 1);
   --cqd-yellow-bg: #fefce8;
   --cqd-yellow-border: #fde047;
   --cqd-yellow-text: #854d0e;
@@ -82,8 +82,10 @@ html {
 body {
   margin: 0;
   padding: 0;
-  width: 200px;
-  height: 530px;
+  /* The approved direction-A stage (prototypes/popup-direction-a.html):
+     360 x 600, the only size the prototype composes for. */
+  width: 360px;
+  height: 600px;
   background: transparent; /* Crucial for rounded corners effect */
   font-family: var(--cqd-font);
   font-size: var(--cqd-fs-body);
@@ -113,22 +115,29 @@ body {
   overflow: scroll;
 }
 
-/* Scroll area – header sticky, content scrolls */
+/* Scroll area – header sticky, content scrolls. Side padding = the
+   prototype's 16px gutters; the header and footer bands escape it to run
+   their hairlines full-bleed, exactly like .p-head / .p-foot. */
 .cqd-scroll-container {
   flex: 1; /* Takes remaining height */
   display: flex;
   flex-direction: column;
-  padding: 16px 16px 4px;
+  padding: 16px 16px 0;
 }
 
 /* ===============================
  * Header & Branding
  * =============================== */
 
+/* .p-head, light-surface adaptation: full-bleed band, hairline below,
+   nothing louder — chrome recedes so the content leads. */
 .cqd-header {
   position: sticky;
   top: 0;
   z-index: 10;
+  margin: 0 -16px;
+  padding: 4px 16px 10px;
+  border-bottom: 1px solid var(--cqd-border-subtle);
   background: var(--cqd-shell-bg);
   transition:
     background-color 160ms ease,
@@ -152,9 +161,9 @@ body {
 }
 
 .cqd-brand-logo {
-  width: 60px;
-  height: 60px;
-  border-radius: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
   object-fit: contain;
   transition: transform var(--cqd-transition-fast);
 }
@@ -167,8 +176,10 @@ body {
   flex: 1;
 }
 
+/* Quiet chrome: the prototype's brand line is 13px/600 — the CTA's
+   15px/600 stays the loudest text on the surface. */
 .cqd-brand-name {
-  font-size: var(--cqd-fs-title);
+  font-size: var(--cqd-fs-body);
   font-weight: 600;
   letter-spacing: -0.01em;
 }
@@ -316,10 +327,10 @@ body {
  * =============================== */
 
 .cqd-content-area {
-  margin-top: 8px;
+  margin-top: 12px;
   display: flex;
   flex-direction: column;
-  gap: 16px; /* Increased gap for vertical stacking */
+  gap: 12px; /* Stillwater rhythm: 12 — section gaps (4/8 grid) */
   min-height: 0;
 }
 
@@ -354,13 +365,16 @@ body {
   color: var(--cqd-yellow-text);
 }
 
+/* .cta.is-error, light-surface adaptation: the calm error card — same
+   geometry in every state, color + border carry the meaning (role="alert"
+   and the dismiss control are unchanged). */
 .cqd-banner-error {
   flex-direction: row;
   align-items: center;
-  border-radius: 999px;
-  padding: 8px 10px;
-  background-color: #fef2f2;
-  border: 1px solid #fecaca;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, rgba(239, 68, 68, 0.08), rgba(239, 68, 68, 0.04));
+  border: 1px solid rgba(239, 68, 68, 0.45);
   color: #991b1b;
 }
 
@@ -435,9 +449,11 @@ body {
   flex-shrink: 0;
 }
 
+/* Quiet chrome: section titles sit at 13px/600 (body-strong); the only
+   15px/600 on the surface is the hero action's title. */
 .cqd-card-title {
   margin: 0;
-  font-size: var(--cqd-fs-title);
+  font-size: var(--cqd-fs-body);
   font-weight: 600;
   color: var(--cqd-text-main);
 }
@@ -794,18 +810,74 @@ body {
   box-shadow: 0 4px 15px rgba(15, 23, 42, 0.18);
 }
 
-/* Non-Classroom CTA */
+/* ── Main action (direction A ".cta") — the ONE filled element. The
+   non-Classroom hero adopts the prototype's CTA geometry: full-width glass
+   tile, 14px radius, icon + 15px/600 title + 11px sub, hover lifts 1px.
+   Handler, aria-label and title attribute are unchanged. ──────────────── */
 .cqd-open-classroom-btn {
+  all: unset;
+  box-sizing: border-box;
   margin-top: 12px;
   width: 100%;
-  justify-content: center;
-  gap: 8px;
-  border-radius: 999px;
-  background: #0b8043;
-  color: #ffffff;
-  border-color: #0b8043;
-  font-size: var(--cqd-fs-caption);
-  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 14px;
+  border: 1px solid rgba(110, 91, 255, 0.5);
+  background: linear-gradient(180deg, rgba(143, 123, 255, 0.22), rgba(110, 91, 255, 0.14));
+  color: var(--cqd-text-main);
+  box-shadow: 0 4px 20px rgba(110, 91, 255, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  transition:
+    transform var(--cqd-transition-fast),
+    box-shadow var(--cqd-transition-fast),
+    border-color var(--cqd-transition-fast),
+    background var(--cqd-transition-fast);
+}
+
+.cqd-open-classroom-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(143, 123, 255, 0.85);
+  box-shadow: 0 6px 26px rgba(110, 91, 255, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.cqd-open-classroom-btn:active {
+  transform: translateY(0);
+}
+
+.cqd-open-classroom-btn:focus-visible {
+  outline: 2px solid var(--cqd-blue);
+  outline-offset: 2px;
+}
+
+.cqd-cta-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  color: #6e5bff;
+}
+
+.cqd-cta-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.cqd-cta-title {
+  display: block;
+  font-size: var(--cqd-fs-title);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.cqd-cta-sub {
+  display: block;
+  font-size: var(--cqd-fs-micro);
+  font-weight: 400;
+  color: var(--cqd-text-muted);
+  line-height: 1.4;
+  margin-top: 1px;
 }
 
 /* Coffee Button */
@@ -951,10 +1023,13 @@ body {
  * Footer – always visible
  * =============================== */
 
+/* .p-foot, light-surface adaptation: the second translucent layer — a
+   full-bleed band under a hairline; content above stays one surface. */
 .cqd-footer {
-  margin-top: 4px;
-  padding: 8px 0 10px;
+  margin: 12px -16px 0;
+  padding: 10px 16px 12px;
   border-top: 1px solid var(--cqd-border-subtle);
+  background: rgba(15, 23, 42, 0.03);
   text-align: center;
 }
 
@@ -2121,7 +2196,14 @@ body {
   justify-content: space-between;
   margin-bottom: 8px;
 }
-.cqd-queue-title { font-size: var(--cqd-fs-caption); font-weight: 600; opacity: 0.85; }
+/* .p-label, light-surface adaptation: 11px/600 uppercase micro label. */
+.cqd-queue-title {
+  font-size: var(--cqd-fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cqd-text-muted);
+}
 .cqd-queue-pause-btn {
   font-size: var(--cqd-fs-micro);
   padding: 3px 10px;
@@ -2131,11 +2213,23 @@ body {
   cursor: pointer;
 }
 .cqd-queue-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+/* .h-row, light-surface adaptation: quiet bordered row tiles. */
 .cqd-queue-row {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: var(--cqd-fs-caption);
+  border: 1px solid var(--cqd-border-subtle);
+  border-radius: 12px;
+  background: var(--cqd-surface);
+  padding: 6px 10px;
+  transition:
+    border-color var(--cqd-transition-fast),
+    background var(--cqd-transition-fast);
+}
+.cqd-queue-row:hover {
+  border-color: rgba(15, 23, 42, 0.18);
+  background: #ffffff;
 }
 .cqd-queue-state {
   font-size: var(--cqd-fs-micro);
@@ -2162,7 +2256,8 @@ body {
 }
 .cqd-queue-cancel:hover { opacity: 1; }
 
-/* ── History panel (0h4d.1.6) ───────────────────────────────────────────── */
+/* ── History panel (0h4d.1.6) — direction A: history is ambient. Rows are
+   the prototype's bordered h-rows; the title is a .p-label micro label. ── */
 .cqd-card-history { padding: 12px 14px; }
 .cqd-history-head {
   display: flex;
@@ -2170,7 +2265,14 @@ body {
   justify-content: space-between;
   margin-bottom: 8px;
 }
-.cqd-history-title { font-size: var(--cqd-fs-caption); font-weight: 600; opacity: 0.85; }
+/* .p-label, light-surface adaptation. */
+.cqd-history-title {
+  font-size: var(--cqd-fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cqd-text-muted);
+}
 .cqd-history-clear {
   font-size: var(--cqd-fs-micro);
   padding: 3px 10px;
@@ -2184,26 +2286,39 @@ body {
   font-size: var(--cqd-fs-caption);
   padding: 5px 8px;
   margin-bottom: 8px;
-  border-radius: 8px;
-  border: 1px solid rgba(0, 0, 0, 0.15);
-  background: transparent;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: var(--cqd-surface);
 }
 .cqd-history-empty { font-size: var(--cqd-fs-caption); opacity: 0.6; padding: 4px 0; }
 .cqd-history-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+/* .h-row, light-surface adaptation: bordered tile, hairline deepens on hover. */
 .cqd-history-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   font-size: var(--cqd-fs-caption);
+  border: 1px solid var(--cqd-border-subtle);
+  border-radius: 12px;
+  background: var(--cqd-surface);
+  padding: 8px 12px;
+  transition:
+    border-color var(--cqd-transition-fast),
+    background var(--cqd-transition-fast);
 }
+.cqd-history-row:hover {
+  border-color: rgba(15, 23, 42, 0.18);
+  background: #ffffff;
+}
+/* .h-ic, light-surface adaptation: 26px rounded status tile. */
 .cqd-history-state {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--cqd-fs-micro);
+  font-size: var(--cqd-fs-caption);
   flex: none;
 }
 .cqd-history-state-ok { background: rgba(52, 168, 83, 0.16); color: #1e7a34; }
@@ -2213,6 +2328,7 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 500;
 }
 .cqd-history-date { font-size: var(--cqd-fs-micro); opacity: 0.55; white-space: nowrap; }
 .cqd-history-redownload {
@@ -2221,10 +2337,22 @@ body {
   cursor: pointer;
   font-size: var(--cqd-fs-body);
   line-height: 1;
-  padding: 2px 4px;
+  padding: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
   opacity: 0.6;
+  transition: opacity var(--cqd-transition-fast), background-color var(--cqd-transition-fast);
 }
-.cqd-history-redownload:hover { opacity: 1; }
+.cqd-history-redownload:hover { opacity: 1; background-color: rgba(15, 23, 42, 0.06); }
+.cqd-history-redownload:focus-visible {
+  outline: 2px solid var(--cqd-blue);
+  outline-offset: 1px;
+}
 
 /* ── Options link (0h4d.1.8) ────────────────────────────────────────────── */
 .cqd-settings-options-link {
