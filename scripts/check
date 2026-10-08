@@ -121,6 +121,7 @@ ws_website=()
 ws_cfw=()
 ws_oracle=()
 ws_tools=()
+ws_scripts=()
 while IFS= read -r f; do
   [ -n "$f" ] || continue
   case $f in
@@ -129,7 +130,8 @@ while IFS= read -r f; do
     cloudflare-worker/*) ws_cfw+=("$f"); declared=1 ;;
     oracle-backend/*) ws_oracle+=("$f"); declared=1 ;;
     tools/*.test.mjs) ws_tools+=("$f"); declared=1 ;;
-    *) : ;; # docs, root config, .github, scripts/, non-test tools: nothing to run
+    scripts/*.test.mjs) ws_scripts+=("$f"); declared=1 ;;
+    *) : ;; # docs, root config, .github, non-test scripts/tools: nothing to run
   esac
 done <<<"$files"
 
@@ -143,4 +145,5 @@ fi
 [ "${#ws_cfw[@]}" -gt 0 ] && verify_ws cloudflare-worker ${ws_cfw[@]+"${ws_cfw[@]}"}
 [ "${#ws_oracle[@]}" -gt 0 ] && verify_ws oracle-backend ${ws_oracle[@]+"${ws_oracle[@]}"}
 [ "${#ws_tools[@]}" -gt 0 ] && verify_ws tools ${ws_tools[@]+"${ws_tools[@]}"}
+[ "${#ws_scripts[@]}" -gt 0 ] && run "scripts:test" node --test ${ws_scripts[@]+"${ws_scripts[@]}"}
 echo "ok"
