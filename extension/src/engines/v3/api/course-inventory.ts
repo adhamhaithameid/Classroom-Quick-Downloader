@@ -1,7 +1,7 @@
 // filepath: extension/src/engines/v3/api/course-inventory.ts
 /**
  * ============================================================================
- * COURSE INVENTORY — the enumeration behind "Download All Classroom" (csaa.6)
+ * COURSE INVENTORY — the enumeration behind "Download Classroom" (csaa.6)
  * ============================================================================
  *
  * One entry point for "every downloadable file in this course": the client's
