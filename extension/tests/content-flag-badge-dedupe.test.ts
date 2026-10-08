@@ -217,7 +217,7 @@ describe('edited_frame: one edited badge per post across combined toggle cycles'
 
     // One click handler total and one accessible label total, even though
     // every cycle re-created the badge after an attribute-clearing refresh.
-    post.querySelectorAll('.cqd-edited-badge').forEach((badge) => badge.click());
+    post.querySelectorAll<HTMLElement>('.cqd-edited-badge').forEach((badge) => badge.click());
     expect(counters.editedBadgeClicks).toBe(1);
     expect(post.querySelectorAll('[aria-label="edited"]')).toHaveLength(1);
 
@@ -289,7 +289,7 @@ describe('comment_frame: one comment pill per post across combined toggle cycles
     // Pinning check: the surviving merged pill carries exactly one handler
     // and one accessible label across all cycles.
     toggleCombined(messageListeners, false);
-    post.querySelectorAll('.cqd-comment-badge').forEach((badge) => badge.click());
+    post.querySelectorAll<HTMLElement>('.cqd-comment-badge').forEach((badge) => badge.click());
     expect(counters.commentBadgeClicks).toBe(1);
     expect(post.querySelectorAll('[aria-label="3 comments"]')).toHaveLength(1);
 
