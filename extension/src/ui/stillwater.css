@@ -3,11 +3,13 @@
  * Stillwater shared foundation — ONE copy for every CQD page surface.
  *
  * The token block, the universal box-sizing reset, the global focus ring and
- * the reduce-motion collapse moved here verbatim from entrypoints/popup/
- * App.css when the options page got its own sheet (D4 follow-up q320):
- * importing popup/App.css wholesale would impose the 360 x 600 popup stage
- * on the options document. Surface rules stay with their entrypoint — popup
- * rules in entrypoints/popup/App.css, options rules in
+ * the reduce-motion collapse are adapted from the popup Stillwater tokens in
+ * entrypoints/popup/App.css when the options page got its own sheet (D4
+ * follow-up q320): importing popup/App.css wholesale would impose the
+ * 360 x 600 popup stage on the options document. Card radius (18px to 14px),
+ * shadow and easing (180ms to 200ms) are updated for the shared surface.
+ * Surface rules stay with their entrypoint — popup rules in
+ * entrypoints/popup/App.css, options rules in
  * entrypoints/options/options.css. Each entry imports this sheet first.
  * ========================================================================== */
 

@@ -101,7 +101,7 @@ describe('stillwater popup frame (App.css)', () => {
     expect(footer).toContain('background:');
   });
 
-  it('motion settles on the approved curve everywhere (one easing, 200ms)', () => {
+  it('declares the shared stillwater easing token', () => {
     expect(tokens).toContain('--cqd-transition-fast: 200ms cubic-bezier(0.22, 1, 0.36, 1);');
   });
 });
