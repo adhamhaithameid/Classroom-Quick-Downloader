@@ -78,6 +78,9 @@ function installed(files: Array<{ driveId: string; title: string; downloadUrl: s
     setTimeoutFn: timers.setTimeoutFn as unknown as typeof setTimeout,
     clearTimeoutFn: timers.clearTimeoutFn as unknown as typeof clearTimeout,
     createInventory: () => makeInventory(files),
+    // These tests exercise the download flow, not the one-time copyright
+    // gate (tests/classroom-copyright-gate.test.ts covers the real gate).
+    copyrightGate: async () => true,
   });
   return { timers, ...bus, uninstall };
 }

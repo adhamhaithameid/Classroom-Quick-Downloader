@@ -362,6 +362,10 @@ function App() {
   // S13: read once — the manifest's identity/oauth2 setup does not change
   // while the popup is open (a reload picks up a redelivered manifest).
   const [apiConfigured] = useState(isApiConfigured);
+  // Legal round 2, surface 03 T2: the API-beta confirm card. Open while the
+  // user's first v3 pick awaits confirmation; the segment stays on the
+  // previous engine the whole time.
+  const [apiConfirmOpen, setApiConfirmOpen] = useState(false);
 
   // COLLAPSIBLE SETTINGS STATE (persisted)
   const [settingsCollapsed, setSettingsCollapsed] = useState(true);
@@ -790,7 +794,23 @@ function App() {
   }, []);
 
   function handleEngineModeSelect(nextMode: 'legacy' | 'v2' | 'v3') {
+    // Any engine decision closes the confirm card first (surface 03 T2:
+    // picking another engine while the card is open is a decline + switch).
+    if (apiConfirmOpen) setApiConfirmOpen(false);
+    // Legal round 2, surface 03 Treatment 2: the FIRST API (beta) pick opens
+    // the confirm card — the three facts as choices, with the way back named.
+    // The previous engine stays selected until the user confirms; later picks
+    // (apiBetaConfirmed persisted) skip the card.
+    if (nextMode === 'v3' && !settings?.apiBetaConfirmed) {
+      setApiConfirmOpen(true);
+      return;
+    }
     if (nextMode === engineMode) return;
+    commitEngineMode(nextMode);
+  }
+
+  /** The shared persistence + live-switch path for an engine decision. */
+  function commitEngineMode(nextMode: 'legacy' | 'v2' | 'v3') {
     setEngineMode(nextMode);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const browserApi = (globalThis as any).chrome;
@@ -805,6 +825,22 @@ function App() {
         }
       });
     }
+  }
+
+  /** Confirm on the API-beta card: persist the flat consent key, then run
+   *  the v3 switch the user asked for (legal round 2, surface 03 T2). */
+  function handleApiBetaConfirm() {
+    setApiConfirmOpen(false);
+    if (settings) {
+      setSettings({ ...settings, apiBetaConfirmed: true });
+    }
+    void saveSetting('apiBetaConfirmed', true);
+    commitEngineMode('v3');
+  }
+
+  /** Decline (Stay on New): close the card; the selection never moved. */
+  function handleApiBetaDecline() {
+    setApiConfirmOpen(false);
   }
 
   function handleOpenClassroomClick() {
@@ -1442,6 +1478,40 @@ function App() {
                             apiConfigured={apiConfigured}
                             onSelect={handleEngineModeSelect}
                           />
+                          {/* Legal round 2, surface 03 Treatment 2
+                              (legal-round2.html .confirm, ask state): one
+                              explicit "try it" with the way back shown first.
+                              Copy verbatim from the approved prototype;
+                              hardcoded English per popup convention. */}
+                          {apiConfirmOpen && (
+                            <div className="cqd-api-confirm" role="group" aria-label="Before you switch to the beta">
+                              <h5>Before you switch to the beta</h5>
+                              <ul>
+                                <li>Google asks for permission on Google's own screen.</li>
+                                <li>
+                                  Your sign-in is used only while you run a
+                                  beta download — never in the background.
+                                </li>
+                                <li>One click returns you to New at any time.</li>
+                              </ul>
+                              <div className="cqd-api-confirm-actions">
+                                <button
+                                  type="button"
+                                  className="cqd-api-confirm-stay"
+                                  onClick={handleApiBetaDecline}
+                                >
+                                  Stay on New
+                                </button>
+                                <button
+                                  type="button"
+                                  className="cqd-api-confirm-try"
+                                  onClick={handleApiBetaConfirm}
+                                >
+                                  Try the beta
+                                </button>
+                              </div>
+                            </div>
+                          )}
                           <div className="cqd-settings-section-note">
                             New runs the rewritten engine. Switch back to Legacy any time — one
                             click rolls everything back.

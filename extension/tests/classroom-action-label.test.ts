@@ -81,6 +81,9 @@ function installed(files: Array<{ driveId: string; title: string; downloadUrl: s
           files ? { fetchedAt: 1, courseId: 'COURSE_1', files } : null),
         clear: vi.fn(),
       }) as unknown as CourseInventoryService,
+    // Action-label tests exercise the button copy, not the one-time
+    // copyright gate (tests/classroom-copyright-gate.test.ts covers it).
+    copyrightGate: async () => true,
   });
   return { timers, uninstall };
 }

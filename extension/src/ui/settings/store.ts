@@ -24,7 +24,16 @@ export type SettingsKey =
   | 'commentsFlagEnabled'
   | 'editedFlagEnabled'
   | 'combinedFlagEnabled'
-  | 'reducedMotionPreferred';
+  | 'reducedMotionPreferred'
+  // Legal round 2 consent moments (legal-round2.html, owner-approved):
+  // apiBetaConfirmed — the API (beta) confirm card shows on the first v3
+  //   pick until the user confirms once (popup seam).
+  // copyrightReminderAcknowledged — the one-time copyright dialog gates the
+  //   first classroom-wide run (classroom-download-controller seam).
+  // Both stay FLAT like every other key; both are opt-in moments, so the
+  // defaults are false and garbage never coerces them open.
+  | 'apiBetaConfirmed'
+  | 'copyrightReminderAcknowledged';
 
 export type Settings = Record<SettingsKey, boolean>;
 
@@ -35,6 +44,8 @@ export const SETTINGS_KEYS: readonly SettingsKey[] = [
   'editedFlagEnabled',
   'combinedFlagEnabled',
   'reducedMotionPreferred',
+  'apiBetaConfirmed',
+  'copyrightReminderAcknowledged',
 ];
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -46,6 +57,10 @@ export const DEFAULT_SETTINGS: Settings = {
   // Opt-IN (Stillwater, audit finding 9): motion stays on unless the user
   // asks for calm. Every other key is on-unless-explicitly-false.
   reducedMotionPreferred: false,
+  // Consent moments default CLOSED: the confirm card and the copyright
+  // dialog show until the user acts (legal round 2, surfaces 03 T2 / 04 T1).
+  apiBetaConfirmed: false,
+  copyrightReminderAcknowledged: false,
 };
 
 export const SETTINGS_SCHEMA_VERSION = 2;

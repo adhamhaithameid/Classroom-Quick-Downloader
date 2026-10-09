@@ -125,6 +125,9 @@ function installedWith(inner: ReturnType<typeof makeInner>) {
     setTimeoutFn: timers.setTimeoutFn as unknown as typeof setTimeout,
     clearTimeoutFn: timers.clearTimeoutFn as unknown as typeof clearTimeout,
     createTokenProvider: () => wrapper,
+    // Consent-fallback tests exercise the token path, not the one-time
+    // copyright gate (tests/classroom-copyright-gate.test.ts covers it).
+    copyrightGate: async () => true,
   });
   return { timers, published, inner, uninstall };
 }

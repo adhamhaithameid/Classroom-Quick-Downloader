@@ -48,8 +48,10 @@ describe('settings store (0h4d.1.8)', () => {
 
   it('exposes the flat keys (compat: content scripts read them directly)', () => {
     expect([...SETTINGS_KEYS].sort()).toEqual([
+      'apiBetaConfirmed',
       'combinedFlagEnabled',
       'commentsFlagEnabled',
+      'copyrightReminderAcknowledged',
       'downloadAllEnabled',
       'editedFlagEnabled',
       'extensionEnabled',
@@ -62,7 +64,33 @@ describe('settings store (0h4d.1.8)', () => {
       editedFlagEnabled: true,
       combinedFlagEnabled: true,
       reducedMotionPreferred: false,
+      apiBetaConfirmed: false,
+      copyrightReminderAcknowledged: false,
     });
+  });
+
+  it('legal gate keys default to false — both consent moments are opt-in (legal round 2)', async () => {
+    // apiBetaConfirmed: the API (beta) confirm card shows until the user
+    // confirms once (legal-round2.html surface 03 T2).
+    // copyrightReminderAcknowledged: the one-time copyright dialog gates the
+    // first classroom-wide run (legal-round2.html surface 04 T1).
+    installStorage();
+    const settings = await loadSettings();
+    expect(settings.apiBetaConfirmed).toBe(false);
+    expect(settings.copyrightReminderAcknowledged).toBe(false);
+    // Garbage never coerces a gate open.
+    const { settings: migrated } = migrateRawSettings({
+      apiBetaConfirmed: 'garbage',
+      copyrightReminderAcknowledged: 42,
+    });
+    expect(migrated.apiBetaConfirmed).toBe(false);
+    expect(migrated.copyrightReminderAcknowledged).toBe(false);
+    // And a save round-trips through the flat key.
+    await saveSetting('apiBetaConfirmed', true);
+    await saveSetting('copyrightReminderAcknowledged', true);
+    const after = await loadSettings();
+    expect(after.apiBetaConfirmed).toBe(true);
+    expect(after.copyrightReminderAcknowledged).toBe(true);
   });
 
   it('reducedMotionPreferred defaults to false — opt-IN, unlike the five on-by-default keys', async () => {
@@ -85,6 +113,8 @@ describe('settings store (0h4d.1.8)', () => {
     expect(migrationWrites!.editedFlagEnabled).toBe(true);
     expect(migrationWrites!.combinedFlagEnabled).toBe(true);
     expect(migrationWrites!.reducedMotionPreferred).toBe(false);
+    expect(migrationWrites!.apiBetaConfirmed).toBe(false);
+    expect(migrationWrites!.copyrightReminderAcknowledged).toBe(false);
   });
 
   it('migrateRawSettings passes a complete v2 payload through without writes', () => {
@@ -95,12 +125,16 @@ describe('settings store (0h4d.1.8)', () => {
       editedFlagEnabled: true,
       combinedFlagEnabled: false,
       reducedMotionPreferred: true,
+      apiBetaConfirmed: true,
+      copyrightReminderAcknowledged: true,
       cqdSettingsSchemaVersion: 2,
     };
     const { settings, migrationWrites } = migrateRawSettings(full);
     expect(settings.extensionEnabled).toBe(false);
     expect(settings.combinedFlagEnabled).toBe(false);
     expect(settings.reducedMotionPreferred).toBe(true);
+    expect(settings.apiBetaConfirmed).toBe(true);
+    expect(settings.copyrightReminderAcknowledged).toBe(true);
     expect(migrationWrites).toBeNull();
   });
 
