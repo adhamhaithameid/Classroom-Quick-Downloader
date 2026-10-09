@@ -90,8 +90,23 @@ export function ControlPanel({
     notifyFixtureChanged();
   }
 
-  function setHistory(kind: 'empty' | 'mixed') {
-    current.historyRows = kind === 'empty' ? [] : historyRowsFixtureHelpers.mixed();
+  function setHistory(kind: 'empty' | 'mixed' | 'failed' | 'corrupt' | 'readfail') {
+    if (kind === 'empty') {
+      current.historyRows = [];
+      current.historyFails = false;
+    } else if (kind === 'mixed') {
+      current.historyRows = historyRowsFixtureHelpers.mixed();
+      current.historyFails = false;
+    } else if (kind === 'failed') {
+      current.historyRows = historyRowsFixtureHelpers.failed();
+      current.historyFails = false;
+    } else if (kind === 'corrupt') {
+      current.historyRows = [historyRowsFixtureHelpers.corrupt()];
+      current.historyFails = false;
+    } else {
+      current.historyRows = [];
+      current.historyFails = true;
+    }
     notifyFixtureChanged();
     onRemount(); // the popup refetches history only on query changes
   }
@@ -234,6 +249,17 @@ export function ControlPanel({
           </button>
           <button type="button" onClick={() => setHistory('mixed')}>
             populated
+          </button>
+          <button type="button" onClick={() => setHistory('failed')}>
+            failed rows
+          </button>
+        </div>
+        <div className="sim-row">
+          <button type="button" onClick={() => setHistory('corrupt')}>
+            corrupt record
+          </button>
+          <button type="button" onClick={() => setHistory('readfail')}>
+            read fails
           </button>
         </div>
       </fieldset>

@@ -4,6 +4,7 @@ import { installFixtureChrome } from './fixtures/fixture-chrome';
 import { getPopupState } from './fixtures/states';
 import { parseHash, type Route } from './hash';
 import { MapRoute } from './routes/MapRoute';
+import { OptionsRoute } from './routes/OptionsRoute';
 import { PopupRoute } from './routes/PopupRoute';
 import './styles.css';
 
@@ -33,9 +34,21 @@ function Root() {
           >
             Popup
           </a>
+          <a
+            href="#options=permissions"
+            aria-current={route.kind === 'options' ? 'page' : undefined}
+          >
+            Options
+          </a>
         </nav>
       </header>
-      {route.kind === 'popup' ? <PopupRoute stateId={route.stateId} /> : <MapRoute />}
+      {route.kind === 'popup' ? (
+        <PopupRoute stateId={route.stateId} />
+      ) : route.kind === 'options' ? (
+        <OptionsRoute stateId={route.stateId} />
+      ) : (
+        <MapRoute />
+      )}
     </>
   );
 }
@@ -54,5 +67,4 @@ function main() {
     </StrictMode>,
   );
 }
-
 main();

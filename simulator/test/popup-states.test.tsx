@@ -109,4 +109,54 @@ describe('simulator route A — real popup App', () => {
     expect(el.querySelector('.cqd-open-classroom-btn')).not.toBeNull();
     expect(el.querySelector('.cqd-card-analytics')).toBeNull();
   });
+
+  it('changelog fetch fails: the error line and Retry render in the overlay', async () => {
+    const el = await renderApp({ ...firstRunFixture(), changelog: 'fail' });
+    // Open the changelog through the REAL version button.
+    await act(async () => {
+      el.querySelector<HTMLButtonElement>('.cqd-brand-version')?.click();
+      await tick(50);
+    });
+    const state = el.querySelector('.cqd-cl-state-error');
+    expect(state).not.toBeNull();
+    expect(state?.textContent).toContain('Simulator: the changelog fetch failed.');
+    expect(el.querySelector('.cqd-cl-retry-btn')).not.toBeNull();
+  });
+
+  it('engine API gated: the beta segment is disabled with the setup tooltip', async () => {
+    const el = await renderApp(firstRunFixture());
+    const api = el.querySelector<HTMLButtonElement>('button[data-mode="v3"]');
+    expect(api).not.toBeNull();
+    expect(api!.disabled).toBe(true);
+    expect(api!.getAttribute('title')).toContain('Requires OAuth setup');
+  });
+
+  it('history corrupt record: renders without crashing', async () => {
+    const el = await renderApp({
+      ...firstRunFixture(),
+      historyRows: [historyRowsFixtureHelpers.corrupt()],
+    });
+    const list = el.querySelector('.cqd-history-list');
+    expect(list).not.toBeNull();
+    expect(list!.textContent).toContain('Invalid Date');
+  });
+
+  it('options route: the real options page mounts with permissions rows', async () => {
+    installFixtureChrome(firstRunFixture());
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    const { OptionsApp } = await import('../../extension/entrypoints/options/OptionsApp');
+    await act(async () => {
+      root = createRoot(container!);
+      root.render(<OptionsApp />);
+    });
+    await act(async () => {
+      await tick(50);
+    });
+    expect(container!.querySelector('.cqd-options')).not.toBeNull();
+    expect(container!.textContent).toContain('Settings apply immediately');
+    // The standing Permissions reference renders its rows on this surface.
+    expect(container!.querySelector('.cqd-options-perms')?.textContent).toContain('Permissions');
+    expect(container!.querySelectorAll('.cqd-perm-row').length).toBeGreaterThan(0);
+  });
 });
