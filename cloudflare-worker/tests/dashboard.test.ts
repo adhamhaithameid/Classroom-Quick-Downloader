@@ -337,7 +337,7 @@ describe("Dashboard card search", () => {
   it("marks every filterable card with data-card", () => {
     const html = renderDashboard(makeStats());
     const count = (html.match(/data-card>/g) || []).length;
-    expect(count).toBe(13);
+    expect(count).toBe(14);
     for (const id of ["overview", "pipeline-health", "breakdown", "raw-pipeline-health", "danger"]) {
       expect(html).toContain(`id="${id}" data-card>`);
     }
@@ -348,5 +348,48 @@ describe("Dashboard card search", () => {
     expect(html).toContain("setTimeout(applyCardSearch, 150)");
     expect(html).toContain("main section[data-card]");
     expect(html).toContain("body.classList.toggle('searching'");
+  });
+});
+
+describe("Dashboard uptime card", () => {
+  it("renders an honest zero state before the first check", () => {
+    const html = renderDashboard(makeStats());
+    expect(html).toContain('id="uptime"');
+    expect(html).toContain("First check pending");
+    expect(html).toContain("No checks recorded");
+    expect(html).toContain("/uptime-ping");
+  });
+
+  it("renders 24h and 7d uptime plus last check when populated", () => {
+    const html = renderDashboard(makeStats(), undefined, {
+      uptime: {
+        lastCheck: { timestamp: 1770000000000, ok: false, latencyMs: 812 },
+        uptime24h: 99.3,
+        uptime7d: 98.7,
+        checks24h: 288,
+        checks7d: 1679,
+        consecutiveFailures: 2,
+      },
+    });
+    expect(html).toContain("99.3%");
+    expect(html).toContain("98.7%");
+    expect(html).toContain("288 checks");
+    expect(html).toContain("1679 checks");
+    expect(html).toContain("consecutive failures: 2");
+    expect(html).toContain("fail");
+  });
+
+  it("embeds the shared admin JSON island with the uptime bundle", () => {
+    const html = renderDashboard(makeStats(), "nonce123", {
+      uptime: { uptime24h: 100, uptime7d: null, checks24h: 1, checks7d: 0, consecutiveFailures: 0, lastCheck: null },
+      generatedAt: 1770000000000,
+    });
+    expect(html).toContain('window.ADMIN_DATA = {"uptime":{"uptime24h":100,"uptime7d":null,"checks24h":1,"checks7d":0,"consecutiveFailures":0,"lastCheck":null},"generatedAt":1770000000000};');
+  });
+
+  it("escapes script-breaking characters in the admin JSON island", () => {
+    const html = renderDashboard(makeStats(), "nonce123<script>", { generatedAt: 1 });
+    expect(html).toContain("window.ADMIN_DATA");
+    expect(html).not.toContain("nonce123<script>");
   });
 });

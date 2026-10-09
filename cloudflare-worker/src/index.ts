@@ -17,6 +17,7 @@ import {
 import type { StoreHealthDoc } from "./store-stats";
 import { fetchStoreReviews, mergeStoreReviews } from "./store-reviews";
 import type { StoreReview, StoreReviewsSnapshot } from "./store-reviews";
+import { readUptimeSummary, runUptimeSelfCheck, UPTIME_PING_PATH } from "./uptime";
 import type { Env as WorkerEnv, StatsResponse } from "./types";
 
 type WorkerLogLevel = "info" | "warn" | "error";
@@ -582,6 +583,7 @@ function isPublicCorsRoute(pathname: string): boolean {
   return (
     pathname === "/config" ||
     pathname === "/health" ||
+    pathname === UPTIME_PING_PATH ||
     pathname === "/pipeline-health" ||
     pathname === "/public/site-metrics" ||
     pathname === "/changelog" ||
@@ -1231,8 +1233,14 @@ async function handleDashboard(request: Request, env: WorkerEnv): Promise<Respon
       { status: 500 }
     );
   }
+  // Shared admin JSON: one bundle every card reads from (uptime, and later
+  // slices reuse this seam). No per-card fetching anywhere.
+  const adminData = {
+    uptime: await readUptimeSummary(env),
+    generatedAt: Date.now(),
+  };
   const nonce = generateCspNonce();
-  const html = renderDashboard(stats, nonce);
+  const html = renderDashboard(stats, nonce, adminData);
 
   return new Response(html, {
     status: 200,
@@ -3251,10 +3259,19 @@ export default {
     }
     if (
       (pathname === "/health" && request.method === "GET") ||
+      (pathname === UPTIME_PING_PATH && request.method === "GET") ||
       (pathname === "/pipeline-health" && request.method === "GET") ||
       (pathname === "/changelog" && request.method === "GET") ||
       (pathname === "/track" && request.method === "POST")
     ) {
+      if (pathname === UPTIME_PING_PATH) {
+        // Lightweight worker-only liveness probe for the 5-minute uptime
+        // self-check. Never cached: a cached hit would fake the latency.
+        return new Response(JSON.stringify({ ok: true, ts: Date.now() }), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+        });
+      }
       return proxyToDO(request, env);
     }
     if (pathname === "/public/site-metrics" && request.method === "GET") {
@@ -3302,6 +3319,14 @@ export default {
   async scheduled(controller: ScheduledController, env: WorkerEnv, _ctx: ExecutionContext): Promise<void> {
     const now = controller.scheduledTime || Date.now();
     const hour = currentHourUtc(now);
+
+    // Free plan allows 5 cron triggers; the worker uses exactly two.
+    // "*/5 * * * *" exists only for the uptime self-check — dispatch on
+    // controller.cron so the hourly jobs below keep their original cadence.
+    if (controller.cron === "*/5 * * * *") {
+      await runUptimeSelfCheck(env, now);
+      return;
+    }
 
     // Refresh the KV-backed /config snapshot on every tick (best effort) so
     // extension polls are served from the edge instead of the DO.

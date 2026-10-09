@@ -1,6 +1,18 @@
 // filepath: cloudflare-worker/src/dashboard/main.ts
 import type { StatsResponse, QuotaDescriptor, ChangelogEntry, ChangelogConfig } from "../types";
 import { FAVICON_PNG_DATA_URI } from "../assets";
+import type { UptimeSummary } from "../uptime";
+import { UPTIME_PING_PATH } from "../uptime";
+
+/**
+ * Shared admin JSON bundle: worker-side data that is not part of the DO
+ * /stats payload. Rendered once per dashboard load into window.ADMIN_DATA;
+ * cards read from this bundle instead of fetching per card.
+ */
+export interface DashboardAdminData {
+  uptime?: UptimeSummary | null;
+  generatedAt?: number;
+}
 
 function escapeHtml(unsafe: string): string {
   return unsafe
@@ -624,11 +636,27 @@ function renderReleaseManagementSection(entries: ChangelogEntry[], config: Chang
 }
 // LEGACY_CHANGELOG_DISABLED_END
 
-export function renderDashboard(stats: StatsResponse, scriptNonce?: string): string {
+export function renderDashboard(stats: StatsResponse, scriptNonce?: string, adminData: DashboardAdminData = {}): string {
   const scriptAttr = scriptNonce ? ` nonce="${escapeHtml(scriptNonce)}"` : "";
   const quota = stats.quota;
   const stateTag = quotaToStateTag(quota);
   const flag = quotaToFlag(quota);
+
+  // Uptime card inputs (honest zero state when no check has run yet).
+  const uptime = adminData.uptime ?? null;
+  const uptimeLastCheck = uptime?.lastCheck ?? null;
+  const uptimePercent = (value: number | null | undefined): string =>
+    typeof value === "number" ? `${value.toFixed(1)}%` : "—";
+  const uptimeDotColor = uptimeLastCheck
+    ? uptimeLastCheck.ok
+      ? "var(--success)"
+      : "var(--danger)"
+    : "var(--text-disabled)";
+  const uptimeStatusLabel = uptimeLastCheck
+    ? uptimeLastCheck.ok
+      ? "ok"
+      : "fail"
+    : "no checks yet";
 
   const requestsToday = quota?.requestsToday ?? 0;
   const remoteEnabled = quota?.remoteEnabled ?? true;
@@ -3341,6 +3369,35 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
           </div>
         </div>
       </section>
+      <section class="card" id="uptime" data-card>
+        <h2>Uptime</h2>
+        <div class="section-subtitle">
+          Worker self-check every 5 minutes against <code>${escapeHtml(UPTIME_PING_PATH)}</code>.
+          ${uptimeLastCheck
+            ? `Last check ${escapeHtml(formatTs(uptimeLastCheck.timestamp))} UTC · <span style="display:inline-block;width:8px;height:8px;border-radius:999px;background:${uptimeDotColor};"></span> ${escapeHtml(uptimeStatusLabel)} · ${Math.max(0, Math.round(uptimeLastCheck.latencyMs))}ms`
+            : "First check pending — the history fills in over the next 24 hours."}
+        </div>
+        <div class="grid-3">
+          <div class="metric" id="uptime-24h" data-tooltip="Share of successful self-checks in the last 24h (5-minute ring).">
+            <div class="metric-label">Uptime (24h)</div>
+            <div class="metric-value" style="color:var(--success)">${uptimePercent(uptime?.uptime24h)}</div>
+            <div class="metric-sub">${uptime ? `${uptime.checks24h} checks` : "No checks recorded"}</div>
+          </div>
+          <div class="metric" id="uptime-7d" data-tooltip="Share of successful self-checks over the last 7 days (hourly rollups).">
+            <div class="metric-label">Uptime (7d)</div>
+            <div class="metric-value" style="color:var(--success)">${uptimePercent(uptime?.uptime7d)}</div>
+            <div class="metric-sub">${uptime ? `${uptime.checks7d} checks` : "No checks recorded"}</div>
+          </div>
+          <div class="metric" id="uptime-last" data-tooltip="Result of the most recent self-check.">
+            <div class="metric-label">Last check</div>
+            <div class="metric-value">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:999px;background:${uptimeDotColor};margin-right:6px;"></span>
+              <span style="font-size:0.9rem;">${escapeHtml(uptimeStatusLabel)}</span>
+            </div>
+            <div class="metric-sub">${uptimeLastCheck ? `consecutive failures: ${uptime?.consecutiveFailures ?? 0}` : "Waiting for the first cron run"}</div>
+          </div>
+        </div>
+      </section>
       </div>
       <div class="tab-panel" id="panel-breakdown" role="tabpanel" aria-labelledby="tab-breakdown" data-panel="breakdown" hidden>
       <section class="card" id="breakdown" data-card>
@@ -4355,6 +4412,8 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
       </div>
     </div>
   </div>
+
+  <script${scriptAttr}>window.ADMIN_DATA = ${safeJson(adminData)};</script>
 
   <script${scriptAttr}>
     (function () {
