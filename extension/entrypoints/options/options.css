@@ -146,8 +146,7 @@ body {
 
 /* Legal round 2, surface 05 Treatment 1 (legal-round2.html .opt-block +
    .lu-line): the Limited Use two-line block. The plain line is body-dim; the
-   exact Chrome Web Store sentence sits under it as the legal footnote step. */
-.cqd-options-lu {
+   exact Chrome Web Store sentence sits under it as the legal footnote step. */.cqd-options-lu {
   margin-top: 14px;
   border: 1px solid var(--cqd-border-subtle);
   border-radius: 12px;
@@ -176,6 +175,126 @@ body {
   border-left: 2px solid var(--cqd-blue);
   padding-left: 10px;
   opacity: 0.85;
+}
+
+/* Legal round 2, surface 02 Treatment 2 (legal-round2.html .acc-row): the
+   standing Permissions reference. Rows are full-width button heads (icon +
+   name + mechanism in faint type + chevron); bodies expand on tap. */
+.cqd-options-perms {
+  margin-top: 14px;
+  border: 1px solid var(--cqd-border-subtle);
+  border-radius: 12px;
+  background: var(--cqd-surface);
+  padding: 6px 0;
+}
+
+.cqd-options-perms-title {
+  font-size: var(--cqd-fs-caption);
+  font-weight: 600;
+  color: var(--cqd-text-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 6px 16px 4px;
+}
+
+.cqd-perm-row {
+  border-top: 1px solid var(--cqd-border-subtle);
+}
+
+.cqd-perm-row:first-of-type {
+  border-top: none;
+}
+
+.cqd-perm-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--cqd-text-main);
+  padding: 12px 16px;
+  transition: background var(--cqd-transition-fast);
+}
+
+.cqd-perm-head:hover {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.cqd-perm-ic {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: rgba(15, 23, 42, 0.05);
+  display: grid;
+  place-items: center;
+  color: var(--cqd-blue);
+}
+
+.cqd-perm-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.cqd-perm-name b {
+  display: block;
+  font-size: var(--cqd-fs-caption);
+  font-weight: 600;
+}
+
+/* The mechanism name — the faint type step (prototype .acc-name small). */
+.cqd-perm-name small {
+  display: block;
+  font-size: var(--cqd-fs-legal);
+  color: var(--cqd-text-muted);
+}
+
+.cqd-perm-chevron {
+  flex: 0 0 auto;
+  color: var(--cqd-text-muted);
+  transition: transform var(--cqd-transition-fast);
+}
+
+.cqd-perm-row.open .cqd-perm-chevron {
+  transform: rotate(180deg);
+}
+
+/* The collapse: max-height + visibility so a closed body leaves the tab
+   order (same convention as the popup privacy ledger). */
+.cqd-perm-collapse {
+  max-height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  transition: max-height var(--cqd-transition-fast),
+    visibility 0s linear var(--cqd-transition-fast);
+}
+
+.cqd-perm-collapse.open {
+  max-height: 12rem;
+  visibility: visible;
+  transition: max-height var(--cqd-transition-fast);
+}
+
+.cqd-perm-body {
+  padding: 0 16px 0 54px;
+}
+
+.cqd-perm-body p {
+  font-size: var(--cqd-fs-micro);
+  color: var(--cqd-text-muted);
+  line-height: 1.55;
+  padding-bottom: 12px;
+  margin: 0;
+}
+
+.cqd-perm-body p em {
+  font-style: normal;
+  color: var(--cqd-text-muted);
+  opacity: 0.8;
+  display: block;
+  margin-top: 4px;
 }
 
 .cqd-options-diag-link {
