@@ -53,6 +53,17 @@ export interface Env {
 export const ANALYTICS_CONFIG_KV_KEY = "analytics:config:v1";
 export const ANALYTICS_CONFIG_KV_TTL_SECONDS = 604800; // 7 days
 
+/**
+ * One install's cumulative lifetime download count (1.9.0, dormant until the
+ * extension's REMOTE_COUNTS_ENABLED switch flips). The count is a monotonic
+ * max: a replayed or downgraded report never lowers it.
+ */
+interface InstallDownloadCount {
+  count: number;
+  browser: string;
+  updatedAt: number;
+}
+
 type DurableStateShape = {
   totalEvents: number;
   totalDownloads: number;
@@ -116,6 +127,15 @@ type DurableStateShape = {
   
   // Set of recently processed event IDs for O(1) idempotency lookup
   processedIds: string[];
+
+  // 1.9.0: DORMANT per-install lifetime download counts (reported through
+  // /track's count-report shape). Latest report wins with a monotonic max
+  // guard, so replays and downgrades cannot lower a count.
+  downloadCounts: Record<string, InstallDownloadCount>;
+
+  // Ring of processed count-report clientBatchIds (idempotency, bounded like
+  // processedIds).
+  processedCountReports: string[];
   
   // Burst tracking (legacy, kept for compatibility)
   burstCounts: Record<string, { count: number; minute: number }>;
@@ -405,6 +425,49 @@ function createEmptyCounters(): Counters {
 function cloneCounterMap(input: Record<string, number> | undefined): Record<string, number> {
   if (!input || typeof input !== "object") return {};
   return { ...input };
+}
+
+/** Coerce stored per-install counts; garbage rows are dropped, not trusted. */
+function normalizeDownloadCounts(
+  input: unknown,
+): Record<string, InstallDownloadCount> {
+  if (!isPlainObject(input)) return {};
+  const out: Record<string, InstallDownloadCount> = {};
+  for (const [installId, value] of Object.entries(input)) {
+    if (!isPlainObject(value)) continue;
+    const count = Number(value.count);
+    if (!Number.isFinite(count) || count < 0) continue;
+    out[installId] = {
+      count: Math.floor(count),
+      browser: typeof value.browser === "string" ? value.browser : "unknown",
+      updatedAt:
+        typeof value.updatedAt === "number" && Number.isFinite(value.updatedAt)
+          ? value.updatedAt
+          : 0,
+    };
+  }
+  return out;
+}
+
+/**
+ * Aggregate per-install counts for /stats: the total across installs, the
+ * per-browser split, and the install count. Zero-state safe.
+ */
+function computeDownloadCountAggregates(
+  counts: Record<string, InstallDownloadCount>,
+  reportsProcessed = 0,
+): { total: number; installs: number; byBrowser: Record<string, number>; reportsProcessed: number } {
+  let total = 0;
+  const byBrowser: Record<string, number> = {};
+  let installs = 0;
+  for (const entry of Object.values(counts)) {
+    if (!entry || typeof entry.count !== "number") continue;
+    total += entry.count;
+    installs += 1;
+    const b = (entry.browser || "unknown").toLowerCase();
+    byBrowser[b] = (byBrowser[b] || 0) + entry.count;
+  }
+  return { total, installs, byBrowser, reportsProcessed };
 }
 
 const CONFIG_VERSION = 2;
@@ -1949,6 +2012,10 @@ export class DownloadsDurable {
       processedIds: [],
       burstCounts: {},
 
+      // 1.9.0 dormant per-install lifetime counts
+      downloadCounts: {},
+      processedCountReports: [],
+
       // Auth-related state
       loginAttempts: {},
       ipAllowlistEnabled: false,
@@ -2158,6 +2225,12 @@ export class DownloadsDurable {
       uniqueRequestsToday: 0,
       processedIds: Array.isArray(stored.processedIds) ? stored.processedIds : [],
       burstCounts: stored.burstCounts ?? {},
+
+      // 1.9.0 dormant per-install lifetime counts
+      downloadCounts: normalizeDownloadCounts(stored.downloadCounts),
+      processedCountReports: Array.isArray(stored.processedCountReports)
+        ? stored.processedCountReports.filter((id) => typeof id === "string")
+        : [],
 
       // Auth-related state
       loginAttempts: stored.loginAttempts ?? base.loginAttempts,
@@ -3769,7 +3842,19 @@ export class DownloadsDurable {
       await this.persist();
       return json({ ok: false, error: "invalid_json" }, { status: 400 });
     }
-    const body = parsedBody.value;
+    const body = parsedBody.value as Record<string, unknown>;
+
+    // 1.9.0: DORMANT download-count reports ride /track with a distinct
+    // shape (installId + lifetimeCount, no events array). Everything below
+    // assumes an events array, so branch before event validation.
+    if (
+      isPlainObject(body) &&
+      !Array.isArray(body.events) &&
+      typeof body.installId === "string" &&
+      typeof body.lifetimeCount === "number"
+    ) {
+      return this.handleDownloadCountReport(body);
+    }
 
     if (!isPlainObject(body) || !Array.isArray(body.events)) {
       logEvent("warn", "track_invalid_payload");
@@ -4549,6 +4634,83 @@ export class DownloadsDurable {
     return Math.max(this.d.reqCountToday, this.d.doRequestsToday);
   }
 
+  // ---------------------------------------------------------------------------
+  // 1.9.0: DORMANT per-install download-count reports (via /track shape)
+  // ---------------------------------------------------------------------------
+
+  private async handleDownloadCountReport(
+    body: Record<string, unknown>,
+  ): Promise<Response> {
+    const now = Date.now();
+
+    // Validation: bounded strings, non-negative integer count.
+    const installId = sanitizeString(body.installId, 128, /^[\x20-\x7E]+$/) || "";
+    const rawCount = Number(body.lifetimeCount);
+    if (!installId || !Number.isFinite(rawCount) || rawCount < 0 || rawCount > 1e12) {
+      this.recordFailure("track_ingest", "invalid_count_report", "bad installId or count", 1, now);
+      await this.persist();
+      return json({ ok: false, error: "invalid_count_report" }, { status: 400 });
+    }
+    const lifetimeCount = Math.floor(rawCount);
+    const browser =
+      sanitizeString(body.browser, 24, FIELD_PATTERNS.generic) || "unknown";
+    const clientBatchId =
+      typeof body.clientBatchId === "string" && body.clientBatchId.length <= 200
+        ? body.clientBatchId
+        : undefined;
+
+    // Idempotency: a replayed clientBatchId collapses to a no-op (one change
+    // per batch id), mirroring the event pipeline's processedIds ring.
+    if (clientBatchId && this.d.processedCountReports.includes(clientBatchId)) {
+      const existing = this.d.downloadCounts[installId];
+      return json(
+        {
+          ok: true,
+          duplicate: true,
+          installId,
+          count: existing?.count ?? 0,
+          ackId: generateAckId(),
+          receivedAt: now,
+        },
+        { status: 200 },
+      );
+    }
+
+    // Monotonic max guard: replays and downgrades cannot lower a count.
+    const existing = this.d.downloadCounts[installId];
+    const nextCount = Math.max(existing?.count ?? 0, lifetimeCount);
+    this.d.downloadCounts[installId] = {
+      count: nextCount,
+      browser: browser !== "unknown" ? browser : existing?.browser ?? "unknown",
+      updatedAt: now,
+    };
+
+    if (clientBatchId) {
+      this.d.processedCountReports.push(clientBatchId);
+      const MAX_PROCESSED_COUNT_REPORTS = 5000;
+      if (this.d.processedCountReports.length > MAX_PROCESSED_COUNT_REPORTS) {
+        this.d.processedCountReports = this.d.processedCountReports.slice(
+          -MAX_PROCESSED_COUNT_REPORTS,
+        );
+      }
+    }
+
+    await this.persist();
+    return json(
+      {
+        ok: true,
+        installId,
+        count: nextCount,
+        previousCount: existing?.count ?? 0,
+        monotonicGuard: lifetimeCount < (existing?.count ?? 0),
+        duplicate: false,
+        ackId: generateAckId(),
+        receivedAt: now,
+      },
+      { status: 200 },
+    );
+  }
+
   private async handleStats(): Promise<Response> {
     this.ensureRequestDay();
     const quota = computeQuotaDescriptor(
@@ -4629,6 +4791,10 @@ export class DownloadsDurable {
       lastEventAt: this.d.lastEventAt ?? null,
       lastFlushAt: this.d.lastFlushAt ?? null,
       counters: this.d.counters ?? {},
+      downloadCountAggregates: computeDownloadCountAggregates(
+        this.d.downloadCounts,
+        this.d.processedCountReports.length,
+      ),
       retryState: this.d.retryState ?? null,
       quota,
       envSnapshot,
@@ -5158,6 +5324,8 @@ export class DownloadsDurable {
       uniqueRequestsToday: 0,
       processedIds: [],
       burstCounts: {},
+      downloadCounts: {},
+      processedCountReports: [],
       loginAttempts: {},
       ipAllowlistEnabled: false,
       ipAllowlist: [],

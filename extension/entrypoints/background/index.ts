@@ -57,6 +57,7 @@ import {
   searchEntries,
 } from '../../src/history/history-store';
 import { countCompletedDownload } from '../../src/history/download-stats';
+import { reportDownloadCount } from '../utils/analytics/count-reporter';
 import {
   STUDENT_WORK_RESOLVE_PUBLISH_TYPE,
   STUDENT_WORK_RESOLVE_RELAY_TYPE,
@@ -545,7 +546,19 @@ export default defineBackground(() => {
         void recordDownloadHistory(pending, 'success');
         // 1.9.0 confetti: one lifetime increment per download id (idempotent,
         // restart-safe); milestone detection rides the same transaction.
-        void countCompletedDownload(pending.requestId);
+        void countCompletedDownload(pending.requestId).then((settle) => {
+          if (!settle.changed) return;
+          // Dormant count reporting: milestone crossings plus a cheap
+          // every-100 drift beacon. REMOTE_COUNTS_ENABLED (false) keeps the
+          // fetch off the wire; the call site is wired and tested for the
+          // day the switch flips.
+          if (settle.crossed.length > 0 || settle.stats.lifetimeCount % 100 === 0) {
+            void reportDownloadCount({
+              installId: settle.stats.installId,
+              lifetimeCount: settle.stats.lifetimeCount,
+            });
+          }
+        });
         cleanup(pending, delta.id);
       };
       try {
