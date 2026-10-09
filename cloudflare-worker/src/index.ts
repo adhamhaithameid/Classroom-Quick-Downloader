@@ -26,7 +26,6 @@ import {
   parseDismissals,
   sanitizeNotificationId,
 } from "./notifications";
-import type { AdminNotification } from "./notifications";
 import { readAmoUsersCache, refreshAmoUsersKv } from "./store-stats";
 import type { Env as WorkerEnv, StatsResponse } from "./types";
 

@@ -409,8 +409,7 @@ describe("recentReports ring (worldwide activity)", () => {
         null,
       ],
     });
-    const { obj } = makeDO();
-    // Rebuild over the same storage: makeDO creates a fresh state, so reuse.
+    // Rebuild over the same storage to exercise the hydration path.
     const env: Env = { DO_SHARED_SECRET: "secret", MAX_BATCH_EVENTS: "10000" } as Env;
     const revived = new DownloadsDurable(state as unknown as DurableObjectState, env);
     const stats = await getStats(revived);
