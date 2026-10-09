@@ -97,13 +97,15 @@ describe('lifetime tracker card (1.9.0 commit 3)', () => {
     });
   }
 
-  it('renders the zero state when nothing has been downloaded', async () => {
+  it('renders the level-0 empty state when nothing has been downloaded', async () => {
     mount();
     await flushTasks();
     const card = container.querySelector('.cqd-lifetime-card');
     expect(card?.textContent).toContain('Lifetime downloads');
+    // Level badge: the install starts at level 0.
+    expect(card?.querySelector('.cqd-lifetime-level')?.textContent).toBe('Level 0');
     expect(card?.querySelector('.cqd-lifetime-empty')?.textContent).toBe(
-      'Download your first file to start the count',
+      'Level 0 — download your first file',
     );
     expect(card?.querySelector('.cqd-lifetime-bar')).toBeNull();
   });
@@ -114,6 +116,8 @@ describe('lifetime tracker card (1.9.0 commit 3)', () => {
     await flushTasks();
     const card = container.querySelector('.cqd-lifetime-card');
     expect(card?.querySelector('.cqd-lifetime-count')?.textContent).toBe('63');
+    // 63 lifetime downloads = two rungs reached (1 and 50) = level 2.
+    expect(card?.querySelector('.cqd-lifetime-level')?.textContent).toBe('Level 2');
     expect(card?.querySelector('.cqd-lifetime-progress')?.textContent).toBe('37 to 100 files');
     // The bar reflects progress toward the rung.
     expect(card?.querySelector<HTMLElement>('.cqd-lifetime-bar-fill')?.style.width).toBe('63%');
@@ -128,6 +132,8 @@ describe('lifetime tracker card (1.9.0 commit 3)', () => {
     await flushTasks();
     const card = container.querySelector('.cqd-lifetime-card');
     expect(card?.querySelector('.cqd-lifetime-count')?.textContent).toBe('1.2M');
+    // Every rung reached: the ladder tops out at level 18.
+    expect(card?.querySelector('.cqd-lifetime-level')?.textContent).toBe('Level 18');
     expect(card?.querySelector('.cqd-lifetime-progress')?.textContent).toBe(
       '1,234,567 files — legend',
     );
@@ -164,6 +170,7 @@ describe('lifetime tracker card (1.9.0 commit 3)', () => {
     await flushTasks();
     const card = container.querySelector('.cqd-lifetime-card');
     expect(card?.querySelector('.cqd-lifetime-count')?.textContent).toBe('1M');
+    expect(card?.querySelector('.cqd-lifetime-level')?.textContent).toBe('Level 18');
     expect(card?.querySelector('.cqd-lifetime-progress')?.textContent).toBe(
       '1,000,000 files — legend',
     );

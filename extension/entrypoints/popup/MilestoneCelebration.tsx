@@ -16,6 +16,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   formatMilestoneCount,
+  levelFor,
   loadDownloadStats,
   requestMilestoneClear,
   watchDownloadStats,
@@ -95,9 +96,10 @@ export function MilestoneCelebration() {
         ✓
       </span>
       <span>
+        {/* Every rung is a level (levelFor): the toast names it. */}
         {toast === 1
-          ? 'First file downloaded!'
-          : `${formatMilestoneCount(toast)} files downloaded!`}
+          ? 'Level 1 reached — first file downloaded!'
+          : `Level ${levelFor(toast)} reached — ${formatMilestoneCount(toast)} files!`}
       </span>
     </div>
   );

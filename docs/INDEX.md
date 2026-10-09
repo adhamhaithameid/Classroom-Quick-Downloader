@@ -21,6 +21,7 @@ Historical/point-in-time files live in `archive/`.
 - [DATA_FLOW_WORKER_ORACLE_WEBSITE.md](DATA_FLOW_WORKER_ORACLE_WEBSITE.md) — **Superseded** (banner in file): Oracle-era pipeline
 - [DATA_FLOW_WEBSITE_EDGE_ORACLE.md](DATA_FLOW_WEBSITE_EDGE_ORACLE.md) — **Superseded** (banner in file): Oracle-era pipeline
 - [ANALYTICS_EVENTS.md](ANALYTICS_EVENTS.md) — analytics event inventory (privacy audit)
+- [GAMIFICATION.md](GAMIFICATION.md) — user levels + milestone celebrations: ladder table, behavior, dormant reporting gate
 - [API_DOWNLOAD_TIER.md](API_DOWNLOAD_TIER.md) — API-based download tier design
 - [TWO_LANGUAGE_SIGNALS.md](TWO_LANGUAGE_SIGNALS.md) — browser locale vs page language; where each is consumed
 

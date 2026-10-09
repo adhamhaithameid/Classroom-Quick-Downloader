@@ -7,10 +7,11 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.9.1-1",
       "version": "1.9.1",
-      "date": "2026-10-09T16:37:22.394Z",
+      "date": "2026-10-09T17:18:06.204Z",
       "summary": "Your downloads now celebrate with you: confetti at 18 lifetime milestones and a live download counter in the popup.",
       "changes": [
         "Summary: Your downloads now celebrate with you: confetti at 18 lifetime milestones and a live download counter in the popup.",
+        "Added: Levels: you start at level 0 and climb to level 18 — every milestone is a level.",
         "Added: Confetti celebrations when you hit a milestone — from your very first file to one million.",
         "Added: A download tracker in the popup showing your lifetime total and how far you are from the next celebration.",
         "Changed: New celebration points keep milestones coming more often as your total grows (2,500; 7,500; 25,000; 75,000; 750,000).",
@@ -18,6 +19,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
         "Fixed: Celebrations can no longer duplicate or lose count when many downloads finish at the same time."
       ],
       "added": [
+        "Levels: you start at level 0 and climb to level 18 — every milestone is a level.",
         "Confetti celebrations when you hit a milestone — from your very first file to one million.",
         "A download tracker in the popup showing your lifetime total and how far you are from the next celebration."
       ],
@@ -33,7 +35,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.8.9-2",
       "version": "1.8.9",
-      "date": "2026-10-08T16:37:22.394Z",
+      "date": "2026-10-08T17:18:06.204Z",
       "summary": "The New engine grows up: post-level and classroom-wide downloads work, highlights ring the right post, and the popup gains history, settings, and diagnostics.",
       "changes": [
         "Summary: The New engine grows up: post-level and classroom-wide downloads work, highlights ring the right post, and the popup gains history, settings, and diagnostics.",
@@ -75,7 +77,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.8.7-3",
       "version": "1.8.7",
-      "date": "2026-10-07T16:37:22.394Z",
+      "date": "2026-10-07T17:18:06.204Z",
       "summary": "Downloads survive browser service-worker restarts — nothing gets stuck or lost mid-download.",
       "changes": [
         "Summary: Downloads survive browser service-worker restarts — nothing gets stuck or lost mid-download.",
@@ -91,7 +93,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.8.6-4",
       "version": "1.8.6",
-      "date": "2026-10-06T16:37:22.394Z",
+      "date": "2026-10-06T17:18:06.204Z",
       "summary": "A dedicated security-hardening release: filenames are sanitized against path tricks, stalled starts time out honestly, and background messaging is fully guarded.",
       "changes": [
         "Summary: A dedicated security-hardening release: filenames are sanitized against path tricks, stalled starts time out honestly, and background messaging is fully guarded.",
@@ -107,7 +109,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.8.3-5",
       "version": "1.8.3",
-      "date": "2026-10-05T16:37:22.394Z",
+      "date": "2026-10-05T17:18:06.204Z",
       "summary": "Download All Classroom: one click collects every attachment in the class.",
       "changes": [
         "Summary: Download All Classroom: one click collects every attachment in the class.",
@@ -123,7 +125,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.8.1-6",
       "version": "1.8.1",
-      "date": "2026-10-04T16:37:22.394Z",
+      "date": "2026-10-04T17:18:06.204Z",
       "summary": "The extension now ships in 147 languages.",
       "changes": [
         "Summary: The extension now ships in 147 languages.",
@@ -139,7 +141,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.8.0-7",
       "version": "1.8.0",
-      "date": "2026-10-03T16:37:22.394Z",
+      "date": "2026-10-03T17:18:06.204Z",
       "summary": "The no-dead-ends release: every download either succeeds or tells you exactly what to do next — with automatic retries, honest timeouts, and an adversarial test program proving it.",
       "changes": [
         "Summary: The no-dead-ends release: every download either succeeds or tells you exactly what to do next — with automatic retries, honest timeouts, and an adversarial test program proving it.",
@@ -165,7 +167,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.7.9-8",
       "version": "1.7.9",
-      "date": "2026-10-02T16:37:22.394Z",
+      "date": "2026-10-02T17:18:06.204Z",
       "summary": "Firefox download reporting is now fully honest: success is only reported when the browser confirms the file finished.",
       "changes": [
         "Summary: Firefox download reporting is now fully honest: success is only reported when the browser confirms the file finished.",
@@ -181,7 +183,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.7.8-9",
       "version": "1.7.8",
-      "date": "2026-10-01T16:37:22.394Z",
+      "date": "2026-10-01T17:18:06.204Z",
       "summary": "Stalled downloads now resolve honestly, and sign-in/error pages are never saved as fake downloads.",
       "changes": [
         "Summary: Stalled downloads now resolve honestly, and sign-in/error pages are never saved as fake downloads.",
@@ -200,7 +202,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.7.7-10",
       "version": "1.7.7",
-      "date": "2026-09-30T16:37:22.394Z",
+      "date": "2026-09-30T17:18:06.204Z",
       "summary": "Every download failure now has a classified, actionable outcome.",
       "changes": [
         "Summary: Every download failure now has a classified, actionable outcome.",
@@ -221,7 +223,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.7.6-11",
       "version": "1.7.6",
-      "date": "2026-09-29T16:37:22.394Z",
+      "date": "2026-09-29T17:18:06.204Z",
       "summary": "Internal hardening: a corpus of eleven real-world download failure scenarios now runs against both the engine's brain and its implementation, and they must agree on every outcome.",
       "changes": [
         "Summary: Internal hardening: a corpus of eleven real-world download failure scenarios now runs against both the engine's brain and its implementation, and they must agree on every outcome."
@@ -234,7 +236,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.7.5-12",
       "version": "1.7.5",
-      "date": "2026-09-28T16:37:22.394Z",
+      "date": "2026-09-28T17:18:06.204Z",
       "summary": "The test simulator learned six new real-world failure shapes — server errors, sign-in redirects, mid-download connection drops, slow streams, empty files and quota pages — so the engine can be verified against them.",
       "changes": [
         "Summary: The test simulator learned six new real-world failure shapes — server errors, sign-in redirects, mid-download connection drops, slow streams, empty files and quota pages — so the engine can be verified against them."
@@ -247,7 +249,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.7.4-13",
       "version": "1.7.4",
-      "date": "2026-09-27T16:37:22.394Z",
+      "date": "2026-09-27T17:18:06.204Z",
       "summary": "Rendering groundwork for the next engine generation: all page observation now flows through one shared, throttled observer.",
       "changes": [
         "Summary: Rendering groundwork for the next engine generation: all page observation now flows through one shared, throttled observer."
@@ -260,7 +262,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.7.3-14",
       "version": "1.7.3",
-      "date": "2026-09-26T16:37:22.394Z",
+      "date": "2026-09-26T17:18:06.204Z",
       "summary": "Download All is now fully stabilized and the automated QA suite covers the entire manual runbook.",
       "changes": [
         "Summary: Download All is now fully stabilized and the automated QA suite covers the entire manual runbook.",
@@ -278,7 +280,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.7.2-15",
       "version": "1.7.2",
-      "date": "2026-09-25T16:37:22.394Z",
+      "date": "2026-09-25T17:18:06.204Z",
       "summary": "The Engine Mode switch shipped in popup settings (Legacy / New) with live switching and one-click rollback, and page detection is now wired to the download engine through one typed bridge.",
       "changes": [
         "Summary: The Engine Mode switch shipped in popup settings (Legacy / New) with live switching and one-click rollback, and page detection is now wired to the download engine through one typed bridge."
@@ -291,7 +293,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.7.1-16",
       "version": "1.7.1",
-      "date": "2026-09-24T16:37:22.394Z",
+      "date": "2026-09-24T17:18:06.204Z",
       "summary": "The engine's internals now communicate through a typed event bus — the architectural groundwork that lets every later change be measured and rolled back independently.",
       "changes": [
         "Summary: The engine's internals now communicate through a typed event bus — the architectural groundwork that lets every later change be measured and rolled back independently."
@@ -304,7 +306,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.7.0-17",
       "version": "1.7.0",
-      "date": "2026-09-23T16:37:22.394Z",
+      "date": "2026-09-23T17:18:06.204Z",
       "summary": "Zero-window downloads verified end-to-end: the old background-tab workaround is fully removed, and a locked test file proves the invisible account fallback completes real downloads.",
       "changes": [
         "Summary: Zero-window downloads verified end-to-end: the old background-tab workaround is fully removed, and a locked test file proves the invisible account fallback completes real downloads."
@@ -317,7 +319,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.6.9-18",
       "version": "1.6.9",
-      "date": "2026-09-22T16:37:22.394Z",
+      "date": "2026-09-22T17:18:06.204Z",
       "summary": "The fix for the most-reported download bug: files that start but fail now quietly try your other signed-in accounts, and downloads go straight through Google's direct file endpoint.",
       "changes": [
         "Summary: The fix for the most-reported download bug: files that start but fail now quietly try your other signed-in accounts, and downloads go straight through Google's direct file endpoint.",
@@ -335,7 +337,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.6.8-19",
       "version": "1.6.8",
-      "date": "2026-09-21T16:37:22.394Z",
+      "date": "2026-09-21T17:18:06.204Z",
       "summary": "The automated QA pipeline now replays the entire manual test runbook in real browsers — including real downloads verified byte-for-byte.",
       "changes": [
         "Summary: The automated QA pipeline now replays the entire manual test runbook in real browsers — including real downloads verified byte-for-byte."
@@ -348,7 +350,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.6.7-20",
       "version": "1.6.7",
-      "date": "2026-09-20T16:37:22.394Z",
+      "date": "2026-09-20T17:18:06.204Z",
       "summary": "Foundation for the automated QA program: a local, deterministic Google Classroom simulator that serves real downloadable files under the real Classroom origins.",
       "changes": [
         "Summary: Foundation for the automated QA program: a local, deterministic Google Classroom simulator that serves real downloadable files under the real Classroom origins."
@@ -361,7 +363,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.6.6-21",
       "version": "1.6.6",
-      "date": "2026-09-19T16:37:22.394Z",
+      "date": "2026-09-19T17:18:06.204Z",
       "summary": "Detection and naming hardening: localized type labels no longer leak into filenames, download state races are fixed, and Sheets attachments get their buttons back.",
       "changes": [
         "Summary: Detection and naming hardening: localized type labels no longer leak into filenames, download state races are fixed, and Sheets attachments get their buttons back.",
@@ -381,7 +383,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.6.5-22",
       "version": "1.6.5",
-      "date": "2026-09-18T16:37:22.394Z",
+      "date": "2026-09-18T17:18:06.204Z",
       "summary": "More detection accuracy fixes: comment counts survive markup drift, exclusions match whole tokens, and localized dates parse correctly.",
       "changes": [
         "Summary: More detection accuracy fixes: comment counts survive markup drift, exclusions match whole tokens, and localized dates parse correctly."
@@ -394,7 +396,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.6.4-23",
       "version": "1.6.4",
-      "date": "2026-09-17T16:37:22.394Z",
+      "date": "2026-09-17T17:18:06.204Z",
       "summary": "Exclusion matching now operates on whole words, eliminating a family of false-positive detections.",
       "changes": [
         "Summary: Exclusion matching now operates on whole words, eliminating a family of false-positive detections."
@@ -407,7 +409,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.6.3-24",
       "version": "1.6.3",
-      "date": "2026-09-16T16:37:22.394Z",
+      "date": "2026-09-16T17:18:06.204Z",
       "summary": "Detection defenses: number extraction now sanity-checks the page before trusting it.",
       "changes": [
         "Summary: Detection defenses: number extraction now sanity-checks the page before trusting it."
@@ -420,7 +422,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.6.2-25",
       "version": "1.6.2",
-      "date": "2026-09-15T16:37:22.394Z",
+      "date": "2026-09-15T17:18:06.204Z",
       "summary": "Detection accuracy across scripts: Armenian keywords, exact word-number matching, and Arabic diacritic folding fixed.",
       "changes": [
         "Summary: Detection accuracy across scripts: Armenian keywords, exact word-number matching, and Arabic diacritic folding fixed."
@@ -433,7 +435,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.6.1-26",
       "version": "1.6.1",
-      "date": "2026-09-14T16:37:22.394Z",
+      "date": "2026-09-14T17:18:06.204Z",
       "summary": "The Engine V4 foundation: a measurable accuracy standard for the detection engine, a pure download state machine, and hardened release gates. Everything after this version is measured against a fixed corpus.",
       "changes": [
         "Summary: The Engine V4 foundation: a measurable accuracy standard for the detection engine, a pure download state machine, and hardened release gates. Everything after this version is measured against a fixed corpus.",
@@ -451,7 +453,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.6.0-27",
       "version": "1.6.0",
-      "date": "2026-09-13T16:37:22.394Z",
+      "date": "2026-09-13T17:18:06.204Z",
       "summary": "The Engine V4 foundation: a measurable accuracy standard for the detection engine, a pure download state machine, and hardened release gates — plus the security-audit roll-up that closed the 1.5 line. Everything after this version is measured against a fixed corpus.",
       "changes": [
         "Summary: The Engine V4 foundation: a measurable accuracy standard for the detection engine, a pure download state machine, and hardened release gates — plus the security-audit roll-up that closed the 1.5 line. Everything after this version is measured against a fixed corpus.",
@@ -476,7 +478,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.5.9-28",
       "version": "1.5.9",
-      "date": "2026-09-12T16:37:22.394Z",
+      "date": "2026-09-12T17:18:06.204Z",
       "summary": "A batch of reviewed, low-risk fixes and cleanups rolled into one stable release.",
       "changes": [
         "Summary: A batch of reviewed, low-risk fixes and cleanups rolled into one stable release."
@@ -489,7 +491,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.5.8-29",
       "version": "1.5.8",
-      "date": "2026-09-11T16:37:22.394Z",
+      "date": "2026-09-11T17:18:06.204Z",
       "summary": "Faster page scanning and a fully accessible popup.",
       "changes": [
         "Summary: Faster page scanning and a fully accessible popup.",
@@ -505,7 +507,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.5.7-30",
       "version": "1.5.7",
-      "date": "2026-09-10T16:37:22.394Z",
+      "date": "2026-09-10T17:18:06.204Z",
       "summary": "A security-hardening release: the developer debug surface now escapes all runtime values before rendering.",
       "changes": [
         "Summary: A security-hardening release: the developer debug surface now escapes all runtime values before rendering."
@@ -518,7 +520,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.5.6-31",
       "version": "1.5.6",
-      "date": "2026-09-09T16:37:22.394Z",
+      "date": "2026-09-09T17:18:06.204Z",
       "summary": "A security-and-accessibility release: cryptographically secure download identifiers, fully labeled controls, and deeper Student Work test coverage.",
       "changes": [
         "Summary: A security-and-accessibility release: cryptographically secure download identifiers, fully labeled controls, and deeper Student Work test coverage."
@@ -531,7 +533,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.5.5-32",
       "version": "1.5.5",
-      "date": "2026-09-08T16:37:22.394Z",
+      "date": "2026-09-08T17:18:06.204Z",
       "summary": "A leaner packaging release focused on reducing extension size while preserving the same classroom behavior.",
       "changes": [
         "Summary: A leaner packaging release focused on reducing extension size while preserving the same classroom behavior.",
@@ -553,7 +555,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.5.4-33",
       "version": "1.5.4",
-      "date": "2026-09-07T16:37:22.394Z",
+      "date": "2026-09-07T17:18:06.204Z",
       "summary": "A performance-focused release with two measurable speed upgrades in scan and download orchestration paths.",
       "changes": [
         "Summary: A performance-focused release with two measurable speed upgrades in scan and download orchestration paths.",
@@ -577,7 +579,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.5.3-34",
       "version": "1.5.3",
-      "date": "2026-09-06T16:37:22.394Z",
+      "date": "2026-09-06T17:18:06.204Z",
       "summary": "Introduced a new detection layer for flags and files to keep ownership mapping stable across complex Classroom layouts.",
       "changes": [
         "Summary: Introduced a new detection layer for flags and files to keep ownership mapping stable across complex Classroom layouts.",
@@ -599,7 +601,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.5.2-35",
       "version": "1.5.2",
-      "date": "2026-09-05T16:37:22.394Z",
+      "date": "2026-09-05T17:18:06.204Z",
       "summary": "A focused stabilization release delivering bug fixes and stronger security hardening for production classrooms.",
       "changes": [
         "Summary: A focused stabilization release delivering bug fixes and stronger security hardening for production classrooms.",
@@ -621,7 +623,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.5.1-36",
       "version": "1.5.1",
-      "date": "2026-09-04T16:37:22.394Z",
+      "date": "2026-09-04T17:18:06.204Z",
       "summary": "Expanded real-world support for the Student Work tap so teachers can download attached files and media directly from submissions.",
       "changes": [
         "Summary: Expanded real-world support for the Student Work tap so teachers can download attached files and media directly from submissions.",
@@ -643,7 +645,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.5.0-37",
       "version": "1.5.0",
-      "date": "2026-09-03T16:37:22.394Z",
+      "date": "2026-09-03T17:18:06.204Z",
       "summary": "This is the best and most reliable state the extension has reached so far. Download buttons, flag placement, and post detection are now much more accurate in real Google Classroom usage.",
       "changes": [
         "Summary: This is the best and most reliable state the extension has reached so far. Download buttons, flag placement, and post detection are now much more accurate in real Google Classroom usage.",
@@ -675,7 +677,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.4.0-38",
       "version": "1.4.0",
-      "date": "2026-09-02T16:37:22.394Z",
+      "date": "2026-09-02T17:18:06.204Z",
       "summary": "A major under-the-hood release that introduced the V2 engine foundation. It made the extension safer to improve without breaking the stable experience you already rely on.",
       "changes": [
         "Summary: A major under-the-hood release that introduced the V2 engine foundation. It made the extension safer to improve without breaking the stable experience you already rely on.",
@@ -699,7 +701,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.3.9-39",
       "version": "1.3.9",
-      "date": "2026-09-01T16:37:22.394Z",
+      "date": "2026-09-01T17:18:06.204Z",
       "summary": "Improved release consistency and user-facing clarity across the website and extension experiences.",
       "changes": [
         "Summary: Improved release consistency and user-facing clarity across the website and extension experiences.",
@@ -727,7 +729,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.3.8-40",
       "version": "1.3.8",
-      "date": "2026-08-31T16:37:22.394Z",
+      "date": "2026-08-31T17:18:06.204Z",
       "summary": "Improved changelog reliability so users always receive updates, even when the version number stays the same.",
       "changes": [
         "Summary: Improved changelog reliability so users always receive updates, even when the version number stays the same.",
@@ -755,7 +757,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.3.7-41",
       "version": "1.3.7",
-      "date": "2026-08-30T16:37:22.394Z",
+      "date": "2026-08-30T17:18:06.204Z",
       "summary": "Improved daily reliability and clearer release communication for normal users.",
       "changes": [
         "Summary: Improved daily reliability and clearer release communication for normal users.",
@@ -783,7 +785,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.3.6-42",
       "version": "1.3.6",
-      "date": "2026-08-29T16:37:22.394Z",
+      "date": "2026-08-29T17:18:06.204Z",
       "summary": "Focused on stability and compatibility hardening for heavy classroom workloads.",
       "changes": [
         "Summary: Focused on stability and compatibility hardening for heavy classroom workloads.",
@@ -811,7 +813,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.3.0-43",
       "version": "1.3.0",
-      "date": "2026-08-28T16:37:22.394Z",
+      "date": "2026-08-28T17:18:06.204Z",
       "summary": "Delivered major reliability, remote-config, and analytics improvements.",
       "changes": [
         "Summary: Delivered major reliability, remote-config, and analytics improvements.",
@@ -839,7 +841,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.2.7-44",
       "version": "1.2.7",
-      "date": "2026-08-27T16:37:22.394Z",
+      "date": "2026-08-27T17:18:06.204Z",
       "summary": "Broad security and reliability hardening across extension behavior.",
       "changes": [
         "Summary: Broad security and reliability hardening across extension behavior.",
@@ -867,7 +869,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.2.3-45",
       "version": "1.2.3",
-      "date": "2026-08-26T16:37:22.394Z",
+      "date": "2026-08-26T17:18:06.204Z",
       "summary": "Usability and telemetry consistency release.",
       "changes": [
         "Summary: Usability and telemetry consistency release.",
@@ -889,7 +891,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.2.2-46",
       "version": "1.2.2",
-      "date": "2026-08-25T16:37:22.394Z",
+      "date": "2026-08-25T17:18:06.204Z",
       "summary": "Cancel-flow polish release.",
       "changes": [
         "Summary: Cancel-flow polish release.",
@@ -911,7 +913,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.2.1-47",
       "version": "1.2.1",
-      "date": "2026-08-24T16:37:22.394Z",
+      "date": "2026-08-24T17:18:06.204Z",
       "summary": "Unified cancel-system iteration release.",
       "changes": [
         "Summary: Unified cancel-system iteration release.",
@@ -933,7 +935,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.2.0-48",
       "version": "1.2.0",
-      "date": "2026-08-23T16:37:22.394Z",
+      "date": "2026-08-23T17:18:06.204Z",
       "summary": "Cancel feature baseline release.",
       "changes": [
         "Summary: Cancel feature baseline release.",
@@ -955,7 +957,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.1.10-49",
       "version": "1.1.10",
-      "date": "2026-08-22T16:37:22.394Z",
+      "date": "2026-08-22T17:18:06.204Z",
       "summary": "Late 1.1 line reliability release.",
       "changes": [
         "Summary: Late 1.1 line reliability release.",
@@ -977,7 +979,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.1.5-50",
       "version": "1.1.5",
-      "date": "2026-08-21T16:37:22.394Z",
+      "date": "2026-08-21T17:18:06.204Z",
       "summary": "Mid 1.1 quality and compatibility release.",
       "changes": [
         "Summary: Mid 1.1 quality and compatibility release.",
@@ -999,7 +1001,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.1.1-51",
       "version": "1.1.1",
-      "date": "2026-08-20T16:37:22.394Z",
+      "date": "2026-08-20T17:18:06.204Z",
       "summary": "Post-1.1 stabilization release.",
       "changes": [
         "Summary: Post-1.1 stabilization release.",
@@ -1021,7 +1023,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.1.0-52",
       "version": "1.1.0",
-      "date": "2026-08-19T16:37:22.394Z",
+      "date": "2026-08-19T17:18:06.204Z",
       "summary": "Feature and packaging expansion release.",
       "changes": [
         "Summary: Feature and packaging expansion release.",
@@ -1043,7 +1045,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.0.1-53",
       "version": "1.0.1",
-      "date": "2026-08-18T16:37:22.394Z",
+      "date": "2026-08-18T17:18:06.204Z",
       "summary": "Post-launch stabilization release.",
       "changes": [
         "Summary: Post-launch stabilization release.",
@@ -1065,7 +1067,7 @@ export const EXTENSION_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.0.0-54",
       "version": "1.0.0",
-      "date": "2026-08-17T16:37:22.394Z",
+      "date": "2026-08-17T17:18:06.204Z",
       "summary": "First stable production release.",
       "changes": [
         "Summary: First stable production release.",
@@ -1109,11 +1111,11 @@ export const EXTENSION_MANUAL_CHANGELOG = {
         "color": "default"
       }
     ],
-    "lastUpdated": 1791563842395
+    "lastUpdated": 1791566286204
   },
   "meta": {
     "applyMode": "manual",
-    "liveUpdatedAt": 1791563842395,
-    "contentChecksum": "manual-1791563842395"
+    "liveUpdatedAt": 1791566286204,
+    "contentChecksum": "manual-1791566286204"
   }
 } as const;

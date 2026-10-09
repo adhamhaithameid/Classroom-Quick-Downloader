@@ -136,8 +136,9 @@ describe('milestone celebration (1.9.0 commit 2)', () => {
     mount();
     await flushTasks();
     expect(burstFn).toHaveBeenCalledTimes(1);
+    // Rung 100 is the 3rd ladder value, so the toast names level 3.
     expect(container.querySelector('.cqd-milestone-toast')?.textContent).toContain(
-      '100 files downloaded!',
+      'Level 3 reached — 100 files!',
     );
     // Pending cleared: the write-back nulls the flag in the record.
     const cleared = store.get(DOWNLOAD_STATS_KEY) as Record<string, unknown>;
@@ -166,7 +167,7 @@ describe('milestone celebration (1.9.0 commit 2)', () => {
     await flushTasks();
     expect(burstFn).not.toHaveBeenCalled();
     expect(container.querySelector('.cqd-milestone-toast')?.textContent).toContain(
-      '100 files downloaded!',
+      'Level 3 reached — 100 files!',
     );
     expect((store.get(DOWNLOAD_STATS_KEY) as Record<string, unknown>).milestonePending).toBeNull();
   });
@@ -189,7 +190,7 @@ describe('milestone celebration (1.9.0 commit 2)', () => {
     await flushTasks();
     expect(burstFn).not.toHaveBeenCalled();
     expect(container.querySelector('.cqd-milestone-toast')?.textContent).toContain(
-      'files downloaded!',
+      'reached — 100 files!',
     );
     expect((store.get(DOWNLOAD_STATS_KEY) as Record<string, unknown>).milestonePending).toBeNull();
   });
@@ -213,8 +214,9 @@ describe('milestone celebration (1.9.0 commit 2)', () => {
     fireStatsChange();
     await flushTasks(4);
     expect(burstFn).toHaveBeenCalledTimes(1);
+    // Rung 50 is the 2nd ladder value: level 2.
     expect(container.querySelector('.cqd-milestone-toast')?.textContent).toContain(
-      '50 files downloaded!',
+      'Level 2 reached — 50 files!',
     );
     expect((store.get(DOWNLOAD_STATS_KEY) as Record<string, unknown>).milestonePending).toBeNull();
   });
@@ -256,7 +258,7 @@ describe('milestone celebration (1.9.0 commit 2)', () => {
     // Reduced motion resolved before the play decision: toast only.
     expect(burstFn).not.toHaveBeenCalled();
     expect(container.querySelector('.cqd-milestone-toast')?.textContent).toContain(
-      'files downloaded!',
+      'reached — 100 files!',
     );
     expect((store.get(DOWNLOAD_STATS_KEY) as Record<string, unknown>).milestonePending).toBeNull();
   });
@@ -269,7 +271,7 @@ describe('milestone celebration (1.9.0 commit 2)', () => {
     expect(container.querySelector('.cqd-milestone-toast')).toBeNull();
   });
 
-  it('announces the first file with singular copy', async () => {
+  it('announces the first file with singular copy that names level 1', async () => {
     seedStats(
       store,
       statsRecord({ lifetimeCount: 1, milestonePending: 1, lastMilestoneReached: 1 }),
@@ -277,7 +279,7 @@ describe('milestone celebration (1.9.0 commit 2)', () => {
     mount();
     await flushTasks();
     expect(container.querySelector('.cqd-milestone-toast')?.textContent).toContain(
-      'First file downloaded!',
+      'Level 1 reached — first file downloaded!',
     );
   });
 

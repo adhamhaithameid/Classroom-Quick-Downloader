@@ -23,7 +23,7 @@
     'Additional pages'
   ];
 
-  const CORE_PATHS = new Set(['/', '/privacy', '/faq', '/changelog', '/site-map']);
+  const CORE_PATHS = new Set(['/', '/privacy', '/faq', '/changelog', '/site-map', '/gamification']);
   const TRUST_PATHS = new Set(['/security', '/support', '/press-kit', '/featured']);
 
   function normalizePath(path: string): string {
@@ -43,6 +43,7 @@
       '/faq': 'FAQ',
       '/changelog': 'Changelog',
       '/site-map': 'Site Map',
+      '/gamification': 'Levels and Milestones',
       '/security': 'Security',
       '/support': 'Support',
       '/press-kit': 'Press Kit',

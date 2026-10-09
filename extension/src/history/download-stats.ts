@@ -94,6 +94,23 @@ export function nextMilestone(count: number): number | null {
   return null;
 }
 
+/**
+ * User level derived from the lifetime count — no extra storage. Level 0 is
+ * the fresh-install state (below the first rung); level N means the Nth
+ * ladder rung has been reached (1 file → level 1 … 1,000,000 files →
+ * level 18). Counts only ever grow, so levels never decrease. Non-finite or
+ * negative inputs sanitize to 0: garbage never inflates the level.
+ */
+export function levelFor(lifetimeCount: number): number {
+  if (!Number.isFinite(lifetimeCount) || lifetimeCount < MILESTONE_LADDER[0]) return 0;
+  let level = 0;
+  for (const rung of MILESTONE_LADDER) {
+    if (rung > lifetimeCount) break;
+    level += 1;
+  }
+  return level;
+}
+
 /** Ladder values in the half-open window (prev, next]. */
 export function milestonesCrossed(prev: number, next: number): number[] {
   if (!(next > prev)) return [];
