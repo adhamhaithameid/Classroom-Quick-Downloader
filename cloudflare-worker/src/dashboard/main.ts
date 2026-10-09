@@ -5,6 +5,7 @@ import type { UptimeSummary } from "../uptime";
 import { UPTIME_PING_PATH } from "../uptime";
 import { CHROME_STORE_PAGE_URL } from "../store-stats";
 import type { AdminNotification } from "../notifications";
+import { WORLD_MAP_COUNTRIES, WORLD_MAP_VIEWBOX } from "./world-map-svg";
 
 /**
  * Shared admin JSON bundle: worker-side data that is not part of the DO
@@ -97,6 +98,48 @@ function countryNameFromCode(code: string): string {
   } catch {
     return "";
   }
+}
+
+// ===== Worldwide map card (zero-dep inline-SVG choropleth) =====
+// Paths come from the generated WORLD_MAP_COUNTRIES constant (Natural Earth
+// 110m, public domain). Fill buckets: index 0 = base (no data), then five
+// accent shades keyed on each country's share of the maximum total.
+const WORLD_MAP_BASE_FILL = "#232838";
+const WORLD_MAP_FILLS = ["#1e3a68", "#27509c", "#3366cc", "#5c8ef2", "#8fb6f9"];
+/** The DO's rest/unknown bucket key (ISO 3166-1 user-assigned range). */
+const WORLD_MAP_REST_CC = "ZZ";
+const WORLD_MAP_TOP_N = 8;
+
+function mapCountryLabel(cc: string): string {
+  if (cc === WORLD_MAP_REST_CC) return "Other";
+  return countryNameFromCode(cc) || cc;
+}
+
+/**
+ * Normalize the DO's per-country totals into sorted [cc, count] pairs.
+ * Keys failing the ISO 3166-1 alpha-2 pattern never reach the SVG or list:
+ * the map is keyed on valid codes only.
+ */
+function normalizeWorldMapData(raw: Record<string, number> | undefined): Array<[string, number]> {
+  const out: Array<[string, number]> = [];
+  for (const [cc, rawCount] of Object.entries(raw ?? {})) {
+    if (!COUNTRY_CODE_PATTERN.test(cc)) continue;
+    const count = Number(rawCount);
+    if (!Number.isFinite(count) || count <= 0) continue;
+    out.push([cc, Math.floor(count)]);
+  }
+  out.sort((a, b) => b[1] - a[1]);
+  return out;
+}
+
+function worldMapFill(counts: Map<string, number>, maxCount: number, cc: string): string {
+  const count = counts.get(cc) ?? 0;
+  if (count <= 0 || maxCount <= 0) return WORLD_MAP_BASE_FILL;
+  const idx = Math.min(
+    WORLD_MAP_FILLS.length - 1,
+    Math.floor((count / maxCount) * WORLD_MAP_FILLS.length),
+  );
+  return WORLD_MAP_FILLS[idx];
 }
 
 function quotaToStateTag(quota?: QuotaDescriptor) {
@@ -687,6 +730,35 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string, admi
   // Worldwide activity card inputs (bounded ring of accepted count reports).
   const recentReports = downloadAggregates?.recentReports ?? [];
   const recentReportsDisplay = [...recentReports].reverse();
+
+  // Worldwide map card inputs: per-country totals, colored by relative share.
+  const worldMapPairs = normalizeWorldMapData(downloadAggregates?.byCountry);
+  const worldMapCounts = new Map<string, number>(worldMapPairs);
+  const worldMapMax = worldMapPairs.length > 0 ? worldMapPairs[0][1] : 0;
+  const hasWorldMapData = worldMapPairs.length > 0;
+  const worldMapCountriesReporting = worldMapPairs.filter(([cc]) => cc !== WORLD_MAP_REST_CC).length;
+  // Path data is a build-time constant with a fixed charset (digits, spaces,
+  // M/Z); keys are regex-checked ISO codes, so no dynamic text reaches the
+  // SVG markup unescaped.
+  const worldMapSvgPaths = Object.entries(WORLD_MAP_COUNTRIES)
+    .filter(([cc]) => COUNTRY_CODE_PATTERN.test(cc))
+    .map(
+      ([cc, pathData]) =>
+        `<path d="${pathData}" fill="${worldMapFill(worldMapCounts, worldMapMax, cc)}" data-cc="${cc}"></path>`,
+    )
+    .join("");
+  const worldMapTopPairs = worldMapPairs.slice(0, WORLD_MAP_TOP_N);
+  const worldMapRestPair = worldMapPairs.find(([cc]) => cc === WORLD_MAP_REST_CC);
+  if (worldMapRestPair && !worldMapTopPairs.some(([cc]) => cc === WORLD_MAP_REST_CC)) {
+    worldMapTopPairs.push(worldMapRestPair);
+  }
+  const worldMapListItems = worldMapTopPairs
+    .map(
+      ([cc, count]) =>
+        `<li data-cc="${cc}"><span class="wmap-name">${escapeHtml(mapCountryLabel(cc))}</span>` +
+        `<span class="wmap-count">${count.toLocaleString()}</span></li>`,
+    )
+    .join("");
 
   // Notifications center inputs (aggregated server-side from existing
   // health signals; dismissals filtered worker-side before render).
@@ -1668,6 +1740,54 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string, admi
       color: var(--text-muted);
       margin-bottom: var(--space-5);
       line-height: 1.5;
+    }
+
+    /* ===== WORLDWIDE MAP (inline-SVG choropleth, zero deps) ===== */
+    .worldwide-map-layout {
+      display: flex;
+      gap: var(--space-5);
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .worldwide-map-svg {
+      flex: 1 1 420px;
+      min-width: 280px;
+      max-width: 100%;
+      height: auto;
+      border: 1px solid var(--border-muted);
+      border-radius: var(--radius);
+      background: var(--bg-surface);
+      padding: var(--space-2);
+    }
+
+    .worldwide-map-list {
+      flex: 0 1 220px;
+      min-width: 180px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+    }
+
+    .worldwide-map-list li {
+      display: flex;
+      justify-content: space-between;
+      gap: var(--space-3);
+      padding: var(--space-1) var(--space-2);
+      border-radius: var(--radius-xs);
+      font-size: 0.85rem;
+    }
+
+    .worldwide-map-list li:nth-child(odd) {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .worldwide-map-list .wmap-count {
+      color: var(--text-secondary);
+      font-variant-numeric: tabular-nums;
     }
     
     /* Config card unified styling */
@@ -3588,6 +3708,32 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string, admi
               </tbody>
             </table>`}
       </section>
+      <section class="card" id="worldwide-map" data-card>
+        <h2>Worldwide Map</h2>
+        <div class="section-subtitle">
+          Reported download totals by country, captured server-side from
+          Cloudflare's geo data. Darker blue means more reported downloads.
+          ${hasWorldMapData
+            ? `${worldMapCountriesReporting} countr${worldMapCountriesReporting === 1 ? "y" : "ies"} reporting.`
+            : ""}
+        </div>
+        ${hasWorldMapData
+          ? ""
+          : `<div class="metric-sub" data-zero-state="world-map">No reports yet — reporting is disabled.</div>`}
+        <div class="worldwide-map-layout">
+          <svg
+            id="worldwide-map-svg"
+            class="worldwide-map-svg"
+            viewBox="${WORLD_MAP_VIEWBOX}"
+            preserveAspectRatio="xMidYMid meet"
+            role="img"
+            aria-label="World map of reported downloads by country"
+          >${worldMapSvgPaths}</svg>
+          <ol id="worldwide-map-list" class="worldwide-map-list"${hasWorldMapData ? "" : ' hidden'}>
+            ${worldMapListItems}
+          </ol>
+        </div>
+      </section>
       </div>
       <div class="tab-panel" id="panel-breakdown" role="tabpanel" aria-labelledby="tab-breakdown" data-panel="breakdown" hidden>
       <section class="card" id="downloads-by-browser" data-card>
@@ -5279,8 +5425,102 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string, admi
 
         updateQuotaChips(stats.quota);
         updateBreakdowns(stats.counters);
+        updateWorldwideMap(
+          stats.downloadCountAggregates && stats.downloadCountAggregates.byCountry,
+        );
         updateLastRefreshLabel();
         updateRemoteConfigForm(stats.remoteConfig || {}, stats.quota || {});
+      }
+
+      // ===== WORLDWIDE MAP live updates (server pushes only; same buckets
+      // and same top-N rules as the server render) =====
+      var WORLD_MAP_BASE_FILL_JS = "#232838";
+      var WORLD_MAP_FILLS_JS = ["#1e3a68", "#27509c", "#3366cc", "#5c8ef2", "#8fb6f9"];
+      var WORLD_MAP_REST_CC_JS = "ZZ";
+      var WORLD_MAP_TOP_N_JS = 8;
+      var WORLD_MAP_CC_RE_JS = /^[A-Z]{2}$/;
+
+      function mapCountryLabelJS(cc) {
+        if (cc === WORLD_MAP_REST_CC_JS) return "Other";
+        return countryNameFromCodeJS(cc) || cc;
+      }
+
+      function normalizeWorldMapDataJS(raw) {
+        var out = [];
+        if (!raw || typeof raw !== "object") return out;
+        Object.keys(raw).forEach(function (cc) {
+          if (!WORLD_MAP_CC_RE_JS.test(cc)) return;
+          var count = Number(raw[cc]);
+          if (!isFinite(count) || count <= 0) return;
+          out.push([cc, Math.floor(count)]);
+        });
+        out.sort(function (a, b) { return b[1] - a[1]; });
+        return out;
+      }
+
+      function buildWorldMapListItemJS(cc, count) {
+        var li = document.createElement("li");
+        li.setAttribute("data-cc", cc);
+        var name = document.createElement("span");
+        name.className = "wmap-name";
+        name.textContent = mapCountryLabelJS(cc);
+        var value = document.createElement("span");
+        value.className = "wmap-count";
+        value.textContent = count.toLocaleString();
+        li.appendChild(name);
+        li.appendChild(value);
+        return li;
+      }
+
+      function updateWorldwideMap(rawByCountry) {
+        var svg = document.getElementById("worldwide-map-svg");
+        var list = document.getElementById("worldwide-map-list");
+        if (!svg || !list) return;
+        var entries = normalizeWorldMapDataJS(rawByCountry);
+        var counts = {};
+        var max = entries.length ? entries[0][1] : 0;
+        entries.forEach(function (e) { counts[e[0]] = e[1]; });
+
+        // Recolor paths; keys were regex-checked at render and re-checked here.
+        var paths = svg.querySelectorAll("path[data-cc]");
+        paths.forEach(function (p) {
+          var cc = p.getAttribute("data-cc") || "";
+          var fill = WORLD_MAP_BASE_FILL_JS;
+          var count = counts[cc] || 0;
+          if (count > 0 && max > 0) {
+            var idx = Math.min(
+              WORLD_MAP_FILLS_JS.length - 1,
+              Math.floor((count / max) * WORLD_MAP_FILLS_JS.length),
+            );
+            fill = WORLD_MAP_FILLS_JS[idx];
+          }
+          if (p.getAttribute("fill") !== fill) p.setAttribute("fill", fill);
+        });
+
+        // Rebuild the top list with DOM nodes (no dynamic innerHTML).
+        while (list.firstChild) list.removeChild(list.firstChild);
+        entries.slice(0, WORLD_MAP_TOP_N_JS).forEach(function (e) {
+          list.appendChild(buildWorldMapListItemJS(e[0], e[1]));
+        });
+        var rest = counts[WORLD_MAP_REST_CC_JS] || 0;
+        if (rest > 0 && !entries.slice(0, WORLD_MAP_TOP_N_JS).some(function (e) {
+          return e[0] === WORLD_MAP_REST_CC_JS;
+        })) {
+          list.appendChild(buildWorldMapListItemJS(WORLD_MAP_REST_CC_JS, rest));
+        }
+        if (entries.length === 0) {
+          list.setAttribute("hidden", "");
+        } else {
+          list.removeAttribute("hidden");
+        }
+        var zero = document.querySelector('[data-zero-state="world-map"]');
+        if (zero) {
+          if (entries.length === 0) {
+            zero.removeAttribute("hidden");
+          } else {
+            zero.setAttribute("hidden", "");
+          }
+        }
       }
 
       function formatDuration(ms) {

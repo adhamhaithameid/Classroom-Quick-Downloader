@@ -343,14 +343,15 @@ describe("Dashboard card search", () => {
     const html = renderDashboard(makeStats());
     const count = (html.match(/data-card>/g) || []).length;
     // 14 base cards + uptime + worldwide-activity + downloads-by-browser
-    // + notifications + live-updates.
-    expect(count).toBe(18);
+    // + notifications + live-updates + worldwide-map.
+    expect(count).toBe(19);
     for (const id of [
       "overview",
       "pipeline-health",
       "uptime",
       "worldwide-activity",
       "live-updates",
+      "worldwide-map",
       "breakdown",
       "downloads-by-browser",
       "raw-pipeline-health",

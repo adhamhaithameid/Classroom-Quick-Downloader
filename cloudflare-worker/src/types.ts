@@ -163,6 +163,12 @@ export interface StatsResponse {
       count: number;
       browser?: string;
     }>;
+    /**
+     * Per-country reported totals (worldwide map card). Bounded: top 100
+     * named ISO 3166-1 alpha-2 codes plus a "ZZ" rest bucket; unknown and
+     * junk codes fold into ZZ server-side.
+     */
+    byCountry?: Record<string, number>;
   };
   retryState: RetryState | null;
 

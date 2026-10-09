@@ -88,6 +88,16 @@ export const MAX_RECENT_COUNT_REPORTS = 20;
  */
 export const LIVE_PUSH_MIN_INTERVAL_MS = 5000;
 
+/**
+ * Per-country download-count totals (dashboard worldwide map): keep the top
+ * N named countries and fold everything else (including junk/unknown codes)
+ * into one extra "rest" bucket. Hard bound: at most
+ * MAX_DOWNLOAD_COUNT_COUNTRIES + 1 keys ever persist.
+ */
+export const MAX_DOWNLOAD_COUNT_COUNTRIES = 100;
+/** Rest/unknown bucket key (ISO 3166-1 user-assigned range; never a country). */
+export const DOWNLOAD_COUNTS_REST_COUNTRY = "ZZ";
+
 /** Coerce stored recent-report entries; garbage rows are dropped. */
 function normalizeRecentCountReports(input: unknown): RecentCountReport[] {
   if (!Array.isArray(input)) return [];
@@ -195,6 +205,11 @@ type DurableStateShape = {
   // (timestamp + reported count + browser) for the dashboard's worldwide
   // activity card. Bounded: 20 entries.
   recentCountReports: RecentCountReport[];
+
+  // Slice 2: per-country reported download totals for the worldwide map
+  // card. Bounded: top MAX_DOWNLOAD_COUNT_COUNTRIES named ISO codes plus a
+  // ZZ rest bucket; unknown/junk country codes fold into the rest bucket.
+  downloadCountsByCountry: Record<string, number>;
 
   // Burst tracking (legacy, kept for compatibility)
   burstCounts: Record<string, { count: number; minute: number }>;
@@ -628,6 +643,62 @@ const REQUEST_HISTORY_DAYS = 400;
 const PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC = [3, 6, 9, 12, 15, 18, 21] as const;
 const MAX_PUBLIC_SITE_COUNTRIES = 300;
 const ISO_ALPHA2_PATTERN = /^[A-Z]{2}$/;
+
+/**
+ * Server-side country capture for count reports: the worker copies
+ * request.cf.country into the CF-IPCountry header before the DO sees the
+ * request, so clients cannot choose their own country. Unknown ("XX") and
+ * junk values fold into the ZZ rest bucket.
+ */
+function normalizeCountryCode(input: unknown): string {
+  if (typeof input !== "string") return "";
+  const cc = input.trim().toUpperCase();
+  if (!ISO_ALPHA2_PATTERN.test(cc)) return "";
+  // XX = Cloudflare "unknown"; ZZ is this feature's rest bucket. Both land
+  // in the same anonymous pile rather than posing as real countries.
+  if (cc === "XX") return "";
+  return cc;
+}
+
+/** Coerce stored per-country totals; junk rows are dropped, map stays bounded. */
+function normalizeDownloadCountsByCountry(input: unknown): Record<string, number> {
+  if (!isPlainObject(input)) return {};
+  const out: Record<string, number> = {};
+  for (const [rawCc, rawCount] of Object.entries(input)) {
+    const cc = normalizeCountryCode(rawCc);
+    const count = Number(rawCount);
+    if (!cc || !Number.isFinite(count) || count < 0) continue;
+    out[cc] = Math.floor(count);
+  }
+  return out;
+}
+
+/**
+ * Collapse the smallest named countries into the ZZ rest bucket until the
+ * map holds at most MAX_DOWNLOAD_COUNT_COUNTRIES named entries plus ZZ.
+ */
+function collapseDownloadCountsByCountry(input: Record<string, number>): Record<string, number> {
+  const entries = Object.entries(input);
+  if (entries.length <= MAX_DOWNLOAD_COUNT_COUNTRIES + 1) {
+    return input;
+  }
+  const rest = entries.find(([cc]) => cc === DOWNLOAD_COUNTS_REST_COUNTRY);
+  const named = entries.filter(([cc]) => cc !== DOWNLOAD_COUNTS_REST_COUNTRY);
+  named.sort((a, b) => b[1] - a[1]);
+  const kept = named.slice(0, MAX_DOWNLOAD_COUNT_COUNTRIES);
+  const overflow = named.slice(MAX_DOWNLOAD_COUNT_COUNTRIES);
+  const out: Record<string, number> = {};
+  for (const [cc, count] of kept) out[cc] = count;
+  let restTotal = rest?.[1] ?? 0;
+  for (const [, count] of overflow) restTotal += count;
+  if (restTotal > 0) out[DOWNLOAD_COUNTS_REST_COUNTRY] = restTotal;
+  return out;
+}
+
+/** Copy of the per-country map for /stats and live pushes (already bounded). */
+function summarizeDownloadCountsByCountry(input: Record<string, number> | undefined): Record<string, number> {
+  return input && typeof input === "object" ? { ...input } : {};
+}
 const USER_FRIENDLY_CHANGELOG_GITHUB_URL =
   "https://raw.githubusercontent.com/adhamhaithameid/Classroom-Quick-Downloader/main/user-friendly-changelog.md";
 const CHANGELOG_DEFAULT_APPLY_MODE: ChangelogApplyMode = "manual";
@@ -2090,6 +2161,7 @@ export class DownloadsDurable {
       downloadCountsDropped: 0,
       processedCountReports: [],
       recentCountReports: [],
+      downloadCountsByCountry: {},
 
       // Auth-related state
       loginAttempts: {},
@@ -2311,6 +2383,9 @@ export class DownloadsDurable {
         ? stored.processedCountReports.filter((id) => typeof id === "string")
         : [],
       recentCountReports: normalizeRecentCountReports(stored.recentCountReports),
+      downloadCountsByCountry: collapseDownloadCountsByCountry(
+        normalizeDownloadCountsByCountry(stored.downloadCountsByCountry),
+      ),
 
       // Auth-related state
       loginAttempts: stored.loginAttempts ?? base.loginAttempts,
@@ -3949,7 +4024,9 @@ export class DownloadsDurable {
       typeof body.installId === "string" &&
       typeof body.lifetimeCount === "number"
     ) {
-      return this.handleDownloadCountReport(body);
+      // Country rides server-side: the worker copied request.cf.country into
+      // the CF-IPCountry header; the client has no say in it.
+      return this.handleDownloadCountReport(body, countryFromRequest);
     }
 
     if (!isPlainObject(body) || !Array.isArray(body.events)) {
@@ -4736,6 +4813,7 @@ export class DownloadsDurable {
 
   private async handleDownloadCountReport(
     body: Record<string, unknown>,
+    country?: string,
   ): Promise<Response> {
     const now = Date.now();
 
@@ -4833,6 +4911,16 @@ export class DownloadsDurable {
     if (this.d.recentCountReports.length > MAX_RECENT_COUNT_REPORTS) {
       this.d.recentCountReports = this.d.recentCountReports.slice(-MAX_RECENT_COUNT_REPORTS);
     }
+
+    // Worldwide map: fold the report's server-captured country into the
+    // bounded per-country totals. Unknown/junk codes land in the ZZ rest
+    // bucket; the collapse keeps the map at top-N named countries plus ZZ.
+    const countryKey = normalizeCountryCode(country) || DOWNLOAD_COUNTS_REST_COUNTRY;
+    this.d.downloadCountsByCountry[countryKey] =
+      (this.d.downloadCountsByCountry[countryKey] ?? 0) + lifetimeCount;
+    this.d.downloadCountsByCountry = collapseDownloadCountsByCountry(
+      this.d.downloadCountsByCountry,
+    );
 
     await this.persist();
     return json(
@@ -4936,6 +5024,7 @@ export class DownloadsDurable {
           this.d.processedCountReports.length,
           this.d.downloadCountsDropped ?? 0,
         ),
+        byCountry: summarizeDownloadCountsByCountry(this.d.downloadCountsByCountry),
         recentReports: (this.d.recentCountReports ?? []).slice(-MAX_RECENT_COUNT_REPORTS),
       },
       retryState: this.d.retryState ?? null,
@@ -5080,6 +5169,7 @@ export class DownloadsDurable {
             d.processedCountReports.length,
             d.downloadCountsDropped ?? 0,
           ),
+          byCountry: summarizeDownloadCountsByCountry(d.downloadCountsByCountry),
           recentReports: (d.recentCountReports ?? []).slice(-MAX_RECENT_COUNT_REPORTS),
         },
       },
@@ -5603,6 +5693,7 @@ export class DownloadsDurable {
       downloadCountsDropped: 0,
       processedCountReports: [],
       recentCountReports: [],
+      downloadCountsByCountry: {},
       loginAttempts: {},
       ipAllowlistEnabled: false,
       ipAllowlist: [],
