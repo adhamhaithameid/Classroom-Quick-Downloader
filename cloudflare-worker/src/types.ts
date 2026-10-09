@@ -155,6 +155,8 @@ export interface StatsResponse {
     installs: number;
     byBrowser: Record<string, number>;
     reportsProcessed: number;
+    /** Reports from unknown installs refused at the map cap. */
+    dropped?: number;
   };
   retryState: RetryState | null;
 

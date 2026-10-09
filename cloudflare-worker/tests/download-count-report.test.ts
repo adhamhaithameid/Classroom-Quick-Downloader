@@ -7,7 +7,7 @@
  * card renders both zero and populated states.
  */
 import { describe, it, expect } from "vitest";
-import { DownloadsDurable } from "../src/downloads_do";
+import { DownloadsDurable, MAX_DOWNLOAD_COUNT_INSTALLS } from "../src/downloads_do";
 import { renderDashboard } from "../src/dashboard/main";
 import type { Env } from "../src/types";
 import type { DurableObjectState } from "@cloudflare/workers-types";
@@ -205,6 +205,79 @@ describe("download-count reports (1.9.0, dormant)", () => {
     expect(res.status).toBe(202);
     const body = (await res.json()) as Record<string, unknown>;
     expect(body.ok).toBe(true);
+  });
+});
+
+describe("download-count map cap (1.9.0, fix round 1)", () => {
+  function makeSeededDO(downloadCounts: Record<string, Record<string, unknown>>) {
+    const state = new MockState();
+    state.storage.seed(STORAGE_KEY, { downloadCounts });
+    const env: Env = {
+      DO_SHARED_SECRET: "secret",
+      MAX_BATCH_EVENTS: "10000",
+    } as Env;
+    const obj = new DownloadsDurable(state as unknown as DurableObjectState, env);
+    return { obj };
+  }
+
+  it("caps unknown installs; known installs still update at the cap", async () => {
+    // Prefill the map to the cap: 50k installs x 10 downloads each.
+    const downloadCounts: Record<string, Record<string, unknown>> = {};
+    for (let i = 0; i < MAX_DOWNLOAD_COUNT_INSTALLS; i++) {
+      downloadCounts[`inst-${i}`] = { count: 10, browser: "chrome", updatedAt: 0 };
+    }
+    const { obj } = makeSeededDO(downloadCounts);
+
+    // Unknown install at cap: dropped, counter incremented, totals unchanged.
+    const dropped = await postReport(
+      obj,
+      countReport({ installId: "brand-new", lifetimeCount: 999, clientBatchId: "dlc-brand-new-999" }),
+    );
+    expect(dropped.status).toBe(200);
+    expect(dropped.body.ok).toBe(true);
+    expect(dropped.body.dropped).toBe(true);
+
+    let stats = await getStats(obj);
+    let agg = stats.downloadCountAggregates as Record<string, unknown>;
+    expect(agg.total).toBe(MAX_DOWNLOAD_COUNT_INSTALLS * 10);
+    expect(agg.installs).toBe(MAX_DOWNLOAD_COUNT_INSTALLS);
+    expect(agg.dropped).toBe(1);
+
+    // Known install at cap: the update is still accepted (monotonic max).
+    const known = await postReport(
+      obj,
+      countReport({ installId: "inst-0", lifetimeCount: 99, clientBatchId: "dlc-inst-0-99" }),
+    );
+    expect(known.status).toBe(200);
+    expect(known.body.dropped).toBeUndefined();
+    expect(known.body.count).toBe(99);
+
+    stats = await getStats(obj);
+    agg = stats.downloadCountAggregates as Record<string, unknown>;
+    expect(agg.total).toBe(MAX_DOWNLOAD_COUNT_INSTALLS * 10 - 10 + 99);
+    expect(agg.dropped).toBe(1);
+  });
+
+  it("a replayed dropped report is idempotent and does not double-count drops", async () => {
+    const downloadCounts: Record<string, Record<string, unknown>> = {};
+    for (let i = 0; i < MAX_DOWNLOAD_COUNT_INSTALLS; i++) {
+      downloadCounts[`inst-${i}`] = { count: 10, browser: "chrome", updatedAt: 0 };
+    }
+    const { obj } = makeSeededDO(downloadCounts);
+
+    await postReport(
+      obj,
+      countReport({ installId: "brand-new", lifetimeCount: 999, clientBatchId: "dlc-brand-new-999" }),
+    );
+    const replay = await postReport(
+      obj,
+      countReport({ installId: "brand-new", lifetimeCount: 999, clientBatchId: "dlc-brand-new-999" }),
+    );
+    expect(replay.body.duplicate).toBe(true);
+
+    const stats = await getStats(obj);
+    const agg = stats.downloadCountAggregates as Record<string, unknown>;
+    expect(agg.dropped).toBe(1);
   });
 });
 

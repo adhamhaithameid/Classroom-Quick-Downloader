@@ -64,6 +64,14 @@ interface InstallDownloadCount {
   updatedAt: number;
 }
 
+/**
+ * Hard ceiling on distinct installs tracked in downloadCounts. Beyond the
+ * cap the map grows no further: unknown installs are dropped (counted in
+ * downloadCountsDropped), known installs keep updating. The feature is
+ * dormant — this is cheap insurance against unbounded per-install growth.
+ */
+export const MAX_DOWNLOAD_COUNT_INSTALLS = 50_000;
+
 type DurableStateShape = {
   totalEvents: number;
   totalDownloads: number;
@@ -132,6 +140,10 @@ type DurableStateShape = {
   // /track's count-report shape). Latest report wins with a monotonic max
   // guard, so replays and downgrades cannot lower a count.
   downloadCounts: Record<string, InstallDownloadCount>;
+
+  // Reports from unknown installs refused at the MAX_DOWNLOAD_COUNT_INSTALLS
+  // cap (observability for the insurance policy, not an error path).
+  downloadCountsDropped: number;
 
   // Ring of processed count-report clientBatchIds (idempotency, bounded like
   // processedIds).
@@ -456,7 +468,14 @@ function normalizeDownloadCounts(
 function computeDownloadCountAggregates(
   counts: Record<string, InstallDownloadCount>,
   reportsProcessed = 0,
-): { total: number; installs: number; byBrowser: Record<string, number>; reportsProcessed: number } {
+  dropped = 0,
+): {
+  total: number;
+  installs: number;
+  byBrowser: Record<string, number>;
+  reportsProcessed: number;
+  dropped: number;
+} {
   let total = 0;
   const byBrowser: Record<string, number> = {};
   let installs = 0;
@@ -467,7 +486,7 @@ function computeDownloadCountAggregates(
     const b = (entry.browser || "unknown").toLowerCase();
     byBrowser[b] = (byBrowser[b] || 0) + entry.count;
   }
-  return { total, installs, byBrowser, reportsProcessed };
+  return { total, installs, byBrowser, reportsProcessed, dropped };
 }
 
 const CONFIG_VERSION = 2;
@@ -2014,6 +2033,7 @@ export class DownloadsDurable {
 
       // 1.9.0 dormant per-install lifetime counts
       downloadCounts: {},
+      downloadCountsDropped: 0,
       processedCountReports: [],
 
       // Auth-related state
@@ -2228,6 +2248,10 @@ export class DownloadsDurable {
 
       // 1.9.0 dormant per-install lifetime counts
       downloadCounts: normalizeDownloadCounts(stored.downloadCounts),
+      downloadCountsDropped:
+        typeof stored.downloadCountsDropped === "number" && stored.downloadCountsDropped >= 0
+          ? Math.floor(stored.downloadCountsDropped)
+          : 0,
       processedCountReports: Array.isArray(stored.processedCountReports)
         ? stored.processedCountReports.filter((id) => typeof id === "string")
         : [],
@@ -4676,6 +4700,38 @@ export class DownloadsDurable {
       );
     }
 
+    // Cap guard: the per-install map is bounded insurance. Unknown installs
+    // past MAX_DOWNLOAD_COUNT_INSTALLS are refused (and counted); known
+    // installs keep updating so live users never stall at the cap.
+    const isKnownInstall = installId in this.d.downloadCounts;
+    if (
+      !isKnownInstall &&
+      Object.keys(this.d.downloadCounts).length >= MAX_DOWNLOAD_COUNT_INSTALLS
+    ) {
+      this.d.downloadCountsDropped = (this.d.downloadCountsDropped ?? 0) + 1;
+      if (clientBatchId) {
+        this.d.processedCountReports.push(clientBatchId);
+        const MAX_PROCESSED_COUNT_REPORTS = 5000;
+        if (this.d.processedCountReports.length > MAX_PROCESSED_COUNT_REPORTS) {
+          this.d.processedCountReports = this.d.processedCountReports.slice(
+            -MAX_PROCESSED_COUNT_REPORTS,
+          );
+        }
+      }
+      await this.persist();
+      return json(
+        {
+          ok: true,
+          dropped: true,
+          installId,
+          count: 0,
+          ackId: generateAckId(),
+          receivedAt: now,
+        },
+        { status: 200 },
+      );
+    }
+
     // Monotonic max guard: replays and downgrades cannot lower a count.
     const existing = this.d.downloadCounts[installId];
     const nextCount = Math.max(existing?.count ?? 0, lifetimeCount);
@@ -4794,6 +4850,7 @@ export class DownloadsDurable {
       downloadCountAggregates: computeDownloadCountAggregates(
         this.d.downloadCounts,
         this.d.processedCountReports.length,
+        this.d.downloadCountsDropped ?? 0,
       ),
       retryState: this.d.retryState ?? null,
       quota,
@@ -5325,6 +5382,7 @@ export class DownloadsDurable {
       processedIds: [],
       burstCounts: {},
       downloadCounts: {},
+      downloadCountsDropped: 0,
       processedCountReports: [],
       loginAttempts: {},
       ipAllowlistEnabled: false,
