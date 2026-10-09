@@ -1977,8 +1977,9 @@ export function PrivacyLedger() {
             <span className="cqd-lg-txt">
               <b>Sends</b>
               <span>
-                Anonymous usage counts — outcomes and file types, never file
-                names. Files travel from Google to you, directly.
+                Anonymous usage stats — outcomes, file types, browser, system,
+                app version, language, timing, and errors. Never file names or
+                file contents. Files travel from Google to you, directly.
               </span>
             </span>
           </div>

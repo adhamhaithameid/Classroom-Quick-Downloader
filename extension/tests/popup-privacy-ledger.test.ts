@@ -141,7 +141,7 @@ describe('popup privacy ledger (legal round 2, surface 01 T2)', () => {
     expect(text).toContain('Your settings and your download history. They stay on this device.');
   });
 
-  it('the Sends row is truthful about anonymous usage counts (never "nothing is sent")', async () => {
+  it('the Sends row is truthful about anonymous usage stats (never "nothing is sent")', async () => {
     renderPopup();
     await new Promise((r) => setTimeout(r, 0));
 
@@ -151,10 +151,14 @@ describe('popup privacy ledger (legal round 2, surface 01 T2)', () => {
 
     const text = container.querySelector('[aria-label="Privacy and data summary"]')?.textContent ?? '';
     expect(text).toContain('Sends');
-    // The analytics pipeline (entrypoints/utils/analytics) sends download
-    // outcomes to the operator's worker — the ledger must say so.
-    expect(text).toContain('Anonymous usage counts');
-    expect(text).toContain('never file names');
+    // The analytics payload (entrypoints/utils/analytics/types.ts) carries
+    // outcomes, file types, browser, OS, extension version, language,
+    // duration buckets, bypass flag, error types, and timestamps; the
+    // uninstall URL adds source/browser/version + totals. The row enumerates
+    // honestly — a reader must not conclude the list is narrower than it is.
+    expect(text).toContain('Anonymous usage stats');
+    expect(text).toContain('outcomes, file types, browser, system, app version, language, timing, and errors');
+    expect(text).toContain('Never file names or file contents.');
     expect(text).toContain('Files travel from Google to you, directly.');
     expect(text.toLowerCase()).not.toContain('nothing to the developer');
   });
