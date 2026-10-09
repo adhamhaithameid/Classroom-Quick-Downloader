@@ -271,6 +271,23 @@ describe('milestone celebration (1.9.0 commit 2)', () => {
     expect(container.querySelector('.cqd-milestone-toast')).toBeNull();
   });
 
+  it('stays quiet for a milestone a Classroom page already celebrated and cleared', async () => {
+    // Cross-surface dedupe (1.9.1): the page played the celebration and its
+    // clear already rode the background chain, so the record carries no
+    // pending when the popup opens — and the page's clear write arriving as
+    // a storage change while the popup is open must not replay either.
+    seedStats(store, statsRecord({ milestonePending: null }));
+    mount();
+    await flushTasks();
+    expect(burstFn).not.toHaveBeenCalled();
+    expect(container.querySelector('.cqd-milestone-toast')).toBeNull();
+    fireStatsChange();
+    await flushTasks(4);
+    expect(burstFn).not.toHaveBeenCalled();
+    expect(container.querySelector('.cqd-milestone-toast')).toBeNull();
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalled();
+  });
+
   it('announces the first file with singular copy that names level 1', async () => {
     seedStats(
       store,
