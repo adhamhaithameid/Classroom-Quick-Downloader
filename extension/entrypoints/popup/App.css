@@ -2646,6 +2646,23 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+.cqd-lifetime-metrics {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+/* Level badge (levels feature): Nth rung reached = level N, derived from
+   the lifetime count. Decorative pill; the toast carries announcements. */
+.cqd-lifetime-level {
+  font-family: var(--cqd-font);
+  font-size: var(--cqd-fs-micro);
+  font-weight: 600;
+  color: var(--cqd-blue);
+  background: var(--cqd-blue-soft);
+  border-radius: 999px;
+  padding: 2px 8px;
+  letter-spacing: 0.02em;
+}
 .cqd-lifetime-count {
   font-family: var(--cqd-font);
   font-size: var(--cqd-fs-heading);

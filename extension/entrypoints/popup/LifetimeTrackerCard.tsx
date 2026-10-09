@@ -4,14 +4,16 @@
  *
  * Stillwater-styled card in the popup's analytics/history area. Reads the
  * stats record on mount and live through the storage watch. States:
- * zero downloads ("Download your first file to start the count"), progress
- * toward the next rung ("37 to 100 files"), and the post-final legend state
- * past 1,000,000. Big counts use compact notation ("1M"); the toast's tick
- * carries the reached state (commit 2).
+ * level 0 ("Level 0 — download your first file"), progress toward the next
+ * rung ("37 to 100 files"), and the post-final legend state past 1,000,000.
+ * The level badge rides next to the lifetime count: level N = Nth rung
+ * reached (levelFor), derived on read — no extra storage. Big counts use
+ * compact notation ("1M"); the toast's tick carries the reached state.
  */
 import { useEffect, useState } from 'react';
 import {
   formatMilestoneCount,
+  levelFor,
   loadDownloadStats,
   nextMilestone,
   watchDownloadStats,
@@ -39,6 +41,7 @@ export function LifetimeTrackerCard() {
 
   const count = stats?.lifetimeCount ?? 0;
   const loaded = stats !== null;
+  const level = levelFor(count);
   // Between the zero state and the final rung the next rung always exists.
   const next = loaded && count > 0 && count < FINAL_MILESTONE ? nextMilestone(count) : null;
   const percent = next !== null ? Math.min(100, Math.round((count / next) * 100)) : 100;
@@ -48,10 +51,13 @@ export function LifetimeTrackerCard() {
       <div className="cqd-card cqd-lifetime-card">
         <div className="cqd-lifetime-head">
           <span className="cqd-lifetime-title">Lifetime downloads</span>
-          <span className="cqd-lifetime-count">{formatMilestoneCount(count)}</span>
+          <span className="cqd-lifetime-metrics">
+            <span className="cqd-lifetime-level">Level {level}</span>
+            <span className="cqd-lifetime-count">{formatMilestoneCount(count)}</span>
+          </span>
         </div>
         {!loaded || count === 0 ? (
-          <p className="cqd-lifetime-empty">Download your first file to start the count</p>
+          <p className="cqd-lifetime-empty">Level 0 — download your first file</p>
         ) : next === null ? (
           <p className="cqd-lifetime-progress">
             {count.toLocaleString('en-US')} files — legend

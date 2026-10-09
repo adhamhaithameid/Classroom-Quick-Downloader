@@ -15,6 +15,7 @@ import {
   clearMilestonePending,
   countCompletedDownload,
   createEmptyStats,
+  levelFor,
   loadDownloadStats,
   milestonesCrossed,
   nextMilestone,
@@ -70,6 +71,39 @@ describe('milestone ladder helpers', () => {
     expect(milestonesCrossed(100, 101)).toEqual([]);
     expect(milestonesCrossed(40, 260)).toEqual([50, 100, 250]);
     expect(milestonesCrossed(5, 5)).toEqual([]);
+  });
+});
+
+describe('user levels derived from the ladder (levels feature)', () => {
+  it('starts at level 0 below the first rung', () => {
+    expect(levelFor(0)).toBe(0);
+  });
+
+  it('maps each exact rung to its level (Nth rung = level N)', () => {
+    MILESTONE_LADDER.forEach((rung, index) => {
+      expect(levelFor(rung)).toBe(index + 1);
+    });
+    expect(levelFor(1)).toBe(1);
+    expect(levelFor(1_000_000)).toBe(18);
+  });
+
+  it('stays at the lower level between rungs', () => {
+    expect(levelFor(2)).toBe(1);
+    expect(levelFor(49)).toBe(1);
+    expect(levelFor(63)).toBe(2);
+    expect(levelFor(999)).toBe(5);
+    expect(levelFor(999_999)).toBe(17);
+  });
+
+  it('never passes level 18 past the final rung', () => {
+    expect(levelFor(1_000_001)).toBe(18);
+    expect(levelFor(12_345_678)).toBe(18);
+  });
+
+  it('treats non-finite and negative counts as level 0 (garbage never inflates)', () => {
+    expect(levelFor(-5)).toBe(0);
+    expect(levelFor(Number.NaN)).toBe(0);
+    expect(levelFor(Number.POSITIVE_INFINITY)).toBe(0);
   });
 });
 
