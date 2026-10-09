@@ -3,6 +3,7 @@ import type { StatsResponse, QuotaDescriptor, ChangelogEntry, ChangelogConfig } 
 import { FAVICON_PNG_DATA_URI } from "../assets";
 import type { UptimeSummary } from "../uptime";
 import { UPTIME_PING_PATH } from "../uptime";
+import { CHROME_STORE_PAGE_URL } from "../store-stats";
 
 /**
  * Shared admin JSON bundle: worker-side data that is not part of the DO
@@ -11,6 +12,7 @@ import { UPTIME_PING_PATH } from "../uptime";
  */
 export interface DashboardAdminData {
   uptime?: UptimeSummary | null;
+  amoUsers?: { firefoxUsers: number; fetchedAtUtc: number } | null;
   generatedAt?: number;
 }
 
@@ -657,6 +659,21 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string, admi
       ? "ok"
       : "fail"
     : "no checks yet";
+
+  // Downloads-by-browser card inputs (honest zero state while the extension
+  // reporting switch is off).
+  const downloadAggregates = stats.downloadCountAggregates ?? null;
+  const reportedByBrowser: Array<[string, number]> = Object.entries(
+    downloadAggregates?.byBrowser ?? {},
+  ).sort((a, b) => b[1] - a[1]);
+  const hasReportedDownloads = reportedByBrowser.length > 0 && (downloadAggregates?.total ?? 0) > 0;
+  const firefoxUsers = adminData.amoUsers?.firefoxUsers ?? 0;
+  const firefoxUsersLabel =
+    firefoxUsers > 0 ? `${firefoxUsers.toLocaleString()} users (Mozilla API)` : "n/a (Mozilla API)";
+
+  // Worldwide activity card inputs (bounded ring of accepted count reports).
+  const recentReports = downloadAggregates?.recentReports ?? [];
+  const recentReportsDisplay = [...recentReports].reverse();
 
   const requestsToday = quota?.requestsToday ?? 0;
   const remoteEnabled = quota?.remoteEnabled ?? true;
@@ -3398,8 +3415,69 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string, admi
           </div>
         </div>
       </section>
+      <section class="card" id="worldwide-activity" data-card>
+        <h2>Worldwide Activity</h2>
+        <div class="section-subtitle">
+          Last ${recentReportsDisplay.length > 0 ? recentReportsDisplay.length : 20} accepted download-count
+          reports from active installs (newest first).
+        </div>
+        ${recentReportsDisplay.length === 0
+          ? `<div class="metric-sub" data-zero-state="recent-reports">No reports yet — reporting is disabled.</div>`
+          : `<table class="table">
+              <thead>
+                <tr><th>Reported at (UTC)</th><th>Lifetime downloads</th><th>Browser</th></tr>
+              </thead>
+              <tbody>
+                ${recentReportsDisplay
+                  .map(
+                    (report) => `<tr>
+                      <td>${escapeHtml(formatTs(report.ts))}</td>
+                      <td>${Number(report.count).toLocaleString()}</td>
+                      <td>${escapeHtml(report.browser || "unknown")}</td>
+                    </tr>`,
+                  )
+                  .join("")}
+              </tbody>
+            </table>`}
+      </section>
       </div>
       <div class="tab-panel" id="panel-breakdown" role="tabpanel" aria-labelledby="tab-breakdown" data-panel="breakdown" hidden>
+      <section class="card" id="downloads-by-browser" data-card>
+        <h2>Downloads by Browser</h2>
+        <div class="section-subtitle">
+          Per-install lifetime counts reported by extensions, next to store-side user counts.
+          ${hasReportedDownloads
+            ? `${Number(downloadAggregates?.total ?? 0).toLocaleString()} reported downloads from ${downloadAggregates?.installs ?? 0} installs.`
+            : "No reports yet — reporting is disabled."}
+        </div>
+        <table class="table">
+          <thead>
+            <tr><th>Browser</th><th>Reported downloads</th><th>Store users</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Chrome</td>
+              <td>${hasReportedDownloads ? Number(downloadAggregates?.byBrowser?.chrome ?? 0).toLocaleString() : "0"}</td>
+              <td><a href="${escapeHtml(CHROME_STORE_PAGE_URL)}" target="_blank" rel="noopener noreferrer">Manual check</a></td>
+            </tr>
+            <tr>
+              <td>Firefox</td>
+              <td>${hasReportedDownloads ? Number(downloadAggregates?.byBrowser?.firefox ?? 0).toLocaleString() : "0"} — Firefox: ${escapeHtml(firefoxUsersLabel)}</td>
+              <td>via Mozilla API</td>
+            </tr>
+            <tr>
+              <td>Edge</td>
+              <td>${hasReportedDownloads ? Number(downloadAggregates?.byBrowser?.edge ?? 0).toLocaleString() : "0"}</td>
+              <td><a href="https://microsoftedge.microsoft.com/addons/detail/ecojbijjkcjdolpeoiemnccgmaeomcmn" target="_blank" rel="noopener noreferrer">Manual check</a></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="metric-sub">
+          ${hasReportedDownloads
+            ? ""
+            : "Reported download columns stay zero until the extension's reporting switch flips."}
+        </div>
+      </section>
       <section class="card" id="breakdown" data-card>
         <div class="section-title-row">
           <h2>Breakdown by Dimensions</h2>

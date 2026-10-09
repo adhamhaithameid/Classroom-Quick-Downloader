@@ -355,3 +355,68 @@ describe("dashboard lifetime-downloads card (1.9.0)", () => {
     expect(html).toContain("firefox: 250");
   });
 });
+
+describe("recentReports ring (worldwide activity)", () => {
+  it("exposes accepted reports on /stats with timestamp, count, browser", async () => {
+    const { obj } = makeDO();
+    await postReport(obj, countReport({ browser: "firefox", clientBatchId: "dlc-r1" }));
+    await postReport(
+      obj,
+      countReport({ installId: "install-2", lifetimeCount: 250, browser: "unknown", clientBatchId: "dlc-r2" }),
+    );
+
+    const stats = await getStats(obj);
+    const agg = stats.downloadCountAggregates as Record<string, unknown>;
+    const recent = agg.recentReports as Array<{ ts: number; count: number; browser?: string }>;
+    expect(recent.length).toBe(2);
+    expect(recent[0].count).toBe(1000);
+    expect(recent[0].browser).toBe("firefox");
+    expect(typeof recent[0].ts).toBe("number");
+    expect(recent[1].count).toBe(250);
+    expect(recent[1].browser).toBeUndefined();
+  });
+
+  it("bounds the ring at 20 reports, dropping the oldest", async () => {
+    const { obj } = makeDO();
+    for (let i = 1; i <= 25; i++) {
+      await postReport(obj, countReport({ lifetimeCount: i, clientBatchId: `dlc-ring-${i}` }));
+    }
+    const stats = await getStats(obj);
+    const agg = stats.downloadCountAggregates as Record<string, unknown>;
+    const recent = agg.recentReports as Array<{ count: number }>;
+    expect(recent.length).toBe(20);
+    expect(recent[0].count).toBe(6);
+    expect(recent[19].count).toBe(25);
+  });
+
+  it("keeps duplicates and dropped installs out of the ring", async () => {
+    const { obj } = makeDO();
+    await postReport(obj, countReport({ clientBatchId: "dlc-dup" }));
+    await postReport(obj, countReport({ clientBatchId: "dlc-dup" })); // duplicate replay
+    const stats = await getStats(obj);
+    const agg = stats.downloadCountAggregates as Record<string, unknown>;
+    expect((agg.recentReports as unknown[]).length).toBe(1);
+  });
+
+  it("survives rehydration and sanitizes garbage entries", async () => {
+    const { state } = makeDO();
+    // Seed storage directly with the persisted state shape.
+    await state.storage.put("analytics_state", {
+      recentCountReports: [
+        { ts: 1_000, count: 42, browser: "chrome" },
+        { ts: "nope", count: 10 },
+        { ts: 2_000, count: -5 },
+        null,
+      ],
+    });
+    const { obj } = makeDO();
+    // Rebuild over the same storage: makeDO creates a fresh state, so reuse.
+    const env: Env = { DO_SHARED_SECRET: "secret", MAX_BATCH_EVENTS: "10000" } as Env;
+    const revived = new DownloadsDurable(state as unknown as DurableObjectState, env);
+    const stats = await getStats(revived);
+    const agg = stats.downloadCountAggregates as Record<string, unknown>;
+    const recent = agg.recentReports as Array<{ ts: number; count: number; browser?: string }>;
+    expect(recent.length).toBe(1);
+    expect(recent[0]).toEqual({ ts: 1_000, count: 42, browser: "chrome" });
+  });
+});

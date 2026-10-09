@@ -265,7 +265,10 @@ describe("cron dispatch", () => {
       globalThis.fetch = originalFetch;
     }
 
-    expect(fetchImpl).not.toHaveBeenCalled();
+    // The 5-minute trigger never fires on the hourly tick; the AMO user
+    // refresh (also hourly, TTL-gated) may fetch, but not the ping.
+    const pingCalls = fetchImpl.mock.calls.filter((call) => String(call[0]).includes("/uptime-ping"));
+    expect(pingCalls.length).toBe(0);
     expect(doFetch).toHaveBeenCalled();
     expect(kv.store.get("site:v1:uptime") ?? null).toBeNull();
   });

@@ -65,6 +65,37 @@ interface InstallDownloadCount {
 }
 
 /**
+ * One accepted count report, kept for the dashboard's worldwide activity
+ * card. `count` is what the client reported (lifetime downloads).
+ */
+interface RecentCountReport {
+  ts: number;
+  count: number;
+  browser?: string;
+}
+
+/** Cap for the recentReports ring surfaced on /stats. */
+export const MAX_RECENT_COUNT_REPORTS = 20;
+
+/** Coerce stored recent-report entries; garbage rows are dropped. */
+function normalizeRecentCountReports(input: unknown): RecentCountReport[] {
+  if (!Array.isArray(input)) return [];
+  const out: RecentCountReport[] = [];
+  for (const value of input) {
+    if (!value || typeof value !== "object") continue;
+    const entry = value as Partial<RecentCountReport>;
+    if (typeof entry.ts !== "number" || !Number.isFinite(entry.ts)) continue;
+    if (typeof entry.count !== "number" || !Number.isFinite(entry.count) || entry.count < 0) continue;
+    out.push({
+      ts: Math.floor(entry.ts),
+      count: Math.floor(entry.count),
+      browser: typeof entry.browser === "string" && entry.browser ? entry.browser.slice(0, 24) : undefined,
+    });
+  }
+  return out.slice(-MAX_RECENT_COUNT_REPORTS);
+}
+
+/**
  * Hard ceiling on distinct installs tracked in downloadCounts. Beyond the
  * cap the map grows no further: unknown installs are dropped (counted in
  * downloadCountsDropped), known installs keep updating. The feature is
@@ -148,7 +179,12 @@ type DurableStateShape = {
   // Ring of processed count-report clientBatchIds (idempotency, bounded like
   // processedIds).
   processedCountReports: string[];
-  
+
+  // Ring of the last MAX_RECENT_COUNT_REPORTS accepted count reports
+  // (timestamp + reported count + browser) for the dashboard's worldwide
+  // activity card. Bounded: 20 entries.
+  recentCountReports: RecentCountReport[];
+
   // Burst tracking (legacy, kept for compatibility)
   burstCounts: Record<string, { count: number; minute: number }>;
 
@@ -2035,6 +2071,7 @@ export class DownloadsDurable {
       downloadCounts: {},
       downloadCountsDropped: 0,
       processedCountReports: [],
+      recentCountReports: [],
 
       // Auth-related state
       loginAttempts: {},
@@ -2255,6 +2292,7 @@ export class DownloadsDurable {
       processedCountReports: Array.isArray(stored.processedCountReports)
         ? stored.processedCountReports.filter((id) => typeof id === "string")
         : [],
+      recentCountReports: normalizeRecentCountReports(stored.recentCountReports),
 
       // Auth-related state
       loginAttempts: stored.loginAttempts ?? base.loginAttempts,
@@ -4751,6 +4789,17 @@ export class DownloadsDurable {
       }
     }
 
+    // Worldwide activity feed: keep the last N accepted reports for the
+    // dashboard. Duplicates (replays) and cap-dropped installs stay out.
+    this.d.recentCountReports.push({
+      ts: now,
+      count: lifetimeCount,
+      browser: browser !== "unknown" ? browser : undefined,
+    });
+    if (this.d.recentCountReports.length > MAX_RECENT_COUNT_REPORTS) {
+      this.d.recentCountReports = this.d.recentCountReports.slice(-MAX_RECENT_COUNT_REPORTS);
+    }
+
     await this.persist();
     return json(
       {
@@ -4847,11 +4896,14 @@ export class DownloadsDurable {
       lastEventAt: this.d.lastEventAt ?? null,
       lastFlushAt: this.d.lastFlushAt ?? null,
       counters: this.d.counters ?? {},
-      downloadCountAggregates: computeDownloadCountAggregates(
-        this.d.downloadCounts,
-        this.d.processedCountReports.length,
-        this.d.downloadCountsDropped ?? 0,
-      ),
+      downloadCountAggregates: {
+        ...computeDownloadCountAggregates(
+          this.d.downloadCounts,
+          this.d.processedCountReports.length,
+          this.d.downloadCountsDropped ?? 0,
+        ),
+        recentReports: (this.d.recentCountReports ?? []).slice(-MAX_RECENT_COUNT_REPORTS),
+      },
       retryState: this.d.retryState ?? null,
       quota,
       envSnapshot,
@@ -5384,6 +5436,7 @@ export class DownloadsDurable {
       downloadCounts: {},
       downloadCountsDropped: 0,
       processedCountReports: [],
+      recentCountReports: [],
       loginAttempts: {},
       ipAllowlistEnabled: false,
       ipAllowlist: [],

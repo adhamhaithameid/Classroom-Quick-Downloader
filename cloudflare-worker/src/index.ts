@@ -18,6 +18,7 @@ import type { StoreHealthDoc } from "./store-stats";
 import { fetchStoreReviews, mergeStoreReviews } from "./store-reviews";
 import type { StoreReview, StoreReviewsSnapshot } from "./store-reviews";
 import { readUptimeSummary, runUptimeSelfCheck, UPTIME_PING_PATH } from "./uptime";
+import { readAmoUsersCache, refreshAmoUsersKv } from "./store-stats";
 import type { Env as WorkerEnv, StatsResponse } from "./types";
 
 type WorkerLogLevel = "info" | "warn" | "error";
@@ -1233,10 +1234,11 @@ async function handleDashboard(request: Request, env: WorkerEnv): Promise<Respon
       { status: 500 }
     );
   }
-  // Shared admin JSON: one bundle every card reads from (uptime, and later
-  // slices reuse this seam). No per-card fetching anywhere.
+  // Shared admin JSON: one bundle every card reads from (uptime, AMO user
+  // counts, and later slices reuse this seam). No per-card fetching anywhere.
   const adminData = {
     uptime: await readUptimeSummary(env),
+    amoUsers: await readAmoUsersCache(env),
     generatedAt: Date.now(),
   };
   const nonce = generateCspNonce();
@@ -3339,6 +3341,9 @@ export default {
 
     // 0h4d.1.10: refresh the reliability metric cache (best effort).
     await refreshReliabilityKv(env);
+
+    // Firefox user counts from the AMO API, TTL-gated to one call per 24h.
+    await refreshAmoUsersKv(env);
 
     if (SITE_SNAPSHOT_REFRESH_HOURS_UTC.has(hour)) {
       await refreshTrendsKv(env);

@@ -157,6 +157,12 @@ export interface StatsResponse {
     reportsProcessed: number;
     /** Reports from unknown installs refused at the map cap. */
     dropped?: number;
+    /** Last 20 accepted count reports (worldwide activity card). */
+    recentReports?: Array<{
+      ts: number;
+      count: number;
+      browser?: string;
+    }>;
   };
   retryState: RetryState | null;
 

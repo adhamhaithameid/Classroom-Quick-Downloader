@@ -337,8 +337,18 @@ describe("Dashboard card search", () => {
   it("marks every filterable card with data-card", () => {
     const html = renderDashboard(makeStats());
     const count = (html.match(/data-card>/g) || []).length;
-    expect(count).toBe(14);
-    for (const id of ["overview", "pipeline-health", "breakdown", "raw-pipeline-health", "danger"]) {
+    // 14 base cards + uptime + worldwide-activity + downloads-by-browser.
+    expect(count).toBe(16);
+    for (const id of [
+      "overview",
+      "pipeline-health",
+      "uptime",
+      "worldwide-activity",
+      "breakdown",
+      "downloads-by-browser",
+      "raw-pipeline-health",
+      "danger",
+    ]) {
       expect(html).toContain(`id="${id}" data-card>`);
     }
   });
@@ -391,5 +401,92 @@ describe("Dashboard uptime card", () => {
     const html = renderDashboard(makeStats(), "nonce123<script>", { generatedAt: 1 });
     expect(html).toContain("window.ADMIN_DATA");
     expect(html).not.toContain("nonce123<script>");
+  });
+});
+
+describe("Dashboard downloads-by-browser card", () => {
+  it("renders an honest zero state while reporting is disabled", () => {
+    const html = renderDashboard(makeStats());
+    expect(html).toContain('id="downloads-by-browser"');
+    expect(html).toContain("No reports yet — reporting is disabled");
+    expect(html).toContain("Manual check");
+    expect(html).toContain("chromewebstore.google.com");
+    expect(html).toContain("microsoftedge.microsoft.com");
+    expect(html).toContain("via Mozilla API");
+  });
+
+  it("renders per-browser counts plus Firefox users from the AMO cache", () => {
+    const html = renderDashboard(
+      makeStats({
+        downloadCountAggregates: {
+          total: 1500,
+          installs: 2,
+          byBrowser: { chrome: 900, firefox: 600 },
+          reportsProcessed: 2,
+          recentReports: [],
+        },
+      }),
+      undefined,
+      { amoUsers: { firefoxUsers: 1234, fetchedAtUtc: 1770000000000 } },
+    );
+    expect(html).toContain("900");
+    expect(html).toContain("600");
+    expect(html).toContain("1,500 reported downloads from 2 installs");
+    expect(html).toContain("1,234 users (Mozilla API)");
+  });
+
+  it("renders Firefox users as n/a when the AMO cache is empty", () => {
+    const html = renderDashboard(makeStats());
+    expect(html).toContain("n/a (Mozilla API)");
+  });
+});
+
+describe("Dashboard worldwide activity card", () => {
+  it("renders an honest zero state before any report arrives", () => {
+    const html = renderDashboard(makeStats());
+    expect(html).toContain('id="worldwide-activity"');
+    expect(html).toContain("No reports yet — reporting is disabled");
+  });
+
+  it("lists recent count reports newest first with escaped browser names", () => {
+    const html = renderDashboard(
+      makeStats({
+        downloadCountAggregates: {
+          total: 200,
+          installs: 2,
+          byBrowser: { firefox: 200 },
+          reportsProcessed: 2,
+          recentReports: [
+            { ts: 1770000000000, count: 150, browser: "firefox" },
+            { ts: 1770000060000, count: 50 },
+          ],
+        },
+      }),
+    );
+    expect(html).toContain('id="worldwide-activity"');
+    expect(html).toContain("<td>150</td>");
+    expect(html).toContain("<td>50</td>");
+    expect(html).toContain("firefox");
+    // Newest first: the newer 50-count report lists above the 150 one.
+    const firefoxIdx = html.indexOf("<td>150</td>");
+    const fiftyIdx = html.indexOf("<td>50</td>");
+    expect(fiftyIdx).toBeGreaterThan(0);
+    expect(firefoxIdx).toBeGreaterThan(fiftyIdx);
+  });
+
+  it("escapes hostile browser strings in report rows", () => {
+    const html = renderDashboard(
+      makeStats({
+        downloadCountAggregates: {
+          total: 5,
+          installs: 1,
+          byBrowser: {},
+          reportsProcessed: 1,
+          recentReports: [{ ts: 1770000000000, count: 5, browser: 'chrome"><script>alert(1)</script>' }],
+        },
+      }),
+    );
+    expect(html).not.toContain('<script>alert(1)</script>');
+    expect(html).toContain("chrome&quot;&gt;&lt;script&gt;");
   });
 });
