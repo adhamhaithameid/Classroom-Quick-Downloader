@@ -236,6 +236,12 @@ a {
   margin: 4px 0 0;
 }
 
+.sim-map-count {
+  color: var(--sim-muted);
+  font-weight: 400;
+  text-transform: none;
+}
+
 /* --- Route B (classroom fixtures) --- */
 
 .sim-classroom {

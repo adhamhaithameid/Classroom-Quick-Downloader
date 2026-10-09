@@ -13,6 +13,7 @@ Historical/point-in-time files live in `archive/`.
 - [EXTENSION_TESTING_RUNBOOK.md](EXTENSION_TESTING_RUNBOOK.md) — extension verification layers, fixtures, CI expectations
 - [DEPLOYMENT_RUNBOOK.md](DEPLOYMENT_RUNBOOK.md) — how production deploys work (updated 2026-09 for the Oracle-free pipeline)
 - [BACKUPS.md](BACKUPS.md) — backup sheet, Google Sheets export, restore procedures
+- [../../simulator/README.md](../../simulator/README.md) — UI simulator: every popup/classroom/options state mounted from real extension code, fixture-backed
 
 ## Architecture & data flow
 
