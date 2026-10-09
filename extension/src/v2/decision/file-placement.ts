@@ -131,46 +131,67 @@ export function computePlacement(
   const recipe = getRecipe(viewKind);
   const decisions: PlacementDecision[] = [];
 
-  // If accordion-based and post is collapsed, skip placement entirely
-  // The renderer won't inject buttons for collapsed posts
-  if (recipe.hideWhenCollapsed && !post.isExpanded) {
-    return decisions;
-  }
+  // Collapsed accordion posts keep their SINGLE-file buttons hidden (the
+  // attachment area is not visible). Bug 2.1: the Download All decision is
+  // exempt — V1 mounts its group button on the post header (findHeaderContainer
+  // .N5dSp/.JZicYb), which stays visible when a classwork item is folded, so
+  // the group decision must survive the collapse. Classwork items are collapsed
+  // by default, so gating the group decision here hid post-level Download All
+  // on the New engine entirely.
+  const hideSingleWhenCollapsed = recipe.hideWhenCollapsed && !post.isExpanded;
 
   // Find the anchor for single-file buttons
   // (usually the file element itself, sometimes the header)
-  for (const file of post.files) {
-    // Skip if a button for this file already exists
-    if (isAlreadyPlaced(file.canonicalId, post.element)) {
-      continue;
+  if (!hideSingleWhenCollapsed) {
+    for (const file of post.files) {
+      // Skip if a button for this file already exists
+      if (isAlreadyPlaced(file.canonicalId, post.element)) {
+        continue;
+      }
+
+      // Skip if below the minimum file count threshold
+      // (some recipes might require 2+ files before showing individual buttons)
+      if (post.files.length < recipe.singleButton.minFilesForButton) {
+        continue;
+      }
+
+      const anchor = findAnchorForFile(
+        post.element,
+        file,
+        recipe.singleButton.anchorStrategy,
+        viewKind,
+      );
+
+      decisions.push({
+        fileId: file.canonicalId,
+        targetElement: anchor.element,
+        insertionPoint: recipe.singleButton.insertionPoint,
+        anchorSelector: anchor.selectorUsed,
+        confidence: anchor.confidence,
+        reasonCodes: buildReasonCodes(anchor, 'single', recipe),
+        fallbackUsed: anchor.isFallback,
+      });
     }
-
-    // Skip if below the minimum file count threshold
-    // (some recipes might require 2+ files before showing individual buttons)
-    if (post.files.length < recipe.singleButton.minFilesForButton) {
-      continue;
-    }
-
-    const anchor = findAnchorForFile(
-      post.element,
-      file,
-      recipe.singleButton.anchorStrategy,
-      viewKind,
-    );
-
-    decisions.push({
-      fileId: file.canonicalId,
-      targetElement: anchor.element,
-      insertionPoint: recipe.singleButton.insertionPoint,
-      anchorSelector: anchor.selectorUsed,
-      confidence: anchor.confidence,
-      reasonCodes: buildReasonCodes(anchor, 'single', recipe),
-      fallbackUsed: anchor.isFallback,
-    });
   }
 
-  // Compute Download All placement if enough files
-  if (post.files.length >= recipe.downloadAll.minFilesForDownloadAll) {
+  // Compute Download All placement if enough files. The threshold counts
+  // EXACTLY the single-button set (countSingleButtonEligibleFiles): a node
+  // counts iff the placement pipeline would place (or has placed) a single
+  // download button for it — the same eligibility the group run resolves to
+  // when it enumerates the post's .cqd-download-btn buttons. The previous
+  // counter (attachment-chip signal scan + download validator) was a
+  // SUPERSET of that set: it counted drive.usercontent.google.com /
+  // doc-XX-docs.googleusercontent.com anchors that discovery never
+  // canonicalizes into buttons, so a label could say N while the run did
+  // fewer. The unified predicate keeps the decision, its "N files" label,
+  // the group run, and the hotkey on one set, and keeps the 2.1 promise
+  // honest: "Download All appears on every post with two or more
+  // downloadable attachments" where downloadable = would-get-a-single-
+  // button. The collapse gate stays exempt (bug 2.1): the header-mounted
+  // group button is visible on folded classwork items and expanding re-runs
+  // placement.
+  const attachmentCount = countSingleButtonEligibleFiles(post, recipe);
+  if (attachmentCount >= recipe.downloadAll.minFilesForDownloadAll) {
     const downloadAllId = `download-all:${post.id}`;
 
     if (!isAlreadyPlaced(downloadAllId, post.element)) {
@@ -188,6 +209,9 @@ export function computePlacement(
         confidence: anchor.confidence,
         reasonCodes: buildReasonCodes(anchor, 'download-all', recipe),
         fallbackUsed: anchor.isFallback,
+        // The "N files" label reads this — it must match the threshold the
+        // decision used, even when discovery's file list is smaller.
+        attachmentCount,
       });
     }
   }
@@ -217,6 +241,9 @@ function downloadAllInsertionPoint(
  *
  * Used when we already have individual buttons placed but need to
  * add/update the Download All button (e.g., after file count changes).
+ *
+ * Bug 2.1: exempt from the collapsed gate — the group button lives on the
+ * post header (V1 parity), which stays visible on folded classwork items.
  */
 export function computeDownloadAllPlacement(
   post: ScannedPost,
@@ -224,11 +251,10 @@ export function computeDownloadAllPlacement(
 ): PlacementDecision | null {
   const recipe = getRecipe(viewKind);
 
-  if (post.files.length < recipe.downloadAll.minFilesForDownloadAll) {
-    return null;
-  }
-
-  if (recipe.hideWhenCollapsed && !post.isExpanded) {
+  // Same contract as computePlacement: the threshold counts exactly the
+  // single-button set (count/run parity — see the comment there).
+  const attachmentCount = countSingleButtonEligibleFiles(post, recipe);
+  if (attachmentCount < recipe.downloadAll.minFilesForDownloadAll) {
     return null;
   }
 
@@ -252,7 +278,62 @@ export function computeDownloadAllPlacement(
     confidence: anchor.confidence,
     reasonCodes: buildReasonCodes(anchor, 'download-all', recipe),
     fallbackUsed: anchor.isFallback,
+    // Same contract as computePlacement: the label reads the threshold count.
+    attachmentCount,
   };
+}
+
+// ============================================================================
+// ATTACHMENT COUNTING — the group threshold counts the single-button set
+// ============================================================================
+
+/**
+ * The Download All threshold counts EXACTLY the single-button set (round-1
+ * count/run parity): a node counts if and only if the placement pipeline
+ * would place (or has placed) a single download button for it.
+ *
+ * Final membership:
+ * - the node is a DISCOVERED file — engine-v2 discovery (selector-registry
+ *   FILE_ANCHOR_CANDIDATES + extractFileNode's canonical-id chain) handed it
+ *   to placement as a post.files entry; and
+ * - the single loop's gates hold — `post.files.length >=
+ *   recipe.singleButton.minFilesForButton` (would place: once the post
+ *   clears the minimum, computePlacement's single loop emits a decision for
+ *   EVERY file — findAnchorForFile always resolves, worst case the post-root
+ *   fallback), or a button for its canonical id is already in the post
+ *   (has placed: the run enumerates the existing button as-is).
+ *
+ * Deliberately NOT counted — the removed counter's superset: attachment
+ * chips found by a V1 signal scan (data-attachment-id / .KlRXdf / .luto0c /
+ * …) whose anchors merely pass the download validator. URL families like
+ * drive.usercontent.google.com and doc-XX-docs.googleusercontent.com pass
+ * validateDownloadUrl but match no discovery candidate, so the pipeline
+ * never canonicalizes them into buttons — counting them let the label say N
+ * while the run did fewer. Discovery is the eligibility source: a chip that
+ * never reaches post.files can neither get a single button nor join the
+ * group run, so it must not reach the threshold.
+ *
+ * The collapse gate is NOT part of eligibility: bug 2.1 exempts the group
+ * decision from it (the header-mounted group button stays visible on folded
+ * classwork items, and expanding re-runs placement), so single-button
+ * eligibility is a discovery-level property, not a render-level one.
+ */
+export function countSingleButtonEligibleFiles(
+  post: Pick<ScannedPost, 'element' | 'files'>,
+  recipe: PlacementRecipe,
+): number {
+  let count = 0;
+  for (const file of post.files) {
+    if (post.files.length >= recipe.singleButton.minFilesForButton) {
+      // Would place — same gate computePlacement's single loop applies.
+      count++;
+      continue;
+    }
+    // Below the single-button minimum nothing new is placed, but an
+    // already-placed button still joins the run (has placed).
+    if (isAlreadyPlaced(file.canonicalId, post.element)) count++;
+  }
+  return count;
 }
 
 // ============================================================================

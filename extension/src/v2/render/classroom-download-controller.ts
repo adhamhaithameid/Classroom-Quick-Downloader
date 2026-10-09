@@ -13,11 +13,14 @@
  * exactly like any other CQD download (browser-session Drive fetches — zero
  * Classroom API quota per file).
  *
- * Gating is structural, not checked here: the ONLY caller of
- * ensureClassroomButton is EngineV3 (v3 mode ⇒ configured ⇒ consented), and
- * resolveClassroomApiRouteContext supplies the courseId only on classwork
- * routes. Firefox/unconfigured installs never construct EngineV3, never see
- * the button, and their DOM features are untouched.
+ * Gating: the orchestrator drives ensureClassroomButton on every view
+ * change (bug 2.2 — see orchestrator.syncClassroomButton) for every mode
+ * whose DOM engine is EngineV2 (v2 mode; v3 mode whose EngineV3 delegates
+ * DOM to V2), gated on isApiConfigured() + the primary engine. The
+ * controller itself honors only the route shape: resolveClassroomApiRoute
+ * Context supplies the courseId on classwork routes, and the button is
+ * removed everywhere else. Firefox/unconfigured installs are gated off by
+ * the orchestrator and never see the button.
  *
  * Failure contract (R7): inventory failure → transient "Couldn't list
  * files" state, DOM untouched. A click mid-run is a stop — no new requests
@@ -31,13 +34,16 @@ import type {
   RequestId,
 } from '../../contracts/topics';
 import { findHeaderContainer } from '../../download-all/button-controller';
+import { CLASSROOM_ACTION_LABEL } from './classroom-action-label';
 import {
   CourseInventoryService,
   GoogleClassroomApiClient,
+  InteractiveConsentTokenProvider,
   sharedClassroomRateLimiter,
   ChromeIdentityTokenProvider,
   resolveClassroomApiRouteContext,
 } from '../../engines/v3/api';
+import type { ClassroomApiTokenProvider } from '../../engines/v3/api';
 import { ViewKind } from '../../engines/types';
 
 /** Per-file pacing — v2 group parity (PER_FILE_STAGGER_MS). */
@@ -52,6 +58,12 @@ export interface ClassroomDownloadDeps {
   clearTimeoutFn?: typeof clearTimeout;
   /** Test seam: override the inventory service (production builds the real one). */
   createInventory?: () => CourseInventoryService;
+  /**
+   * Test seam: override the token provider the inventory client uses
+   * (production wraps the Chrome identity one with the interactive-consent
+   * escalation — bug 2.5, user-gesture-scoped).
+   */
+  createTokenProvider?: () => ClassroomApiTokenProvider;
 }
 
 interface ClassroomRun {
@@ -82,10 +94,17 @@ export function installClassroomDownloadController(
   injectedDeps: ClassroomDownloadDeps,
 ): () => void {
   deps = injectedDeps;
+  // Bug 2.5: the click is a user gesture, so the inventory client's token
+  // provider may escalate a non-interactive miss to ONE interactive consent
+  // prompt. Scoped to this client only — student-work discovery keeps the
+  // strictly non-interactive provider.
+  const tokenProvider: ClassroomApiTokenProvider = injectedDeps.createTokenProvider
+    ? injectedDeps.createTokenProvider()
+    : new InteractiveConsentTokenProvider(new ChromeIdentityTokenProvider());
   inventory = injectedDeps.createInventory
     ? injectedDeps.createInventory()
     : new CourseInventoryService(
-        new GoogleClassroomApiClient(new ChromeIdentityTokenProvider(), {
+        new GoogleClassroomApiClient(tokenProvider, {
           beforeCall: () => limiter.acquire(),
         }),
       );
@@ -110,7 +129,7 @@ export function resetClassroomDownloadController(): void {
 }
 
 // ============================================================================
-// BUTTON LIFECYCLE — driven by EngineV3 (init + fullScan)
+// BUTTON LIFECYCLE — driven by the orchestrator (syncClassroomButton on view change)
 // ============================================================================
 
 /** The shared csaa.5 budget — one window for every v3 API caller. */
@@ -119,8 +138,9 @@ const limiter = sharedClassroomRateLimiter;
 /**
  * Ensure the button exists on the current classwork page, and remove it when
  * the route is no longer classwork. Idempotent; safe to call every scan.
- * Called ONLY by EngineV3 (see the gating note in the header). The href
- * parameter is a test seam — production resolves the live location.
+ * Called ONLY by the orchestrator (syncClassroomButton on the view-change
+ * path — see the gating note in the header). The href parameter is a test
+ * seam — production resolves the live location.
  */
 export function ensureClassroomButton(href: string = window.location.href): void {
   if (!deps) return;
@@ -152,7 +172,7 @@ export function ensureClassroomButton(href: string = window.location.href): void
   button.className = 'cqd-classroom-dl';
   button.dataset.cqdCourseId = context.courseId;
   button.setAttribute('aria-live', 'polite');
-  button.textContent = 'Download all classroom files';
+  button.textContent = CLASSROOM_ACTION_LABEL;
   button.addEventListener('click', () => {
     void handleClassroomClick();
   });
@@ -279,7 +299,7 @@ function scheduleReset(currentRun: ClassroomRun): void {
   currentRun.resetTimer = setTimeoutFn(() => {
     if (run === currentRun) {
       currentRun.button.classList.remove('cqd-classroom-dl-busy');
-      setLabel('Download all classroom files');
+      setLabel(CLASSROOM_ACTION_LABEL);
       run = null;
     }
   }, CLASSROOM_FEEDBACK_MS);

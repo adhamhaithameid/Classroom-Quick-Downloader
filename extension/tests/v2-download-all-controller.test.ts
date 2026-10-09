@@ -12,6 +12,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { createEventBus } from '../src/bus/event-bus';
 import type { PageTopicMap } from '../src/contracts/topics';
 import { EngineV2 } from '../src/engines/v2/engine-v2';
+import { engineRegistry } from '../src/engines/engine-registry';
 import type { ViewKind } from '../src/engines/types';
 import {
   wireDownloadPath,
@@ -23,6 +24,8 @@ import {
   uninstallDownloadAllController,
   resetDownloadAllController,
   handleDownloadAllClickV2,
+  handleRunDownloadAllRequest,
+  runDownloadAllForActiveMode,
   getRunFor,
   PER_FILE_STAGGER_MS,
   GROUP_FEEDBACK_MS,
@@ -299,5 +302,163 @@ describe('v2 Download All group machine (z57 S3)', () => {
     }
     expect(group.classList.contains('cqd-all-success')).toBe(true);
     expect(group.querySelector('.cqd-download-all-main')?.textContent).toBe('Downloaded');
+  });
+});
+
+// ===========================================================================
+// Bug 2.1 — the Alt+Shift+D keyboard path. The background relays
+// CQD_RUN_DOWNLOAD_ALL to the tab; in v2 mode the group controller runs the
+// first eligible (≥2 files, not busy) group — V1's download_all.content.ts
+// handler keeps owning legacy/shadow modes.
+// ===========================================================================
+describe('CQD_RUN_DOWNLOAD_ALL shortcut (v2 hotkey path)', () => {
+  let bus: ReturnType<typeof createEventBus<PageTopicMap>>;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    document.body.innerHTML = '';
+    requested.length = 0;
+    sendMessage.mockClear();
+    resetDownloadController();
+    resetDownloadAllController();
+    uninstallDownloadAllController();
+    bus = createEventBus<PageTopicMap>();
+    wireDownloadPath(bus, runtime);
+    installDownloadAllController(runtime);
+    bus.subscribe('download:requested', (p) => requested.push(p));
+  });
+
+  afterEach(() => {
+    uninstallDownloadAllController();
+    resetDownloadController();
+    vi.useRealTimers();
+  });
+
+  it('runs the first eligible group (≥2 files, idle)', () => {
+    makePost(3, 'post-1');
+    makePost(2, 'post-2');
+
+    expect(handleRunDownloadAllRequest()).toBe(true);
+    expect(getRunFor('post-1')).toBeDefined();
+    expect(requested).toHaveLength(1); // first file enters on the run start
+  });
+
+  it('returns false (and starts nothing) when no group is eligible', () => {
+    makePost(1, 'post-1'); // below the ≥2-files threshold
+
+    expect(handleRunDownloadAllRequest()).toBe(false);
+    expect(requested).toHaveLength(0);
+    expect(getRunFor('post-1')).toBeUndefined();
+  });
+
+  it('runs a group with fewer single buttons than the decision count (eligibility is not a DOM census)', () => {
+    // The button's eligibility comes from the placement DECISION (recorded
+    // on the group button as data-cqd-group-count), not from counting
+    // .cqd-download-btn nodes — a collapsed or mid-render post can hold a
+    // placed group button while its single buttons are absent, and the
+    // hotkey must reach the same run path the button click uses.
+    const { group, files } = makePost(2, 'post-1');
+    files[1].remove(); // only ONE single button reachable now
+
+    expect(handleRunDownloadAllRequest()).toBe(true);
+    expect(getRunFor('post-1')).toBeDefined();
+    expect(requested).toHaveLength(1); // the reachable file enters the run
+    expect(group.isConnected).toBe(true);
+  });
+
+  it('skips a group whose decision count is below the threshold (mixed-post regression)', () => {
+    // A post whose downloadable-attachment count is 1 never gets a group
+    // decision in production; a stale/hand-made count="1" button must not
+    // be hotkey-runnable (V1: 1 registered file < MIN_FILES_FOR_DOWNLOAD_ALL).
+    makePost(1, 'post-1');
+
+    expect(handleRunDownloadAllRequest()).toBe(false);
+    expect(requested).toHaveLength(0);
+    expect(getRunFor('post-1')).toBeUndefined();
+  });
+
+  it('skips a busy group and does not restart it', () => {
+    const { group } = makePost(2, 'post-1');
+    handleDownloadAllClickV2('post-1', group);
+    const started = requestedPayloads().length;
+    expect(started).toBe(1);
+
+    expect(handleRunDownloadAllRequest()).toBe(false);
+    expect(requestedPayloads().length).toBe(1); // no new request issued
+    expect(getRunFor('post-1')).toBeDefined();
+  });
+});
+
+// ===========================================================================
+// Follow-up — v3 hotkey parity. EngineV3 (API beta) delegates ALL DOM to
+// EngineV2, so v3 renders the same group buttons — but the bootstrap's
+// CQD_RUN_DOWNLOAD_ALL listener was mode-gated to 'v2' only, leaving the
+// hotkey dead in v3. The mode gate now lives in the controller
+// (runDownloadAllForActiveMode): modes whose DOM engine is EngineV2 — 'v2'
+// AND 'v3' — run the same first-eligible-group path; legacy/shadow return
+// null so the V1 entrypoint handler keeps owning those modes.
+// ===========================================================================
+describe('CQD_RUN_DOWNLOAD_ALL shortcut (v3 mode parity)', () => {
+  let bus: ReturnType<typeof createEventBus<PageTopicMap>>;
+  const registryMode = () =>
+    (engineRegistry as unknown as { getMode: () => string }).getMode();
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    document.body.innerHTML = '';
+    requested.length = 0;
+    sendMessage.mockClear();
+    resetDownloadController();
+    resetDownloadAllController();
+    uninstallDownloadAllController();
+    bus = createEventBus<PageTopicMap>();
+    wireDownloadPath(bus, runtime);
+    installDownloadAllController(runtime);
+    bus.subscribe('download:requested', (p) => requested.push(p));
+  });
+
+  afterEach(() => {
+    uninstallDownloadAllController();
+    resetDownloadController();
+    engineRegistry.setMode('legacy'); // the singleton must not leak modes
+    vi.useRealTimers();
+  });
+
+  it('v3 mode: the hotkey reaches the group controller', () => {
+    makePost(2, 'post-v3');
+    engineRegistry.setMode('v3');
+
+    expect(runDownloadAllForActiveMode()).toBe(true);
+    expect(getRunFor('post-v3')).toBeDefined();
+    expect(requested).toHaveLength(1);
+    expect(registryMode()).toBe('v3');
+  });
+
+  it('v2 mode: unchanged gate through the same seam', () => {
+    makePost(2, 'post-v2');
+    engineRegistry.setMode('v2');
+
+    expect(runDownloadAllForActiveMode()).toBe(true);
+    expect(getRunFor('post-v2')).toBeDefined();
+  });
+
+  it('legacy and shadow modes return null (the V1 entrypoint owns them)', () => {
+    makePost(2, 'post-legacy');
+
+    engineRegistry.setMode('legacy');
+    expect(runDownloadAllForActiveMode()).toBeNull();
+
+    engineRegistry.setMode('shadow');
+    expect(runDownloadAllForActiveMode()).toBeNull();
+
+    expect(requested).toHaveLength(0);
+    expect(getRunFor('post-legacy')).toBeUndefined();
+  });
+
+  it('v3 mode with no eligible group reports no-group (false, not null)', () => {
+    makePost(1, 'post-v3-empty');
+    engineRegistry.setMode('v3');
+
+    expect(runDownloadAllForActiveMode()).toBe(false);
   });
 });

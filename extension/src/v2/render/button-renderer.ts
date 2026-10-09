@@ -276,12 +276,18 @@ export function renderButton(
  * 3. Uses DocumentFragment for batched DOM insertion where possible
  *
  * @param decisions - Placement decisions from file-placement.ts
- * @param files - Map of canonical file ID → ScannedFile
+ * @param files - Map of canonical file ID → ScannedFile (page-wide)
+ * @param postFilesById - Optional map of post ID → that post's own files.
+ *   Download All decisions resolve their file list/count through it so the
+ *   button reflects THE POST, not the page (bug 2.1: the page-wide map made
+ *   every group button report the whole page's file count). Callers that
+ *   don't supply it keep the legacy page-wide behavior.
  * @returns Array of created button elements
  */
 export function renderBatch(
   decisions: PlacementDecision[],
   files: Map<string, ScannedFile>,
+  postFilesById?: Map<string, ScannedFile[]>,
 ): HTMLButtonElement[] {
   if (decisions.length === 0) return [];
 
@@ -299,7 +305,7 @@ export function renderBatch(
 
     if (isDownloadAll) {
       const postId = decision.fileId.replace('download-all:', '');
-      const postFiles = Array.from(files.values());
+      const postFiles = postFilesById?.get(postId) ?? Array.from(files.values());
       const btn = renderDownloadAllButton(decision, postFiles, isDark);
       if (btn) rendered.push(btn);
     } else {
@@ -341,10 +347,14 @@ export function renderDownloadAllButton(
   // Clone the Download All template
   const btn = getDownloadAllTemplate().cloneNode(true) as HTMLButtonElement;
 
-  // Set attributes
+  // Set attributes. The count shown is the DOWNLOADABLE-attachment count the
+  // decision threshold used (V1 parity: the group button reports exactly the
+  // set its group machine counts) — falling back to discovery's file list
+  // for decisions that predate attachmentCount.
+  const count = decision.attachmentCount ?? files.length;
   btn.setAttribute(getFileIdAttr(), decision.fileId);
-  btn.setAttribute('aria-label', `Download all ${files.length} files`);
-  btn.title = `Download All (${files.length} files)`;
+  btn.setAttribute('aria-label', `Download all ${count} files`);
+  btn.title = `Download All (${count} files)`;
 
   // Add extra class from recipe if specified
   for (const code of decision.reasonCodes) {
@@ -355,10 +365,11 @@ export function renderDownloadAllButton(
   // Seed the group sub-text with the file count (V1 parity: "N files")
   const subEl = btn.querySelector('.cqd-download-all-sub');
   if (subEl) {
-    subEl.textContent = `${files.length} ${files.length === 1 ? 'file' : 'files'}`;
+    subEl.textContent = `${count} ${count === 1 ? 'file' : 'files'}`;
   }
-  // The group machine's reset restores the idle sub-text from this count.
-  btn.dataset.cqdGroupCount = String(files.length);
+  // The group machine's reset restores the idle sub-text from this count —
+  // and the hotkey reads it as the decision's eligibility record.
+  btn.dataset.cqdGroupCount = String(count);
 
   // Apply dark mode
   if (isDark) {
@@ -369,6 +380,65 @@ export function renderDownloadAllButton(
   insertAtPosition(btn, decision.targetElement, decision.insertionPoint);
 
   return btn;
+}
+
+/**
+ * Sync an already-placed Download All button with a FRESH decision count
+ * (round-1 stale-count fix): data-cqd-group-count used to be written once at
+ * render, and the placement engine's isAlreadyPlaced check blocks re-render,
+ * so a post whose attachments changed kept the old count — the button label,
+ * its aria/title, and the hotkey's eligibility all read it.
+ *
+ * Called from the engine's render seam (cleanupAndWirePosts) with the same
+ * count the placement decision uses (countSingleButtonEligibleFiles), so the
+ * label and eligibility stay truthful after every scan. Mirrors V1's
+ * updateGroupState (src/download-all/refresh.ts): below the threshold the
+ * group button is REMOVED; otherwise the count surfaces are rewritten.
+ *
+ * Never CREATES a button — the no-duplicates guarantee is untouched; a
+ * removed group button returns only when placement emits a fresh decision.
+ *
+ * @param postEl - The post root to search for the group button
+ * @param postId - The post id (button file id is `download-all:{postId}`)
+ * @param count - The fresh decision count
+ * @param minFilesForDownloadAll - The recipe's group threshold
+ * @param deferVisuals - True while a group run is busy: the sub-text is
+ *   owned by the run machine (progress / cancel affordance), so only the
+ *   dataset is updated — the post-run reset restores the idle label from
+ *   it. aria-label and title are never run-owned and stay truthful.
+ */
+export function syncDownloadAllCount(
+  postEl: HTMLElement,
+  postId: string,
+  count: number,
+  minFilesForDownloadAll: number,
+  deferVisuals: boolean = false,
+): void {
+  const escapedId = safeCssEscape(`download-all:${postId}`);
+  const btn = postEl.querySelector<HTMLButtonElement>(
+    `[${getInjectedAttr()}][${getFileIdAttr()}="${escapedId}"]`,
+  );
+  if (!btn) return;
+
+  // V1 refresh parity: below the threshold the group button goes away.
+  if (count < minFilesForDownloadAll) {
+    btn.remove();
+    return;
+  }
+
+  const recorded = Number(btn.getAttribute('data-cqd-group-count'));
+  if (recorded === count) return;
+
+  // The dataset is the hotkey's eligibility record AND the post-run reset's
+  // label source — always kept fresh.
+  btn.dataset.cqdGroupCount = String(count);
+
+  if (!deferVisuals) {
+    const subEl = btn.querySelector<HTMLElement>('.cqd-download-all-sub');
+    if (subEl) subEl.textContent = `${count} ${count === 1 ? 'file' : 'files'}`;
+  }
+  btn.setAttribute('aria-label', `Download all ${count} files`);
+  btn.title = `Download All (${count} files)`;
 }
 
 /**

@@ -118,10 +118,11 @@ export default defineContentScript({
         m.installDownloadAllController(),
       );
 
-      // 3d-2. Classroom-wide download (csaa.6): the "Download all classroom
-      //     files" button for v3 mode on classwork routes. Rendering is gated
-      //     structurally — only EngineV3 calls ensureClassroomButton, and v3
-      //     mode already implies isApiConfigured + explicit API-beta consent.
+      // 3d-2. Classroom-wide download (csaa.6, bug 2.2): the "Download all
+      //     classroom files" button on classwork routes. Rendering is driven
+      //     by the orchestrator (syncClassroomButton on every view change)
+      //     for every mode whose DOM engine is EngineV2 — v2 AND v3 — gated
+      //     on isApiConfigured() and the primary engine.
       await import('../src/v2/render/classroom-download-controller').then((m) =>
         m.installClassroomDownloadController({ bus: orchestrator.getBus() }),
       );
@@ -138,6 +139,29 @@ export default defineContentScript({
             applyFlagToggle(message.flag, message.enabled !== false);
           }
         });
+      }
+
+      // 3f. Keyboard route (bug 2.1 + hotkey follow-up): Alt+Shift+D is
+      //     relayed by the background as CQD_RUN_DOWNLOAD_ALL. Modes whose
+      //     DOM engine is EngineV2 — v2 AND v3 (EngineV3 delegates its DOM
+      //     to EngineV2, so the group buttons are identical there) — are
+      //     answered by the v2 group controller via
+      //     runDownloadAllForActiveMode(); legacy/shadow modes keep the V1
+      //     entrypoint handler (this listener ignores the message there).
+      if (typeof chrome !== 'undefined' && chrome?.runtime?.onMessage) {
+        const { runDownloadAllForActiveMode } = await import(
+          '../src/v2/render/download-all-controller'
+        );
+        chrome.runtime.onMessage.addListener(
+          (message: { type?: string }, _sender: unknown, sendResponse: (r: unknown) => void) => {
+            if (!message || message.type !== 'CQD_RUN_DOWNLOAD_ALL') return;
+            const handled = runDownloadAllForActiveMode();
+            if (handled === null) return; // legacy/shadow — the V1 entrypoint owns it
+            // Synchronous response + no `true` return — the same contract
+            // the V1 entrypoint's own CQD_RUN_DOWNLOAD_ALL handler uses.
+            sendResponse(handled ? { ok: true } : { ok: false, reason: 'no-group' });
+          },
+        );
       }
 
       // 4. Initialize debug panel (Ctrl+Shift+D to toggle)

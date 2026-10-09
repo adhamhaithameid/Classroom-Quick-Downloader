@@ -69,10 +69,6 @@ import {
   sharedClassroomRateLimiter,
   type ApiDiscoveryService,
 } from './api';
-import {
-  ensureClassroomButton,
-  removeClassroomButton,
-} from '../../v2/render/classroom-download-controller';
 
 // ============================================================================
 // V3 ENGINE — Extends V2 with API integration
@@ -133,10 +129,12 @@ export class EngineV3 implements CQDEngine {
     // signal this is the real init scan; on an aborted one (tests, teardown
     // races) it is a no-op and fullScan picks the posts up instead.
     this.runApiCorroborationPass();
-    // csaa.6: the whole-classroom button is a v3-only feature — this call is
-    // the GATE (v3 mode ⇒ configured ⇒ API-beta consented). The controller
-    // itself removes it when the route is not classwork.
-    ensureClassroomButton();
+    // csaa.6 / bug 2.2: the whole-classroom button is driven by the
+    // ORCHESTRATOR (orchestrator.syncClassroomButton, on the view-change
+    // path) for every EngineV2-DOM mode — v2 and v3 alike. This engine no
+    // longer calls ensureClassroomButton: the orchestrator knows the mode
+    // and the API-config gate, and double-driving from here would be
+    // redundant work on every init/scan.
 
     console.log(
       `[Engine V3] Initialized for view: ${viewKind} (API assist: ${this.latestApiSnapshot ? 'snapshot ready' : 'fallback to DOM'})`,
@@ -152,7 +150,8 @@ export class EngineV3 implements CQDEngine {
     this.apiCorroboration.clear();
     publishStudentWorkApiSnapshot(null);
     sharedClassroomRateLimiter.reset();
-    removeClassroomButton();
+    // Button removal is the orchestrator's job too (syncClassroomButton on
+    // view change / stop) — see the note in init().
     console.log('[Engine V3] Destroyed');
   }
 
@@ -166,9 +165,8 @@ export class EngineV3 implements CQDEngine {
 
   fullScan(): void {
     this.v2.fullScan();
-    // Re-check the button on every scan — SPA navigation between classes
-    // keeps this engine alive but changes the route context underneath it.
-    ensureClassroomButton();
+    // Button re-checks on SPA navigation live in the orchestrator
+    // (syncClassroomButton) — see the note in init().
     if (this.currentView && isStudentWorkView(this.currentView)) {
       // Refresh the cache, THEN corroborate the posts V2 just tracked — the
       // pass reads the detector's cache, so it must not race the refresh.

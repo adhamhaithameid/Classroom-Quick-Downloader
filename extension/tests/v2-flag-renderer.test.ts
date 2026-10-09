@@ -11,6 +11,7 @@ import {
   renderFlagBadge,
   removeStaleBadges,
   removeAllV2Badges,
+  applyFlagToggle,
 } from '../src/v2/render/flag-renderer';
 import {
   injectFlagStyles,
@@ -232,6 +233,216 @@ describe('renderFlagBadge', () => {
     const badge = post.querySelector('[data-cqd-v2-flag="badge"]') as HTMLElement;
     expect(badge.title).toContain('comment');
     expect(badge.getAttribute('aria-label')).toBeTruthy();
+  });
+});
+
+// ============================================================================
+// TEST SUITE: post anchoring (bug 2.4 — highlight must track the changed post)
+// ============================================================================
+
+describe('post anchoring (bug 2.4)', () => {
+  // Classroom post cards are position:static. Flag artifacts are
+  // position:absolute, so on a static card they resolve against the nearest
+  // POSITIONED ancestor — the page/stream container — making the highlight
+  // ring span the whole classroom. V1 parity: the card must get inline
+  // position:relative before any flag artifact is appended.
+
+  function createStaticPost(): HTMLElement {
+    // Real Classroom cards carry no inline position (unlike createPost()).
+    const div = document.createElement('div');
+    div.setAttribute('data-stream-item-id', `post-${Date.now()}`);
+    document.body.appendChild(div);
+    return div;
+  }
+
+  it('sets inline position:relative on a static card when a flag artifact renders', () => {
+    const post = createStaticPost();
+    expect(post.style.position).toBe('');
+
+    renderFlagBadge(makeDecision({
+      finalVerdict: 'comment',
+      commentScore: 80,
+      commentCount: 3,
+    }), post);
+
+    expect(post.style.position).toBe('relative');
+    expect(getComputedStyle(post).position).toBe('relative');
+  });
+
+  it('anchors the overlay to the card (card is positioned while the overlay exists)', () => {
+    // jsdom has no layout engine (offsetParent is always null), so the
+    // browser-side proof "overlay.offsetParent === card" reduces here to its
+    // DOM precondition: the card must be non-static while the overlay exists.
+    const post = createStaticPost();
+    renderFlagBadge(makeDecision({
+      finalVerdict: 'both',
+      commentScore: 80,
+      editedScore: 50,
+      commentCount: 2,
+    }), post);
+
+    expect(post.querySelector('.cqd-overlay-container')).not.toBeNull();
+    expect(getComputedStyle(post).position).not.toBe('static');
+  });
+
+  it('does not overwrite an already-positioned card (inline absolute stays)', () => {
+    const post = createStaticPost();
+    post.style.position = 'absolute';
+
+    renderFlagBadge(makeDecision({
+      finalVerdict: 'comment',
+      commentScore: 80,
+      commentCount: 3,
+    }), post);
+
+    expect(post.style.position).toBe('absolute');
+  });
+
+  it('does not overwrite a card positioned by stylesheet rules', () => {
+    const style = document.createElement('style');
+    style.textContent = '#cqd-styled-card { position: absolute; }';
+    document.head.appendChild(style);
+
+    const post = createStaticPost();
+    post.id = 'cqd-styled-card';
+
+    renderFlagBadge(makeDecision({
+      finalVerdict: 'comment',
+      commentScore: 80,
+      commentCount: 3,
+    }), post);
+
+    // No inline override was added; the stylesheet rule still wins.
+    expect(post.style.position).toBe('');
+    expect(getComputedStyle(post).position).toBe('absolute');
+
+    style.remove();
+  });
+
+  it('clears the added inline position when the verdict becomes "none"', () => {
+    const post = createStaticPost();
+    renderFlagBadge(makeDecision({
+      finalVerdict: 'comment',
+      commentScore: 80,
+      commentCount: 3,
+    }), post);
+    expect(post.style.position).toBe('relative');
+
+    renderFlagBadge(makeDecision({ finalVerdict: 'none' }), post);
+
+    expect(post.style.position).toBe('');
+  });
+
+  it('clears the added inline position via removeStaleBadges', () => {
+    const post = createStaticPost();
+    renderFlagBadge(makeDecision({
+      finalVerdict: 'edited',
+      editedScore: 50,
+    }), post);
+    expect(post.style.position).toBe('relative');
+
+    removeStaleBadges(post);
+
+    expect(post.style.position).toBe('');
+  });
+
+  it('clears the added inline position when a live toggle disables all flags', () => {
+    const post = createStaticPost();
+    renderFlagBadge(makeDecision({
+      finalVerdict: 'both',
+      commentScore: 80,
+      editedScore: 50,
+      commentCount: 2,
+    }), post);
+    expect(post.style.position).toBe('relative');
+
+    applyFlagToggle('commentsFlagEnabled', false);
+    expect(post.style.position).toBe('relative'); // edited half still renders
+    applyFlagToggle('editedFlagEnabled', false);
+    expect(post.style.position).toBe('');
+
+    // Leave toggles enabled for other tests.
+    applyFlagToggle('commentsFlagEnabled', true);
+    applyFlagToggle('editedFlagEnabled', true);
+  });
+
+  it('keeps author-supplied positioning untouched on removal (restores only what we added)', () => {
+    const post = createStaticPost();
+    post.style.position = 'absolute';
+
+    renderFlagBadge(makeDecision({
+      finalVerdict: 'comment',
+      commentScore: 80,
+      commentCount: 3,
+    }), post);
+    expect(post.style.position).toBe('absolute');
+
+    removeStaleBadges(post);
+
+    expect(post.style.position).toBe('absolute');
+  });
+
+  it('restores the added inline position on engine destroy (removeAllV2Badges)', () => {
+    // destroy() runs on every SPA navigation — the walk up to anchored hosts
+    // must resolve BEFORE the artifacts are detached from the DOM.
+    const post = createStaticPost();
+    renderFlagBadge(makeDecision({
+      finalVerdict: 'comment',
+      commentScore: 80,
+      commentCount: 3,
+    }), post);
+    expect(post.style.position).toBe('relative');
+
+    removeAllV2Badges();
+
+    expect(document.querySelectorAll('[data-cqd-v2-flag]')).toHaveLength(0);
+    expect(post.style.position).toBe('');
+  });
+
+  it('clears anchoring bookkeeping on destroy so a fresh render re-anchors from scratch', () => {
+    // 'both' renders two artifacts per card (overlay + pill) — both must
+    // resolve to the same host pre-detach, and the card must be deletable
+    // from anchoredPosts so the next render anchors it again.
+    const post = createStaticPost();
+    renderFlagBadge(makeDecision({
+      finalVerdict: 'both',
+      commentScore: 80,
+      editedScore: 50,
+      commentCount: 2,
+    }), post);
+    expect(post.querySelectorAll('[data-cqd-v2-flag]')).toHaveLength(2);
+    expect(post.style.position).toBe('relative');
+
+    removeAllV2Badges();
+    expect(post.style.position).toBe('');
+
+    // Stale bookkeeping would make ensurePostAnchored early-return here and
+    // leave the card static under the new artifacts.
+    renderFlagBadge(makeDecision({
+      finalVerdict: 'comment',
+      commentScore: 80,
+      commentCount: 1,
+    }), post);
+    expect(post.style.position).toBe('relative');
+
+    removeAllV2Badges();
+    expect(post.style.position).toBe('');
+  });
+
+  it('engine destroy leaves author-supplied positioning untouched', () => {
+    const post = createStaticPost();
+    post.style.position = 'absolute';
+
+    renderFlagBadge(makeDecision({
+      finalVerdict: 'comment',
+      commentScore: 80,
+      commentCount: 3,
+    }), post);
+    expect(post.style.position).toBe('absolute');
+
+    removeAllV2Badges();
+
+    expect(post.style.position).toBe('absolute');
   });
 });
 

@@ -20,10 +20,19 @@ vi.mock('../src/engines/engine-registry', () => ({
     getPrimaryEngine: vi.fn(() => registryState.primary),
   },
 }));
-vi.mock('../src/v2/context/route-classifier', () => ({
-  RouteWatcher: class { start() {} stop() {} },
-  isClassroomUrl: vi.fn((url: string) => url.startsWith('https://classroom.google.com/')),
-}));
+vi.mock('../src/v2/context/route-classifier', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/v2/context/route-classifier')>();
+  return {
+    // Spread the real module first: this mock replaces the module WHOLESALE,
+    // and the orchestrator transitively imports other bindings through it —
+    // the classroom download controller → resolveClassroomApiRouteContext →
+    // classifyRoute. Dropping any binding makes that sync path throw
+    // "no export is defined on the mock" the moment a v4 test reaches it.
+    ...actual,
+    RouteWatcher: class { start() {} stop() {} },
+    isClassroomUrl: vi.fn((url: string) => url.startsWith('https://classroom.google.com/')),
+  };
+});
 vi.mock('../src/v2/compat/shadow-compare', () => ({ ShadowComparator: class {} }));
 
 import { Orchestrator } from '../src/v2/orchestrator/orchestrator';
@@ -532,6 +541,86 @@ describe('Orchestrator observes through the shared page port (S10)', () => {
       'decision:flags',
       'decision:placement',
     ]);
+
+    o.stop();
+  });
+});
+
+// ===========================================================================
+// Bug 2.2 fix round — the classroom sync path resolves routes through the
+// route-classifier mock without undefined bindings
+// ===========================================================================
+
+import {
+  installClassroomDownloadController,
+  resetClassroomDownloadController,
+  uninstallClassroomDownloadController,
+} from '../src/v2/render/classroom-download-controller';
+
+const CLASSROOM_BUTTON_ID = 'cqd-classroom-dl-btn';
+
+describe('Orchestrator classroom sync path (route-context wiring)', () => {
+  beforeEach(() => {
+    // Fresh shared port per test (same idiom as the S10 block above) and the
+    // header container ensureClassroomButton appends the button to.
+    delete (window as { __cqdDomPort?: unknown }).__cqdDomPort;
+    document.body.innerHTML = '<div class="N5dSp"></div>';
+    installClassroomDownloadController({
+      bus: { publish: vi.fn(), subscribe: vi.fn(() => () => {}) } as never,
+    });
+  });
+
+  afterEach(() => {
+    uninstallClassroomDownloadController();
+    resetClassroomDownloadController();
+    vi.unstubAllGlobals();
+    document.body.innerHTML = '';
+    delete (window as { __cqdDomPort?: unknown }).__cqdDomPort;
+    registryState.primary = null;
+  });
+
+  it('handleViewChange on classroom routes resolves route context without undefined bindings', async () => {
+    // syncClassroomButton's gate: primary DOM engine is V2 AND the API is
+    // configured (real config module reads the chrome globals).
+    vi.stubGlobal('chrome', {
+      identity: { getAuthToken: () => {} },
+      runtime: {
+        getManifest: () => ({
+          oauth2: { client_id: 'cqd-test.apps.googleusercontent.com' },
+        }),
+      },
+    });
+    registryState.primary = {
+      name: 'engine-v2',
+      version: '0.0.0-test',
+      init: vi.fn(async () => {}),
+      destroy: vi.fn(),
+      handleMutations: vi.fn(),
+      fullScan: vi.fn(),
+    } as unknown as Record<string, unknown>;
+
+    const o = new Orchestrator();
+    o.start();
+    const drive = (v: ViewKind, u: string): Promise<void> =>
+      (o as unknown as { handleViewChange: (v: ViewKind, p: ViewKind | null, u: string) => Promise<void> })
+        .handleViewChange(v, null, u);
+
+    // Classwork route — the full sync path renders the button through
+    // resolveClassroomApiRouteContext.
+    await drive(ViewKind.CLASSWORK_LIST, 'https://classroom.google.com/w/COURSE_1/t/all');
+    expect(document.querySelectorAll(`#${CLASSROOM_BUTTON_ID}`)).toHaveLength(1);
+
+    // Submissions route — route-context's submissions branch is the ONLY
+    // caller of the classifyRoute binding it imports transitively from
+    // route-classifier. If the v4 mock replaces that module without carrying
+    // classifyRoute, THIS line throws "classifyRoute is not a function".
+    // (Classwork routes never dereference it, so only a submissions URL pins
+    // the binding.) Non-classwork verdict → the button is removed, no throw.
+    await drive(
+      ViewKind.STUDENT_WORK_TEACHER,
+      'https://classroom.google.com/u/0/c/test-class/a/CW_1/submissions',
+    );
+    expect(document.querySelectorAll(`#${CLASSROOM_BUTTON_ID}`)).toHaveLength(0);
 
     o.stop();
   });

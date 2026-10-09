@@ -268,6 +268,14 @@ export interface PlacementDecision {
   confidence: number;
   reasonCodes: string[];
   fallbackUsed: boolean;
+  /**
+   * Download-all decisions only: the downloadable-attachment count the
+   * threshold was evaluated against. The renderer's "N files" label reads
+   * this so the button always reports the same number the decision (and the
+   * hotkey eligibility) used — even when discovery's file list is smaller.
+   * Absent on single-file decisions.
+   */
+  attachmentCount?: number;
 }
 
 // ============================================================================

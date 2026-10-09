@@ -42,6 +42,13 @@ const V2_FLAG_ATTR = 'data-cqd-v2-flag';
 /** Registry of the last decision per post — the live-toggle re-render source. */
 const lastDecisions = new WeakMap<HTMLElement, FlagDecision>();
 
+/**
+ * Cards whose inline position:relative WE set (bug 2.4 anchoring, V1 parity).
+ * Only cards we anchored are eligible for restore-on-removal — author- or
+ * stylesheet-supplied positioning is never touched.
+ */
+const anchoredPosts = new WeakSet<HTMLElement>();
+
 /** Live flag enable state (popup toggles flip these without a reload). */
 const enabled = { comments: true, edited: true };
 
@@ -62,7 +69,7 @@ export function renderFlagBadge(decision: FlagDecision, post: HTMLElement): void
   const { finalVerdict, commentCount } = decision;
 
   if (finalVerdict === 'none') {
-    removeFlagArtifacts(post);
+    removeFlagArtifacts(post, { restorePosition: true });
     return;
   }
 
@@ -70,12 +77,19 @@ export function renderFlagBadge(decision: FlagDecision, post: HTMLElement): void
   const wantEdited = enabled.edited && (finalVerdict === 'edited' || finalVerdict === 'both');
 
   if (!wantComment && !wantEdited) {
-    removeFlagArtifacts(post);
+    removeFlagArtifacts(post, { restorePosition: true });
     return;
   }
 
   const dark = isDarkMode();
   const existing = post.querySelector<HTMLElement>(`[${V2_FLAG_ATTR}="badge"]`);
+
+  // Bug 2.4 anchoring (V1 parity): artifacts are position:absolute, so a
+  // static card makes them resolve against the page container — the highlight
+  // ring spans the whole classroom. Anchor the card first (also covers the
+  // idempotent early-return below, where artifacts already exist).
+  ensurePostAnchored(post);
+
   const existingKind = existing?.getAttribute('data-cqd-flag-kind') ?? null;
   const existingCount = existing?.getAttribute('data-cqd-comment-count') ?? null;
 
@@ -100,16 +114,33 @@ export function renderFlagBadge(decision: FlagDecision, post: HTMLElement): void
 
 /** Remove badges + overlay from one post (verdict 'none' or kind change). */
 export function removeStaleBadges(post: HTMLElement): void {
-  removeFlagArtifacts(post);
+  removeFlagArtifacts(post, { restorePosition: true });
 }
 
 /** Remove ALL V2 flag artifacts in a scope (engine destroy). V1-safe. */
 export function removeAllV2Badges(scope?: HTMLElement): void {
   const root = scope || document.body;
   if (!root) return;
-  for (const el of Array.from(root.querySelectorAll<HTMLElement>(`[${V2_FLAG_ATTR}]`))) {
+  const artifacts = Array.from(root.querySelectorAll<HTMLElement>(`[${V2_FLAG_ATTR}]`));
+  // Resolve each artifact's anchored host BEFORE detaching it: once removed,
+  // parentElement is null and the walk up would find nothing — the destroy
+  // path (every SPA navigation) would leave cards we anchored inline-
+  // positioned with stale anchoredPosts entries.
+  const hosts = new Set<HTMLElement>();
+  for (const el of artifacts) {
+    let node: HTMLElement | null = el.parentElement;
+    while (node) {
+      if (anchoredPosts.has(node)) {
+        hosts.add(node);
+        break;
+      }
+      node = node.parentElement;
+    }
     el.remove();
   }
+  // Restore inline anchoring we added on cards whose artifacts are all gone
+  // (restorePostAnchoring re-checks for surviving artifacts per host).
+  for (const host of hosts) restorePostAnchoring(host);
 }
 
 /**
@@ -264,10 +295,53 @@ function buildBothBadge(count: number, dark: boolean): HTMLElement {
 // ============================================================================
 
 /** Strip every v2 flag artifact from a post. */
-function removeFlagArtifacts(post: HTMLElement): void {
+function removeFlagArtifacts(
+  post: HTMLElement,
+  opts: { restorePosition?: boolean } = {},
+): void {
   for (const el of Array.from(post.querySelectorAll<HTMLElement>(`[${V2_FLAG_ATTR}]`))) {
     el.remove();
   }
+  // Only true-removal paths restore the inline anchoring; the mid-render
+  // call (kind change, artifacts re-appended right after) must not strip it.
+  if (opts.restorePosition) restorePostAnchoring(post);
+}
+
+/**
+ * Bug 2.4 anchoring (V1 parity — comment_frame.content.ts:308 /
+ * edited_frame.content.ts:339): flag artifacts are position:absolute, so the
+ * card must be a positioned ancestor or the overlay ring + edge pills resolve
+ * against the nearest positioned ancestor (the page container). If the card's
+ * computed position is 'static', set inline position:relative. An existing
+ * non-static position (inline or stylesheet) is never overwritten, and only
+ * cards WE anchored are tracked for restore.
+ */
+function ensurePostAnchored(post: HTMLElement): void {
+  if (anchoredPosts.has(post)) return;
+  const view = post.ownerDocument?.defaultView ?? (typeof window === 'undefined' ? null : window);
+  if (!view) return;
+  let position = 'static';
+  try {
+    position = view.getComputedStyle(post).position || 'static';
+  } catch {
+    return;
+  }
+  if (position !== 'static') return;
+  post.style.position = 'relative';
+  anchoredPosts.add(post);
+}
+
+/**
+ * Undo ensurePostAnchored: restore the inline position when the last flag
+ * artifact has left a card we anchored. V1 never restores (it only re-asserts
+ * 'relative' on rescan); we restore to keep the card's DOM as we found it —
+ * cheap, and leaves nothing behind after toggle-off or engine destroy.
+ */
+function restorePostAnchoring(post: HTMLElement): void {
+  if (!anchoredPosts.has(post)) return;
+  if (post.querySelector(`[${V2_FLAG_ATTR}]`)) return; // still has artifacts
+  post.style.position = '';
+  anchoredPosts.delete(post);
 }
 
 /**

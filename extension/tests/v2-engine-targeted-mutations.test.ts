@@ -296,3 +296,116 @@ describe('EngineV2 targeted mutation scans (S11)', () => {
     ).not.toBeNull();
   });
 });
+
+// ============================================================================
+// TARGETED RESCAN KEEPS THE GROUP COUNT TRUTHFUL (round-1 stale-count fix)
+// ============================================================================
+
+describe('EngineV2 targeted rescan syncs the Download All count', () => {
+  let engine: EngineV2;
+  let controller: AbortController;
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    engine = new EngineV2();
+    controller = new AbortController();
+    controller.abort(); // skip waitForContentReady, same idiom as above
+    engineRegistry.setMode('v2');
+  });
+
+  afterEach(() => {
+    engine.destroy();
+    engineRegistry.setMode('shadow');
+  });
+
+  /** A stream post carrying N Drive attachment anchors. */
+  function makePostWithFiles(id: string, driveIds: string[]): HTMLElement {
+    const post = document.createElement('article');
+    post.setAttribute('data-stream-item-id', id);
+    for (const driveId of driveIds) {
+      const anchor = document.createElement('a');
+      anchor.setAttribute('data-drive-id', driveId);
+      anchor.href = `https://drive.google.com/file/d/${driveId}/view`;
+      anchor.textContent = `${driveId.slice(0, 5)}.pdf`;
+      post.appendChild(anchor);
+    }
+    return post;
+  }
+
+  function seedSinglePost(post: HTMLElement): void {
+    const host = document.createElement('div');
+    host.id = 'page';
+    host.appendChild(post);
+    document.body.appendChild(host);
+    engine.init('stream' as ViewKind, controller.signal);
+    engine.fullScan();
+  }
+
+  it('an edited post gets its group count label updated without a duplicate button', async () => {
+    const post = makePostWithFiles('post-edit-1', [
+      'editAaaaaPad20Chars0000',
+      'editBbbbbPad20Chars0000',
+      'editCccccPad20Chars0000',
+    ]);
+    seedSinglePost(post);
+
+    const btn = post.querySelector<HTMLButtonElement>('button.cqd-download-all-btn');
+    expect(btn).not.toBeNull();
+    expect(btn!.dataset.cqdGroupCount).toBe('3');
+
+    // Edit: the third attachment is removed from the post.
+    const removed = post.querySelectorAll('a[data-drive-id]')[2]!;
+    removed.remove();
+    engine.handleMutations([childListMutation(post, [], [removed])]);
+
+    const buttons = post.querySelectorAll<HTMLButtonElement>('button.cqd-download-all-btn');
+    expect(buttons).toHaveLength(1); // no duplicates
+    expect(buttons[0]!.dataset.cqdGroupCount).toBe('2');
+    expect(buttons[0]!.querySelector('.cqd-download-all-sub')?.textContent).toBe('2 files');
+    expect(buttons[0]!.getAttribute('aria-label')).toBe('Download all 2 files');
+    expect(buttons[0]!.title).toBe('Download All (2 files)');
+
+    // The removed file's single button went stale and is cleaned up too.
+    expect(post.querySelectorAll('button.cqd-download-btn')).toHaveLength(2);
+  });
+
+  it('a post whose count rises gets its group count label updated', async () => {
+    const post = makePostWithFiles('post-edit-2', [
+      'riseAaaaaPad20Chars0000',
+      'riseBbbbbPad20Chars0000',
+    ]);
+    seedSinglePost(post);
+    expect(
+      post.querySelector<HTMLButtonElement>('button.cqd-download-all-btn')!.dataset.cqdGroupCount,
+    ).toBe('2');
+
+    const added = document.createElement('a');
+    added.setAttribute('data-drive-id', 'riseCccccPad20Chars0000');
+    added.href = 'https://drive.google.com/file/d/riseCccccPad20Chars0000/view';
+    added.textContent = 'c.pdf';
+    post.appendChild(added);
+    engine.handleMutations([childListMutation(post, [added])]);
+
+    const buttons = post.querySelectorAll<HTMLButtonElement>('button.cqd-download-all-btn');
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0]!.dataset.cqdGroupCount).toBe('3');
+    expect(buttons[0]!.querySelector('.cqd-download-all-sub')?.textContent).toBe('3 files');
+  });
+
+  it('a post dropping below the threshold loses its group button (V1 refresh parity)', async () => {
+    const post = makePostWithFiles('post-edit-3', [
+      'dropAaaaaPad20Chars0000',
+      'dropBbbbbPad20Chars0000',
+    ]);
+    seedSinglePost(post);
+    expect(post.querySelector('button.cqd-download-all-btn')).not.toBeNull();
+
+    const removed = post.querySelectorAll('a[data-drive-id]')[1]!;
+    removed.remove();
+    engine.handleMutations([childListMutation(post, [], [removed])]);
+
+    expect(post.querySelector('button.cqd-download-all-btn')).toBeNull();
+    // The remaining file keeps its single button.
+    expect(post.querySelectorAll('button.cqd-download-btn')).toHaveLength(1);
+  });
+});

@@ -70,14 +70,15 @@ import {
 } from '../../v2/selectors/selector-registry';
 import { engineRegistry } from '../engine-registry';
 import type { SelectorScorer } from '../../v2/selectors/selector-scorer';
-import { computePlacement } from '../../v2/decision/file-placement';
+import { computePlacement, countSingleButtonEligibleFiles } from '../../v2/decision/file-placement';
 import { scoreFlagsForPost } from '../../v2/decision/flag-scoring';
 import { keywordDetector } from '../../detect/keyword/keyword-detector';
 import { runComparison, installCompareGlobals } from '../../compare/compare-runner';
 import type { ScannedPost, ScannedFile } from '../../v2/model/dom-scanner';
-import { renderBatch, removeStaleButtons, removeAllV2Buttons } from '../../v2/render/button-renderer';
+import { renderBatch, removeStaleButtons, removeAllV2Buttons, syncDownloadAllCount } from '../../v2/render/button-renderer';
 import { ensurePostClickWiring, resetDownloadController } from '../../v2/render/download-controller';
-import { resetDownloadAllController } from '../../v2/render/download-all-controller';
+import { resetDownloadAllController, isGroupRunBusy } from '../../v2/render/download-all-controller';
+import { getRecipe } from '../../v2/decision/placement-recipes';
 import { resolveDownloadUrl } from '../../v2/decision/download-url';
 import { sanitizeFileName } from '../../core/name/sanitize';
 import { injectV2Styles, removeV2Styles } from '../../v2/render/button-styles';
@@ -107,6 +108,22 @@ import type { PerformanceSummary, TimingPercentiles } from '../../v2/telemetry/p
  * exactly the cases where a full page scan is the efficient move anyway.
  */
 export const TARGETED_SCAN_MAX_POSTS = 8;
+
+/**
+ * Pure FileNode → ScannedFile projection — one shared mapping for every
+ * consumer that hands engine files to the v2 placement/renderer seam
+ * (planPlacementForPost, buildFileMap, buildPostFilesMap).
+ */
+function toScannedFile(file: FileNode): ScannedFile {
+  return {
+    canonicalId: file.canonicalId,
+    element: file.element,
+    idSource: file.idSource,
+    name: file.name,
+    ext: file.ext,
+    downloadUrl: file.downloadUrl,
+  };
+}
 
 // ============================================================================
 // V2 ENGINE CLASS
@@ -534,7 +551,7 @@ export class EngineV2 implements CQDEngine {
     // renderPlacedButtons), then scoped stale-button cleanup + click wiring.
     if (freshDecisions.length > 0) {
       const fileMap = this.buildFileMap();
-      renderBatch(freshDecisions, fileMap);
+      renderBatch(freshDecisions, fileMap, this.buildPostFilesMap());
       this.recordRenderedButtons(freshDecisions);
     }
     this.cleanupAndWirePosts(affectedNodes);
@@ -1121,14 +1138,7 @@ export class EngineV2 implements CQDEngine {
       id: post.id,
       element: post.element,
       fingerprint: `${post.id}-${post.files.length}-${post.lastScannedAt}`,
-      files: post.files.map((f): ScannedFile => ({
-        canonicalId: f.canonicalId,
-        element: f.element,
-        idSource: f.idSource,
-        name: f.name,
-        ext: f.ext,
-        downloadUrl: f.downloadUrl,
-      })),
+      files: post.files.map(toScannedFile),
       isExpanded: true, // Default to expanded — accordion check done by recipe
       isConnected: post.element.isConnected,
     };
@@ -1161,7 +1171,7 @@ export class EngineV2 implements CQDEngine {
 
     // Render all buttons in one batch
     const fileMap = this.buildFileMap();
-    renderBatch(this.placementDecisions, fileMap);
+    renderBatch(this.placementDecisions, fileMap, this.buildPostFilesMap());
 
     // S5 additive: record what the batch applied (see recordRenderedButtons).
     this.recordRenderedButtons(this.placementDecisions);
@@ -1179,17 +1189,23 @@ export class EngineV2 implements CQDEngine {
     const fileMap = new Map<string, ScannedFile>();
     for (const post of this.postMap.values()) {
       for (const file of post.files) {
-        fileMap.set(file.canonicalId, {
-          canonicalId: file.canonicalId,
-          element: file.element,
-          idSource: file.idSource,
-          name: file.name,
-          ext: file.ext,
-          downloadUrl: file.downloadUrl,
-        });
+        fileMap.set(file.canonicalId, toScannedFile(file));
       }
     }
     return fileMap;
+  }
+
+  /**
+   * Build the post-id → that post's own files map (bug 2.1): the batch
+   * renderer resolves Download All decisions through it so each group button
+   * reports ITS post's file count, not the page-wide total.
+   */
+  private buildPostFilesMap(): Map<string, ScannedFile[]> {
+    const map = new Map<string, ScannedFile[]>();
+    for (const post of this.postMap.values()) {
+      map.set(post.id, post.files.map(toScannedFile));
+    }
+    return map;
   }
 
   /**
@@ -1216,10 +1232,11 @@ export class EngineV2 implements CQDEngine {
   }
 
   /**
-   * Remove stale buttons (files that no longer exist in the post) and
-   * ensure the delegated click wiring, for the given posts. Per-post body
-   * extracted from renderPlacedButtons so the S11 targeted path applies
-   * the same lifecycle to just the touched posts.
+   * Remove stale buttons (files that no longer exist in the post), keep the
+   * Download All button's count truthful, and ensure the delegated click
+   * wiring, for the given posts. Per-post body extracted from
+   * renderPlacedButtons so the S11 targeted path applies the same lifecycle
+   * to just the touched posts.
    */
   private cleanupAndWirePosts(posts: Iterable<PostNode>): void {
     // Materialize once: the caller may pass a live Map iterator
@@ -1229,11 +1246,36 @@ export class EngineV2 implements CQDEngine {
     // button dead (caught by qa-02/06/08, 2026-09-17).
     const postList = Array.from(posts);
 
+    // The count sync needs the recipe for the threshold — both call sites
+    // run post-init where currentView is set; skip otherwise (same guard
+    // shape as planPlacements).
+    const recipe = this.currentView ? getRecipe(this.currentView) : null;
+
     for (const post of postList) {
       const validIds = new Set(post.files.map(f => f.canonicalId));
       // Also keep the Download All button
       validIds.add(`download-all:${post.id}`);
       removeStaleButtons(post.element, validIds);
+
+      // Round-1 stale-count fix: data-cqd-group-count is written once at
+      // render and isAlreadyPlaced blocks re-render, so a post whose
+      // attachments changed kept the old count — the label, aria/title and
+      // the hotkey's eligibility all read it. After every scan, feed the
+      // button the SAME count the placement decision uses
+      // (countSingleButtonEligibleFiles — the single-button set), so label
+      // and eligibility stay truthful. Below the threshold the button is
+      // removed (V1 refresh parity); it returns when placement emits a
+      // fresh decision. Never creates a button — the no-duplicates
+      // guarantee holds.
+      if (recipe) {
+        syncDownloadAllCount(
+          post.element,
+          post.id,
+          countSingleButtonEligibleFiles(post, recipe),
+          recipe.downloadAll.minFilesForDownloadAll,
+          isGroupRunBusy(post.id),
+        );
+      }
     }
 
     // z57 S1: the render seam owns the button lifecycle, so the delegated

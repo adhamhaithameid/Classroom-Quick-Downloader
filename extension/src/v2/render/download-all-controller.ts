@@ -27,6 +27,7 @@
  */
 
 import type { RequestId, AcquireOutcome } from '../../contracts/topics';
+import { engineRegistry } from '../../engines/engine-registry';
 import { getButtonStateV2, setButtonStateV2 } from './button-state';
 import {
   handleSingleDownloadClickV2,
@@ -45,6 +46,8 @@ export const PER_FILE_STAGGER_MS = 1000;
 export const GROUP_FEEDBACK_MS = 3000;
 /** V1's post-cancel reset delay. */
 export const GROUP_CANCELLED_RESET_MS = 1500;
+/** V1 parity (src/download-all/state.ts): minimum attachments for a group. */
+export const MIN_FILES_FOR_DOWNLOAD_ALL = 2;
 
 // ============================================================================
 // TYPES
@@ -116,22 +119,95 @@ export function resetDownloadAllController(): void {
 /**
  * The delegated Download All click. Busy run → cancel; otherwise start.
  * (V1's ensureDownloadAllButton click semantics.)
+ *
+ * @returns true when a run actually started — false for a cancel click and
+ *   for a post with no runnable single buttons (startRun's empty bail, e.g.
+ *   a never-expanded collapsed post). The hotkey scan uses this to move on
+ *   to the next eligible group instead of claiming a run it did not start.
  */
-export function handleDownloadAllClickV2(postId: string, groupButton: HTMLButtonElement): void {
+export function handleDownloadAllClickV2(postId: string, groupButton: HTMLButtonElement): boolean {
   const run = runs.get(postId);
   if (run && !isRunSettled(run)) {
     cancelRun(run);
-    return;
+    return false;
   }
   if (run) {
     // Previous run finished and reset — restart clean.
     teardownRun(run);
     runs.delete(postId);
   }
-  startRun(postId, groupButton);
+  return startRun(postId, groupButton);
 }
 
-function startRun(postId: string, groupButton: HTMLButtonElement): void {
+/**
+ * CQD_RUN_DOWNLOAD_ALL entry (bug 2.1): the Alt+Shift+D keyboard path.
+ *
+ * The background relays the command to the active tab; in v2 mode the V1
+ * entrypoint's handler has no V1 groups to run (the v2 engine renders), so
+ * the v2 controller answers instead — mirroring V1's eligibility: the first
+ * group in document order that is NOT busy and holds ≥2 files wins.
+ *
+ * Runs from the v2 bootstrap's onMessage listener (mode-gated to 'v2');
+ * legacy/shadow modes keep the V1 entrypoint handler.
+ *
+ * Eligibility is the group button's OWN decision record, not a census of
+ * `.cqd-download-btn` nodes: the button exists only where the placement
+ * decision emitted (downloadable attachments ≥ threshold), and
+ * data-cqd-group-count carries that decision's count. Counting single
+ * buttons instead made the hotkey skip posts the button serves — collapsed
+ * classwork items keep their header-anchored group button while their
+ * single-file buttons stay unplaced (bug 2.1's collapse contract).
+ *
+ * @returns true when a group was started (the caller answers the runtime
+ *   message with { ok: true }); false when no group was eligible.
+ */
+export function handleRunDownloadAllRequest(): boolean {
+  const buttons = Array.from(
+    document.querySelectorAll<HTMLButtonElement>('.cqd-download-all-btn'),
+  );
+
+  for (const button of buttons) {
+    const fileId = button.getAttribute('data-cqd-file-id') || '';
+    if (!fileId.startsWith('download-all:')) continue;
+    const postId = fileId.slice('download-all:'.length);
+
+    // Busy group — skip it (V1 parity: only idle groups are eligible).
+    const run = runs.get(postId);
+    if (run && !isRunSettled(run)) continue;
+
+    // Decision-recorded downloadable count (absent attribute = the decision
+    // guarantees the threshold held when the button was placed).
+    const count = Number(button.getAttribute('data-cqd-group-count') ?? MIN_FILES_FOR_DOWNLOAD_ALL);
+    if (count < MIN_FILES_FOR_DOWNLOAD_ALL) continue;
+
+    if (handleDownloadAllClickV2(postId, button)) return true;
+    // The run could not start (no runnable single buttons in this post —
+    // e.g. a never-expanded collapsed post): fall through to the next
+    // eligible group, exactly like V1's first-eligible scan.
+  }
+  return false;
+}
+
+/**
+ * CQD_RUN_DOWNLOAD_ALL for the ACTIVE engine mode — the bootstrap's
+ * onMessage listener delegates here so the mode gate is testable.
+ *
+ * Modes whose DOM engine is EngineV2 answer the hotkey: 'v2', and 'v3' too
+ * (EngineV3 delegates all DOM work to EngineV2, so v3 renders the very same
+ * group buttons and this same controller drives them — the old v2-only gate
+ * left Alt+Shift+D dead in v3). 'legacy'/'shadow' return null: the V1
+ * entrypoint's own CQD_RUN_DOWNLOAD_ALL handler owns those modes.
+ *
+ * @returns true when a group was started, false when the mode is ours but
+ *   no group was eligible, null when the mode is not ours.
+ */
+export function runDownloadAllForActiveMode(): boolean | null {
+  const mode = engineRegistry.getMode();
+  if (mode !== 'v2' && mode !== 'v3') return null;
+  return handleRunDownloadAllRequest();
+}
+
+function startRun(postId: string, groupButton: HTMLButtonElement): boolean {
   const root =
     groupButton.closest<HTMLElement>('[data-stream-item-id]') ??
     groupButton.parentElement ??
@@ -155,7 +231,9 @@ function startRun(postId: string, groupButton: HTMLButtonElement): void {
       requestId: null,
     });
   }
-  if (files.length === 0) return;
+  // Nothing runnable (single buttons not placed yet — collapsed classwork
+  // post): no run to start. The caller reports that instead of claiming one.
+  if (files.length === 0) return false;
 
   const run: GroupRun = {
     root,
@@ -204,6 +282,7 @@ function startRun(postId: string, groupButton: HTMLButtonElement): void {
   });
 
   updateRunUI(run);
+  return true;
 }
 
 /** One file's request settled — promote the group machine. */
@@ -422,4 +501,17 @@ function getRuntime(): GroupRuntime | null {
 /** Test hook: the live run for a post (read-only view). */
 export function getRunFor(postId: string): Readonly<GroupRun> | undefined {
   return runs.get(postId);
+}
+
+/**
+ * Whether a group run for this post is mid-flight (started, not settled).
+ *
+ * The render seam consults this before rewriting the group button's
+ * sub-text: during a run that text is the run machine's progress display
+ * (updateRunUI), so a stale-count sync must defer to it — the dataset
+ * update alone keeps the post-run reset truthful.
+ */
+export function isGroupRunBusy(postId: string): boolean {
+  const run = runs.get(postId);
+  return run !== undefined && !isRunSettled(run);
 }
