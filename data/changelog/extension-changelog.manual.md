@@ -2,6 +2,7 @@
 ### Summary
 Your downloads now celebrate with you: confetti at 18 lifetime milestones and a live download counter in the popup.
 ### Added
+- Levels: you start at level 0 and climb to level 18 — every milestone is a level.
 - Confetti celebrations when you hit a milestone — from your very first file to one million.
 - A download tracker in the popup showing your lifetime total and how far you are from the next celebration.
 ### Changed

@@ -15,6 +15,7 @@ It focuses on meaningful product, reliability, security, and architecture change
 Lifetime download milestones: the extension celebrates your progress with confetti and shows a running download counter in the popup.
 
 ### Added
+- Levels: start at level 0 and climb to level 18 — every milestone is a level.
 - Added milestone celebrations at 18 lifetime totals (1 through 1,000,000, with celebration points at 2,500, 7,500, 25,000, 75,000, and 750,000).
 - Added the popup download tracker: lifetime count, progress toward the next milestone, and a replayable celebration toast.
 - Added the dormant download-count reporting path: per-install aggregate counts reach the worker and the admin dashboard once enabled.
