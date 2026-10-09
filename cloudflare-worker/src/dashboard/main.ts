@@ -1,6 +1,26 @@
 // filepath: cloudflare-worker/src/dashboard/main.ts
 import type { StatsResponse, QuotaDescriptor, ChangelogEntry, ChangelogConfig } from "../types";
 import { FAVICON_PNG_DATA_URI } from "../assets";
+import type { UptimeSummary } from "../uptime";
+import { UPTIME_PING_PATH } from "../uptime";
+import { CHROME_STORE_PAGE_URL } from "../store-stats";
+import type { AdminNotification } from "../notifications";
+import { WORLD_MAP_COUNTRIES, WORLD_MAP_VIEWBOX } from "./world-map-svg";
+
+/**
+ * Shared admin JSON bundle: worker-side data that is not part of the DO
+ * /stats payload. Rendered once per dashboard load into window.ADMIN_DATA;
+ * cards read from this bundle instead of fetching per card.
+ */
+export interface DashboardAdminData {
+  uptime?: UptimeSummary | null;
+  amoUsers?: { firefoxUsers: number; fetchedAtUtc: number } | null;
+  notifications?: {
+    visible: AdminNotification[];
+    dismissedIds: string[];
+  } | null;
+  generatedAt?: number;
+}
 
 function escapeHtml(unsafe: string): string {
   return unsafe
@@ -78,6 +98,48 @@ function countryNameFromCode(code: string): string {
   } catch {
     return "";
   }
+}
+
+// ===== Worldwide map card (zero-dep inline-SVG choropleth) =====
+// Paths come from the generated WORLD_MAP_COUNTRIES constant (Natural Earth
+// 110m, public domain). Fill buckets: index 0 = base (no data), then five
+// accent shades keyed on each country's share of the maximum total.
+const WORLD_MAP_BASE_FILL = "#232838";
+const WORLD_MAP_FILLS = ["#1e3a68", "#27509c", "#3366cc", "#5c8ef2", "#8fb6f9"];
+/** The DO's rest/unknown bucket key (ISO 3166-1 user-assigned range). */
+const WORLD_MAP_REST_CC = "ZZ";
+const WORLD_MAP_TOP_N = 8;
+
+function mapCountryLabel(cc: string): string {
+  if (cc === WORLD_MAP_REST_CC) return "Other";
+  return countryNameFromCode(cc) || cc;
+}
+
+/**
+ * Normalize the DO's per-country totals into sorted [cc, count] pairs.
+ * Keys failing the ISO 3166-1 alpha-2 pattern never reach the SVG or list:
+ * the map is keyed on valid codes only.
+ */
+function normalizeWorldMapData(raw: Record<string, number> | undefined): Array<[string, number]> {
+  const out: Array<[string, number]> = [];
+  for (const [cc, rawCount] of Object.entries(raw ?? {})) {
+    if (!COUNTRY_CODE_PATTERN.test(cc)) continue;
+    const count = Number(rawCount);
+    if (!Number.isFinite(count) || count <= 0) continue;
+    out.push([cc, Math.floor(count)]);
+  }
+  out.sort((a, b) => b[1] - a[1]);
+  return out;
+}
+
+function worldMapFill(counts: Map<string, number>, maxCount: number, cc: string): string {
+  const count = counts.get(cc) ?? 0;
+  if (count <= 0 || maxCount <= 0) return WORLD_MAP_BASE_FILL;
+  const idx = Math.min(
+    WORLD_MAP_FILLS.length - 1,
+    Math.floor((count / maxCount) * WORLD_MAP_FILLS.length),
+  );
+  return WORLD_MAP_FILLS[idx];
 }
 
 function quotaToStateTag(quota?: QuotaDescriptor) {
@@ -624,11 +686,86 @@ function renderReleaseManagementSection(entries: ChangelogEntry[], config: Chang
 }
 // LEGACY_CHANGELOG_DISABLED_END
 
-export function renderDashboard(stats: StatsResponse, scriptNonce?: string): string {
+export function renderDashboard(stats: StatsResponse, scriptNonce?: string, adminData: DashboardAdminData = {}): string {
   const scriptAttr = scriptNonce ? ` nonce="${escapeHtml(scriptNonce)}"` : "";
   const quota = stats.quota;
   const stateTag = quotaToStateTag(quota);
   const flag = quotaToFlag(quota);
+
+  // Uptime card inputs (honest zero state when no check has run yet).
+  const uptime = adminData.uptime ?? null;
+  const uptimeLastCheck = uptime?.lastCheck ?? null;
+  const uptimePercent = (value: number | null | undefined): string =>
+    typeof value === "number" ? `${value.toFixed(1)}%` : "—";
+  // 0% must never render green: >=99 success, >=90 warn, below danger,
+  // no data neutral.
+  const uptimePercentColor = (value: number | null | undefined): string => {
+    if (typeof value !== "number") return "var(--text-primary)";
+    if (value >= 99) return "var(--success)";
+    if (value >= 90) return "var(--warning)";
+    return "var(--danger)";
+  };
+  const uptimeDotColor = uptimeLastCheck
+    ? uptimeLastCheck.ok
+      ? "var(--success)"
+      : "var(--danger)"
+    : "var(--text-disabled)";
+  const uptimeStatusLabel = uptimeLastCheck
+    ? uptimeLastCheck.ok
+      ? "ok"
+      : "fail"
+    : "no checks yet";
+
+  // Downloads-by-browser card inputs (honest zero state while the extension
+  // reporting switch is off).
+  const downloadAggregates = stats.downloadCountAggregates ?? null;
+  const reportedByBrowser: Array<[string, number]> = Object.entries(
+    downloadAggregates?.byBrowser ?? {},
+  ).sort((a, b) => b[1] - a[1]);
+  const hasReportedDownloads = reportedByBrowser.length > 0 && (downloadAggregates?.total ?? 0) > 0;
+  const firefoxUsers = adminData.amoUsers?.firefoxUsers ?? 0;
+  const firefoxUsersLabel =
+    firefoxUsers > 0 ? `${firefoxUsers.toLocaleString()} users (Mozilla API)` : "n/a (Mozilla API)";
+
+  // Worldwide activity card inputs (bounded ring of accepted count reports).
+  const recentReports = downloadAggregates?.recentReports ?? [];
+  const recentReportsDisplay = [...recentReports].reverse();
+
+  // Worldwide map card inputs: per-country totals, colored by relative share.
+  const worldMapPairs = normalizeWorldMapData(downloadAggregates?.byCountry);
+  const worldMapCounts = new Map<string, number>(worldMapPairs);
+  const worldMapMax = worldMapPairs.length > 0 ? worldMapPairs[0][1] : 0;
+  const hasWorldMapData = worldMapPairs.length > 0;
+  const worldMapCountriesReporting = worldMapPairs.filter(([cc]) => cc !== WORLD_MAP_REST_CC).length;
+  // Path data is a build-time constant with a fixed charset (digits, spaces,
+  // M/Z); keys are regex-checked ISO codes, so no dynamic text reaches the
+  // SVG markup unescaped.
+  const worldMapSvgPaths = Object.entries(WORLD_MAP_COUNTRIES)
+    .filter(([cc]) => COUNTRY_CODE_PATTERN.test(cc))
+    .map(
+      ([cc, pathData]) =>
+        `<path d="${pathData}" fill="${worldMapFill(worldMapCounts, worldMapMax, cc)}" data-cc="${cc}"></path>`,
+    )
+    .join("");
+  const worldMapTopPairs = worldMapPairs.slice(0, WORLD_MAP_TOP_N);
+  const worldMapRestPair = worldMapPairs.find(([cc]) => cc === WORLD_MAP_REST_CC);
+  if (worldMapRestPair && !worldMapTopPairs.some(([cc]) => cc === WORLD_MAP_REST_CC)) {
+    worldMapTopPairs.push(worldMapRestPair);
+  }
+  const worldMapListItems = worldMapTopPairs
+    .map(
+      ([cc, count]) =>
+        `<li data-cc="${cc}"><span class="wmap-name">${escapeHtml(mapCountryLabel(cc))}</span>` +
+        `<span class="wmap-count">${count.toLocaleString()}</span></li>`,
+    )
+    .join("");
+
+  // Notifications center inputs (aggregated server-side from existing
+  // health signals; dismissals filtered worker-side before render).
+  const visibleNotifications = adminData.notifications?.visible ?? [];
+  const dismissedNotificationIds = adminData.notifications?.dismissedIds ?? [];
+  const notificationSeverityColor = (severity: string): string =>
+    severity === "critical" ? "var(--danger)" : severity === "warn" ? "var(--warning)" : "var(--accent)";
 
   const requestsToday = quota?.requestsToday ?? 0;
   const remoteEnabled = quota?.remoteEnabled ?? true;
@@ -674,7 +811,6 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
   const cfgAllowLegacy = remoteConfig.allowLegacyEvents ?? true;
   const cfgRemoteReason = remoteConfig.remoteEnabledReason ?? "ok";
   const pipelineHealthUrl = `${workerUrl}/pipeline-health`;
-  const overviewDashboardUrl = `${workerUrl}/api/public/website/overview`;
   const uptimeStatusUrl = pipelineHealthUrl;
   const cfgHealth = remoteConfig.healthThresholds || {
     warnPendingBatches: 10,
@@ -865,7 +1001,6 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
       --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
       
       /* Layout */
-      --sidebar-width: 220px;
       --content-max-width: 1200px;
       --header-height: 64px;
     }
@@ -932,11 +1067,6 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
       to { opacity: 1; transform: translateY(0); }
     }
     
-    @keyframes slideInLeft {
-      from { opacity: 0; transform: translateX(-100%); }
-      to { opacity: 1; transform: translateX(0); }
-    }
-    
     @keyframes fadeIn {
       from { opacity: 0; }
       to { opacity: 1; }
@@ -970,7 +1100,7 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
     }
     
     /* ===== GLOBAL CURSOR STYLES ===== */
-    a, button, .btn, .nav-item, .clickable, .toggle-switch, [role="button"] {
+    a, button, .btn, .tab-item, .clickable, .toggle-switch, [role="button"] {
       cursor: pointer;
     }
     
@@ -978,41 +1108,31 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
       cursor: help;
     }
     
-    /* ===== LAYOUT WRAPPER ===== */
-    .dashboard-layout {
-      display: flex;
-      min-height: 100vh;
-    }
-    
-    /* ===== SIDEBAR NAVIGATION ===== */
-    .sidebar-nav {
-      position: fixed;
-      left: 0;
+    /* ===== TAB BAR NAVIGATION (was fixed sidebar) ===== */
+    .tab-bar-wrap {
+      position: sticky;
       top: 0;
-      width: var(--sidebar-width);
-      height: 100vh;
-      background: var(--bg-card);
-      border-right: 1px solid var(--border);
-      padding: 0;
-      display: flex;
-      flex-direction: column;
       z-index: 1000;
-      overflow-y: auto;
-      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: var(--shadow-lg);
-    }
-    
-    .nav-header {
-      padding: var(--space-2) var(--space-2);
-      margin-bottom: var(--space-4);
+      background: var(--bg-base);
       border-bottom: 1px solid var(--border);
+      padding: var(--space-3) 0;
+      margin: calc(var(--space-6) * -1) 0 var(--space-5);
     }
 
     @keyframes pulse-accent {
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: 0.6; transform: scale(0.85); }
     }
-    
+
+    .tab-bar-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: var(--space-3);
+      margin-bottom: var(--space-3);
+    }
+
     .nav-brand {
       font-size: 0.95rem;
       font-weight: 700;
@@ -1028,7 +1148,7 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
       font-variant-numeric: tabular-nums;
       font-size: 0.95rem;
       color: var(--text-primary);
-      padding: 10px 12px;
+      padding: 6px 12px;
       border-radius: 10px;
       border: 1px solid var(--border-subtle);
       background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
@@ -1061,7 +1181,7 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
     }
 
     .nav-utc-time {
-      font-size: 1.5rem;
+      font-size: 1.1rem;
       color: var(--text-primary);
       letter-spacing: 0.06em;
       white-space: nowrap;
@@ -1069,112 +1189,222 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
     }
 
     .nav-utc-time.is-12h {
-      font-size: 1.1rem;
+      font-size: 0.95rem;
     }
-    
-    .nav-subtitle {
-      font-size: 0.7rem;
-      color: var(--text-muted);
-      margin-top: 2px;
+
+    /* Card search input (tab bar) */
+    .card-search {
+      flex: 1;
+      min-width: 180px;
+      max-width: 340px;
+      padding: 8px 14px;
+      border-radius: var(--radius-full);
+      border: 1px solid var(--border);
+      background: var(--bg-input);
+      color: var(--text-primary);
+      font-size: 0.85rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
     }
-    
-    .nav-section {
-      padding: var(--space-3) var(--space-4);
-      font-size: 0.65rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
+
+    .card-search:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.18);
+    }
+
+    .card-search::placeholder {
       color: var(--text-disabled);
     }
-    
-    .nav-item {
-      display: flex;
-      align-items: center;
-      gap: var(--space-3);
-      padding: var(--space-3) var(--space-5);
-      margin: var(--space-1) var(--space-2);
-      border-radius: var(--radius-sm);
+
+    .search-empty {
+      display: none;
+      margin-top: var(--space-3);
+      padding: var(--space-3) var(--space-4);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      background: var(--bg-surface);
       color: var(--text-muted);
-      text-decoration: none;
       font-size: 0.85rem;
-      font-weight: 500;
-      transition: all 0.2s ease;
-      cursor: pointer;
     }
-    
-    .nav-item:hover {
+
+    .search-empty.visible {
+      display: block;
+    }
+
+    /* Horizontal tab list */
+    .tab-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-1);
+      padding: var(--space-1);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      overflow-x: auto;
+    }
+
+    .tab-item {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-3);
+      margin: 0;
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      font-weight: 500;
+      font-family: inherit;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+    }
+
+    .tab-item:hover {
       color: var(--text-secondary);
       background: var(--bg-hover);
     }
-    
-    .nav-item.active {
+
+    .tab-item[aria-selected="true"] {
       color: var(--accent-hover);
-      background: rgba(59, 130, 246, 0.3);
-      border-left: 2px solid var(--accent);
-      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-      margin-left: 0;
-      padding-left: calc(var(--space-5) - 2px);
+      background: rgba(59, 130, 246, 0.22);
+      border-color: rgba(59, 130, 246, 0.45);
     }
-    
-    .nav-item.active .nav-icon {
+
+    .tab-item[aria-selected="true"] .nav-icon {
       color: var(--accent);
     }
-    
-    /* Scroll offset for section anchors */
-    section[id] {
-      scroll-margin-top: 24px;
+
+    .tab-item:focus-visible,
+    .card-search:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 2px;
     }
-    
-    .nav-icon {
-      width: 18px;
-      height: 18px;
-      flex-shrink: 0;
-    }
-    
-    .nav-item.danger-nav {
+
+    .tab-item.danger-nav {
       color: var(--danger);
     }
-    
-    .nav-item.danger-nav:hover {
+
+    .tab-item.danger-nav:hover {
       background: var(--danger-bg);
     }
-    
-    /* Hamburger Menu */
-    .hamburger-btn {
-      display: none;
-      position: fixed;
-      top: var(--space-4);
-      left: var(--space-4);
-      z-index: 1100;
-      width: 44px;
-      height: 44px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      cursor: pointer;
+
+    .tab-item.danger-nav[aria-selected="true"] {
+      color: #fca5a5;
+      background: var(--danger-bg);
+      border-color: rgba(239, 68, 68, 0.45);
+    }
+
+    .nav-icon {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+
+    .nav-icon.danger-icon {
+      color: var(--danger);
+    }
+
+    /* Notifications tab badge + notification list items */
+    .tab-badge {
+      display: inline-flex;
       align-items: center;
       justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      border-radius: 999px;
+      background: var(--danger);
+      color: #fff;
+      font-size: 0.68rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .notif-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .notif-item {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-4);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg-surface);
+    }
+
+    .notif-chip {
+      flex-shrink: 0;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #fff;
+      margin-top: 2px;
+    }
+
+    .notif-body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .notif-title {
+      font-size: 0.9rem;
+      font-weight: 600;
       color: var(--text-primary);
     }
-    
-    .hamburger-btn svg {
-      width: 22px;
-      height: 22px;
+
+    .notif-detail {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-top: 2px;
     }
-    
-    .sidebar-overlay {
+
+    .notif-empty {
+      padding: var(--space-4);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      color: var(--text-muted);
+      font-size: 0.88rem;
+    }
+
+    .notif-footer {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: var(--space-3);
+      margin-top: var(--space-3);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    /* Tab panels: one visible at a time; search mode shows all */
+    .tab-panel[hidden] {
       display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.6);
-      z-index: 999;
-      backdrop-filter: blur(4px);
+    }
+
+    body.searching .tab-panel[hidden] {
+      display: block;
+    }
+
+    /* Scroll offset for section anchors */
+    section[id] {
+      scroll-margin-top: 96px;
     }
     
     /* ===== MAIN CONTENT ===== */
     .main-content {
       flex: 1;
-      margin-left: var(--sidebar-width);
+      margin-left: 0;
       padding: var(--space-6);
       max-width: 100%;
       overflow-x: hidden;
@@ -1510,6 +1740,54 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
       color: var(--text-muted);
       margin-bottom: var(--space-5);
       line-height: 1.5;
+    }
+
+    /* ===== WORLDWIDE MAP (inline-SVG choropleth, zero deps) ===== */
+    .worldwide-map-layout {
+      display: flex;
+      gap: var(--space-5);
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .worldwide-map-svg {
+      flex: 1 1 420px;
+      min-width: 280px;
+      max-width: 100%;
+      height: auto;
+      border: 1px solid var(--border-muted);
+      border-radius: var(--radius);
+      background: var(--bg-surface);
+      padding: var(--space-2);
+    }
+
+    .worldwide-map-list {
+      flex: 0 1 220px;
+      min-width: 180px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+    }
+
+    .worldwide-map-list li {
+      display: flex;
+      justify-content: space-between;
+      gap: var(--space-3);
+      padding: var(--space-1) var(--space-2);
+      border-radius: var(--radius-xs);
+      font-size: 0.85rem;
+    }
+
+    .worldwide-map-list li:nth-child(odd) {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .worldwide-map-list .wmap-count {
+      color: var(--text-secondary);
+      font-variant-numeric: tabular-nums;
     }
     
     /* Config card unified styling */
@@ -2623,29 +2901,22 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
     }
     
     @media (max-width: 768px) {
-      /* Hide sidebar, show hamburger */
-      .sidebar-nav {
-        transform: translateX(-100%);
+      /* Tab bar: single horizontal scroll strip on small screens */
+      .tab-bar {
+        flex-wrap: nowrap;
       }
-      
-      .sidebar-nav.open {
-        transform: translateX(0);
-        animation: slideInLeft 0.3s ease;
+
+      .tab-item {
+        padding: var(--space-2);
+        font-size: 0.78rem;
       }
-      
-      .hamburger-btn {
-        display: flex;
+
+      .card-search {
+        max-width: none;
       }
-      
-      .sidebar-overlay.active {
-        display: block;
-        animation: fadeIn 0.2s ease;
-      }
-      
+
       .main-content {
-        margin-left: 0;
         padding: var(--space-4);
-        padding-top: calc(var(--space-4) + 60px); /* Space for hamburger */
       }
       
       .page {
@@ -3097,21 +3368,9 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
   </style>
 </head>
 <body>
-  <!-- Hamburger Menu Button -->
-  <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle navigation">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <line x1="3" y1="6" x2="21" y2="6"/>
-      <line x1="3" y1="12" x2="21" y2="12"/>
-      <line x1="3" y1="18" x2="21" y2="18"/>
-    </svg>
-  </button>
-  
-  <!-- Sidebar Overlay -->
-  <div class="sidebar-overlay" id="sidebar-overlay"></div>
-
-  <!-- Sidebar Navigation -->
-  <nav class="sidebar-nav" id="sidebar">
-    <div class="nav-header">
+  <!-- Tab Bar Navigation (was fixed sidebar; same sections, IA only) -->
+  <div class="tab-bar-wrap" id="tab-bar-wrap">
+    <div class="tab-bar-top">
       <div class="nav-brand nav-utc" id="nav-utc-clock" data-tooltip="Current UTC time. All analytics and flush windows use UTC.">
         <div class="nav-utc-row">
           <span class="nav-utc-dot"></span>
@@ -3119,60 +3378,64 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
         </div>
         <span class="nav-utc-time">--:--:--</span>
       </div>
+      <input
+        type="search"
+        id="card-search"
+        class="card-search"
+        data-card-search
+        placeholder="Search cards across all tabs…"
+        aria-label="Search cards across all tabs"
+        autocomplete="off"
+      />
     </div>
-    
-    <div class="nav-section">Analytics</div>
-    <a href="#overview" class="nav-item active" data-section="overview">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-      Overview
-    </a>
-    <a href="#breakdown" class="nav-item" data-section="breakdown">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
-      Breakdown
-    </a>
-    
-    <div class="nav-section">System</div>
-    <a href="#system" class="nav-item" data-section="system">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.82 1.18V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0-1.18-2.82H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08z"/></svg>
-      Environment
-    </a>
-    <a href="#quota" class="nav-item" data-section="quota">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-      Quota & Mode
-    </a>
-    <a href="#remote-config" class="nav-item" data-section="remote-config">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v6"/><path d="M12 17v6"/><path d="M4.22 4.22l4.24 4.24"/><path d="M15.54 15.54l4.24 4.24"/><path d="M1 12h6"/><path d="M17 12h6"/><path d="M4.22 19.78l4.24-4.24"/><path d="M15.54 8.46l4.24-4.24"/></svg>
-      Remote Config
-    </a>
-    
-    <div class="nav-section">Tools</div>
-    <a href="#debug" class="nav-item" data-section="debug">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      Debug & Actions
-    </a>
-    <a href="#raw" class="nav-item" data-section="raw">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-      Raw JSON
-    </a>
-    
-    <div class="nav-section">Security</div>
-    <a href="#security" class="nav-item" data-section="security">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-      Security Settings
-    </a>
-    
-    <div class="nav-section">Data</div>
-    <a href="#datahub" class="nav-item" data-section="datahub">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
-      Data Hub
-    </a>
-    
-    <div class="nav-section">Admin</div>
-    <a href="#danger" class="nav-item danger-nav" data-section="danger">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      Danger Zone
-    </a>
-  </nav>
+    <div class="tab-bar" id="tab-bar" role="tablist" aria-label="Dashboard sections">
+      <button type="button" class="tab-item" id="tab-notifications" role="tab" data-section="notifications" aria-selected="false" aria-controls="panel-notifications" tabindex="-1">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        Notifications${visibleNotifications.length > 0 ? ` <span class="tab-badge" data-notification-count>${visibleNotifications.length}</span>` : ""}
+      </button>
+      <button type="button" class="tab-item active" id="tab-overview" role="tab" data-section="overview" aria-selected="true" aria-controls="panel-overview" tabindex="0">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Overview
+      </button>
+      <button type="button" class="tab-item" id="tab-breakdown" role="tab" data-section="breakdown" aria-selected="false" aria-controls="panel-breakdown" tabindex="-1">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+        Breakdown
+      </button>
+      <button type="button" class="tab-item" id="tab-system" role="tab" data-section="system" aria-selected="false" aria-controls="panel-system" tabindex="-1">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.82 1.18V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0-1.18-2.82H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08z"/></svg>
+        Environment
+      </button>
+      <button type="button" class="tab-item" id="tab-quota" role="tab" data-section="quota" aria-selected="false" aria-controls="panel-quota" tabindex="-1">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        Quota &amp; Mode
+      </button>
+      <button type="button" class="tab-item" id="tab-remote-config" role="tab" data-section="remote-config" aria-selected="false" aria-controls="panel-remote-config" tabindex="-1">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v6"/><path d="M12 17v6"/><path d="M4.22 4.22l4.24 4.24"/><path d="M15.54 15.54l4.24 4.24"/><path d="M1 12h6"/><path d="M17 12h6"/><path d="M4.22 19.78l4.24-4.24"/><path d="M15.54 8.46l4.24-4.24"/></svg>
+        Remote Config
+      </button>
+      <button type="button" class="tab-item" id="tab-debug" role="tab" data-section="debug" aria-selected="false" aria-controls="panel-debug" tabindex="-1">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Debug &amp; Actions
+      </button>
+      <button type="button" class="tab-item" id="tab-raw" role="tab" data-section="raw" aria-selected="false" aria-controls="panel-raw" tabindex="-1">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        Raw JSON
+      </button>
+      <button type="button" class="tab-item" id="tab-security" role="tab" data-section="security" aria-selected="false" aria-controls="panel-security" tabindex="-1">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Security Settings
+      </button>
+      <button type="button" class="tab-item" id="tab-datahub" role="tab" data-section="datahub" aria-selected="false" aria-controls="panel-datahub" tabindex="-1">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        Data Hub
+      </button>
+      <button type="button" class="tab-item danger-nav" id="tab-danger" role="tab" data-section="danger" aria-selected="false" aria-controls="panel-danger" tabindex="-1">
+        <svg class="nav-icon danger-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Danger Zone
+      </button>
+    </div>
+    <div class="search-empty" id="search-empty" data-search-empty role="status">No cards match your search. Clear the query to see every tab.</div>
+  </div>
 
   <!-- Main Content -->
   <div class="main-content">
@@ -3228,8 +3491,54 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
     </div>
 
     <main>
+      <div class="tab-panel" id="panel-notifications" role="tabpanel" aria-labelledby="tab-notifications" data-panel="notifications" hidden>
+      <section class="card" id="notifications" data-card>
+        <h2>Notifications</h2>
+        <div class="section-subtitle">
+          Health signals aggregated from pipeline health, store scrapes, quota
+          proximity, and uptime checks. In-dashboard only — no email, no
+          external pushes.
+        </div>
+        ${visibleNotifications.length === 0
+          ? `<div class="notif-empty" data-zero-state="notifications">All clear — no active notifications.</div>`
+          : `<div class="notif-list" data-notification-list>
+              ${visibleNotifications
+                .map(
+                  (notification) => `<div class="notif-item" data-notification-id="${escapeHtml(notification.id)}" style="border-left-color:${notificationSeverityColor(notification.severity)};">
+                    <span class="notif-chip" style="background:${notificationSeverityColor(notification.severity)};">${escapeHtml(notification.severity)}</span>
+                    <div class="notif-body">
+                      <div class="notif-title">${escapeHtml(notification.title)}</div>
+                      <div class="notif-detail">${escapeHtml(notification.detail)}</div>
+                    </div>
+                    <button type="button" class="btn btn-secondary" data-dismiss-notification="${escapeHtml(notification.id)}" data-tooltip="Hide this notification until it clears and recurs.">Dismiss</button>
+                  </div>`,
+                )
+                .join("")}
+            </div>`}
+        <div class="notif-footer" data-notification-footer>
+          <span>${dismissedNotificationIds.length > 0 ? `${dismissedNotificationIds.length} dismissed` : ""}</span>
+          ${dismissedNotificationIds.length > 0
+            ? `<button type="button" class="btn btn-secondary" id="notif-reset">Reset dismissed</button>`
+            : ""}
+        </div>
+      </section>
+      </div>
+      <div class="tab-panel" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" data-panel="overview">
+      <section class="card" id="live-updates" data-card>
+        <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+          <label class="toggle-switch" data-tooltip="Opens ONE websocket to the worker and receives pushed stats. Closes after 10 minutes, when the tab hides, or when toggled off. The client sends nothing; the server pushes at most one update per 5 seconds.">
+            <input type="checkbox" id="live-toggle" aria-controls="live-state" />
+            <span class="toggle-slider"></span>
+          </label>
+          <div>
+            <div class="metric-label">Go live</div>
+            <div class="metric-sub" id="live-state" data-live-state="off">Off — press to stream stats over one websocket. No polling, no auto-reconnect.</div>
+          </div>
+          <span class="metric-sub" id="live-last-push" style="margin-left:auto;"></span>
+        </div>
+      </section>
       <!-- Top Cards -->
-      <section class="card" id="overview">
+      <section class="card" id="overview" data-card>
         <div class="grid-5">
           <div class="metric" id="card-downloads" data-tooltip="Downloads completed successfully (status=success)">
             <div class="metric-label">Total Downloads</div>
@@ -3292,7 +3601,7 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
           }
         </div>
       </section>
-      <section class="card" id="pipeline-health">
+      <section class="card" id="pipeline-health" data-card>
         <div class="health-header">
           <h2>Pipeline Health</h2>
           <span class="health-chip ok" id="pipeline-health-chip">OK</span>
@@ -3345,7 +3654,125 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
           </div>
         </div>
       </section>
-      <section class="card" id="breakdown">
+      <section class="card" id="uptime" data-card>
+        <h2>Uptime</h2>
+        <div class="section-subtitle">
+          Worker self-check every 5 minutes against <code>${escapeHtml(UPTIME_PING_PATH)}</code>.
+          ${uptimeLastCheck
+            ? `Last check ${escapeHtml(formatTs(uptimeLastCheck.timestamp))} UTC · <span style="display:inline-block;width:8px;height:8px;border-radius:999px;background:${uptimeDotColor};"></span> ${escapeHtml(uptimeStatusLabel)} · ${Math.max(0, Math.round(uptimeLastCheck.latencyMs))}ms`
+            : "First check pending — the history fills in over the next 24 hours."}
+        </div>
+        <div class="grid-3">
+          <div class="metric" id="uptime-24h" data-tooltip="Share of successful self-checks in the last 24h (5-minute ring).">
+            <div class="metric-label">Uptime (24h)</div>
+            <div class="metric-value" style="color:${uptimePercentColor(uptime?.uptime24h)}">${uptimePercent(uptime?.uptime24h)}</div>
+            <div class="metric-sub">${uptime ? `${uptime.checks24h} checks` : "No checks recorded"}</div>
+          </div>
+          <div class="metric" id="uptime-7d" data-tooltip="Share of successful self-checks over the last 7 days (hourly rollups).">
+            <div class="metric-label">Uptime (7d)</div>
+            <div class="metric-value" style="color:${uptimePercentColor(uptime?.uptime7d)}">${uptimePercent(uptime?.uptime7d)}</div>
+            <div class="metric-sub">${uptime ? `${uptime.checks7d} checks` : "No checks recorded"}</div>
+          </div>
+          <div class="metric" id="uptime-last" data-tooltip="Result of the most recent self-check.">
+            <div class="metric-label">Last check</div>
+            <div class="metric-value">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:999px;background:${uptimeDotColor};margin-right:6px;"></span>
+              <span style="font-size:0.9rem;">${escapeHtml(uptimeStatusLabel)}</span>
+            </div>
+            <div class="metric-sub">${uptimeLastCheck ? `consecutive failures: ${uptime?.consecutiveFailures ?? 0}` : "Waiting for the first cron run"}</div>
+          </div>
+        </div>
+      </section>
+      <section class="card" id="worldwide-activity" data-card>
+        <h2>Worldwide Activity</h2>
+        <div class="section-subtitle">
+          Last ${recentReportsDisplay.length > 0 ? recentReportsDisplay.length : 20} accepted download-count
+          reports from active installs (newest first).
+        </div>
+        ${recentReportsDisplay.length === 0
+          ? `<div class="metric-sub" data-zero-state="recent-reports">No reports yet — reporting is disabled.</div>`
+          : `<table class="table">
+              <thead>
+                <tr><th>Reported at (UTC)</th><th>Lifetime downloads</th><th>Browser</th></tr>
+              </thead>
+              <tbody>
+                ${recentReportsDisplay
+                  .map(
+                    (report) => `<tr>
+                      <td>${escapeHtml(formatTs(report.ts))}</td>
+                      <td>${Number(report.count).toLocaleString()}</td>
+                      <td>${escapeHtml(report.browser || "unknown")}</td>
+                    </tr>`,
+                  )
+                  .join("")}
+              </tbody>
+            </table>`}
+      </section>
+      <section class="card" id="worldwide-map" data-card>
+        <h2>Worldwide Map</h2>
+        <div class="section-subtitle">
+          Reported download totals by country, captured server-side from
+          Cloudflare's geo data. Darker blue means more reported downloads.
+          ${hasWorldMapData
+            ? `${worldMapCountriesReporting} countr${worldMapCountriesReporting === 1 ? "y" : "ies"} reporting.`
+            : ""}
+        </div>
+        ${hasWorldMapData
+          ? ""
+          : `<div class="metric-sub" data-zero-state="world-map">No reports yet — reporting is disabled.</div>`}
+        <div class="worldwide-map-layout">
+          <svg
+            id="worldwide-map-svg"
+            class="worldwide-map-svg"
+            viewBox="${WORLD_MAP_VIEWBOX}"
+            preserveAspectRatio="xMidYMid meet"
+            role="img"
+            aria-label="World map of reported downloads by country"
+          >${worldMapSvgPaths}</svg>
+          <ol id="worldwide-map-list" class="worldwide-map-list"${hasWorldMapData ? "" : ' hidden'}>
+            ${worldMapListItems}
+          </ol>
+        </div>
+      </section>
+      </div>
+      <div class="tab-panel" id="panel-breakdown" role="tabpanel" aria-labelledby="tab-breakdown" data-panel="breakdown" hidden>
+      <section class="card" id="downloads-by-browser" data-card>
+        <h2>Downloads by Browser</h2>
+        <div class="section-subtitle">
+          Per-install lifetime counts reported by extensions, next to store-side user counts.
+          ${hasReportedDownloads
+            ? `${Number(downloadAggregates?.total ?? 0).toLocaleString()} reported downloads from ${downloadAggregates?.installs ?? 0} installs.`
+            : "No reports yet — reporting is disabled."}
+        </div>
+        <table class="table">
+          <thead>
+            <tr><th>Browser</th><th>Reported downloads</th><th>Store users</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Chrome</td>
+              <td>${hasReportedDownloads ? Number(downloadAggregates?.byBrowser?.chrome ?? 0).toLocaleString() : "0"}</td>
+              <td><a href="${escapeHtml(CHROME_STORE_PAGE_URL)}" target="_blank" rel="noopener noreferrer">Manual check</a></td>
+            </tr>
+            <tr>
+              <td>Firefox</td>
+              <td>${hasReportedDownloads ? Number(downloadAggregates?.byBrowser?.firefox ?? 0).toLocaleString() : "0"} — Firefox: ${escapeHtml(firefoxUsersLabel)}</td>
+              <td>via Mozilla API</td>
+            </tr>
+            <tr>
+              <td>Edge</td>
+              <td>${hasReportedDownloads ? Number(downloadAggregates?.byBrowser?.edge ?? 0).toLocaleString() : "0"}</td>
+              <td><a href="https://microsoftedge.microsoft.com/addons/detail/ecojbijjkcjdolpeoiemnccgmaeomcmn" target="_blank" rel="noopener noreferrer">Manual check</a></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="metric-sub">
+          ${hasReportedDownloads
+            ? ""
+            : "Reported download columns stay zero until the extension's reporting switch flips."}
+        </div>
+      </section>
+      <section class="card" id="breakdown" data-card>
         <div class="section-title-row">
           <h2>Breakdown by Dimensions</h2>
           <button id="breakdown-toggle-all" class="btn-toggle-all" type="button" data-expanded="false">
@@ -3497,10 +3924,11 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
           </div>
         </div>
       </section>
-
+      </div>
+      <div class="tab-panel" id="panel-system" role="tabpanel" aria-labelledby="tab-system" data-panel="system" hidden>
 
       <!-- Buffer, Timing & Environment -->
-      <section class="card" id="system">
+      <section class="card" id="system" data-card>
         <h2>Buffer, Timing & Environment</h2>
         <div class="grid-3">
           <div id="card-buffer">
@@ -3539,9 +3967,11 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
           </div>
         </div>
       </section>
+      </div>
+      <div class="tab-panel" id="panel-quota" role="tabpanel" aria-labelledby="tab-quota" data-panel="quota" hidden>
 
       <!-- Worker Quota & Mode -->
-      <section class="card" id="quota">
+      <section class="card" id="quota" data-card>
         <h2>Worker Quota & Mode</h2>
         <div class="split-section">
           <!-- Left: Usage -->
@@ -3611,9 +4041,11 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
           </div>
         </div>
       </section>
+      </div>
+      <div class="tab-panel" id="panel-remote-config" role="tabpanel" aria-labelledby="tab-remote-config" data-panel="remote-config" hidden>
 
       <!-- Remote Config -->
-      <section class="card" id="remote-config">
+      <section class="card" id="remote-config" data-card>
         <h2>Remote Config</h2>
         <div class="section-subtitle">
           Controls pushed to the extension. Changes apply on the next config fetch.
@@ -3776,9 +4208,11 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
         </div>
         <div class="rc-status" id="config-status" data-tooltip="Status of the last config operation.">Idle</div>
       </section>
+      </div>
+      <div class="tab-panel" id="panel-debug" role="tabpanel" aria-labelledby="tab-debug" data-panel="debug" hidden>
 
       <!-- Debug & Actions -->
-      <section class="card" id="debug">
+      <section class="card" id="debug" data-card>
         <h2>Debug & Actions</h2>
         <div class="split-section">
           <!-- Debug & Endpoints -->
@@ -3844,7 +4278,7 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
         </div>
       </section>
 
-      <section class="card" id="legacy-changelog-disabled">
+      <section class="card" id="legacy-changelog-disabled" data-card>
         <h2>Extension Changelog Controls Moved</h2>
         <div class="section-subtitle" style="margin-bottom: 12px;">
           Legacy Cloudflare sections <strong>📢 Release Publishing</strong> and
@@ -3855,25 +4289,29 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
           analytics dashboard under <code>Extension Changelog</code>.
         </div>
       </section>
+      </div>
+      <div class="tab-panel" id="panel-raw" role="tabpanel" aria-labelledby="tab-raw" data-panel="raw" hidden>
 
       <!-- Raw /stats payload -->
-      <section class="card" id="raw">
+      <section class="card" id="raw" data-card>
         <h2>Raw /stats payload</h2>
         <div class="metric-sub">
           Direct JSON returned by <code>/stats</code>
         </div>
         <pre id="raw-stats-json" class="code-block code-block-large">${rawStatsJson}</pre>
       </section>
-      <section class="card" id="raw-pipeline-health">
+      <section class="card" id="raw-pipeline-health" data-card>
         <h2>Raw /pipeline-health payload</h2>
         <div class="metric-sub">
           Direct JSON returned by <code>/pipeline-health</code>
         </div>
         <pre id="raw-health-json" class="code-block code-block-large">${rawHealthJson}</pre>
       </section>
+      </div>
+      <div class="tab-panel" id="panel-security" role="tabpanel" aria-labelledby="tab-security" data-panel="security" hidden>
 
       <!-- Security Settings -->
-      <section class="card" id="security">
+      <section class="card" id="security" data-card>
         <h2>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
           Security Settings
@@ -4016,9 +4454,11 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
           </div>
         </div>
       </section>
+      </div>
+      <div class="tab-panel" id="panel-datahub" role="tabpanel" aria-labelledby="tab-datahub" data-panel="datahub" hidden>
 
       <!-- Data Hub -->
-      <section class="card" id="datahub">
+      <section class="card" id="datahub" data-card>
         <h2>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
           Data Hub
@@ -4144,9 +4584,11 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
           </div>
         </div>
       </section>
+      </div>
+      <div class="tab-panel" id="panel-danger" role="tabpanel" aria-labelledby="tab-danger" data-panel="danger" hidden>
 
       <!-- Admin Controls / Danger Zone -->
-      <section class="card danger-zone" id="danger">
+      <section class="card danger-zone" id="danger" data-card>
         <div class="danger-header">
           <div>
             <div class="danger-title">Admin Controls / Danger Zone</div>
@@ -4265,6 +4707,7 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
           </div>
         </div>
       </section>
+      </div>
     </main>
 
     <!-- Context Modal -->
@@ -4341,6 +4784,8 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
       </div>
     </div>
   </div>
+
+  <script${scriptAttr}>window.ADMIN_DATA = ${safeJson(adminData)};</script>
 
   <script${scriptAttr}>
     (function () {
@@ -4980,8 +5425,102 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
 
         updateQuotaChips(stats.quota);
         updateBreakdowns(stats.counters);
+        updateWorldwideMap(
+          stats.downloadCountAggregates && stats.downloadCountAggregates.byCountry,
+        );
         updateLastRefreshLabel();
         updateRemoteConfigForm(stats.remoteConfig || {}, stats.quota || {});
+      }
+
+      // ===== WORLDWIDE MAP live updates (server pushes only; same buckets
+      // and same top-N rules as the server render) =====
+      var WORLD_MAP_BASE_FILL_JS = "#232838";
+      var WORLD_MAP_FILLS_JS = ["#1e3a68", "#27509c", "#3366cc", "#5c8ef2", "#8fb6f9"];
+      var WORLD_MAP_REST_CC_JS = "ZZ";
+      var WORLD_MAP_TOP_N_JS = 8;
+      var WORLD_MAP_CC_RE_JS = /^[A-Z]{2}$/;
+
+      function mapCountryLabelJS(cc) {
+        if (cc === WORLD_MAP_REST_CC_JS) return "Other";
+        return countryNameFromCodeJS(cc) || cc;
+      }
+
+      function normalizeWorldMapDataJS(raw) {
+        var out = [];
+        if (!raw || typeof raw !== "object") return out;
+        Object.keys(raw).forEach(function (cc) {
+          if (!WORLD_MAP_CC_RE_JS.test(cc)) return;
+          var count = Number(raw[cc]);
+          if (!isFinite(count) || count <= 0) return;
+          out.push([cc, Math.floor(count)]);
+        });
+        out.sort(function (a, b) { return b[1] - a[1]; });
+        return out;
+      }
+
+      function buildWorldMapListItemJS(cc, count) {
+        var li = document.createElement("li");
+        li.setAttribute("data-cc", cc);
+        var name = document.createElement("span");
+        name.className = "wmap-name";
+        name.textContent = mapCountryLabelJS(cc);
+        var value = document.createElement("span");
+        value.className = "wmap-count";
+        value.textContent = count.toLocaleString();
+        li.appendChild(name);
+        li.appendChild(value);
+        return li;
+      }
+
+      function updateWorldwideMap(rawByCountry) {
+        var svg = document.getElementById("worldwide-map-svg");
+        var list = document.getElementById("worldwide-map-list");
+        if (!svg || !list) return;
+        var entries = normalizeWorldMapDataJS(rawByCountry);
+        var counts = {};
+        var max = entries.length ? entries[0][1] : 0;
+        entries.forEach(function (e) { counts[e[0]] = e[1]; });
+
+        // Recolor paths; keys were regex-checked at render and re-checked here.
+        var paths = svg.querySelectorAll("path[data-cc]");
+        paths.forEach(function (p) {
+          var cc = p.getAttribute("data-cc") || "";
+          var fill = WORLD_MAP_BASE_FILL_JS;
+          var count = counts[cc] || 0;
+          if (count > 0 && max > 0) {
+            var idx = Math.min(
+              WORLD_MAP_FILLS_JS.length - 1,
+              Math.floor((count / max) * WORLD_MAP_FILLS_JS.length),
+            );
+            fill = WORLD_MAP_FILLS_JS[idx];
+          }
+          if (p.getAttribute("fill") !== fill) p.setAttribute("fill", fill);
+        });
+
+        // Rebuild the top list with DOM nodes (no dynamic innerHTML).
+        while (list.firstChild) list.removeChild(list.firstChild);
+        entries.slice(0, WORLD_MAP_TOP_N_JS).forEach(function (e) {
+          list.appendChild(buildWorldMapListItemJS(e[0], e[1]));
+        });
+        var rest = counts[WORLD_MAP_REST_CC_JS] || 0;
+        if (rest > 0 && !entries.slice(0, WORLD_MAP_TOP_N_JS).some(function (e) {
+          return e[0] === WORLD_MAP_REST_CC_JS;
+        })) {
+          list.appendChild(buildWorldMapListItemJS(WORLD_MAP_REST_CC_JS, rest));
+        }
+        if (entries.length === 0) {
+          list.setAttribute("hidden", "");
+        } else {
+          list.removeAttribute("hidden");
+        }
+        var zero = document.querySelector('[data-zero-state="world-map"]');
+        if (zero) {
+          if (entries.length === 0) {
+            zero.removeAttribute("hidden");
+          } else {
+            zero.setAttribute("hidden", "");
+          }
+        }
       }
 
       function formatDuration(ms) {
@@ -7086,74 +7625,295 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
 
       fetchWebsiteStatus();
 
+      // ===== LIVE UPDATES (user-initiated websocket; zero standing polling) =====
+      // ON = one websocket to /admin/live; the server pushes throttled stats
+      // deltas and the client sends NOTHING after connect (DO hibernation
+      // bills incoming messages 20:1). OFF / 10 minutes / tab hidden /
+      // unload = close. NO auto-reconnect: going live again is always a
+      // user action. These limits are quota-load-bearing.
+      var LIVE_CLOSE_AFTER_MS = 10 * 60 * 1000; // hard auto-close after 10 minutes
+      var LIVE_WS_PATH = "/admin/live";
+      var LIVE_OFF_TEXT = "Off — press to stream stats over one websocket. No polling, no auto-reconnect.";
+      var liveSocket = null;
+      var liveAutoCloseTimer = null;
+
+      function setLiveStatus(text, stateAttr) {
+        var el = document.getElementById("live-state");
+        if (!el) return;
+        if (el.textContent !== text) el.textContent = text;
+        if (stateAttr) el.setAttribute("data-live-state", stateAttr);
+      }
+
+      function setLiveLastPush(text) {
+        var el = document.getElementById("live-last-push");
+        if (el && el.textContent !== text) el.textContent = text;
+      }
+
+      function clearLiveAutoClose() {
+        if (liveAutoCloseTimer) {
+          clearTimeout(liveAutoCloseTimer);
+          liveAutoCloseTimer = null;
+        }
+      }
+
+      function resetLiveToggle() {
+        var toggle = document.getElementById("live-toggle");
+        if (toggle && toggle.checked) toggle.checked = false;
+      }
+
+      function closeLiveSocket(reason) {
+        clearLiveAutoClose();
+        if (liveSocket) {
+          var ws = liveSocket;
+          liveSocket = null;
+          try {
+            ws.close(1000, reason || "client-close");
+          } catch (e) {
+            // Already closing; nothing to do.
+          }
+        }
+        resetLiveToggle();
+        setLiveStatus(LIVE_OFF_TEXT, "off");
+      }
+
+      function handleLiveMessage(event) {
+        try {
+          var msg = JSON.parse(event.data);
+          if (!msg || msg.type !== "stats-delta" || !msg.stats) return;
+          updateUI(msg.stats);
+          setLiveLastPush("Last push " + formatTs(msg.ts) + " UTC");
+          setLiveStatus("Live — receiving pushed stats.", "live");
+        } catch (e) {
+          // Malformed push: ignore it and keep the socket open.
+        }
+      }
+
+      function openLiveSocket() {
+        if (liveSocket) return;
+        var proto = location.protocol === "https:" ? "wss:" : "ws:";
+        var ws;
+        try {
+          ws = new WebSocket(proto + "//" + location.host + LIVE_WS_PATH);
+        } catch (e) {
+          resetLiveToggle();
+          setLiveStatus("Live unavailable in this browser.", "error");
+          return;
+        }
+        liveSocket = ws;
+        setLiveStatus("Connecting…", "connecting");
+        ws.onopen = function () {
+          if (liveSocket !== ws) return;
+          setLiveStatus("Live — receiving pushed stats.", "live");
+        };
+        ws.onmessage = handleLiveMessage;
+        ws.onclose = function () {
+          // No auto-reconnect by design: only the toggle reopens.
+          if (liveSocket !== ws) return;
+          liveSocket = null;
+          clearLiveAutoClose();
+          resetLiveToggle();
+          setLiveStatus(LIVE_OFF_TEXT, "off");
+        };
+        ws.onerror = function () {
+          // onclose fires after onerror; no extra handling here.
+        };
+        // Quota guard: never hold the socket longer than 10 minutes.
+        liveAutoCloseTimer = setTimeout(function () {
+          closeLiveSocket("auto-close-10m");
+          setLiveLastPush("Auto-closed after 10 minutes");
+        }, LIVE_CLOSE_AFTER_MS);
+      }
+
+      var liveToggle = document.getElementById("live-toggle");
+      if (liveToggle) {
+        liveToggle.addEventListener("change", function () {
+          if (liveToggle.checked) {
+            openLiveSocket();
+          } else {
+            closeLiveSocket("user-off");
+          }
+        });
+      }
+
+      // Close when the tab hides or the page unloads (no background sockets).
+      document.addEventListener("visibilitychange", function () {
+        if (document.hidden && liveSocket) closeLiveSocket("tab-hidden");
+      });
+      window.addEventListener("pagehide", function () {
+        if (liveSocket) closeLiveSocket("page-unload");
+      });
+      window.addEventListener("beforeunload", function () {
+        if (liveSocket) closeLiveSocket("page-unload");
+      });
+
       updateLiveIndicator();
       setInterval(updateLiveIndicator, 5000);
       fetchPipelineHealth();
       setInterval(fetchPipelineHealth, 60000);
       
-      // ===== SCROLL TRACKING FOR SIDEBAR NAV =====
-      const sections = document.querySelectorAll('section[id]');
-      const navItems = document.querySelectorAll('.nav-item[data-section]');
-      
-      const observerOptions = {
-        root: null,
-        rootMargin: '-20% 0px -60% 0px',
-        threshold: 0
-      };
-      
-      const observerCallback = (entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            const sectionId = entry.target.getAttribute('id');
-            navItems.forEach(item => {
-              if (item.getAttribute('data-section') === sectionId) {
-                item.classList.add('active');
-              } else {
-                item.classList.remove('active');
-              }
-            });
+      // ===== TAB NAVIGATION + CARD SEARCH =====
+      // Sidebar sections became tabs (same sections, same content, IA only).
+      // Active tab persists via location.hash; existing #anchors keep working:
+      // any hash resolves to the tab panel that contains the target section.
+      const tabs = Array.prototype.slice.call(document.querySelectorAll('.tab-item[data-section]'));
+      const panels = Array.prototype.slice.call(document.querySelectorAll('.tab-panel[data-panel]'));
+      const sections = Array.prototype.slice.call(document.querySelectorAll('section[id]'));
+
+      // Map every section id to the panel that contains it.
+      const panelForSection = {};
+      panels.forEach((panel) => {
+        const name = panel.getAttribute('data-panel');
+        panel.querySelectorAll('section[id]').forEach((section) => {
+          panelForSection[section.getAttribute('id')] = name;
+        });
+        panelForSection[name] = name;
+      });
+
+      function selectTab(name, opts) {
+        const options = opts || {};
+        const known = panels.some((panel) => panel.getAttribute('data-panel') === name);
+        if (!known) return false;
+        tabs.forEach((tab) => {
+          const isTarget = tab.getAttribute('data-section') === name;
+          tab.setAttribute('aria-selected', isTarget ? 'true' : 'false');
+          tab.setAttribute('tabindex', isTarget ? '0' : '-1');
+          tab.classList.toggle('active', isTarget);
+        });
+        panels.forEach((panel) => {
+          const isTarget = panel.getAttribute('data-panel') === name;
+          if (document.body.classList.contains('searching')) {
+            // Search mode shows every panel; hidden is driven by the search filter.
+            panel.hidden = false;
+          } else {
+            panel.hidden = !isTarget;
           }
         });
-      };
-      
-      const observer = new IntersectionObserver(observerCallback, observerOptions);
-      sections.forEach(section => observer.observe(section));
-      
+        if (options.updateHash && location.hash !== '#' + name) {
+          history.replaceState(null, '', '#' + name);
+        }
+        if (options.focusSection) {
+          const target = document.getElementById(name);
+          if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        return true;
+      }
+
+      tabs.forEach((tab, idx) => {
+        tab.addEventListener('click', () => {
+          selectTab(tab.getAttribute('data-section'), { updateHash: true, focusSection: true });
+        });
+        tab.addEventListener('keydown', (event) => {
+          // APG tabs pattern: Left/Right move, Home/End jump, focus activates.
+          const key = event.key;
+          let nextIdx = null;
+          if (key === 'ArrowRight') nextIdx = (idx + 1) % tabs.length;
+          else if (key === 'ArrowLeft') nextIdx = (idx - 1 + tabs.length) % tabs.length;
+          else if (key === 'Home') nextIdx = 0;
+          else if (key === 'End') nextIdx = tabs.length - 1;
+          if (nextIdx === null) return;
+          event.preventDefault();
+          tabs[nextIdx].focus();
+          selectTab(tabs[nextIdx].getAttribute('data-section'), { updateHash: true });
+        });
+      });
+
+      function activateFromHash() {
+        const raw = (location.hash || '').replace(/^#/, '');
+        if (!raw) {
+          selectTab('overview');
+          return;
+        }
+        const panelName = panelForSection[raw] || null;
+        if (panelName) {
+          selectTab(panelName, { focusSection: raw !== panelName });
+        }
+      }
+      window.addEventListener('hashchange', activateFromHash);
+      activateFromHash();
+
+      // ===== CARD SEARCH (client-side, debounced; filters cards across tabs) =====
+      const searchInput = document.getElementById('card-search');
+      const searchEmpty = document.getElementById('search-empty');
+      const searchCards = Array.prototype.slice.call(document.querySelectorAll('main section[data-card]'));
+      let searchTimer = null;
+
+      function applyCardSearch() {
+        const query = (searchInput.value || '').trim().toLowerCase();
+        const searching = query.length > 0;
+        document.body.classList.toggle('searching', searching);
+        let matches = 0;
+        searchCards.forEach((card) => {
+          const hit = !searching || (card.textContent || '').toLowerCase().indexOf(query) !== -1;
+          card.hidden = searching && !hit;
+          if (hit) matches += 1;
+        });
+        tabs.forEach((tab) => {
+          tab.disabled = searching;
+        });
+        panels.forEach((panel) => {
+          panel.hidden = false;
+        });
+        if (searchEmpty) {
+          searchEmpty.classList.toggle('visible', searching && matches === 0);
+        }
+        if (!searching) {
+          activateFromHash();
+        }
+      }
+
+      if (searchInput) {
+        searchInput.addEventListener('input', () => {
+          if (searchTimer) clearTimeout(searchTimer);
+          searchTimer = setTimeout(applyCardSearch, 150);
+        });
+      }
+
+      // ===== NOTIFICATIONS (in-dashboard dismiss; no email, no pushes) =====
+      document.querySelectorAll('[data-dismiss-notification]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const id = button.getAttribute('data-dismiss-notification');
+          if (!id) return;
+          button.disabled = true;
+          try {
+            const res = await fetch('/admin/notifications/dismiss', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin',
+              body: JSON.stringify({ id }),
+            });
+            if (res.ok) {
+              const item = document.querySelector('[data-notification-id="' + id.replace(/"/g, '\\"') + '"]');
+              if (item && item.parentElement) {
+                item.remove();
+              }
+            }
+          } catch (error) {
+            // Leave the item visible when the dismiss call fails.
+          } finally {
+            button.disabled = false;
+          }
+        });
+      });
+
+      const notifReset = document.getElementById('notif-reset');
+      if (notifReset) {
+        notifReset.addEventListener('click', async () => {
+          notifReset.disabled = true;
+          try {
+            const res = await fetch('/admin/notifications/reset', {
+              method: 'POST',
+              credentials: 'same-origin',
+            });
+            if (res.ok) location.reload();
+          } catch (error) {
+            notifReset.disabled = false;
+          }
+        });
+      }
+
       // Add staggered entrance animation to cards
       document.querySelectorAll('.card').forEach((card, i) => {
         card.style.animationDelay = (i * 0.06) + 's';
-      });
-      
-      // ===== HAMBURGER MENU TOGGLE =====
-      const hamburgerBtn = document.getElementById('hamburger-btn');
-      const sidebar = document.getElementById('sidebar');
-      const sidebarOverlay = document.getElementById('sidebar-overlay');
-      
-      function toggleSidebar() {
-        sidebar.classList.toggle('open');
-        sidebarOverlay.classList.toggle('active');
-      }
-      
-      function closeSidebar() {
-        sidebar.classList.remove('open');
-        sidebarOverlay.classList.remove('active');
-      }
-      
-      if (hamburgerBtn) {
-        hamburgerBtn.addEventListener('click', toggleSidebar);
-      }
-      
-      if (sidebarOverlay) {
-        sidebarOverlay.addEventListener('click', closeSidebar);
-      }
-      
-      // Close sidebar on nav item click (mobile)
-      navItems.forEach(item => {
-        item.addEventListener('click', () => {
-          if (window.innerWidth <= 768) {
-            closeSidebar();
-          }
-        });
       });
     })();
   </script>

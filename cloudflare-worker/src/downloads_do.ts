@@ -22,6 +22,9 @@ import type {
 // Explicit type imports (not the tsconfig global): the extension test suite
 // imports this module, and that program does not load workers-types globals.
 import type { D1Database, DurableObjectState } from "@cloudflare/workers-types";
+// workers-types WebSocket (the lib "WebWorker" global with the same name
+// shadows it inside this file).
+import type { WebSocket as DOWebSocket } from "@cloudflare/workers-types";
 import { archiveBatch, pruneArchive, readArchiveStats } from "./event-archive";
 import { generateSecureRandomString, secureRandom } from "./downloads_do/helpers";
 import { timingSafeStringEqual } from "./timing";
@@ -62,6 +65,55 @@ interface InstallDownloadCount {
   count: number;
   browser: string;
   updatedAt: number;
+}
+
+/**
+ * One accepted count report, kept for the dashboard's worldwide activity
+ * card. `count` is what the client reported (lifetime downloads).
+ */
+interface RecentCountReport {
+  ts: number;
+  count: number;
+  browser?: string;
+}
+
+/** Cap for the recentReports ring surfaced on /stats. */
+export const MAX_RECENT_COUNT_REPORTS = 20;
+
+/**
+ * Live stats websocket (/admin/live): server pushes are throttled to at most
+ * one per this interval. The dashboard's live mode is user-initiated and the
+ * client sends nothing after the upgrade (incoming WS messages bill 20:1 on
+ * the free plan), so this throttle bounds the whole feature's cost.
+ */
+export const LIVE_PUSH_MIN_INTERVAL_MS = 5000;
+
+/**
+ * Per-country download-count totals (dashboard worldwide map): keep the top
+ * N named countries and fold everything else (including junk/unknown codes)
+ * into one extra "rest" bucket. Hard bound: at most
+ * MAX_DOWNLOAD_COUNT_COUNTRIES + 1 keys ever persist.
+ */
+export const MAX_DOWNLOAD_COUNT_COUNTRIES = 100;
+/** Rest/unknown bucket key (ISO 3166-1 user-assigned range; never a country). */
+export const DOWNLOAD_COUNTS_REST_COUNTRY = "ZZ";
+
+/** Coerce stored recent-report entries; garbage rows are dropped. */
+function normalizeRecentCountReports(input: unknown): RecentCountReport[] {
+  if (!Array.isArray(input)) return [];
+  const out: RecentCountReport[] = [];
+  for (const value of input) {
+    if (!value || typeof value !== "object") continue;
+    const entry = value as Partial<RecentCountReport>;
+    if (typeof entry.ts !== "number" || !Number.isFinite(entry.ts)) continue;
+    if (typeof entry.count !== "number" || !Number.isFinite(entry.count) || entry.count < 0) continue;
+    out.push({
+      ts: Math.floor(entry.ts),
+      count: Math.floor(entry.count),
+      browser: typeof entry.browser === "string" && entry.browser ? entry.browser.slice(0, 24) : undefined,
+    });
+  }
+  return out.slice(-MAX_RECENT_COUNT_REPORTS);
 }
 
 /**
@@ -148,7 +200,17 @@ type DurableStateShape = {
   // Ring of processed count-report clientBatchIds (idempotency, bounded like
   // processedIds).
   processedCountReports: string[];
-  
+
+  // Ring of the last MAX_RECENT_COUNT_REPORTS accepted count reports
+  // (timestamp + reported count + browser) for the dashboard's worldwide
+  // activity card. Bounded: 20 entries.
+  recentCountReports: RecentCountReport[];
+
+  // Slice 2: per-country reported download totals for the worldwide map
+  // card. Bounded: top MAX_DOWNLOAD_COUNT_COUNTRIES named ISO codes plus a
+  // ZZ rest bucket; unknown/junk country codes fold into the rest bucket.
+  downloadCountsByCountry: Record<string, number>;
+
   // Burst tracking (legacy, kept for compatibility)
   burstCounts: Record<string, { count: number; minute: number }>;
 
@@ -581,6 +643,62 @@ const REQUEST_HISTORY_DAYS = 400;
 const PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC = [3, 6, 9, 12, 15, 18, 21] as const;
 const MAX_PUBLIC_SITE_COUNTRIES = 300;
 const ISO_ALPHA2_PATTERN = /^[A-Z]{2}$/;
+
+/**
+ * Server-side country capture for count reports: the worker copies
+ * request.cf.country into the CF-IPCountry header before the DO sees the
+ * request, so clients cannot choose their own country. Unknown ("XX") and
+ * junk values fold into the ZZ rest bucket.
+ */
+function normalizeCountryCode(input: unknown): string {
+  if (typeof input !== "string") return "";
+  const cc = input.trim().toUpperCase();
+  if (!ISO_ALPHA2_PATTERN.test(cc)) return "";
+  // XX = Cloudflare "unknown"; ZZ is this feature's rest bucket. Both land
+  // in the same anonymous pile rather than posing as real countries.
+  if (cc === "XX") return "";
+  return cc;
+}
+
+/** Coerce stored per-country totals; junk rows are dropped, map stays bounded. */
+function normalizeDownloadCountsByCountry(input: unknown): Record<string, number> {
+  if (!isPlainObject(input)) return {};
+  const out: Record<string, number> = {};
+  for (const [rawCc, rawCount] of Object.entries(input)) {
+    const cc = normalizeCountryCode(rawCc);
+    const count = Number(rawCount);
+    if (!cc || !Number.isFinite(count) || count < 0) continue;
+    out[cc] = Math.floor(count);
+  }
+  return out;
+}
+
+/**
+ * Collapse the smallest named countries into the ZZ rest bucket until the
+ * map holds at most MAX_DOWNLOAD_COUNT_COUNTRIES named entries plus ZZ.
+ */
+function collapseDownloadCountsByCountry(input: Record<string, number>): Record<string, number> {
+  const entries = Object.entries(input);
+  if (entries.length <= MAX_DOWNLOAD_COUNT_COUNTRIES + 1) {
+    return input;
+  }
+  const rest = entries.find(([cc]) => cc === DOWNLOAD_COUNTS_REST_COUNTRY);
+  const named = entries.filter(([cc]) => cc !== DOWNLOAD_COUNTS_REST_COUNTRY);
+  named.sort((a, b) => b[1] - a[1]);
+  const kept = named.slice(0, MAX_DOWNLOAD_COUNT_COUNTRIES);
+  const overflow = named.slice(MAX_DOWNLOAD_COUNT_COUNTRIES);
+  const out: Record<string, number> = {};
+  for (const [cc, count] of kept) out[cc] = count;
+  let restTotal = rest?.[1] ?? 0;
+  for (const [, count] of overflow) restTotal += count;
+  if (restTotal > 0) out[DOWNLOAD_COUNTS_REST_COUNTRY] = restTotal;
+  return out;
+}
+
+/** Copy of the per-country map for /stats and live pushes (already bounded). */
+function summarizeDownloadCountsByCountry(input: Record<string, number> | undefined): Record<string, number> {
+  return input && typeof input === "object" ? { ...input } : {};
+}
 const USER_FRIENDLY_CHANGELOG_GITHUB_URL =
   "https://raw.githubusercontent.com/adhamhaithameid/Classroom-Quick-Downloader/main/user-friendly-changelog.md";
 const CHANGELOG_DEFAULT_APPLY_MODE: ChangelogApplyMode = "manual";
@@ -1984,6 +2102,13 @@ export class DownloadsDurable {
   private data: DurableStateShape | null = null;
   private loaded: Promise<void>;
 
+  // Live stats websocket bookkeeping (in-memory only; never persisted).
+  // livePushLastAt bounds pushes to one per LIVE_PUSH_MIN_INTERVAL_MS;
+  // livePushTimer holds the single trailing-edge push when a change lands
+  // inside the throttle window.
+  private livePushLastAt = 0;
+  private livePushTimer: ReturnType<typeof setTimeout> | null = null;
+
   constructor(state: DurableObjectState, env: Env) {
     this.state = state;
     this.env = env;
@@ -2035,6 +2160,8 @@ export class DownloadsDurable {
       downloadCounts: {},
       downloadCountsDropped: 0,
       processedCountReports: [],
+      recentCountReports: [],
+      downloadCountsByCountry: {},
 
       // Auth-related state
       loginAttempts: {},
@@ -2255,6 +2382,10 @@ export class DownloadsDurable {
       processedCountReports: Array.isArray(stored.processedCountReports)
         ? stored.processedCountReports.filter((id) => typeof id === "string")
         : [],
+      recentCountReports: normalizeRecentCountReports(stored.recentCountReports),
+      downloadCountsByCountry: collapseDownloadCountsByCountry(
+        normalizeDownloadCountsByCountry(stored.downloadCountsByCountry),
+      ),
 
       // Auth-related state
       loginAttempts: stored.loginAttempts ?? base.loginAttempts,
@@ -2963,6 +3094,11 @@ export class DownloadsDurable {
     });
     await this.state.storage.put(STORAGE_KEY_CHANGELOG, { changelog, changelogRevisions });
     await this.state.storage.put(STORAGE_KEY_UNINSTALL, { uninstallSubmissions });
+
+    // Durable-state boundary: persisted changes are what live dashboards
+    // want to see. No-op unless a live websocket is attached, and throttled
+    // to one push per LIVE_PUSH_MIN_INTERVAL_MS.
+    this.notifyLiveStatsChanged();
   }
 
   private get d(): DurableStateShape {
@@ -3192,6 +3328,17 @@ export class DownloadsDurable {
 
     if (pathname === "/pipeline-health" && request.method === "GET") {
       return this.handlePipelineHealth(request);
+    }
+
+    // Live stats websocket (dashboard "Go live" toggle). The worker has
+    // already passed the admin session check; the secret header below is the
+    // session-injected credential. Hibernation API: the DO does not stay
+    // resident for open sockets, and the client sends nothing after connect.
+    if (pathname === "/admin/live" && request.method === "GET") {
+      if (!this.isAuthorizedAdmin(request)) {
+        return json({ ok: false, error: "unauthorized" }, { status: 401 });
+      }
+      return this.handleLiveSocket(request);
     }
 
     if (pathname === "/admin/storage-export" && request.method === "GET") {
@@ -3877,7 +4024,9 @@ export class DownloadsDurable {
       typeof body.installId === "string" &&
       typeof body.lifetimeCount === "number"
     ) {
-      return this.handleDownloadCountReport(body);
+      // Country rides server-side: the worker copied request.cf.country into
+      // the CF-IPCountry header; the client has no say in it.
+      return this.handleDownloadCountReport(body, countryFromRequest);
     }
 
     if (!isPlainObject(body) || !Array.isArray(body.events)) {
@@ -4664,6 +4813,7 @@ export class DownloadsDurable {
 
   private async handleDownloadCountReport(
     body: Record<string, unknown>,
+    country?: string,
   ): Promise<Response> {
     const now = Date.now();
 
@@ -4750,6 +4900,27 @@ export class DownloadsDurable {
         );
       }
     }
+
+    // Worldwide activity feed: keep the last N accepted reports for the
+    // dashboard. Duplicates (replays) and cap-dropped installs stay out.
+    this.d.recentCountReports.push({
+      ts: now,
+      count: lifetimeCount,
+      browser: browser !== "unknown" ? browser : undefined,
+    });
+    if (this.d.recentCountReports.length > MAX_RECENT_COUNT_REPORTS) {
+      this.d.recentCountReports = this.d.recentCountReports.slice(-MAX_RECENT_COUNT_REPORTS);
+    }
+
+    // Worldwide map: fold the report's server-captured country into the
+    // bounded per-country totals. Unknown/junk codes land in the ZZ rest
+    // bucket; the collapse keeps the map at top-N named countries plus ZZ.
+    const countryKey = normalizeCountryCode(country) || DOWNLOAD_COUNTS_REST_COUNTRY;
+    this.d.downloadCountsByCountry[countryKey] =
+      (this.d.downloadCountsByCountry[countryKey] ?? 0) + lifetimeCount;
+    this.d.downloadCountsByCountry = collapseDownloadCountsByCountry(
+      this.d.downloadCountsByCountry,
+    );
 
     await this.persist();
     return json(
@@ -4847,11 +5018,15 @@ export class DownloadsDurable {
       lastEventAt: this.d.lastEventAt ?? null,
       lastFlushAt: this.d.lastFlushAt ?? null,
       counters: this.d.counters ?? {},
-      downloadCountAggregates: computeDownloadCountAggregates(
-        this.d.downloadCounts,
-        this.d.processedCountReports.length,
-        this.d.downloadCountsDropped ?? 0,
-      ),
+      downloadCountAggregates: {
+        ...computeDownloadCountAggregates(
+          this.d.downloadCounts,
+          this.d.processedCountReports.length,
+          this.d.downloadCountsDropped ?? 0,
+        ),
+        byCountry: summarizeDownloadCountsByCountry(this.d.downloadCountsByCountry),
+        recentReports: (this.d.recentCountReports ?? []).slice(-MAX_RECENT_COUNT_REPORTS),
+      },
       retryState: this.d.retryState ?? null,
       quota,
       envSnapshot,
@@ -4910,6 +5085,146 @@ export class DownloadsDurable {
     };
 
     return json(payload);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Live stats websocket (/admin/live, hibernation API)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Accept the dashboard's live-stats upgrade. Called only after the admin
+   * secret check passed (worker session check injects the credential).
+   *
+   * Hibernation API: acceptWebSocket lets the DO evict from memory while the
+   * socket stays open — open sockets cost nothing on the free plan. The
+   * client never sends application messages after connect (incoming messages
+   * bill 20:1); protocol pings are answered by the auto-response pair
+   * without waking the DO.
+   */
+  private handleLiveSocket(_request: Request): Response {
+    const upgrade = (_request.headers.get("Upgrade") || "").toLowerCase();
+    if (upgrade !== "websocket") {
+      return json({ ok: false, error: "expected_websocket_upgrade" }, { status: 426 });
+    }
+
+    const hibernatable = this.state as DurableObjectState & {
+      acceptWebSocket?: (ws: DOWebSocket, tags?: string[]) => void;
+      setWebSocketAutoResponse?: (pair?: unknown) => void;
+    };
+    if (typeof hibernatable.acceptWebSocket !== "function") {
+      // Runtime without the hibernation API (unit tests, old runtimes):
+      // refuse instead of silently pinning the DO in memory.
+      return json({ ok: false, error: "websocket_hibernation_unavailable" }, { status: 501 });
+    }
+
+    // lib "WebWorker" declares a DOM-flavored WebSocketPair that shadows the
+    // workers-types one; align the pair with the hibernation API's type.
+    const pair = new WebSocketPair() as unknown as { 0: DOWebSocket; 1: DOWebSocket };
+    hibernatable.acceptWebSocket(pair[1]);
+    if (typeof hibernatable.setWebSocketAutoResponse === "function") {
+      hibernatable.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
+    }
+
+    // One server-initiated hello so a fresh client paints current values.
+    // Strictly server -> client from here on.
+    try {
+      pair[1].send(JSON.stringify(this.buildLiveStatsMessage("hello")));
+    } catch {
+      // Socket died between accept and send; the client will see the close.
+    }
+
+    // The 101 MUST carry the CLIENT end of the pair on the response's
+    // webSocket property (per the hibernation docs): the runtime hands it to
+    // the connecting client. Without it workerd rejects the handshake and
+    // every upgrade dies as 502 at the worker's stub.fetch. ResponseInit is
+    // cast because lib "WebWorker" shadows the workers-types declaration
+    // that carries the webSocket field.
+    return new Response(null, {
+      status: 101,
+      statusText: "Switching Protocols",
+      headers: { Upgrade: "websocket" },
+      webSocket: pair[0],
+    } as unknown as ResponseInit);
+  }
+
+  /**
+   * Compact live snapshot: the fields the overview cards bind to, plus the
+   * download-count aggregates (worldwide card). Deliberately much smaller
+   * than the full /stats payload — this rides on every throttled push.
+   */
+  private buildLiveStatsMessage(reason: "hello" | "delta"): Record<string, unknown> {
+    const d = this.d;
+    return {
+      type: "stats-delta",
+      reason,
+      ts: Date.now(),
+      stats: {
+        totalEvents: d.totalEvents ?? 0,
+        totalDownloads: d.totalDownloads ?? 0,
+        totalSuccess: d.totalSuccess ?? 0,
+        totalFail: d.totalFail ?? 0,
+        totalCancelled: d.totalCancelled ?? 0,
+        pendingEvents: d.pendingEvents ?? 0,
+        lastEventAt: d.lastEventAt ?? null,
+        lastFlushAt: d.lastFlushAt ?? null,
+        requestsToday: d.reqCountToday ?? 0,
+        doRequestsToday: d.doRequestsToday ?? 0,
+        quota: computeQuotaDescriptor(this.quotaRequestsToday(), d.hardRemoteOff),
+        downloadCountAggregates: {
+          ...computeDownloadCountAggregates(
+            d.downloadCounts,
+            d.processedCountReports.length,
+            d.downloadCountsDropped ?? 0,
+          ),
+          byCountry: summarizeDownloadCountsByCountry(d.downloadCountsByCountry),
+          recentReports: (d.recentCountReports ?? []).slice(-MAX_RECENT_COUNT_REPORTS),
+        },
+      },
+    };
+  }
+
+  /** Connected live sockets; [] when the runtime lacks the hibernation API. */
+  private liveSockets(): DOWebSocket[] {
+    const hibernatable = this.state as DurableObjectState & {
+      getWebSockets?: () => DOWebSocket[];
+    };
+    if (typeof hibernatable.getWebSockets !== "function") return [];
+    const sockets = hibernatable.getWebSockets();
+    return Array.isArray(sockets) ? sockets : [];
+  }
+
+  /** Push the current snapshot to every connected live socket. */
+  private sendLiveStats(reason: "hello" | "delta"): void {
+    const sockets = this.liveSockets();
+    if (sockets.length === 0) return;
+    this.livePushLastAt = Date.now();
+    const payload = JSON.stringify(this.buildLiveStatsMessage(reason));
+    for (const ws of sockets) {
+      try {
+        ws.send(payload);
+      } catch {
+        // Closed or hibernated mid-push; the socket cleans itself up.
+      }
+    }
+  }
+
+  /**
+   * Throttle gate for state changes: immediate push when the window has
+   * elapsed, otherwise one trailing push scheduled at the window edge. At
+   * most one push per LIVE_PUSH_MIN_INTERVAL_MS no matter how hot ingest is.
+   */
+  private notifyLiveStatsChanged(): void {
+    if (this.liveSockets().length === 0) return;
+    const waitMs = this.livePushLastAt + LIVE_PUSH_MIN_INTERVAL_MS - Date.now();
+    if (waitMs <= 0) {
+      this.sendLiveStats("delta");
+      return;
+    }
+    if (this.livePushTimer) return;
+    this.livePushTimer = setTimeout(() => {
+      this.livePushTimer = null;
+      this.sendLiveStats("delta");
+    }, waitMs);
   }
 
   /**
@@ -5384,6 +5699,8 @@ export class DownloadsDurable {
       downloadCounts: {},
       downloadCountsDropped: 0,
       processedCountReports: [],
+      recentCountReports: [],
+      downloadCountsByCountry: {},
       loginAttempts: {},
       ipAllowlistEnabled: false,
       ipAllowlist: [],

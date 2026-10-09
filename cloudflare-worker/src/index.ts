@@ -17,6 +17,16 @@ import {
 import type { StoreHealthDoc } from "./store-stats";
 import { fetchStoreReviews, mergeStoreReviews } from "./store-reviews";
 import type { StoreReview, StoreReviewsSnapshot } from "./store-reviews";
+import { readUptimeSummary, runUptimeSelfCheck, UPTIME_PING_PATH } from "./uptime";
+import {
+  applyDismissals,
+  boundDismissals,
+  buildNotifications,
+  NOTIFICATION_DISMISSALS_KV_KEY,
+  parseDismissals,
+  sanitizeNotificationId,
+} from "./notifications";
+import { readAmoUsersCache, refreshAmoUsersKv } from "./store-stats";
 import type { Env as WorkerEnv, StatsResponse } from "./types";
 
 type WorkerLogLevel = "info" | "warn" | "error";
@@ -582,6 +592,7 @@ function isPublicCorsRoute(pathname: string): boolean {
   return (
     pathname === "/config" ||
     pathname === "/health" ||
+    pathname === UPTIME_PING_PATH ||
     pathname === "/pipeline-health" ||
     pathname === "/public/site-metrics" ||
     pathname === "/changelog" ||
@@ -1231,8 +1242,34 @@ async function handleDashboard(request: Request, env: WorkerEnv): Promise<Respon
       { status: 500 }
     );
   }
+  // Shared admin JSON: one bundle every card reads from (uptime, AMO user
+  // counts, notifications; later slices reuse this seam). No per-card
+  // fetching anywhere.
+  const scrapeHealthDoc = await readStoreHealth(env);
+  const scrapeAlerts = evaluateScrapeHealth(scrapeHealthDoc, {
+    now: Date.now(),
+    failThreshold: SCRAPE_FAIL_THRESHOLD,
+    staleOkMs: SCRAPE_STALE_OK_MS,
+  });
+  const uptimeSummary = await readUptimeSummary(env);
+  const notifications = buildNotifications({
+    stats,
+    pipelineHealth: await fetchPipelineHealthForNotifications(env),
+    scrapeAlerts,
+    uptime: uptimeSummary,
+  });
+  const dismissalState = applyDismissals(notifications, await readNotificationDismissals(env));
+  const adminData = {
+    uptime: uptimeSummary,
+    amoUsers: await readAmoUsersCache(env),
+    notifications: {
+      visible: dismissalState.visible,
+      dismissedIds: dismissalState.dismissedIds,
+    },
+    generatedAt: Date.now(),
+  };
   const nonce = generateCspNonce();
-  const html = renderDashboard(stats, nonce);
+  const html = renderDashboard(stats, nonce, adminData);
 
   return new Response(html, {
     status: 200,
@@ -1982,6 +2019,52 @@ async function handleWebsiteConsoleAdminEndpoint(
 // Used by dashboard to call admin endpoints without exposing the secret
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Live Stats Websocket Proxy (session-gated upgrade; 101 passthrough)
+// ---------------------------------------------------------------------------
+
+/**
+ * Proxy the /admin/live websocket upgrade to the Durable Object after the
+ * EXISTING admin session check (session cookie or X-Admin-Secret — same
+ * resolveAuthContext as every other /admin route). Unauthenticated upgrades
+ * are rejected with 401 before any upgrade is attempted.
+ *
+ * The DO's 101 response carries the upgraded socket and is returned
+ * verbatim: rebuilding the Response (as withCors does) would drop the
+ * webSocket attachment and break the handshake. Browsers cannot send custom
+ * headers on websocket connects, so session-cookie auth is the path the
+ * dashboard uses; the worker injects the DO secret server-side below.
+ */
+async function handleLiveSocketProxy(request: Request, env: WorkerEnv): Promise<Response> {
+  const auth = await resolveAuthContext(request, env);
+  if (!auth.hasValidSecret && !auth.hasValidSession) {
+    return unauthorizedResponse(request, env);
+  }
+
+  const headers = new Headers(request.headers);
+  // CRITICAL: inject the real admin secret for DO authorization (same
+  // pattern as handleProtectedAdminEndpoint).
+  if (!auth.hasValidSecret) {
+    headers.set("X-Admin-Secret", env.DO_SHARED_SECRET);
+  }
+
+  const stub = getDownloadsStub(env);
+  const upgradeReq = new Request(buildDoRpcForwardUrl(request), {
+    method: "GET",
+    headers,
+    redirect: request.redirect,
+  });
+
+  try {
+    return await stub.fetch(upgradeReq);
+  } catch {
+    return new Response(
+      JSON.stringify({ ok: false, error: "upstream_unavailable" }),
+      { status: 502, headers: { "content-type": "application/json; charset=utf-8" } },
+    );
+  }
+}
+
 async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): Promise<Response> {
   const pathname = new URL(request.url).pathname;
   const auth = await resolveAuthContext(request, env);
@@ -2037,6 +2120,47 @@ async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): P
         }),
         { status: 200, headers: { "content-type": "application/json; charset=utf-8" } },
       ),
+      env,
+    );
+  }
+
+  if (pathname === "/admin/notifications/dismiss" && request.method === "POST") {
+    let id: string;
+    try {
+      const body = (await request.json()) as { id?: unknown };
+      id = sanitizeNotificationId(body.id);
+    } catch {
+      id = "";
+    }
+    if (!id) {
+      return withCors(
+        request,
+        new Response(
+          JSON.stringify({ ok: false, error: "invalid_notification_id" }),
+          { status: 400, headers: { "content-type": "application/json; charset=utf-8" } },
+        ),
+        env,
+      );
+    }
+    await dismissNotification(env, id);
+    return withCors(
+      request,
+      new Response(JSON.stringify({ ok: true, dismissed: id }), {
+        status: 200,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      }),
+      env,
+    );
+  }
+
+  if (pathname === "/admin/notifications/reset" && request.method === "POST") {
+    await resetNotificationDismissals(env);
+    return withCors(
+      request,
+      new Response(JSON.stringify({ ok: true, reset: true }), {
+        status: 200,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      }),
       env,
     );
   }
@@ -2522,6 +2646,65 @@ async function writeStoreHealth(env: WorkerEnv, doc: StoreHealthDoc): Promise<vo
     });
   } catch {
     // Best-effort health bookkeeping only.
+  }
+}
+
+// --- Notification dismissals (bounded KV ring keyed by notification id) ----
+
+async function readNotificationDismissals(env: WorkerEnv): Promise<Array<{ id: string; ts: number }>> {
+  if (!env.SITE_SNAPSHOT_KV) return [];
+  try {
+    return parseDismissals(await env.SITE_SNAPSHOT_KV.get(NOTIFICATION_DISMISSALS_KV_KEY));
+  } catch {
+    return [];
+  }
+}
+
+async function dismissNotification(env: WorkerEnv, id: string): Promise<void> {
+  if (!env.SITE_SNAPSHOT_KV) return;
+  try {
+    const existing = await readNotificationDismissals(env);
+    existing.push({ id, ts: Date.now() });
+    await env.SITE_SNAPSHOT_KV.put(
+      NOTIFICATION_DISMISSALS_KV_KEY,
+      JSON.stringify(boundDismissals(existing)),
+    );
+  } catch {
+    // Best-effort: losing a dismissal must not error the dashboard.
+  }
+}
+
+async function resetNotificationDismissals(env: WorkerEnv): Promise<void> {
+  if (!env.SITE_SNAPSHOT_KV) return;
+  try {
+    await env.SITE_SNAPSHOT_KV.put(NOTIFICATION_DISMISSALS_KV_KEY, JSON.stringify([]));
+  } catch {
+    // Best-effort.
+  }
+}
+
+/**
+ * Fetch the DO's pipeline-health once per dashboard load (render-time only —
+ * this is not polling; the client keeps its own pre-existing 60s refresh).
+ */
+async function fetchPipelineHealthForNotifications(env: WorkerEnv): Promise<{ status?: string; reasons?: string[] } | null> {
+  try {
+    if (!env.DO_SHARED_SECRET) return null;
+    const stub = getDownloadsStub(env);
+    const res = await stub.fetch(new Request("https://do/pipeline-health", {
+      method: "GET",
+      headers: { "X-Admin-Secret": env.DO_SHARED_SECRET },
+    }));
+    if (!res.ok) return null;
+    const payload = (await res.json()) as { status?: unknown; reasons?: unknown };
+    return {
+      status: typeof payload.status === "string" ? payload.status : undefined,
+      reasons: Array.isArray(payload.reasons)
+        ? payload.reasons.filter((reason): reason is string => typeof reason === "string")
+        : undefined,
+    };
+  } catch {
+    return null;
   }
 }
 
@@ -3209,6 +3392,14 @@ export default {
       return handleWebsiteConsoleDashboard(request, env);
     }
 
+    // Live stats websocket (dashboard "Go live" toggle). Same admin session
+    // check as other /admin routes; the upgrade must fail closed with 401
+    // before any 101. The DO's 101 response is returned verbatim — wrapping
+    // it (withCors) would drop the upgraded socket.
+    if (pathname === "/admin/live" && request.method === "GET") {
+      return handleLiveSocketProxy(request, env);
+    }
+
     // Logout
     if (pathname === "/logout") {
       return handleLogout(request, env);
@@ -3251,10 +3442,19 @@ export default {
     }
     if (
       (pathname === "/health" && request.method === "GET") ||
+      (pathname === UPTIME_PING_PATH && request.method === "GET") ||
       (pathname === "/pipeline-health" && request.method === "GET") ||
       (pathname === "/changelog" && request.method === "GET") ||
       (pathname === "/track" && request.method === "POST")
     ) {
+      if (pathname === UPTIME_PING_PATH) {
+        // Lightweight worker-only liveness probe for the 5-minute uptime
+        // self-check. Never cached: a cached hit would fake the latency.
+        return new Response(JSON.stringify({ ok: true, ts: Date.now() }), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+        });
+      }
       return proxyToDO(request, env);
     }
     if (pathname === "/public/site-metrics" && request.method === "GET") {
@@ -3281,6 +3481,8 @@ export default {
       pathname === "/admin/storage-export" ||
       pathname === "/admin/update-config" ||
       pathname === "/admin/ip-allowlist" ||
+      pathname === "/admin/notifications/dismiss" ||
+      pathname === "/admin/notifications/reset" ||
       pathname === "/admin/website/status" ||
       pathname === "/admin/website/flush-now" ||
       pathname === "/admin/website/replay-dlq" ||
@@ -3303,6 +3505,14 @@ export default {
     const now = controller.scheduledTime || Date.now();
     const hour = currentHourUtc(now);
 
+    // Free plan allows 5 cron triggers; the worker uses exactly two.
+    // "*/5 * * * *" exists only for the uptime self-check — dispatch on
+    // controller.cron so the hourly jobs below keep their original cadence.
+    if (controller.cron === "*/5 * * * *") {
+      await runUptimeSelfCheck(env, now);
+      return;
+    }
+
     // Refresh the KV-backed /config snapshot on every tick (best effort) so
     // extension polls are served from the edge instead of the DO.
     await refreshAnalyticsConfigKvFromDo(env);
@@ -3314,6 +3524,9 @@ export default {
 
     // 0h4d.1.10: refresh the reliability metric cache (best effort).
     await refreshReliabilityKv(env);
+
+    // Firefox user counts from the AMO API, TTL-gated to one call per 24h.
+    await refreshAmoUsersKv(env);
 
     if (SITE_SNAPSHOT_REFRESH_HOURS_UTC.has(hour)) {
       await refreshTrendsKv(env);

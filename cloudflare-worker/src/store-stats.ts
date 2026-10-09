@@ -32,11 +32,11 @@ export type StoreStatsSnapshot = {
 
 const STORE_FETCH_TIMEOUT_MS = 5_000;
 
-const CHROME_STORE_PAGE_URL =
+export const CHROME_STORE_PAGE_URL =
   "https://chromewebstore.google.com/detail/classroom-quick-downloade/oemoongiefmpmomjikcjmkkkhffcbdid?hl=en";
 const FIREFOX_AMO_API_URL =
   "https://addons.mozilla.org/api/v5/addons/addon/classroom-quick-downloader/?lang=en-US";
-const EDGE_DETAILS_API_URL =
+export const EDGE_DETAILS_API_URL =
   "https://microsoftedge.microsoft.com/addons/getproductdetailsbycrxid/ecojbijjkcjdolpeoiemnccgmaeomcmn?hl=en-US&gl=US";
 const GITHUB_LATEST_RELEASE_URL =
   "https://api.github.com/repos/adhamhaithameid/Classroom-Quick-Downloader/releases/latest";
@@ -378,4 +378,92 @@ export function evaluateScrapeHealth(
     }
   }
   return alerts;
+}
+
+// --- Firefox user counts (AMO), cached in KV for 24h ------------------------
+
+export const AMO_USERS_KV_KEY = "site:v1:amo-users";
+export const AMO_USERS_TTL_MS = 24 * 60 * 60 * 1000;
+
+export type AmoUsersCache = {
+  firefoxUsers: number;
+  fetchedAtUtc: number;
+};
+
+/** Minimal KV surface so tests can pass a plain in-memory object. */
+type KvLike = {
+  get(key: string): Promise<string | null>;
+  put(key: string, value: string): Promise<void>;
+};
+
+export function parseAmoUsersCache(raw: string | null): AmoUsersCache | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<AmoUsersCache>;
+    if (typeof parsed.firefoxUsers !== "number" || !Number.isFinite(parsed.firefoxUsers)) return null;
+    if (typeof parsed.fetchedAtUtc !== "number" || !Number.isFinite(parsed.fetchedAtUtc)) return null;
+    return {
+      firefoxUsers: Math.max(0, Math.floor(parsed.firefoxUsers)),
+      fetchedAtUtc: parsed.fetchedAtUtc,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Read the cached AMO user count without any upstream call. The dashboard
+ * uses this so a card render never triggers a fetch.
+ */
+export async function readAmoUsersCache(env: { SITE_SNAPSHOT_KV?: KvLike }): Promise<AmoUsersCache | null> {
+  if (!env.SITE_SNAPSHOT_KV) return null;
+  try {
+    return parseAmoUsersCache(await env.SITE_SNAPSHOT_KV.get(AMO_USERS_KV_KEY));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Refresh the AMO user count when the cache is older than 24h. At most one
+ * upstream call per day; the hourly cron calls this and the TTL gate keeps
+ * the real cadence at daily. Best-effort: failures leave the old cache.
+ */
+export async function refreshAmoUsersKv(
+  env: { SITE_SNAPSHOT_KV?: KvLike },
+  opts: { now?: number; fetchImpl?: typeof fetch; ttlMs?: number } = {},
+): Promise<void> {
+  const kv = env.SITE_SNAPSHOT_KV;
+  if (!kv) return;
+  const now = opts.now ?? Date.now();
+  const ttlMs = opts.ttlMs ?? AMO_USERS_TTL_MS;
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  try {
+    const cached = parseAmoUsersCache(await kv.get(AMO_USERS_KV_KEY));
+    if (cached && now - cached.fetchedAtUtc < ttlMs) return;
+  } catch {
+    // A KV read failure should not block the refresh.
+  }
+  try {
+    const response = await fetchImpl(`${FIREFOX_AMO_API_URL}`, {
+      method: "GET",
+      headers: { "user-agent": BROWSER_UA, accept: "application/json" },
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!response.ok) return;
+    const payload = (await response.json()) as { average_daily_users?: unknown };
+    // A payload without the field is junk (schema drift, error page as JSON).
+    // Keep the previous cached value AND its fetchedAtUtc: writing 0 with a
+    // fresh timestamp would hide a stale-good count behind "n/a" for 24h.
+    if (typeof payload.average_daily_users !== "number" || !Number.isFinite(payload.average_daily_users)) {
+      return;
+    }
+    const next: AmoUsersCache = {
+      firefoxUsers: Math.max(0, Math.floor(payload.average_daily_users)),
+      fetchedAtUtc: now,
+    };
+    await kv.put(AMO_USERS_KV_KEY, JSON.stringify(next));
+  } catch {
+    // Upstream problems must never break the cron.
+  }
 }
