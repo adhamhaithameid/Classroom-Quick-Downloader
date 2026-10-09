@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+# scripts/check — affected-only verification. Replaces full-monorepo test runs.
+# Usage:
+#   scripts/check [workspace]   workspace: extension|website|cloudflare-worker|oracle-backend|tools
+#   scripts/check --changed     derive affected workspaces from uncommitted changes
+# With no argument, behaves like --changed.
+# Prints "ok <workspace>:<step>" per step, or "FAIL <step>" plus the first 30
+# error lines. Exits 1 on the first failure.
+#
+# Test selection:
+#   - changed *test.*/*spec.* files -> those files only
+#   - changed source files          -> vitest related (tests importing them)
+#   - explicit workspace, no changes-> that workspace's unit suite
+#   - oracle-backend                -> bounded go vet + test:smoke
+set -uo pipefail
+cd "$(git rev-parse --show-toplevel 2>/dev/null)" || exit 1
+
+OUT=$(mktemp)
+trap 'rm -f "$OUT"' EXIT
+
+run() { # run <label> <cmd...>
+  local label=$1
+  shift
+  if "$@" >"$OUT" 2>&1; then
+    echo "ok $label"
+  else
+    echo "FAIL $label"
+    head -30 "$OUT"
+    exit 1
+  fi
+}
+
+# split ws-relative files into test files and source files, then verify
+ws_tests() { # ws_tests <ws> <ws-relative files...>
+  local ws=$1
+  shift
+  local tests=() srcs=() f base
+  for f in "$@"; do
+    base=${f##*/}
+    case $base in
+      *.test.* | *.spec.*) tests+=("$f") ;;
+      *) srcs+=("$f") ;;
+    esac
+  done
+  case $ws in
+    extension | website | cloudflare-worker)
+      if [ "${#tests[@]}" -gt 0 ]; then
+        run "$ws:test" pnpm -C "$ws" exec vitest run --passWithNoTests ${tests[@]+"${tests[@]}"}
+      elif [ "${#srcs[@]}" -gt 0 ]; then
+        run "$ws:test:related" pnpm -C "$ws" exec vitest related --run --passWithNoTests ${srcs[@]+"${srcs[@]}"}
+      else
+        run "$ws:test" pnpm -C "$ws" exec vitest run --passWithNoTests
+      fi
+      ;;
+    oracle-backend)
+      run "$ws:test" pnpm -C "$ws" run test:smoke
+      ;;
+    tools)
+      if [ "${#tests[@]}" -gt 0 ]; then
+        run "$ws:test" node --test ${tests[@]+"${tests[@]}"}
+      else
+        run "$ws:test" node --test tools/verify-production.test.mjs
+      fi
+      ;;
+  esac
+}
+
+verify_ws() { # verify_ws <ws> <repo-relative files...>
+  local ws=$1
+  shift
+  local rel=() f
+  for f in "$@"; do
+    rel+=("${f#"$ws"/}")
+  done
+  case $ws in
+    extension)
+      run "$ws:typecheck" pnpm -C "$ws" exec tsc --noEmit --pretty false
+      ws_tests "$ws" ${rel[@]+"${rel[@]}"}
+      ;;
+    website)
+      run "$ws:typecheck" pnpm -C "$ws" run check
+      ws_tests "$ws" ${rel[@]+"${rel[@]}"}
+      ;;
+    cloudflare-worker)
+      run "$ws:typecheck" pnpm -C "$ws" exec tsc --noEmit --pretty false
+      run "$ws:lint" pnpm -C "$ws" run lint
+      ws_tests "$ws" ${rel[@]+"${rel[@]}"}
+      ;;
+    oracle-backend)
+      run "$ws:typecheck" bash -c 'cd oracle-backend && go vet ./...'
+      ws_tests "$ws" ${rel[@]+"${rel[@]}"}
+      ;;
+    tools) ws_tests "$ws" ${rel[@]+"${rel[@]}"} ;;
+  esac
+}
+
+if [ "$#" -eq 1 ] && [ "$1" != "--changed" ]; then
+  case $1 in
+    extension | website | cloudflare-worker | oracle-backend | tools) verify_ws "$1" ;;
+    *)
+      echo "unknown workspace: $1 (use extension|website|cloudflare-worker|oracle-backend|tools|--changed)"
+      exit 2
+      ;;
+  esac
+  exit 0
+fi
+
+# --changed (default): map uncommitted changes to workspaces
+files=$( {
+  git diff --name-only HEAD
+  git ls-files --others --exclude-standard
+} | sort -u)
+if [ -z "$files" ]; then
+  echo "ok no changes"
+  exit 0
+fi
+
+declared=0
+ws_extension=()
+ws_website=()
+ws_cfw=()
+ws_oracle=()
+ws_tools=()
+ws_scripts=()
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  case $f in
+    extension/*) ws_extension+=("$f"); declared=1 ;;
+    website/*) ws_website+=("$f"); declared=1 ;;
+    cloudflare-worker/*) ws_cfw+=("$f"); declared=1 ;;
+    oracle-backend/*) ws_oracle+=("$f"); declared=1 ;;
+    tools/*.test.mjs) ws_tools+=("$f"); declared=1 ;;
+    scripts/*.test.mjs) ws_scripts+=("$f"); declared=1 ;;
+    *) : ;; # docs, root config, .github, non-test scripts/tools: nothing to run
+  esac
+done <<<"$files"
+
+if [ "$declared" -eq 0 ]; then
+  echo "ok no affected workspaces (docs/config-only change)"
+  exit 0
+fi
+
+[ "${#ws_extension[@]}" -gt 0 ] && verify_ws extension ${ws_extension[@]+"${ws_extension[@]}"}
+[ "${#ws_website[@]}" -gt 0 ] && verify_ws website ${ws_website[@]+"${ws_website[@]}"}
+[ "${#ws_cfw[@]}" -gt 0 ] && verify_ws cloudflare-worker ${ws_cfw[@]+"${ws_cfw[@]}"}
+[ "${#ws_oracle[@]}" -gt 0 ] && verify_ws oracle-backend ${ws_oracle[@]+"${ws_oracle[@]}"}
+[ "${#ws_tools[@]}" -gt 0 ] && verify_ws tools ${ws_tools[@]+"${ws_tools[@]}"}
+[ "${#ws_scripts[@]}" -gt 0 ] && run "scripts:test" node --test ${ws_scripts[@]+"${ws_scripts[@]}"}
+echo "ok"

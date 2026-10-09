@@ -1,0 +1,16 @@
+# Noise filters for agent search tools (rg, fd). Mirrors the token-diet
+# audit's "noisy read targets" sink: lockfiles, bundles, maps, reports.
+node_modules/
+dist/
+.output/
+build/
+coverage/
+playwright-report/
+test-results/
+*.map
+*.min.*
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+.superpowers/
+.beads/dolt/

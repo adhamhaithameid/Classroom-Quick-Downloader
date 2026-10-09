@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# scripts/orient — one-call agent orientation. Prints branch, last commit,
+# dirty files, touched workspaces, and a bd ready summary in <=15 lines.
+# Usage: scripts/orient
+set -uo pipefail
+cd "$(git rev-parse --show-toplevel 2>/dev/null)" || exit 1
+
+echo "branch: $(git branch --show-current)"
+echo "last:   $(git log -1 --format='%h %s' | cut -c1-100)"
+
+dirty=$(git status --porcelain)
+dirty_n=$(printf '%s' "$dirty" | grep -c . || true)
+dirs=$(printf '%s\n' "$dirty" | awk 'NF {print $2}' | cut -d/ -f1 | sort -u | tr '\n' ' ')
+echo "dirty:  ${dirty_n} files (touched: ${dirs:-none})"
+if [ "${dirty_n:-0}" -gt 0 ]; then
+  printf '%s\n' "$dirty" | head -6 | sed 's/^/  /'
+  [ "$dirty_n" -gt 6 ] && echo "  ... $(("$dirty_n" - 6)) more"
+fi
+
+if command -v bd >/dev/null 2>&1; then
+  ready=$(bd ready 2>/dev/null || true)
+  ready_n=$(printf '%s' "$ready" | grep -c . || true)
+  echo "bd ready: ${ready_n} open (top 3):"
+  printf '%s\n' "$ready" | head -3 | cut -c1-110 | sed 's/^/  /'
+fi
