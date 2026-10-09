@@ -33,7 +33,8 @@ export const DOWNLOAD_STATS_INTEGRITY_KEY = 'cqd_download_stats_integrity_v1';
 
 /** Owner-approved ladder — do not reorder or extend without a decision. */
 export const MILESTONE_LADDER: readonly number[] = [
-  1, 50, 100, 250, 500, 1000, 5000, 10000, 50000, 100000, 250000, 500000, 1000000,
+  1, 50, 100, 250, 500, 1000, 2500, 5000, 7500, 10000, 25000, 50000, 75000,
+  100000, 250000, 500000, 750000, 1000000,
 ];
 
 /**
