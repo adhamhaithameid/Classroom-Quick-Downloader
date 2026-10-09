@@ -5133,11 +5133,18 @@ export class DownloadsDurable {
       // Socket died between accept and send; the client will see the close.
     }
 
+    // The 101 MUST carry the CLIENT end of the pair on the response's
+    // webSocket property (per the hibernation docs): the runtime hands it to
+    // the connecting client. Without it workerd rejects the handshake and
+    // every upgrade dies as 502 at the worker's stub.fetch. ResponseInit is
+    // cast because lib "WebWorker" shadows the workers-types declaration
+    // that carries the webSocket field.
     return new Response(null, {
       status: 101,
       statusText: "Switching Protocols",
       headers: { Upgrade: "websocket" },
-    });
+      webSocket: pair[0],
+    } as unknown as ResponseInit);
   }
 
   /**

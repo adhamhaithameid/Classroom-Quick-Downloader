@@ -143,17 +143,25 @@ async function upgradeLive(obj: DownloadsDurable, withSecret = true): Promise<Re
 
 // Node's undici Response rejects status 101 (a workerd-only allowance for
 // websocket handshakes). While the upgrade runs, swap in a permissive fake so
-// the DO's real 101 construction path is exercised unchanged.
+// the DO's real 101 construction path is exercised unchanged. The fake
+// surfaces the init's webSocket property: the hibernation contract requires
+// the 101 to carry the CLIENT end of the pair, and a fake that dropped it
+// would hide exactly that class of bug.
 class FakeUpgradeResponse {
   status: number;
   statusText: string;
   headers: Headers;
   body = null;
+  webSocket: unknown;
 
-  constructor(_body: null, init: { status: number; statusText?: string; headers?: HeadersInit }) {
+  constructor(
+    _body: null,
+    init: { status: number; statusText?: string; headers?: HeadersInit; webSocket?: unknown },
+  ) {
     this.status = init.status;
     this.statusText = init.statusText || "";
     this.headers = new Headers(init.headers);
+    this.webSocket = init.webSocket;
   }
 }
 
@@ -269,16 +277,16 @@ describe("live stats websocket auth (commit 5)", () => {
   });
 
   it("worker passes an authenticated upgrade through to the DO verbatim", async () => {
-    // Plain-object 101: undici cannot build a real one in Node, and the
-    // proxy must return the DO's response untouched (no re-wrapping).
-    const env = workerEnv(
-      async () =>
-        ({
-          status: 101,
-          statusText: "Switching Protocols",
-          headers: new Headers({ Upgrade: "websocket" }),
-        }) as unknown as Response,
-    );
+    // Plain-object 101 with an attached socket: undici cannot build a real
+    // one in Node, and the proxy must return the DO's response untouched —
+    // re-wrapping (withCors-style) would drop the webSocket attachment.
+    const doResponse = {
+      status: 101,
+      statusText: "Switching Protocols",
+      headers: new Headers({ Upgrade: "websocket" }),
+      webSocket: { kind: "client-socket" },
+    } as unknown as Response;
+    const env = workerEnv(async () => doResponse);
     const res = await worker.fetch(
       new Request("https://example.com/admin/live", {
         method: "GET",
@@ -288,6 +296,9 @@ describe("live stats websocket auth (commit 5)", () => {
       {} as ExecutionContext,
     );
     expect(res.status).toBe(101);
+    // Same object identity: the socket survives the proxy untouched.
+    expect(res).toBe(doResponse);
+    expect((res as unknown as { webSocket: unknown }).webSocket).toEqual({ kind: "client-socket" });
   });
 
   it("DO rejects an upgrade without the admin secret with 401", async () => {
@@ -321,9 +332,17 @@ describe("live stats websocket pushes (commit 5)", () => {
   it("accepts the upgrade, sends a hello snapshot, and throttles pushes to one per 5s", async () => {
     const { obj, state } = makeDO();
 
-    const res = await withUpgradeResponseSupport(() => upgradeLive(obj));
+    const res = (await withUpgradeResponseSupport(() => upgradeLive(obj))) as unknown as InstanceType<
+      typeof FakeUpgradeResponse
+    >;
     expect(res.status).toBe(101);
     expect(res.statusText).toBe("Switching Protocols");
+
+    // Hibernation contract: the 101 carries the CLIENT end of the pair
+    // (pair[0]). The DO accepted pair[1] server-side, so the attached socket
+    // must be a different live socket than the one that receives pushes.
+    expect(res.webSocket).toBeInstanceOf(MockLiveSocket);
+    expect(res.webSocket).not.toBe(state.accepted[0]);
 
     // Hibernation API wired: one socket accepted, ping auto-response set.
     expect(state.accepted).toHaveLength(1);
