@@ -104,6 +104,6 @@ export function wrapPageHtml(html: string, opts: { rtl?: boolean }): string {
 }
 
 /** Same-origin URL the classroom iframe loads a fixture page from. */
-export function classroomFixtureUrl(page: ClassroomPageMeta): string {
+export function classroomFixtureUrl(page: Pick<ClassroomPageMeta, 'id' | 'rtl'>): string {
   return `/sim/classroom/${encodeURIComponent(page.id)}.html${page.rtl ? '?dir=rtl' : ''}`;
 }

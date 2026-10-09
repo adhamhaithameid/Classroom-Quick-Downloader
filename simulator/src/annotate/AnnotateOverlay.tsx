@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { describeElement, percentOfRect } from './describe';
+import { copyTextToClipboard, formatAnnotationsMarkdown } from './export';
 import { routeMeta } from './route-info';
 import { clearAnnotations, loadAllGroups, loadAnnotations, saveAnnotations } from './store';
 import type { Annotation, AnnotationGroup, AnnotationTarget } from './types';
@@ -258,6 +259,20 @@ export function AnnotateOverlay({ route, enabled }: { route: Route; enabled: boo
     closeEditor();
   }, [closeEditor, notes.length, stateId]);
 
+  const [copied, setCopied] = useState(false);
+
+  const copyMarkdown = useCallback(async () => {
+    const markdown = formatAnnotationsMarkdown(loadAllGroups(), {
+      now: new Date(),
+      baseUrl: `${window.location.origin}${window.location.pathname}`,
+    });
+    const ok = await copyTextToClipboard(markdown);
+    if (ok) {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    }
+  }, []);
+
   if (!enabled) return null;
 
   const editing = editingId ? notes.find((note) => note.id === editingId) : undefined;
@@ -305,6 +320,9 @@ export function AnnotateOverlay({ route, enabled }: { route: Route; enabled: boo
         ) : null}
       </ul>
       <div className="sim-row">
+        <button type="button" onClick={() => void copyMarkdown()}>
+          {copied ? 'Copied!' : 'Copy notes as Markdown'}
+        </button>
         <button type="button" onClick={clearCurrent}>
           Clear notes
         </button>
@@ -333,6 +351,10 @@ export function AnnotateOverlay({ route, enabled }: { route: Route; enabled: boo
           className="sim-annotate-editor"
           role="dialog"
           aria-label={`Edit note ${editingNumber}`}
+          style={{
+            left: `${editing.target.xPct}%`,
+            top: `${editing.target.yPct}%`,
+          }}
           onKeyDown={(event) => {
             if (event.key === 'Escape') cancelEditing();
           }}

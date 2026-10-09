@@ -146,5 +146,5 @@ export function describeElement(
 /** Deterministic one-line descriptor for the Markdown export Target line. */
 export function formatElementTarget(target: ElementTarget): string {
   const text = target.text ? ` "${target.text}"` : '';
-  return `${target.path}${text} @ ${target.xPct}%,${target.yPct}%`;
+  return `${target.path}${text} @ ${target.xPct},${target.yPct}`;
 }

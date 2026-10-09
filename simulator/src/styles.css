@@ -20,6 +20,16 @@ body {
   color: var(--sim-text);
 }
 
+/* The popup's App.css styles `body` for the REAL extension surface (the
+   360x600 popup shell). All routes share one bundle, so those rules leak
+   into this document and collapse the shell (and the classroom iframe) to
+   popup size. The extra class wins on specificity and restores layout. */
+body.sim-body {
+  width: auto;
+  height: auto;
+  overflow: auto;
+}
+
 a {
   color: var(--sim-accent);
 }
