@@ -181,7 +181,7 @@ export async function runUptimeSelfCheck(
   fetchImpl: typeof fetch = fetch,
 ): Promise<UptimeCheckEntry> {
   const started = Date.now();
-  let ok = false;
+  let ok: boolean;
   try {
     const response = await fetchImpl(`${WORKER_PUBLIC_BASE_URL}${UPTIME_PING_PATH}`, {
       method: "GET",
