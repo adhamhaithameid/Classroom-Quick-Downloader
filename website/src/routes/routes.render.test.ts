@@ -48,7 +48,7 @@ describe('route render smoke coverage', () => {
     const html = squish(body);
     const expectedBaseUrl = SITE_URL.replace(/\/+$/, '');
 
-    expect(head).toContain('Classroom Quick Downloader — Google Classroom Bulk Download');
+    expect(head).toContain('Classroom Quick Downloader — Google Classroom Files');
     expect(head).toContain(`${expectedBaseUrl}/`);
     expect(head).toContain('og:image');
     expect(head).toContain('twitter:image');
@@ -75,7 +75,7 @@ describe('route render smoke coverage', () => {
     const expectedBaseUrl = SITE_URL.replace(/\/+$/, '');
     const expectedLatestRelease = APP_VERSION.startsWith('v') ? APP_VERSION : `v${APP_VERSION}`;
 
-    expect(head).toContain('Classroom Quick Downloader — Google Classroom Bulk Download');
+    expect(head).toContain('Classroom Quick Downloader — Google Classroom Files');
     expect(head).toContain('SoftwareApplication');
     expect(head).toContain('WebSite');
     expect(head).toContain('WebPage');

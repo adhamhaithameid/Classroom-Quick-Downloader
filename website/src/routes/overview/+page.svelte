@@ -141,8 +141,11 @@
     name: 'Classroom Quick Downloader',
     description:
       'Free browser extension that lets students download Google Classroom assignment attachments in one click.',
-    applicationCategory: 'BrowserExtension',
+    // 'BrowserApplication' is the schema.org software category enum value for
+    // browser software; 'BrowserExtension' is not in the vocabulary.
+    applicationCategory: 'BrowserApplication',
     operatingSystem: 'Chrome, Firefox, Edge, Chromium browsers',
+    browserRequirements: 'Requires Chrome, Firefox, Edge, or any Chromium-based desktop browser.',
     image: `${SITE_URL}/images/cqd-social-card.png`,
     screenshot: `${SITE_URL}/images/solution-flags.webp`,
     isAccessibleForFree: true,
@@ -1543,8 +1546,12 @@
   on:pointercancel={onEditPointerUp}
 />
 
+<!-- SERP guard: the previous 59-char title ("…Google Classroom Bulk
+     Download") exceeded Google's ~580px title display width and truncated
+     mid-word ("Bulk …"). This 51-char variant keeps the brand first, keeps
+     "Google Classroom", and swaps the cut-off tail for a benefit keyword. -->
 <SeoMeta
-  title="Classroom Quick Downloader — Google Classroom Bulk Download"
+  title="Classroom Quick Downloader — Google Classroom Files"
   description="Bulk download all Google Classroom attachments in one click. Free browser extension for Chrome, Firefox, and Edge, built for students and teachers."
   path={seoPath}
   keywords="download all google classroom files, bulk download google classroom attachments, google classroom extension"
