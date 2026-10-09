@@ -283,3 +283,171 @@ a {
 .sim-options-frame > * {
   min-height: 480px;
 }
+
+/* --- Annotate mode (dev tool) --- */
+
+.sim-header-spacer {
+  flex: 1;
+}
+
+.sim-annotate-toggle {
+  background: var(--sim-bg);
+  color: var(--sim-muted);
+  border: 1px solid var(--sim-border);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.sim-annotate-toggle:hover {
+  color: var(--sim-text);
+  border-color: var(--sim-accent);
+}
+
+.sim-annotate-toggle[aria-pressed='true'] {
+  color: #ffffff;
+  background: var(--sim-accent);
+  border-color: var(--sim-accent);
+}
+
+.sim-frame-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.sim-popup-frame,
+.sim-options-frame,
+.sim-map {
+  position: relative;
+}
+
+.sim-annotate-layer {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 30;
+}
+
+.sim-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 10px;
+  border: 1px solid #ffffff;
+  background: var(--sim-accent);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+  z-index: 32;
+}
+
+.sim-pin:hover,
+.sim-pin:focus-visible {
+  outline: 2px solid #ffd760;
+  outline-offset: 1px;
+}
+
+.sim-pin-active {
+  background: #d93025;
+}
+
+.sim-annotate-editor {
+  position: absolute;
+  transform: translate(12px, 12px);
+  width: 230px;
+  background: var(--sim-surface);
+  border: 1px solid var(--sim-accent);
+  border-radius: 8px;
+  padding: 10px;
+  pointer-events: auto;
+  z-index: 40;
+}
+
+.sim-annotate-editor .sim-field input,
+.sim-annotate-editor .sim-field textarea {
+  background: var(--sim-bg);
+  color: var(--sim-text);
+  border: 1px solid var(--sim-border);
+  border-radius: 6px;
+  padding: 6px;
+  font-size: 12px;
+  width: 100%;
+}
+
+.sim-annotate-panel {
+  position: fixed;
+  top: 60px;
+  right: 16px;
+  width: 300px;
+  max-height: calc(100vh - 80px);
+  overflow: auto;
+  background: var(--sim-surface);
+  border: 1px solid var(--sim-border);
+  border-radius: 12px;
+  padding: 12px;
+  z-index: 50;
+}
+
+.sim-annotate-panel h2 {
+  font-size: 13px;
+  margin: 0 0 4px;
+}
+
+.sim-annotate-list {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sim-annotate-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  background: var(--sim-bg);
+  color: var(--sim-text);
+  border: 1px solid var(--sim-border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.sim-annotate-item:hover {
+  border-color: var(--sim-accent);
+}
+
+.sim-annotate-item .sim-pin-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--sim-accent);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.sim-annotate-item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sim-annotate-state {
+  color: var(--sim-muted);
+  font-size: 11px;
+}
