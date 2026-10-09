@@ -80,7 +80,7 @@ export default defineContentScript({
       });
 
       // 2. Initialize mode controller
-      //    Reads cqdV2Mode from chrome.storage.local (default: 'legacy' —
+      //    Reads cqdV2Mode from chrome.storage.local (default: 'v2' —
       //    shadow is an explicit opt-in, see mode-controller.ts D9)
       //    Sets up message listener for popup → content script mode changes
       //    Sets up storage.onChanged listener for cross-tab mode sync

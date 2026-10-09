@@ -1,6 +1,11 @@
 #!/usr/bin/env sh
 
-# Full-suite gate: nothing reaches the remote without the complete test
-# suite passing on this machine (strict pyramid + headless browser E2E).
-# Skip for one push with: git push --no-verify
-pnpm run test:gate
+# Scoped gate (tools/pre-push-scope.mjs): runs only the workspaces your push
+# touches. Full gate for main pushes, unclear diffs, or CQD_FULL_GATE=1.
+# CI runs the complete matrix on every PR. Skip for one push: --no-verify.
+
+# Self-heal PATH for gate children: arm64 openssl (x86_64 breaks Node's
+# spawnSync with -86), pnpm, go. The gate scripts assume all three exist.
+export PATH="/opt/homebrew/opt/openssl/bin:$HOME/.local/bin:/usr/local/opt/go/bin:$PATH"
+
+exec node tools/pre-push-scope.mjs

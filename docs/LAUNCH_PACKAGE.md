@@ -131,7 +131,7 @@ user-facing story). Stage the launch around **v1.6.0**:
 ### MUST happen before v1.6.0
 
 - [ ] Oracle VM recovered and Worker 429 (error 1027) mitigated — `ORACLE_RECOVERY_RUNBOOK.md`
-- [ ] Analytics contract deployed to Oracle + Worker + Website **together** — `RELEASE_SEQUENCE_V160.md`
+- [ ] Analytics contract deployed to Oracle + Worker + Website **together** — `archive/RELEASE_SEQUENCE_V160.md`
   (run `node tools/verify-analytics-contract.mjs` in preflight)
 - [ ] Extension v1.6.0 passes the Manual-QA replay suite + `EXTENSION_TESTING_RUNBOOK.md`
 - [ ] Website accuracy/copy pass (license claims, permissions, bylines) deployed

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Production smoke test for the CQD website — run any time, especially right
-// after a deploy (see docs/RELEASE_SEQUENCE_V160.md).
+// after a deploy (see docs/archive/RELEASE_SEQUENCE_V160.md).
 //
 //   node tools/verify-production.mjs
 //   BASE_URL=https://classroom-quick-downloader.adhamhaithameid.is-a.dev node tools/verify-production.mjs

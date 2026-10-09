@@ -48,7 +48,7 @@ Last updated: 2026-08-20
 
 1. **Close duplicate PRs** (10 min)
    - Close #636, #619, #637, #639, #624, #622, #623, #627, #620, #625
-   - See full list in PR_ISSUE_TRIAGE_2026-06-24.md
+   - See full list in [archive/PR_ISSUE_TRIAGE_2026-06-24.md](archive/PR_ISSUE_TRIAGE_2026-06-24.md)
 
 2. **Merge security PRs** (review each diff)
    - #609 Titan SSRF fix — HIGH priority, review carefully
