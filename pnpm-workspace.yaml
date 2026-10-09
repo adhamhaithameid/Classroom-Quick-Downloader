@@ -3,6 +3,7 @@ packages:
   - "cloudflare-worker"
   - "oracle-backend"
   - "website"
+  - "simulator"
   - "tools/*"
 onlyBuiltDependencies:
   - esbuild
