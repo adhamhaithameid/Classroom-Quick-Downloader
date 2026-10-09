@@ -270,6 +270,7 @@ export async function loadFlowHarness(options: FlowHarnessOptions = {}) {
     tabCreations,
     cleanupSpy,
     recordSpy,
+    dispatchMessage,
     requestDownload: (url: string = ORIGINAL_URL, requestId = 'req-corpus', fileMeta: any = { name: 'lecture.pdf', ext: 'pdf' }) =>
       dispatchMessage({ type: 'CQD_DOWNLOAD', url, requestId, fileMeta }),
     dispatchDownloadChange: (delta: any) => {

@@ -15,9 +15,9 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import {
-  clearMilestonePending,
   formatMilestoneCount,
   loadDownloadStats,
+  requestMilestoneClear,
   watchDownloadStats,
 } from '../../src/history/download-stats';
 import { celebrationUsesConfetti, fireConfettiBurst } from '../../src/celebration/confetti';
@@ -39,9 +39,10 @@ export function MilestoneCelebration() {
       void fireConfettiBurst();
     }
     setToast(pending);
-    // Hand the milestone off: clears the flag so it never replays on the
-    // next popup open.
-    void clearMilestonePending();
+    // Hand the milestone off through the background message: the clear runs
+    // on the service worker's serialized settle chain, so it can never
+    // revert an in-flight settle write. The popup never touches the record.
+    void requestMilestoneClear();
   }
 
   // Initial read: settings settle FIRST so the first play decision sees the

@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MilestoneCelebration } from '../entrypoints/popup/MilestoneCelebration';
 import { celebrationUsesConfetti, prefersReducedMotionOS } from '../src/celebration/confetti';
 import {
+  CQD_STATS_CLEAR_MILESTONE,
   DOWNLOAD_STATS_INTEGRITY_KEY,
   DOWNLOAD_STATS_KEY,
 } from '../src/history/download-stats';
@@ -58,6 +59,24 @@ function installMemoryStore(): Store {
     for (const [k, v] of Object.entries(kv)) store.set(k, v);
     cb?.();
   });
+  // Fix round 1: simulated background. It acks the clear message and does
+  // the record write itself, exactly like the service worker's chain.
+  (chrome.runtime as { sendMessage?: unknown }).sendMessage = vi.fn(
+    (msg: { type?: string }, cb?: (res?: { ok?: boolean }) => void) => {
+      if (msg?.type === CQD_STATS_CLEAR_MILESTONE) {
+        const stats = store.get(DOWNLOAD_STATS_KEY) as Record<string, unknown> | undefined;
+        if (stats) {
+          const next = { ...stats, milestonePending: null };
+          store.set(DOWNLOAD_STATS_KEY, next);
+          store.set(
+            DOWNLOAD_STATS_INTEGRITY_KEY,
+            computeChecksum(JSON.stringify(next)),
+          );
+        }
+      }
+      cb?.({ ok: true });
+    },
+  );
   return store;
 }
 

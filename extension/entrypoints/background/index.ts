@@ -56,7 +56,7 @@ import {
   clearHistory as clearHistoryEntries,
   searchEntries,
 } from '../../src/history/history-store';
-import { countCompletedDownload } from '../../src/history/download-stats';
+import { countCompletedDownload, clearMilestonePending } from '../../src/history/download-stats';
 import { reportDownloadCount } from '../utils/analytics/count-reporter';
 import {
   STUDENT_WORK_RESOLVE_PUBLISH_TYPE,
@@ -763,6 +763,18 @@ export default defineBackground(() => {
     if (message.type === 'CQD_HISTORY_CLEAR') {
       void (async () => {
         await clearHistoryEntries();
+        sendResponse({ ok: true });
+      })();
+      return false;
+    }
+
+    // Fix round 1: the popup never writes the stats record directly. Every
+    // milestone clear rides this message into the service worker's
+    // serialized settle chain, so a settle saving in flight cannot be
+    // overwritten by a stale popup write (lost update during batch storms).
+    if (message.type === 'CQD_STATS_CLEAR_MILESTONE') {
+      void (async () => {
+        await clearMilestonePending();
         sendResponse({ ok: true });
       })();
       return false;

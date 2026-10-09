@@ -65,7 +65,7 @@ describe('download-count reporter (1.9.0 commit 4, dormant)', () => {
     expect(body.installId).toBe('install-1');
     expect(body.lifetimeCount).toBe(100);
     expect(typeof body.browser).toBe('string');
-    expect(body.browser?.length).toBeGreaterThan(0);
+    expect(String(body.browser).length).toBeGreaterThan(0);
     expect(body.clientBatchId).toBe(buildCountBatchId('install-1', 100));
   });
 

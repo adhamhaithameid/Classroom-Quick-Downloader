@@ -248,6 +248,58 @@ export async function clearMilestonePending(): Promise<DownloadStats> {
 }
 
 /**
+ * Message type the popup sends to clear a milestone pending. Every stats
+ * write lives in the background service worker's serialized settle chain —
+ * a popup-context load-then-set could revert a settle saving in flight
+ * (lost update during batch storms with the popup open).
+ */
+export const CQD_STATS_CLEAR_MILESTONE = 'CQD_STATS_CLEAR_MILESTONE';
+
+const CLEAR_ACK_TIMEOUT_MS = 1500;
+
+/**
+ * Popup-side clear: ask the background to clear the pending flag on the
+ * serialized chain. Falls back to the local chain only when no messaging
+ * channel exists (tests, non-extension contexts) or the background never
+ * acks — the record then behaves exactly as before fix round 1.
+ */
+export async function requestMilestoneClear(): Promise<void> {
+  const chromeRef = globalThis as {
+    chrome?: {
+      runtime?: {
+        sendMessage?: (msg: unknown, cb: (res?: { ok?: boolean }) => void) => void;
+        lastError?: unknown;
+      };
+    };
+  };
+  const sendMessage = chromeRef.chrome?.runtime?.sendMessage;
+  if (typeof sendMessage !== 'function') {
+    await clearMilestonePending();
+    return;
+  }
+  const acked = await new Promise<boolean>((resolve) => {
+    let settled = false;
+    const finish = (value: boolean): void => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish(false), CLEAR_ACK_TIMEOUT_MS);
+    try {
+      sendMessage({ type: CQD_STATS_CLEAR_MILESTONE }, (res?: { ok?: boolean }) => {
+        void chromeRef.chrome?.runtime?.lastError;
+        clearTimeout(timer);
+        finish(res?.ok === true);
+      });
+    } catch {
+      clearTimeout(timer);
+      finish(false);
+    }
+  });
+  if (!acked) await clearMilestonePending();
+}
+
+/**
  * Subscribe to stats-record changes (storage.onChanged, our key only).
  * The callback re-reads through the checksummed load path — newValue is
  * never trusted raw. Returns the unsubscribe fn.
