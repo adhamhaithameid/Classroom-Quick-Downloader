@@ -19,7 +19,9 @@
  * Live toggles (qa-03 golden rule 8): the popup's cqd-flag-toggle message
  * reaches applyFlagToggle (wired in v2_bootstrap), which strips badges of the
  * disabled kind and re-renders enabled ones from the last-decision registry —
- * no reload, no waiting for a scan.
+ * no reload, no waiting for a scan. The combined "Both" pill toggles the
+ * merge itself: off degrades a both-verdict to the comment single, on
+ * re-merges.
  *
  * RTL (golden rule 7): the product sets data-cqd-dir on <body> and the badge
  * CSS anchors edge-ribbons by it, exactly like V1's styles.ts.
@@ -50,7 +52,9 @@ const lastDecisions = new WeakMap<HTMLElement, FlagDecision>();
 const anchoredPosts = new WeakSet<HTMLElement>();
 
 /** Live flag enable state (popup toggles flip these without a reload). */
-const enabled = { comments: true, edited: true };
+// `combined` is the popup's "Both" pill: it gates ONLY the merge into the
+// combined badge — the single comment/edited renders are untouched by it.
+const enabled = { comments: true, edited: true, combined: true };
 
 // ============================================================================
 // PUBLIC API
@@ -94,7 +98,15 @@ export function renderFlagBadge(decision: FlagDecision, post: HTMLElement): void
   const existingCount = existing?.getAttribute('data-cqd-comment-count') ?? null;
 
   // Idempotence: same kind + same count → nothing to do.
-  const kind = wantComment && wantEdited ? 'both' : wantComment ? 'comment' : 'edited';
+  // The "Both" pill (combinedFlagEnabled) gates the merge: while it is off, a
+  // 'both' verdict degrades to the surviving comment single — this renderer
+  // is one-badge-per-post (deep-validator CHECK 5), so the merge, not the
+  // flags, is what the pill disables. Same degrade semantics as the other
+  // two toggles.
+  const kind =
+    wantComment && wantEdited
+      ? enabled.combined ? 'both' : 'comment'
+      : wantComment ? 'comment' : 'edited';
   const countKey = wantComment ? String(commentCount ?? '') : null;
   if (existing && existingKind === kind && existingCount === countKey) return;
 
@@ -148,9 +160,13 @@ export function removeAllV2Badges(scope?: HTMLElement): void {
  * disabled kind and re-renders enabled ones from the last-decision registry —
  * live, no reload (qa-03 golden rule 8).
  */
-export function applyFlagToggle(flag: 'commentsFlagEnabled' | 'editedFlagEnabled', isOn: boolean): void {
+export function applyFlagToggle(
+  flag: 'commentsFlagEnabled' | 'editedFlagEnabled' | 'combinedFlagEnabled',
+  isOn: boolean,
+): void {
   if (flag === 'commentsFlagEnabled') enabled.comments = isOn;
   if (flag === 'editedFlagEnabled') enabled.edited = isOn;
+  if (flag === 'combinedFlagEnabled') enabled.combined = isOn;
 
   // Re-render every post this page has a decision for (bounded to live posts).
   for (const post of document.querySelectorAll<HTMLElement>('[data-stream-item-id]')) {

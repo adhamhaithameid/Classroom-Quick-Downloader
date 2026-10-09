@@ -1,6 +1,9 @@
 // filepath: entrypoints/popup/App.tsx
 
 import { useEffect, useId, useMemo, useRef, useState, useCallback, type KeyboardEvent, type MouseEvent } from 'react';
+// Stillwater foundation (tokens, reset, focus, motion collapse) — shared
+// with the options page; App.css keeps the popup's surface rules.
+import '../../src/ui/stillwater.css';
 import './App.css';
 import logoSrc from '../../assets/CQD.png';
 import logoGraySrc from '../../assets/CQD-gray.png';
@@ -20,7 +23,7 @@ import {
   type ChangelogFetchResult
 } from '../utils/changelog';
 import { popupMessage } from './i18n';
-import { CHANGELOG_SITE_URL } from '../utils/analytics/constants';
+import { CHANGELOG_SITE_URL, WEBSITE_BASE_URL } from '../utils/analytics/constants';
 import { isApiConfigured } from '../../src/engines/v3/api/config';
 import {
   DEFAULT_SETTINGS,
@@ -38,6 +41,10 @@ const GITHUB_PROFILE_URL = 'https://github.com/adhamhaithameid';
 const GITHUB_STAR_URL = `${GITHUB_REPO_URL}/stargazers`;
 const GITHUB_AVATAR_URL = avatarSrc;
 const BUY_ME_COFFEE_URL = 'https://buymeacoffee.com/adhamhaithameid';
+// Legal round 2, surface 01 T2: the ledger foot's "Full privacy policy" link
+// (legal-round2.html). The store listing + this site page carry the policy;
+// the ledger stays three lines and never inlines it.
+const PRIVACY_POLICY_URL = `${WEBSITE_BASE_URL}/privacy`;
 
 // Extension Store URLs for each browser
 const EXTENSION_STORE_URLS = {
@@ -347,12 +354,18 @@ function App() {
   const [changelogStatus, setChangelogStatus] = useState<'loading' | 'ready' | 'offline' | 'error'>('loading');
   const [changelogStatusMessage, setChangelogStatusMessage] = useState<string | null>(null);
 
-  // ENGINE MODE STATE
-  const [engineMode, setEngineMode] = useState<string>('legacy');
+  // ENGINE MODE STATE — the initial value mirrors the runtime default
+  // (mode-controller.ts DEFAULT_MODE 'v2'): fresh installs run v2, so the
+  // control must render New selected, not Legacy (audit finding 12).
+  const [engineMode, setEngineMode] = useState<string>('v2');
   const [engineModeLoading, setEngineModeLoading] = useState(true);
   // S13: read once — the manifest's identity/oauth2 setup does not change
   // while the popup is open (a reload picks up a redelivered manifest).
   const [apiConfigured] = useState(isApiConfigured);
+  // Legal round 2, surface 03 T2: the API-beta confirm card. Open while the
+  // user's first v3 pick awaits confirmation; the segment stays on the
+  // previous engine the whole time.
+  const [apiConfirmOpen, setApiConfirmOpen] = useState(false);
 
   // COLLAPSIBLE SETTINGS STATE (persisted)
   const [settingsCollapsed, setSettingsCollapsed] = useState(true);
@@ -708,6 +721,15 @@ function App() {
     void saveSetting('extensionEnabled', nextState);
   }
 
+  // In-app reduce motion (Stillwater, audit finding 9): optimistic save only —
+  // every surface (content scripts included) watches the flat storage key.
+  function handleToggleReduceMotion() {
+    if (!settings) return;
+    const nextState = !settings.reducedMotionPreferred;
+    setSettings({ ...settings, reducedMotionPreferred: nextState });
+    void saveSetting('reducedMotionPreferred', nextState);
+  }
+
   function handleToggleSettingsCollapse() {
     const next = !settingsCollapsed;
     setSettingsCollapsed(next);
@@ -752,7 +774,9 @@ function App() {
       return;
     }
     browserApi.storage.local.get('cqdV2Mode', (res: { cqdV2Mode?: string }) => {
-      setEngineMode(res.cqdV2Mode || 'legacy');
+      // Same source of truth as the runtime (mode-controller.ts readMode):
+      // a saved mode wins, no/invalid saved value falls back to DEFAULT_MODE.
+      setEngineMode(resolveEngineMode(res.cqdV2Mode));
       setEngineModeLoading(false);
     });
 
@@ -760,7 +784,7 @@ function App() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const listener = (changes: any, area: string) => {
       if (area === 'local' && changes.cqdV2Mode) {
-        setEngineMode(changes.cqdV2Mode.newValue || 'legacy');
+        setEngineMode(resolveEngineMode(changes.cqdV2Mode.newValue));
       }
     };
     if (browserApi.storage.onChanged) {
@@ -770,7 +794,23 @@ function App() {
   }, []);
 
   function handleEngineModeSelect(nextMode: 'legacy' | 'v2' | 'v3') {
+    // Any engine decision closes the confirm card first (surface 03 T2:
+    // picking another engine while the card is open is a decline + switch).
+    if (apiConfirmOpen) setApiConfirmOpen(false);
+    // Legal round 2, surface 03 Treatment 2: the FIRST API (beta) pick opens
+    // the confirm card — the three facts as choices, with the way back named.
+    // The previous engine stays selected until the user confirms; later picks
+    // (apiBetaConfirmed persisted) skip the card.
+    if (nextMode === 'v3' && !settings?.apiBetaConfirmed) {
+      setApiConfirmOpen(true);
+      return;
+    }
     if (nextMode === engineMode) return;
+    commitEngineMode(nextMode);
+  }
+
+  /** The shared persistence + live-switch path for an engine decision. */
+  function commitEngineMode(nextMode: 'legacy' | 'v2' | 'v3') {
     setEngineMode(nextMode);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const browserApi = (globalThis as any).chrome;
@@ -785,6 +825,22 @@ function App() {
         }
       });
     }
+  }
+
+  /** Confirm on the API-beta card: persist the flat consent key, then run
+   *  the v3 switch the user asked for (legal round 2, surface 03 T2). */
+  function handleApiBetaConfirm() {
+    setApiConfirmOpen(false);
+    if (settings) {
+      setSettings({ ...settings, apiBetaConfirmed: true });
+    }
+    void saveSetting('apiBetaConfirmed', true);
+    commitEngineMode('v3');
+  }
+
+  /** Decline (Stay on New): close the card; the selection never moved. */
+  function handleApiBetaDecline() {
+    setApiConfirmOpen(false);
   }
 
   function handleOpenClassroomClick() {
@@ -894,7 +950,7 @@ function App() {
   const logoToUse = isClassroomTab ? logoSrc : logoGraySrc;
 
   return (
-    <main className="cqd-app">
+    <main className={`cqd-app ${settings?.reducedMotionPreferred ? 'cqd-reduce-motion' : ''}`}>
       <div className="cqd-scroll-container" ref={scrollRef}>
         {/* HEADER – always visible */}
         <header
@@ -1402,6 +1458,14 @@ function App() {
                             disabled={isLoadingSettings}
                             primary
                           />
+                          <ToggleRow
+                            label="Reduce motion"
+                            description="Minimize animations across the extension."
+                            checked={settings?.reducedMotionPreferred ?? false}
+                            loading={isLoadingSettings}
+                            onToggle={handleToggleReduceMotion}
+                            disabled={isLoadingSettings}
+                          />
                         </div>
                       </div>
 
@@ -1414,6 +1478,40 @@ function App() {
                             apiConfigured={apiConfigured}
                             onSelect={handleEngineModeSelect}
                           />
+                          {/* Legal round 2, surface 03 Treatment 2
+                              (legal-round2.html .confirm, ask state): one
+                              explicit "try it" with the way back shown first.
+                              Copy verbatim from the approved prototype;
+                              hardcoded English per popup convention. */}
+                          {apiConfirmOpen && (
+                            <div className="cqd-api-confirm" role="group" aria-label="Before you switch to the beta">
+                              <h5>Before you switch to the beta</h5>
+                              <ul>
+                                <li>Google asks for permission on Google's own screen.</li>
+                                <li>
+                                  Your sign-in is used only while you run a
+                                  beta download — never in the background.
+                                </li>
+                                <li>One click returns you to New at any time.</li>
+                              </ul>
+                              <div className="cqd-api-confirm-actions">
+                                <button
+                                  type="button"
+                                  className="cqd-api-confirm-stay"
+                                  onClick={handleApiBetaDecline}
+                                >
+                                  Stay on New
+                                </button>
+                                <button
+                                  type="button"
+                                  className="cqd-api-confirm-try"
+                                  onClick={handleApiBetaConfirm}
+                                >
+                                  Try the beta
+                                </button>
+                              </div>
+                            </div>
+                          )}
                           <div className="cqd-settings-section-note">
                             New runs the rewritten engine. Switch back to Legacy any time — one
                             click rolls everything back.
@@ -1424,27 +1522,15 @@ function App() {
                       <div className="cqd-settings-section">
                         <div className="cqd-settings-section-label">{popupMessage('popupSettingsSectionFlags')}</div>
                         <div className="cqd-toggle-group">
-                          <div className="cqd-flag-toggle-row cqd-flag-toggle-comment">
-                            <ToggleRow
-                              label="Comment Flags"
-                              description="Badges for posts with comments."
-                              checked={settings?.commentsFlagEnabled ?? true}
-                              loading={isLoadingSettings}
-                              onToggle={() => handleToggleFlag('commentsFlagEnabled')}
-                              disabled={isLoadingSettings}
-                            />
-                          </div>
-
-                          <div className="cqd-flag-toggle-row cqd-flag-toggle-edited">
-                            <ToggleRow
-                              label="Edited Flags"
-                              description="Badges for edited posts."
-                              checked={settings?.editedFlagEnabled ?? true}
-                              loading={isLoadingSettings}
-                              onToggle={() => handleToggleFlag('editedFlagEnabled')}
-                              disabled={isLoadingSettings}
-                            />
-                          </div>
+                          {/* Stillwater pills (A design): one pill per flat
+                              flag key — Comment / Edited / Both. */}
+                          <FlagPills
+                            comments={settings?.commentsFlagEnabled ?? true}
+                            edited={settings?.editedFlagEnabled ?? true}
+                            combined={settings?.combinedFlagEnabled ?? true}
+                            disabled={isLoadingSettings}
+                            onToggle={handleToggleFlag}
+                          />
                         </div>
                         <div className="cqd-settings-section-note">Flag detection is experimental and may not always be accurate.</div>
                       </div>
@@ -1468,14 +1554,44 @@ function App() {
                   Open Google Classroom, then click the extension again from
                   that tab to see your download controls.
                 </p>
+                {/* Direction A main action: the ONE filled element — the
+                    prototype's .cta geometry (icon + title + sub). Same
+                    handler and truthful aria contract as before; the class
+                    cqd-button is dropped so the hero owns its geometry. */}
                 <button
                   type="button"
-                  className="cqd-button cqd-open-classroom-btn"
+                  className="cqd-open-classroom-btn"
                   onClick={handleOpenClassroomClick}
                   aria-label="Open Google Classroom in a new tab"
                   title="Open Google Classroom in a new tab"
                 >
-                  <span>Open Google Classroom</span>
+                  <span className="cqd-cta-icon" aria-hidden="true">
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M8 2v8m0 0 3-3m-3 3L5 7"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M2.5 12.5h11"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </span>
+                  <span className="cqd-cta-text">
+                    <span className="cqd-cta-title">Open Google Classroom</span>
+                    <span className="cqd-cta-sub">Opens in a new tab</span>
+                  </span>
                 </button>
               </div>
             </section>
@@ -1550,11 +1666,62 @@ function App() {
                   aria-label="Support the developer on Buy Me a Coffee"
                   title="Support the developer on Buy Me a Coffee"
                 >
-                  <img
-                    src={bmcLogoSrc}
-                    alt="Buy Me a Coffee"
-                    className="cqd-coffee-icon"
-                  />
+                  {/* Stillwater star shimmer (Phase 4 D3, effects.html B):
+                      five staggered stars + one periodic sheen pass, purely
+                      decorative — the button's a11y surface is unchanged. */}
+                  <svg
+                    className="cqd-coffee-star"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 12 12"
+                    aria-hidden="true"
+                  >
+                    <path d="M6 0 7.2 4.8 12 6 7.2 7.2 6 12 4.8 7.2 0 6 4.8 4.8Z" fill="#FFE566" />
+                  </svg>
+                  <svg
+                    className="cqd-coffee-star"
+                    width="10"
+                    height="10"
+                    viewBox="0 0 12 12"
+                    aria-hidden="true"
+                  >
+                    <path d="M6 0 7.2 4.8 12 6 7.2 7.2 6 12 4.8 7.2 0 6 4.8 4.8Z" fill="#FFF3B0" />
+                  </svg>
+                  <svg
+                    className="cqd-coffee-star"
+                    width="13"
+                    height="13"
+                    viewBox="0 0 12 12"
+                    aria-hidden="true"
+                  >
+                    <path d="M6 0 7.2 4.8 12 6 7.2 7.2 6 12 4.8 7.2 0 6 4.8 4.8Z" fill="#FFE566" />
+                  </svg>
+                  <svg
+                    className="cqd-coffee-star"
+                    width="9"
+                    height="9"
+                    viewBox="0 0 12 12"
+                    aria-hidden="true"
+                  >
+                    <path d="M6 0 7.2 4.8 12 6 7.2 7.2 6 12 4.8 7.2 0 6 4.8 4.8Z" fill="#FFF3B0" />
+                  </svg>
+                  <svg
+                    className="cqd-coffee-star"
+                    width="11"
+                    height="11"
+                    viewBox="0 0 12 12"
+                    aria-hidden="true"
+                  >
+                    <path d="M6 0 7.2 4.8 12 6 7.2 7.2 6 12 4.8 7.2 0 6 4.8 4.8Z" fill="#FFE566" />
+                  </svg>
+                  <span className="cqd-coffee-sheen" aria-hidden="true" />
+                  <span className="cqd-coffee-icon-clip">
+                    <img
+                      src={bmcLogoSrc}
+                      alt="Buy Me a Coffee"
+                      className="cqd-coffee-icon"
+                    />
+                  </span>
                 </button>
 
                 <button
@@ -1681,6 +1848,23 @@ function App() {
                   Report it here
                 </a>
               </p>
+              {/* The ONLY approved legal surface (Phase 4 D4, legal.html
+                  surface 03 via legal-round2.html's footer composite): the
+                  affiliation notice on its own 10px legal line. Hardcoded
+                  English — the popup's current convention; i18n sweep will
+                  adopt it. */}
+              <p className="cqd-footer-affil">
+                <strong>Not affiliated with Google.</strong> Downloads belong
+                to their owners — follow your school's policies.
+              </p>
+              {/* Legal round 2, surface 01 Treatment 2 (legal-round2.html): the
+                  "Privacy & data" pill expands the Reads / Keeps / Sends ledger
+                  in place — one tap, three data directions. Copy rules: short
+                  sentences, plain words, and the Sends row tells the truth
+                  about the anonymous usage counts the analytics pipeline sends.
+                  Hardcoded English per the popup convention; i18n sweep will
+                  adopt it. */}
+              <PrivacyLedger />
             </div>
           </footer>
 
@@ -1692,6 +1876,132 @@ function App() {
 
 // --- Subcomponents ---
 
+/** Shared icons for the ledger's three data directions (legal-round2.html
+ *  stage 01 T2: eye = reads, device = keeps, arrow = sends). Purely
+ *  decorative — the text lines carry the meaning. */
+function LedgerIcon({ kind }: { kind: 'reads' | 'keeps' | 'sends' }) {
+  if (kind === 'reads') {
+    return (
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M1.5 8s2.4-4.2 6.5-4.2S14.5 8 14.5 8s-2.4 4.2-6.5 4.2S1.5 8 1.5 8Z" stroke="currentColor" strokeWidth="1.3" />
+        <circle cx="8" cy="8" r="1.8" stroke="currentColor" strokeWidth="1.3" />
+      </svg>
+    );
+  }
+  if (kind === 'keeps') {
+    return (
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <rect x="2.5" y="3" width="11" height="7.5" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+        <path d="M5.5 13h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M2 8h8m0 0L7 5m3 3-3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12.5 3.5h2M12.5 12.5h2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/**
+ * The privacy ledger (legal round 2, surface 01 Treatment 2, owner-approved):
+ * a "Privacy & data" pill in the footer expands a small ledger card in place —
+ * Reads / Keeps on this device / Sends, one question per line. Copy rules:
+ * short sentences, plain words, no fear language, and TRUTHFUL about the
+ * Sends direction — the analytics pipeline (entrypoints/utils/analytics)
+ * sends anonymous usage counts (download outcomes, file types, error types —
+ * no file names, no file contents) to the operator's worker, while the files
+ * themselves travel from Google to the user directly.
+ *
+ * Keyboard: the pill is a real button (aria-expanded/aria-controls); the
+ * collapsed panel is visibility:hidden so nothing inside is tabbable; "Got it"
+ * closes and returns focus to the pill. The collapse animation rides the
+ * shared Stillwater motion token; the global reduce-motion collapse flattens
+ * it (in-app setting and OS preference both).
+ */
+export function PrivacyLedger() {
+  const [open, setOpen] = useState(false);
+  const pillRef = useRef<HTMLButtonElement | null>(null);
+
+  const close = () => {
+    setOpen(false);
+    pillRef.current?.focus();
+  };
+
+  return (
+    <div className="cqd-priv-row">
+      <button
+        type="button"
+        ref={pillRef}
+        className="cqd-priv-pill"
+        aria-expanded={open}
+        aria-controls="cqd-priv-ledger"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+          <path
+            d="M6 1 1.8 2.8v2.9c0 2.5 1.8 4.3 4.2 5.3 2.4-1 4.2-2.8 4.2-5.3V2.8L6 1Z"
+            stroke="currentColor"
+            strokeWidth="1.1"
+            strokeLinejoin="round"
+          />
+        </svg>
+        Privacy &amp; data
+      </button>
+      <div id="cqd-priv-ledger" className={`cqd-priv-ledger-wrap ${open ? 'open' : ''}`}>
+        <div className="cqd-priv-ledger" role="group" aria-label="Privacy and data summary">
+          <h4>Where your files and data go</h4>
+          <div className="cqd-lg-line">
+            <span className="cqd-lg-ic" aria-hidden="true">
+              <LedgerIcon kind="reads" />
+            </span>
+            <span className="cqd-lg-txt">
+              <b>Reads</b>
+              <span>The Classroom pages you open, to find posts and attachments.</span>
+            </span>
+          </div>
+          <div className="cqd-lg-line">
+            <span className="cqd-lg-ic" aria-hidden="true">
+              <LedgerIcon kind="keeps" />
+            </span>
+            <span className="cqd-lg-txt">
+              <b>Keeps on this device</b>
+              <span>Your settings and your download history. They stay on this device.</span>
+            </span>
+          </div>
+          <div className="cqd-lg-line">
+            <span className="cqd-lg-ic" aria-hidden="true">
+              <LedgerIcon kind="sends" />
+            </span>
+            <span className="cqd-lg-txt">
+              <b>Sends</b>
+              <span>
+                Anonymous usage stats — outcomes, file types, browser, system,
+                app version, language, timing, and errors. Never file names or
+                file contents. Files travel from Google to you, directly.
+              </span>
+            </span>
+          </div>
+          <div className="cqd-priv-ledger-foot">
+            <a
+              href={PRIVACY_POLICY_URL}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Open the full privacy policy"
+            >
+              Full privacy policy ↗
+            </a>
+            <button type="button" className="cqd-priv-ledger-close" onClick={close}>
+              Got it
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** The engine modes the popup exposes (#684). S13: the API (beta) option is
  *  the CONSENT surface (#398) — it renders only as a disabled, tooltip'd
  *  hint until the install is OAuth-configured (isApiConfigured(): identity
@@ -1699,6 +2009,23 @@ function App() {
  *  selecting it while enabled is the user's explicit consent that sets
  *  cqdV2Mode 'v3'. */
 export type PopupEngineMode = 'legacy' | 'v2' | 'v3';
+
+/**
+ * Resolve the popup's engine-mode display from raw storage — the same
+ * fallback the runtime applies (mode-controller.ts readMode): a saved mode
+ * wins; a missing, empty or invalid value (fresh install, corruption, key
+ * removal) falls back to DEFAULT_MODE 'v2'. 'shadow' is not a popup mode
+ * (the selector never offered it), so it resolves to the default too.
+ * The old `res.cqdV2Mode || 'legacy'` read showed Legacy selected on fresh
+ * installs while the runtime ran v2 — the documented label quirk (audit
+ * finding 12).
+ */
+export function resolveEngineMode(stored: unknown): PopupEngineMode {
+  if (stored === 'legacy' || stored === 'v2' || stored === 'v3') {
+    return stored;
+  }
+  return 'v2';
+}
 
 /** Tooltip shown while the API option is disabled — the owner setup path. */
 const API_SETUP_TOOLTIP = 'Requires OAuth setup (see docs)';
@@ -1721,7 +2048,10 @@ interface EngineModeRowProps {
 
 /** Separate Engine Mode control (#684 decision: not folded into flag
  *  toggles — engine selection changes the whole page pipeline, flags tune
- *  one feature). Segmented control, aria-pressed marks the active mode.
+ *  one feature). Stillwater SEGMENTED control (prototypes/components.html
+ *  option 1, owner-approved): a radiogroup whose three segments carry
+ *  role="radio" + aria-checked, roving tabindex, and arrow-key selection —
+ *  selection follows focus, ←/→/↑/↓ wrap and skip the disabled API segment.
  *  Labels resolve via chrome.i18n with en fallback (bead 770).
  *  The API (beta) option is disabled-with-tooltip until OAuth is configured
  *  (S13) — a hidden option is not a shipped option, and neither is an
@@ -1810,20 +2140,125 @@ export function EngineModeRow({ mode, loading, apiConfigured, onSelect }: Engine
       title: apiConfigured ? API_PRIVACY_TOOLTIP : API_SETUP_TOOLTIP,
     },
   ];
+
+  /** Arrow-key selection (radio pattern): ←/↑ step back, →/↓ step forward,
+   *  wrapping; disabled segments are skipped. Selection follows focus. */
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'ArrowUp' && e.key !== 'ArrowDown') {
+      return;
+    }
+    const enabled = options.filter((option) => !option.disabled);
+    if (enabled.length === 0) return;
+    const delta = e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 1;
+    const next = (enabled.findIndex((option) => option.value === mode) + delta + enabled.length) % enabled.length;
+    const target = enabled[next];
+    e.preventDefault();
+    e.currentTarget.querySelector<HTMLButtonElement>(`[data-mode="${target.value}"]`)?.focus();
+    onSelect(target.value);
+  };
+
   return (
-    <div className="cqd-engine-mode" role="group" aria-label={popupMessage('popupEngineMode')}>
-      {options.map((option) => (
+    <div
+      className="cqd-engine-mode"
+      role="radiogroup"
+      aria-label={popupMessage('popupEngineMode')}
+      onKeyDown={handleKeyDown}
+    >
+      {options.map((option) => {
+        const checked = mode === option.value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            className="cqd-engine-mode-option"
+            data-mode={option.value}
+            aria-checked={checked}
+            tabIndex={checked ? 0 : -1}
+            disabled={!!loading || option.disabled}
+            title={option.title || undefined}
+            onClick={() => { if (!option.disabled) onSelect(option.value); }}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** The popup's flag-selection pills (Stillwater, direction A "pills",
+ *  owner-approved incl. the new Both card). Each pill IS one flat store
+ *  key — Comment -> commentsFlagEnabled, Edited -> editedFlagEnabled,
+ *  Both -> combinedFlagEnabled — an independent aria-pressed toggle, the
+ *  combinations the prototype allows (no pill forces another). The mini
+ *  before/after stage previews the flag's treatment; its cycle freezes on
+ *  the AFTER state under reduced motion (batch D1 conventions). */
+export type FlagPillKey = 'commentsFlagEnabled' | 'editedFlagEnabled' | 'combinedFlagEnabled';
+
+const FLAG_PILLS: ReadonlyArray<{
+  key: FlagPillKey;
+  label: string;
+  variant: 'comment' | 'edited' | 'both';
+  title: string;
+}> = [
+  {
+    key: 'commentsFlagEnabled',
+    label: 'Comment',
+    variant: 'comment',
+    title: 'Highlight posts with teacher comments.',
+  },
+  {
+    key: 'editedFlagEnabled',
+    label: 'Edited',
+    variant: 'edited',
+    title: 'Highlight posts edited after publishing.',
+  },
+  {
+    key: 'combinedFlagEnabled',
+    label: 'Both',
+    variant: 'both',
+    title: 'Comment and edited highlights in one combined flag.',
+  },
+];
+
+export function FlagPills({
+  comments,
+  edited,
+  combined,
+  disabled,
+  onToggle,
+}: {
+  comments: boolean;
+  edited: boolean;
+  combined: boolean;
+  disabled?: boolean;
+  onToggle: (key: FlagPillKey) => void;
+}) {
+  const values: Record<FlagPillKey, boolean> = {
+    commentsFlagEnabled: comments,
+    editedFlagEnabled: edited,
+    combinedFlagEnabled: combined,
+  };
+  return (
+    <div className="cqd-flag-pills" role="group" aria-label="Highlight changes">
+      {FLAG_PILLS.map((pill) => (
         <button
-          key={option.value}
+          key={pill.key}
           type="button"
-          className="cqd-engine-mode-option"
-          data-mode={option.value}
-          aria-pressed={mode === option.value}
-          disabled={!!loading || option.disabled}
-          title={option.title || undefined}
-          onClick={() => { if (!option.disabled) onSelect(option.value); }}
+          className={`cqd-flag-pill cqd-flag-pill-${pill.variant}`}
+          data-flag={pill.key}
+          aria-pressed={values[pill.key]}
+          disabled={!!disabled}
+          title={pill.title}
+          onClick={() => onToggle(pill.key)}
         >
-          {option.label}
+          <span className="cqd-flag-pill-stage" aria-hidden="true">
+            <span className="cqd-flag-pill-post" />
+            <span className="cqd-flag-pill-ring" />
+            <span className="cqd-flag-pill-badge" />
+          </span>
+          {pill.label}
         </button>
       ))}
     </div>

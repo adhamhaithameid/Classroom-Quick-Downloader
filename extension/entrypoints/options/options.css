@@ -1,0 +1,343 @@
+/* filepath: entrypoints/options/options.css */
+/* ============================================================================
+ * Options page surface (0h4d.1.8; stillwater pass = D4 follow-up q320).
+ *
+ * The options entry imported no stylesheet, so the options rules sat dormant
+ * in popup/App.css and the page rendered unstyled. They now ship here on the
+ * approved tokens only: the --cqd-fs-* type scale, the popup card treatment
+ * (quiet card, 14px radius, soft shadow, hairline border), the translucent
+ * footer band and the one shared motion curve. Layout, DOM, order and the
+ * aria contract of every row are unchanged (options-page.test.ts pins
+ * behavior); the page reads as the same family as the popup.
+ * ========================================================================== */
+
+body {
+  margin: 0;
+  background: var(--cqd-shell-bg);
+  font-family: var(--cqd-font);
+  font-size: var(--cqd-fs-body);
+  color: var(--cqd-text-main);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Same band mechanics as the popup shell: flex column so the footer band
+   pins to the document bottom when the content runs short. */
+.cqd-options {
+  display: flex;
+  flex-direction: column;
+  max-width: 560px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 32px 20px 0;
+  font-family: var(--cqd-font);
+  font-size: var(--cqd-fs-body);
+  color: var(--cqd-text-main);
+}
+
+.cqd-options-header h1 {
+  font-size: var(--cqd-fs-heading);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 4px;
+}
+
+.cqd-options-sub {
+  font-size: var(--cqd-fs-caption);
+  color: var(--cqd-text-muted);
+  margin: 0 0 20px;
+}
+
+/* The popup card treatment (fc3404d6): quiet white card, 14px radius,
+   hairline border, soft depth. */
+.cqd-options-card {
+  border: 1px solid var(--cqd-border-subtle);
+  border-radius: var(--cqd-radius-xl);
+  box-shadow: var(--cqd-shadow-soft);
+  padding: 6px 16px;
+  background: #ffffff;
+}
+
+.cqd-options-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--cqd-border-subtle);
+}
+
+.cqd-options-row:last-child {
+  border-bottom: none;
+}
+
+.cqd-options-row-text {
+  display: grid;
+  gap: 2px;
+}
+
+.cqd-options-label {
+  font-size: var(--cqd-fs-body);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.cqd-options-label-primary {
+  color: var(--cqd-blue);
+}
+
+/* Row descriptions on the micro step, the popup toggle-row grammar. */
+.cqd-options-description {
+  font-size: var(--cqd-fs-micro);
+  color: var(--cqd-text-muted);
+  line-height: 1.45;
+}
+
+/* The labeled-row switch keeps its DOM and aria contract; colors keep the
+   established greens (no tokens exist for them), motion moves onto the
+   shared curve. */
+.cqd-options-toggle {
+  width: 42px;
+  height: 24px;
+  border-radius: 999px;
+  border: none;
+  position: relative;
+  cursor: pointer;
+  flex: none;
+  transition: background var(--cqd-transition-fast);
+}
+
+.cqd-options-toggle:focus-visible {
+  outline: 2px solid var(--cqd-blue);
+  outline-offset: 2px;
+}
+
+.cqd-options-toggle.on {
+  background: #34a853;
+}
+
+.cqd-options-toggle.off {
+  background: rgba(15, 23, 42, 0.25);
+}
+
+.cqd-options-knob {
+  position: absolute;
+  top: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.2);
+  transition: left var(--cqd-transition-fast);
+}
+
+.cqd-options-toggle.on .cqd-options-knob {
+  left: 21px;
+}
+
+.cqd-options-toggle.off .cqd-options-knob {
+  left: 3px;
+}
+
+.cqd-options-note {
+  font-size: var(--cqd-fs-caption);
+  color: var(--cqd-text-muted);
+  margin-top: 16px;
+}
+
+/* Legal round 2, surface 05 Treatment 1 (legal-round2.html .opt-block +
+   .lu-line): the Limited Use two-line block. The plain line is body-dim; the
+   exact Chrome Web Store sentence sits under it as the legal footnote step. */.cqd-options-lu {
+  margin-top: 14px;
+  border: 1px solid var(--cqd-border-subtle);
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--cqd-surface);
+}
+
+.cqd-options-lu h4 {
+  font-size: var(--cqd-fs-caption);
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.cqd-options-lu p {
+  font-size: var(--cqd-fs-micro);
+  color: var(--cqd-text-muted);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.cqd-options-lu-line {
+  margin-top: 10px;
+  font-size: var(--cqd-fs-legal);
+  color: var(--cqd-text-muted);
+  line-height: 1.55;
+  border-left: 2px solid var(--cqd-blue);
+  padding-left: 10px;
+  opacity: 0.85;
+}
+
+/* Legal round 2, surface 02 Treatment 2 (legal-round2.html .acc-row): the
+   standing Permissions reference. Rows are full-width button heads (icon +
+   name + mechanism in faint type + chevron); bodies expand on tap. */
+.cqd-options-perms {
+  margin-top: 14px;
+  border: 1px solid var(--cqd-border-subtle);
+  border-radius: 12px;
+  background: var(--cqd-surface);
+  padding: 6px 0;
+}
+
+.cqd-options-perms-title {
+  font-size: var(--cqd-fs-caption);
+  font-weight: 600;
+  color: var(--cqd-text-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 6px 16px 4px;
+}
+
+.cqd-perm-row {
+  border-top: 1px solid var(--cqd-border-subtle);
+}
+
+.cqd-perm-row:first-of-type {
+  border-top: none;
+}
+
+.cqd-perm-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--cqd-text-main);
+  padding: 12px 16px;
+  transition: background var(--cqd-transition-fast);
+}
+
+.cqd-perm-head:hover {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.cqd-perm-ic {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: rgba(15, 23, 42, 0.05);
+  display: grid;
+  place-items: center;
+  color: var(--cqd-blue);
+}
+
+.cqd-perm-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.cqd-perm-name b {
+  display: block;
+  font-size: var(--cqd-fs-caption);
+  font-weight: 600;
+}
+
+/* The mechanism name — the faint type step (prototype .acc-name small). */
+.cqd-perm-name small {
+  display: block;
+  font-size: var(--cqd-fs-legal);
+  color: var(--cqd-text-muted);
+}
+
+.cqd-perm-chevron {
+  flex: 0 0 auto;
+  color: var(--cqd-text-muted);
+  transition: transform var(--cqd-transition-fast);
+}
+
+.cqd-perm-row.open .cqd-perm-chevron {
+  transform: rotate(180deg);
+}
+
+/* The collapse: max-height + visibility so a closed body leaves the tab
+   order (same convention as the popup privacy ledger). */
+.cqd-perm-collapse {
+  max-height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  transition: max-height var(--cqd-transition-fast),
+    visibility 0s linear var(--cqd-transition-fast);
+}
+
+.cqd-perm-collapse.open {
+  max-height: 12rem;
+  visibility: visible;
+  transition: max-height var(--cqd-transition-fast);
+}
+
+.cqd-perm-body {
+  padding: 0 16px 0 54px;
+}
+
+.cqd-perm-body p {
+  font-size: var(--cqd-fs-micro);
+  color: var(--cqd-text-muted);
+  line-height: 1.55;
+  padding-bottom: 12px;
+  margin: 0;
+}
+
+.cqd-perm-body p em {
+  font-style: normal;
+  color: var(--cqd-text-muted);
+  opacity: 0.8;
+  display: block;
+  margin-top: 4px;
+}
+
+.cqd-options-diag-link {
+  margin: 12px 0 24px;
+  font-size: var(--cqd-fs-caption);
+  font-weight: 500;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--cqd-border-subtle);
+  background: transparent;
+  color: var(--cqd-text-main);
+  cursor: pointer;
+  font-family: var(--cqd-font);
+  transition:
+    background-color var(--cqd-transition-fast),
+    border-color var(--cqd-transition-fast);
+}
+
+.cqd-options-diag-link:hover {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.cqd-options-diag-link:focus-visible {
+  outline: 2px solid var(--cqd-blue);
+  outline-offset: 2px;
+}
+
+/* The approved affiliation notice in the popup's translucent .p-foot band:
+   hairline above, 10px legal step, column bleed via the same negative-margin
+   escape the popup band uses on its gutters; margin-top auto pins it to the
+   document bottom when the content runs short. */
+.cqd-options-affil {
+  margin: auto -20px 0;
+  padding: 10px 20px 12px;
+  border-top: 1px solid var(--cqd-border-subtle);
+  background: rgba(15, 23, 42, 0.03);
+  text-align: center;
+  font-size: var(--cqd-fs-legal);
+  color: var(--cqd-text-muted);
+  line-height: 1.45;
+}
+
+.cqd-options-affil strong {
+  font-weight: 600;
+  color: var(--cqd-text-main);
+}

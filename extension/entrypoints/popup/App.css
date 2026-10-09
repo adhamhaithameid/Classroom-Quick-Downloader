@@ -1,45 +1,14 @@
  /* filepath: entrypoints/popup/App.css */
 
-:root {
-  --cqd-blue: #005dd7;
-  --cqd-blue-hover: #004bb0;
-  --cqd-blue-soft: #e3edff;
-  --cqd-blue-soft-border: #c4d5ff;
-  --cqd-bg: #ffffff;
-  --cqd-shell-bg: #f3f4f6;
-  --cqd-surface: #f9fafb;
-  --cqd-border-subtle: #e5e7eb;
-  --cqd-text-main: #0f172a;
-  --cqd-text-muted: #6b7280;
-  --cqd-radius-xl: 18px;
-  --cqd-shadow-soft: 0 8px 24px rgba(15, 23, 42, 0.08);
-  --cqd-shadow-hover: 0 14px 34px rgba(15, 23, 42, 0.16);
-  --cqd-transition-fast: 180ms cubic-bezier(0.2, 0, 0, 1);
-  --cqd-yellow-bg: #fefce8;
-  --cqd-yellow-border: #fde047;
-  --cqd-yellow-text: #854d0e;
-  --cqd-red: #ef4444;
-}
+/* The Stillwater foundation — the --cqd-* tokens, the universal box-sizing
+   reset, the global focus ring and the reduce-motion collapse — lives in
+   src/ui/stillwater.css, ONE copy shared with the options page (q320).
+   This sheet keeps the popup's surface rules only; App.tsx imports the
+   foundation sheet first. */
 
 /* ===============================
- * Popup Shell Sizing & Reset
+ * Popup Shell Sizing
  * =============================== */
-
-html {
-  box-sizing: border-box;
-}
-
-*, *::before, *::after {
-  box-sizing: inherit;
-  /* outline: none !important; */
-}
-
-/* Global focus */
-:focus-visible {
-  outline: 2px solid var(--cqd-blue);
-  outline-offset: 2px;
-  border-radius: 2px;
-}
 
 /* Rounded Buttons Focus */
 .cqd-button:focus-visible,
@@ -67,10 +36,13 @@ html {
 body {
   margin: 0;
   padding: 0;
-  width: 200px;
-  height: 530px;
+  /* The approved direction-A stage (prototypes/popup-direction-a.html):
+     360 x 600, the only size the prototype composes for. */
+  width: 360px;
+  height: 600px;
   background: transparent; /* Crucial for rounded corners effect */
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--cqd-font);
+  font-size: var(--cqd-fs-body);
   color: var(--cqd-text-main);
   background: var(--cqd-shell-bg);
   -webkit-font-smoothing: antialiased;
@@ -97,22 +69,29 @@ body {
   overflow: scroll;
 }
 
-/* Scroll area – header sticky, content scrolls */
+/* Scroll area – header sticky, content scrolls. Side padding = the
+   prototype's 16px gutters; the header and footer bands escape it to run
+   their hairlines full-bleed, exactly like .p-head / .p-foot. */
 .cqd-scroll-container {
   flex: 1; /* Takes remaining height */
   display: flex;
   flex-direction: column;
-  padding: 16px 16px 4px;
+  padding: 16px 16px 0;
 }
 
 /* ===============================
  * Header & Branding
  * =============================== */
 
+/* .p-head, light-surface adaptation: full-bleed band, hairline below,
+   nothing louder — chrome recedes so the content leads. */
 .cqd-header {
   position: sticky;
   top: 0;
   z-index: 10;
+  margin: 0 -16px;
+  padding: 4px 16px 10px;
+  border-bottom: 1px solid var(--cqd-border-subtle);
   background: var(--cqd-shell-bg);
   transition:
     background-color 160ms ease,
@@ -136,9 +115,9 @@ body {
 }
 
 .cqd-brand-logo {
-  width: 60px;
-  height: 60px;
-  border-radius: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
   object-fit: contain;
   transition: transform var(--cqd-transition-fast);
 }
@@ -151,9 +130,11 @@ body {
   flex: 1;
 }
 
+/* Quiet chrome: the prototype's brand line is 13px/600 — the CTA's
+   15px/600 stays the loudest text on the surface. */
 .cqd-brand-name {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--cqd-fs-body);
+  font-weight: 600;
   letter-spacing: -0.01em;
 }
 
@@ -162,7 +143,7 @@ body {
   align-items: center;
   gap: 6px;
   margin-top: 2px;
-  font-size: 11px;
+  font-size: var(--cqd-fs-micro);
   color: var(--cqd-text-muted);
 }
 
@@ -212,7 +193,7 @@ body {
   background: var(--cqd-blue-soft);
   padding: 2px 8px;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: var(--cqd-fs-micro);
   border: none;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -300,10 +281,10 @@ body {
  * =============================== */
 
 .cqd-content-area {
-  margin-top: 8px;
+  margin-top: 12px;
   display: flex;
   flex-direction: column;
-  gap: 16px; /* Increased gap for vertical stacking */
+  gap: 12px; /* Stillwater rhythm: 12 — section gaps (4/8 grid) */
   min-height: 0;
 }
 
@@ -323,7 +304,7 @@ body {
   gap: 8px;
   padding: 10px 12px;
   border-radius: 12px;
-  font-size: 11px;
+  font-size: var(--cqd-fs-micro);
 }
 
 .cqd-banner-content {
@@ -338,13 +319,16 @@ body {
   color: var(--cqd-yellow-text);
 }
 
+/* .cta.is-error, light-surface adaptation: the calm error card — same
+   geometry in every state, color + border carry the meaning (role="alert"
+   and the dismiss control are unchanged). */
 .cqd-banner-error {
   flex-direction: row;
   align-items: center;
-  border-radius: 999px;
-  padding: 8px 10px;
-  background-color: #fef2f2;
-  border: 1px solid #fecaca;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, rgba(239, 68, 68, 0.08), rgba(239, 68, 68, 0.04));
+  border: 1px solid rgba(239, 68, 68, 0.45);
   color: #991b1b;
 }
 
@@ -364,7 +348,7 @@ body {
   border: none;
   background: transparent;
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--cqd-fs-body);
   line-height: 1;
   border-radius: 999px;
   width: 20px;
@@ -385,8 +369,8 @@ body {
   border: none;
   background-color: rgba(0, 0, 0, 0.05);
   color: inherit;
-  font-weight: 700;
-  font-size: 11px;
+  font-weight: 600;
+  font-size: var(--cqd-fs-micro);
   padding: 6px 10px;
   border-radius: 6px;
   cursor: pointer;
@@ -419,16 +403,18 @@ body {
   flex-shrink: 0;
 }
 
+/* Quiet chrome: section titles sit at 13px/600 (body-strong); the only
+   15px/600 on the surface is the hero action's title. */
 .cqd-card-title {
   margin: 0;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: var(--cqd-fs-body);
+  font-weight: 600;
   color: var(--cqd-text-main);
 }
 
 .cqd-card-subtitle {
   margin: 4px 0 4px 0;
-  font-size: 12px;
+  font-size: var(--cqd-fs-caption);
   color: var(--cqd-text-muted);
 }
 
@@ -488,8 +474,8 @@ body {
 }
 
 .cqd-analytics-main-number {
-  font-size: 20px;
-  font-weight: 800;
+  font-size: var(--cqd-fs-heading);
+  font-weight: 600;
   line-height: 1;
 }
 
@@ -507,7 +493,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  font-size: var(--cqd-fs-micro);
   margin-bottom: 4px;
 }
 
@@ -515,7 +501,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  font-size: var(--cqd-fs-micro);
   margin-bottom: 4px;
   padding: 4px 8px;
   margin-left: -8px;
@@ -549,7 +535,7 @@ body {
 }
 
 .cqd-muted-text {
-  font-size: 11px;
+  font-size: var(--cqd-fs-micro);
   color: var(--cqd-text-muted);
 }
 
@@ -564,7 +550,7 @@ body {
 }
 
 .cqd-toggle-group-title {
-  font-size: 12px;
+  font-size: var(--cqd-fs-caption);
   font-weight: 600;
   color: var(--cqd-text-muted);
   margin-bottom: 4px;
@@ -604,13 +590,13 @@ body {
 }
 
 .cqd-toggle-label {
-  font-size: 13px;
+  font-size: var(--cqd-fs-body);
   font-weight: 600;
   letter-spacing: -0.01em;
 }
 
 .cqd-toggle-description {
-  font-size: 11px;
+  font-size: var(--cqd-fs-micro);
   color: var(--cqd-text-muted);
   margin-top: 2px;
   line-height: 1.45;
@@ -631,7 +617,7 @@ body {
 }
 
 .cqd-designer-credit {
-  font-size: 11px;
+  font-size: var(--cqd-fs-micro);
   color: var(--cqd-text-muted);
   margin: 0;
   display: flex;
@@ -702,7 +688,7 @@ body {
   justify-content: space-between;
   padding: 8px 0;
   border-bottom: 1px dashed var(--cqd-border-subtle);
-  font-size: 13px;
+  font-size: var(--cqd-fs-body);
 }
 
 .cqd-meta-row:last-child {
@@ -715,7 +701,7 @@ body {
 
 .cqd-meta-row dd {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--cqd-fs-body);
 }
 
 /* ===============================
@@ -737,8 +723,8 @@ body {
   justify-content: center;
   padding: 10px 14px;
   border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--cqd-fs-caption);
+  font-weight: 500;
   border: 1px solid transparent;
   cursor: pointer;
   transition: all var(--cqd-transition-fast);
@@ -778,18 +764,74 @@ body {
   box-shadow: 0 4px 15px rgba(15, 23, 42, 0.18);
 }
 
-/* Non-Classroom CTA */
+/* ── Main action (direction A ".cta") — the ONE filled element. The
+   non-Classroom hero adopts the prototype's CTA geometry: full-width glass
+   tile, 14px radius, icon + 15px/600 title + 11px sub, hover lifts 1px.
+   Handler, aria-label and title attribute are unchanged. ──────────────── */
 .cqd-open-classroom-btn {
+  all: unset;
+  box-sizing: border-box;
   margin-top: 12px;
   width: 100%;
-  justify-content: center;
-  gap: 8px;
-  border-radius: 999px;
-  background: #0b8043;
-  color: #ffffff;
-  border-color: #0b8043;
-  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 14px;
+  border: 1px solid rgba(110, 91, 255, 0.5);
+  background: linear-gradient(180deg, rgba(143, 123, 255, 0.22), rgba(110, 91, 255, 0.14));
+  color: var(--cqd-text-main);
+  box-shadow: 0 4px 20px rgba(110, 91, 255, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  transition:
+    transform var(--cqd-transition-fast),
+    box-shadow var(--cqd-transition-fast),
+    border-color var(--cqd-transition-fast),
+    background var(--cqd-transition-fast);
+}
+
+.cqd-open-classroom-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(143, 123, 255, 0.85);
+  box-shadow: 0 6px 26px rgba(110, 91, 255, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.cqd-open-classroom-btn:active {
+  transform: translateY(0);
+}
+
+.cqd-open-classroom-btn:focus-visible {
+  outline: 2px solid var(--cqd-blue);
+  outline-offset: 2px;
+}
+
+.cqd-cta-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  color: #6e5bff;
+}
+
+.cqd-cta-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.cqd-cta-title {
+  display: block;
+  font-size: var(--cqd-fs-title);
   font-weight: 600;
+  line-height: 1.25;
+}
+
+.cqd-cta-sub {
+  display: block;
+  font-size: var(--cqd-fs-micro);
+  font-weight: 400;
+  color: var(--cqd-text-muted);
+  line-height: 1.4;
+  margin-top: 1px;
 }
 
 /* Coffee Button */
@@ -809,7 +851,121 @@ body {
   transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
     box-shadow 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   box-shadow: 0 4px 15px rgba(255, 221, 0, 0.3);
+  /* Stillwater D3: relative + visible so the decorative stars may break
+     the edge; the logo keeps its own clip via .cqd-coffee-icon-clip. */
+  position: relative;
+  overflow: visible;
+}
+
+.cqd-coffee-icon-clip {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
   overflow: hidden;
+}
+
+/* ===============================
+ * STAR SHIMMER (Stillwater Phase 4 batch D3, effects.html B)
+ * Attention by sparkle, not by pulse: five four-point stars on staggered
+ * 4.8s cycles (each visible ~25% of the time) plus one sheen pass every
+ * 6.5s. Nothing loops fast, nothing scales past the button, everything is
+ * aria-hidden and pointer-events: none — the label contrast is untouched.
+ * =============================== */
+.cqd-coffee-star {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(0.4) rotate(0deg);
+  animation: cqd-twinkle 4.8s ease-in-out infinite;
+}
+
+/* The prototype's five star anchors (0s … 4.1s stagger). */
+.cqd-coffee-star:nth-of-type(1) { top: -9px; left: 14%; animation-delay: 0s; }
+.cqd-coffee-star:nth-of-type(2) { top: -12px; left: 46%; animation-delay: 1.4s; }
+.cqd-coffee-star:nth-of-type(3) { top: -6px; right: 16%; animation-delay: 2.6s; }
+.cqd-coffee-star:nth-of-type(4) { bottom: -9px; left: 28%; animation-delay: 3.4s; }
+.cqd-coffee-star:nth-of-type(5) { bottom: -11px; right: 34%; animation-delay: 4.1s; }
+
+@keyframes cqd-twinkle {
+  0% { opacity: 0; transform: scale(0.3) rotate(0deg); }
+  8% { opacity: 0.9; transform: scale(1) rotate(24deg); }
+  16% { opacity: 0.35; transform: scale(0.7) rotate(40deg); }
+  26% { opacity: 0; transform: scale(0.3) rotate(60deg); }
+  100% { opacity: 0; transform: scale(0.3) rotate(60deg); }
+}
+
+.cqd-coffee-sheen {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 60%;
+  border-radius: 999px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.cqd-coffee-sheen::before {
+  content: '';
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: 0;
+  width: 60%;
+  background: linear-gradient(
+    105deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 80%
+  );
+  transform: translateX(-160%) skewX(-12deg);
+  animation: cqd-sheen-pass 6.5s ease-in-out infinite;
+  animation-delay: 1.2s;
+}
+
+@keyframes cqd-sheen-pass {
+  0% { transform: translateX(-160%) skewX(-12deg); }
+  16% { transform: translateX(340%) skewX(-12deg); }
+  100% { transform: translateX(340%) skewX(-12deg); }
+}
+
+/* Reduced motion: motion off is not emphasis off — the stars hold a
+   static 30% opacity and the sheen parks off-canvas (effects.html B),
+   under BOTH gates. The generic duration-collapse blocks already exist;
+   these statics restore the frozen state the collapse would blank out. */
+.cqd-reduce-motion .cqd-coffee-star {
+  animation: none !important;
+  opacity: 0.3;
+  transform: scale(0.8);
+}
+
+.cqd-reduce-motion .cqd-coffee-sheen::before {
+  animation: none !important;
+  transform: translateX(-160%) skewX(-12deg);
+}
+
+.cqd-reduce-motion .cqd-coffee-button:hover {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cqd-app .cqd-coffee-star {
+    animation: none !important;
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+
+  .cqd-app .cqd-coffee-sheen::before {
+    animation: none !important;
+    transform: translateX(-160%) skewX(-12deg);
+  }
+
+  .cqd-app .cqd-coffee-button:hover {
+    transform: none;
+  }
 }
 
 .cqd-coffee-icon {
@@ -821,15 +977,18 @@ body {
  * Footer – always visible
  * =============================== */
 
+/* .p-foot, light-surface adaptation: the second translucent layer — a
+   full-bleed band under a hairline; content above stays one surface. */
 .cqd-footer {
-  margin-top: 4px;
-  padding: 8px 0 10px;
+  margin: 12px -16px 0;
+  padding: 10px 16px 12px;
   border-top: 1px solid var(--cqd-border-subtle);
+  background: rgba(15, 23, 42, 0.03);
   text-align: center;
 }
 
 .cqd-footer-text {
-  font-size: 11px;
+  font-size: var(--cqd-fs-micro);
   color: var(--cqd-text-muted);
   margin: 0;
 }
@@ -838,6 +997,159 @@ body {
   color: var(--cqd-blue);
   text-decoration: none;
   font-weight: 600;
+}
+
+/* The approved affiliation notice (legal.html surface 03): its own 10px
+   legal-only line under the footer text; the lead sentence carries the
+   weight (.foot-line b convention). */
+.cqd-footer-affil {
+  font-size: var(--cqd-fs-legal);
+  color: var(--cqd-text-muted);
+  line-height: 1.45;
+  margin: 4px 0 0;
+}
+
+.cqd-footer-affil strong {
+  color: var(--cqd-text-main);
+  font-weight: 600;
+}
+
+/* ===============================
+ * Privacy & data ledger (legal round 2, surface 01 T2)
+ * =============================== */
+
+/* The footer stays clean: one pill under the approved notice; the ledger
+   expands in place below it (.priv-pill + .collapse + .ledger of
+   legal-round2.html, adapted to the light Stillwater tokens). */
+.cqd-priv-row {
+  margin-top: 8px;
+}
+
+.cqd-priv-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--cqd-fs-micro);
+  font-weight: 500;
+  color: var(--cqd-text-muted);
+  border: 1px solid var(--cqd-border-subtle);
+  background: transparent;
+  border-radius: 999px;
+  padding: 5px 11px;
+  transition: color var(--cqd-transition-fast), border-color var(--cqd-transition-fast);
+}
+
+.cqd-priv-pill:hover {
+  color: var(--cqd-text-main);
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.cqd-priv-pill[aria-expanded="true"] {
+  color: var(--cqd-text-main);
+  border-color: var(--cqd-blue);
+}
+
+/* The collapse: max-height + visibility so a closed ledger leaves the tab
+   order (nothing inside is focusable while hidden). */
+.cqd-priv-ledger-wrap {
+  max-height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  transition: max-height var(--cqd-transition-fast),
+    visibility 0s linear var(--cqd-transition-fast);
+}
+
+.cqd-priv-ledger-wrap.open {
+  max-height: 32rem;
+  visibility: visible;
+  transition: max-height var(--cqd-transition-fast);
+}
+
+.cqd-priv-ledger {
+  margin: 10px auto 2px;
+  max-width: 340px;
+  border: 1px solid var(--cqd-border-subtle);
+  border-radius: 12px;
+  background: var(--cqd-surface);
+  padding: 12px 14px;
+  text-align: left;
+}
+
+.cqd-priv-ledger h4 {
+  font-size: var(--cqd-fs-caption);
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.cqd-lg-line {
+  display: flex;
+  gap: 10px;
+  padding: 7px 0;
+  border-top: 1px solid var(--cqd-border-subtle);
+}
+
+.cqd-lg-line:first-of-type {
+  border-top: none;
+}
+
+.cqd-lg-ic {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.05);
+  display: grid;
+  place-items: center;
+  color: var(--cqd-blue);
+}
+
+.cqd-lg-txt b {
+  display: block;
+  font-size: var(--cqd-fs-caption);
+  font-weight: 600;
+  color: var(--cqd-text-main);
+}
+
+.cqd-lg-txt span {
+  display: block;
+  font-size: var(--cqd-fs-micro);
+  color: var(--cqd-text-muted);
+  line-height: 1.5;
+  margin-top: 1px;
+}
+
+.cqd-priv-ledger-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.cqd-priv-ledger-foot a {
+  font-size: var(--cqd-fs-micro);
+  color: var(--cqd-blue);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.cqd-priv-ledger-foot a:hover {
+  text-decoration: underline;
+}
+
+.cqd-priv-ledger-close {
+  border: none;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--cqd-text-main);
+  font-size: var(--cqd-fs-micro);
+  font-weight: 600;
+  padding: 6px 12px;
+  transition: background var(--cqd-transition-fast);
+}
+
+.cqd-priv-ledger-close:hover {
+  background: rgba(15, 23, 42, 0.1);
 }
 
 /* ===============================
@@ -1117,7 +1429,7 @@ body {
 
 .cqd-share-browser-name {
   flex: 1;
-  font-size: 13px;
+  font-size: var(--cqd-fs-body);
   font-weight: 600;
   color: var(--cqd-text-main);
   display: flex;
@@ -1126,8 +1438,8 @@ body {
 }
 
 .cqd-share-detected-badge {
-  font-size: 8px;
-  font-weight: 700;
+  font-size: var(--cqd-fs-micro);
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.3px;
   color: var(--cqd-blue);
@@ -1147,7 +1459,7 @@ body {
   background: #ffffff;
   border: 1px solid #d1d5db;
   color: var(--cqd-text-main);
-  font-size: 11px;
+  font-size: var(--cqd-fs-micro);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -1278,8 +1590,8 @@ body {
 
 .cqd-cl-title {
   margin: 0;
-  font-size: 17px;
-  font-weight: 700;
+  font-size: var(--cqd-fs-heading);
+  font-weight: 600;
   color: white;
   display: flex;
   align-items: center;
@@ -1289,7 +1601,7 @@ body {
 }
 
 .cqd-cl-title .btn-bullet {
-  font-size: 20px;
+  font-size: var(--cqd-fs-heading);
   filter: drop-shadow(0 2px 2px rgba(0,0,0,0.15));
   animation: float 3s ease-in-out infinite;
 }
@@ -1310,8 +1622,8 @@ body {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--cqd-fs-caption);
+  font-weight: 500;
   line-height: 1;
   transition: background-color 0.2s ease, border-color 0.2s ease;
   white-space: nowrap;
@@ -1346,7 +1658,7 @@ body {
   margin-bottom: 12px;
   padding: 10px 12px;
   border-radius: 10px;
-  font-size: 12px;
+  font-size: var(--cqd-fs-caption);
   border: 1px solid transparent;
 }
 
@@ -1377,8 +1689,8 @@ body {
   background: #fff;
   color: #991b1b;
   border-radius: 8px;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--cqd-fs-micro);
+  font-weight: 600;
   padding: 6px 10px;
   cursor: pointer;
 }
@@ -1441,9 +1753,9 @@ body {
 }
 
 .cqd-cl-version {
-  font-weight: 800;
+  font-weight: 600;
   color: white;
-  font-size: 12px;
+  font-size: var(--cqd-fs-caption);
   background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   padding: 4px 12px;
   border-radius: 999px;
@@ -1459,18 +1771,18 @@ body {
 }
 .cqd-cl-entry:first-child .cqd-cl-version::after {
   content: 'NEW';
-  font-size: 9px;
+  font-size: var(--cqd-fs-micro);
   background: rgba(255,255,255,0.25);
   padding: 2px 5px;
   border-radius: 4px;
   margin-left: 6px;
   vertical-align: middle;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.04em;
 }
 
 .cqd-cl-date {
-  font-size: 11px;
+  font-size: var(--cqd-fs-micro);
   color: #64748b;
   font-weight: 600;
   text-transform: uppercase;
@@ -1482,7 +1794,7 @@ body {
   margin: 0;
   padding: 0 4px;
   list-style: none;
-  font-size: 13px;
+  font-size: var(--cqd-fs-body);
   color: #334155;
   line-height: 1.6;
 }
@@ -1510,11 +1822,11 @@ body {
   background: #dcfce7;
   color: #16a34a;
   border-radius: 50%;
-  font-size: 10px;
+  font-size: var(--cqd-fs-micro);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 /* Footer */
@@ -1537,11 +1849,11 @@ body {
   min-width: 0;
   min-height: 40px;
   padding: 9px 10px;
-  font-size: 11.5px;
+  font-size: var(--cqd-fs-caption);
   line-height: 1.2;
   color: #1d4ed8;
   text-decoration: none;
-  font-weight: 700;
+  font-weight: 500;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1619,7 +1931,7 @@ body {
   padding: 40px;
   text-align: center;
   color: var(--cqd-text-muted);
-  font-size: 13px;
+  font-size: var(--cqd-fs-body);
 }
 
 /* ============================================================================
@@ -1628,8 +1940,8 @@ body {
 
 .cqd-cl-tag {
   display: inline-block;
-  font-size: 9px;
-  font-weight: 700;
+  font-size: var(--cqd-fs-micro);
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   padding: 2px 8px;
@@ -1689,8 +2001,8 @@ body {
   background: rgba(148, 163, 184, 0.1);
   border: 1px solid rgba(148, 163, 184, 0.18);
   color: var(--cqd-text-muted);
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--cqd-fs-micro);
+  font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: uppercase;
   transition:
@@ -1747,14 +2059,14 @@ body {
 
 .cqd-card-settings .cqd-disclaimer {
   margin-top: 10px;
-  font-size: 11px;
+  font-size: var(--cqd-fs-micro);
   color: var(--cqd-text-muted);
   text-align: left;
 }
 
 .cqd-settings-section-label {
-  font-size: 10px;
-  font-weight: 700;
+  font-size: var(--cqd-fs-micro);
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--cqd-text-muted);
@@ -1762,43 +2074,297 @@ body {
 }
 
 .cqd-settings-section-note {
-  font-size: 10px;
+  font-size: var(--cqd-fs-micro);
   color: var(--cqd-text-muted);
   padding: 0 4px;
 }
 
-/* ============================================================================
-   FLAG TOGGLE COLORED BORDERS
-   ============================================================================ */
-
-.cqd-flag-toggle-row {
+/* ── Engine segmented control (Stillwater, prototypes/components.html
+   option 1: three equal segments, selected = violet tint + inset ring,
+   2px inner track padding, 11px track radius, 9px segment radius). The
+   light-surface adaptation keeps the prototype's violet accent. ───────── */
+.cqd-engine-mode {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.05);
   border: 1px solid var(--cqd-border-subtle);
-  border-left: 3px solid transparent;
-  border-radius: 14px;
-  gap: 0px;
-  margin: 0px;
-  padding: 0px;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  border-radius: 11px;
+  padding: 2px;
 }
 
-/* Comment flags — blue (matches comment badge color) */
-.cqd-flag-toggle-comment {
-  border-left-color: #9B00FF;
-  border-color: #9B00FF;
+.cqd-engine-mode-option {
+  border: none;
+  background: transparent;
+  color: var(--cqd-text-muted);
+  font-family: var(--cqd-font);
+  font-size: var(--cqd-fs-caption);
+  font-weight: 500;
+  padding: 7px 4px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background var(--cqd-transition-fast), color var(--cqd-transition-fast),
+    box-shadow var(--cqd-transition-fast);
 }
 
-/* Edited flags — orange/amber (matches edited badge color) */
-.cqd-flag-toggle-edited {
-  border-left-color: #007F8D;
-  border-color: #007F8D;
+.cqd-engine-mode-option:hover:not(:disabled) {
+  color: var(--cqd-text-main);
 }
 
-/* Both flags — red/pink (matches both badge color) */
-.cqd-flag-toggle-both {
-  border-left-color: #FF4036;
-  border-color: #FF4036;
+.cqd-engine-mode-option[aria-checked='true'] {
+  background: linear-gradient(180deg, rgba(143, 123, 255, 0.24), rgba(143, 123, 255, 0.16));
+  color: var(--cqd-text-main);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(143, 123, 255, 0.45);
 }
 
+.cqd-engine-mode-option:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cqd-engine-mode-option:focus-visible {
+  outline: 2px solid var(--cqd-blue);
+  outline-offset: -2px; /* inside the segment so the track never clips it */
+}
+
+/* ===============================
+ * API-beta confirm card (legal round 2, surface 03 T2)
+ * =============================== */
+
+/* The .confirm of legal-round2.html, light Stillwater adaptation: one
+   explicit "try it" with the way back named first, rendered right under the
+   engine selector while the first beta pick awaits confirmation. */
+.cqd-api-confirm {
+  margin-top: 10px;
+  border: 1px solid rgba(143, 123, 255, 0.45);
+  border-radius: 12px;
+  background: rgba(143, 123, 255, 0.07);
+  padding: 12px 14px;
+}
+
+.cqd-api-confirm h5 {
+  font-size: var(--cqd-fs-caption);
+  font-weight: 600;
+  color: var(--cqd-text-main);
+  margin: 0 0 6px;
+}
+
+.cqd-api-confirm ul {
+  margin: 0 0 10px;
+  padding-left: 16px;
+}
+
+.cqd-api-confirm li {
+  font-size: var(--cqd-fs-micro);
+  color: var(--cqd-text-muted);
+  line-height: 1.55;
+  margin-bottom: 3px;
+}
+
+.cqd-api-confirm-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.cqd-api-confirm-stay,
+.cqd-api-confirm-try {
+  border: none;
+  border-radius: 8px;
+  font-family: var(--cqd-font);
+  font-size: var(--cqd-fs-micro);
+  font-weight: 600;
+  padding: 7px 12px;
+  cursor: pointer;
+  transition: background var(--cqd-transition-fast), filter var(--cqd-transition-fast);
+}
+
+.cqd-api-confirm-stay {
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--cqd-text-muted);
+}
+
+.cqd-api-confirm-stay:hover {
+  background: rgba(15, 23, 42, 0.1);
+  color: var(--cqd-text-main);
+}
+
+.cqd-api-confirm-try {
+  background: var(--cqd-blue);
+  color: #ffffff;
+}
+
+.cqd-api-confirm-try:hover {
+  filter: brightness(1.08);
+}
+
+/* ── Flag preview pills (Stillwater, direction A "pills" + components.html
+   preview cards). One pill per flat flag key; the mini stage plays the
+   prototype's before/after cycle (5.2s): the plain post is the before,
+   the ring + badge (the flagged result) are the after. Colors are the
+   prototype palette's light-surface tones: comment #9B00FF, edited
+   #007F8D, Both = the purple→cyan gradient. ───────────────────────────── */
+.cqd-flag-pills {
+  display: flex;
+  gap: 6px;
+}
+
+.cqd-flag-pill {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--cqd-border-subtle);
+  border-radius: 999px;
+  background: var(--cqd-surface);
+  color: var(--cqd-text-muted);
+  font-family: var(--cqd-font);
+  font-size: var(--cqd-fs-caption);
+  font-weight: 500;
+  padding: 8px 4px;
+  cursor: pointer;
+  transition: border-color var(--cqd-transition-fast), background var(--cqd-transition-fast),
+    color var(--cqd-transition-fast), box-shadow var(--cqd-transition-fast);
+}
+
+.cqd-flag-pill:hover:not(:disabled) {
+  border-color: var(--cqd-text-muted);
+  color: var(--cqd-text-main);
+}
+
+.cqd-flag-pill:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cqd-flag-pill:focus-visible {
+  outline: 2px solid var(--cqd-blue);
+  outline-offset: 2px;
+}
+
+/* Selected pills — the prototype's pressed affordance per variant. */
+.cqd-flag-pill-comment[aria-pressed='true'] {
+  border-color: rgba(155, 0, 255, 0.55);
+  background: rgba(155, 0, 255, 0.06);
+  color: var(--cqd-text-main);
+  box-shadow: inset 0 0 0 1px rgba(155, 0, 255, 0.3);
+}
+
+.cqd-flag-pill-edited[aria-pressed='true'] {
+  border-color: rgba(0, 127, 141, 0.55);
+  background: rgba(0, 127, 141, 0.06);
+  color: var(--cqd-text-main);
+  box-shadow: inset 0 0 0 1px rgba(0, 127, 141, 0.3);
+}
+
+.cqd-flag-pill-both[aria-pressed='true'] {
+  border-color: rgba(155, 0, 255, 0.55);
+  background: linear-gradient(90deg, rgba(155, 0, 255, 0.06), rgba(0, 127, 141, 0.08));
+  color: var(--cqd-text-main);
+  box-shadow: inset 0 0 0 1px rgba(0, 127, 141, 0.35);
+}
+
+/* Mini before/after stage. */
+.cqd-flag-pill-stage {
+  position: relative;
+  width: 14px;
+  height: 10px;
+  flex: 0 0 auto;
+}
+
+.cqd-flag-pill-post {
+  position: absolute;
+  inset: 2px 1px;
+  border-radius: 3px;
+  background: rgba(15, 23, 42, 0.16);
+}
+
+.cqd-flag-pill-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.cqd-flag-pill-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.cqd-flag-pill-comment .cqd-flag-pill-ring {
+  box-shadow: 0 0 0 2px rgba(155, 0, 255, 0.75);
+}
+.cqd-flag-pill-comment .cqd-flag-pill-badge {
+  background: #9b00ff;
+}
+
+.cqd-flag-pill-edited .cqd-flag-pill-ring {
+  box-shadow: 0 0 0 2px rgba(0, 127, 141, 0.75);
+}
+.cqd-flag-pill-edited .cqd-flag-pill-badge {
+  background: #007f8d;
+}
+
+/* Both: gradient ring (padding-box/border-box mask trick) + gradient dot. */
+.cqd-flag-pill-both .cqd-flag-pill-ring {
+  border: 1.5px solid transparent;
+  background: linear-gradient(135deg, rgba(155, 0, 255, 0.8), rgba(0, 127, 141, 0.8)) border-box;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+.cqd-flag-pill-both .cqd-flag-pill-badge {
+  background: linear-gradient(135deg, #9b00ff, #007f8d);
+}
+
+/* Before/after cycle (components.html ring-cycle/badge-cycle, 5.2s). */
+@keyframes cqd-flag-pill-ring-cycle {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  74% { opacity: 1; }
+  88% { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+@keyframes cqd-flag-pill-badge-cycle {
+  0% { opacity: 0; transform: scale(0.6); }
+  10% { opacity: 1; transform: scale(1.04); }
+  14% { transform: scale(1); }
+  74% { opacity: 1; transform: scale(1); }
+  88% { opacity: 0; transform: scale(0.9); }
+  100% { opacity: 0; transform: scale(0.6); }
+}
+
+.cqd-flag-pill .cqd-flag-pill-ring {
+  animation: cqd-flag-pill-ring-cycle 5.2s var(--cqd-ease) infinite;
+}
+
+.cqd-flag-pill .cqd-flag-pill-badge {
+  animation: cqd-flag-pill-badge-cycle 5.2s var(--cqd-ease) infinite;
+}
+
+/* Reduced motion: stop the cycle and hold the AFTER state — the flagged
+   result stays readable (prototype convention; batch 1's global 0.01ms
+   collapse only shortens the loop, which would end on the empty frame). */
+.cqd-reduce-motion .cqd-flag-pill-ring,
+.cqd-reduce-motion .cqd-flag-pill-badge {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cqd-app .cqd-flag-pill-ring,
+  .cqd-app .cqd-flag-pill-badge {
+    animation: none;
+  }
+}
 
 /* ── Queue panel (0h4d.1.2) ─────────────────────────────────────────────── */
 .cqd-card-queue { padding: 12px 14px; }
@@ -1808,9 +2374,16 @@ body {
   justify-content: space-between;
   margin-bottom: 8px;
 }
-.cqd-queue-title { font-size: 12px; font-weight: 600; opacity: 0.85; }
+/* .p-label, light-surface adaptation: 11px/600 uppercase micro label. */
+.cqd-queue-title {
+  font-size: var(--cqd-fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cqd-text-muted);
+}
 .cqd-queue-pause-btn {
-  font-size: 11px;
+  font-size: var(--cqd-fs-micro);
   padding: 3px 10px;
   border-radius: 999px;
   border: 1px solid rgba(0, 0, 0, 0.15);
@@ -1818,14 +2391,26 @@ body {
   cursor: pointer;
 }
 .cqd-queue-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+/* .h-row, light-surface adaptation: quiet bordered row tiles. */
 .cqd-queue-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--cqd-fs-caption);
+  border: 1px solid var(--cqd-border-subtle);
+  border-radius: 12px;
+  background: var(--cqd-surface);
+  padding: 6px 10px;
+  transition:
+    border-color var(--cqd-transition-fast),
+    background var(--cqd-transition-fast);
+}
+.cqd-queue-row:hover {
+  border-color: rgba(15, 23, 42, 0.18);
+  background: #ffffff;
 }
 .cqd-queue-state {
-  font-size: 10px;
+  font-size: var(--cqd-fs-micro);
   padding: 2px 6px;
   border-radius: 999px;
   white-space: nowrap;
@@ -1843,13 +2428,14 @@ body {
   background: transparent;
   cursor: pointer;
   opacity: 0.55;
-  font-size: 12px;
+  font-size: var(--cqd-fs-caption);
   line-height: 1;
   padding: 2px 4px;
 }
 .cqd-queue-cancel:hover { opacity: 1; }
 
-/* ── History panel (0h4d.1.6) ───────────────────────────────────────────── */
+/* ── History panel (0h4d.1.6) — direction A: history is ambient. Rows are
+   the prototype's bordered h-rows; the title is a .p-label micro label. ── */
 .cqd-card-history { padding: 12px 14px; }
 .cqd-history-head {
   display: flex;
@@ -1857,9 +2443,16 @@ body {
   justify-content: space-between;
   margin-bottom: 8px;
 }
-.cqd-history-title { font-size: 12px; font-weight: 600; opacity: 0.85; }
+/* .p-label, light-surface adaptation. */
+.cqd-history-title {
+  font-size: var(--cqd-fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cqd-text-muted);
+}
 .cqd-history-clear {
-  font-size: 11px;
+  font-size: var(--cqd-fs-micro);
   padding: 3px 10px;
   border-radius: 999px;
   border: 1px solid rgba(0, 0, 0, 0.15);
@@ -1868,29 +2461,42 @@ body {
 }
 .cqd-history-search {
   width: 100%;
-  font-size: 12px;
+  font-size: var(--cqd-fs-caption);
   padding: 5px 8px;
   margin-bottom: 8px;
-  border-radius: 8px;
-  border: 1px solid rgba(0, 0, 0, 0.15);
-  background: transparent;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: var(--cqd-surface);
 }
-.cqd-history-empty { font-size: 12px; opacity: 0.6; padding: 4px 0; }
+.cqd-history-empty { font-size: var(--cqd-fs-caption); opacity: 0.6; padding: 4px 0; }
 .cqd-history-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+/* .h-row, light-surface adaptation: bordered tile, hairline deepens on hover. */
 .cqd-history-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12px;
+  gap: 10px;
+  font-size: var(--cqd-fs-caption);
+  border: 1px solid var(--cqd-border-subtle);
+  border-radius: 12px;
+  background: var(--cqd-surface);
+  padding: 8px 12px;
+  transition:
+    border-color var(--cqd-transition-fast),
+    background var(--cqd-transition-fast);
 }
+.cqd-history-row:hover {
+  border-color: rgba(15, 23, 42, 0.18);
+  background: #ffffff;
+}
+/* .h-ic, light-surface adaptation: 26px rounded status tile. */
 .cqd-history-state {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: var(--cqd-fs-caption);
   flex: none;
 }
 .cqd-history-state-ok { background: rgba(52, 168, 83, 0.16); color: #1e7a34; }
@@ -1900,23 +2506,36 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 500;
 }
-.cqd-history-date { font-size: 10px; opacity: 0.55; white-space: nowrap; }
+.cqd-history-date { font-size: var(--cqd-fs-micro); opacity: 0.55; white-space: nowrap; }
 .cqd-history-redownload {
   border: none;
   background: transparent;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--cqd-fs-body);
   line-height: 1;
-  padding: 2px 4px;
+  padding: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
   opacity: 0.6;
+  transition: opacity var(--cqd-transition-fast), background-color var(--cqd-transition-fast);
 }
-.cqd-history-redownload:hover { opacity: 1; }
+.cqd-history-redownload:hover { opacity: 1; background-color: rgba(15, 23, 42, 0.06); }
+.cqd-history-redownload:focus-visible {
+  outline: 2px solid var(--cqd-blue);
+  outline-offset: 1px;
+}
 
 /* ── Options link (0h4d.1.8) ────────────────────────────────────────────── */
 .cqd-settings-options-link {
   width: 100%;
-  font-size: 12px;
+  font-size: var(--cqd-fs-caption);
   padding: 7px 10px;
   margin-top: 8px;
   border-radius: 8px;
@@ -1927,59 +2546,8 @@ body {
 }
 .cqd-settings-options-link:hover { background: rgba(0, 0, 0, 0.04); }
 
-/* ── Options page (0h4d.1.8) ────────────────────────────────────────────── */
-.cqd-options {
-  max-width: 560px;
-  margin: 0 auto;
-  padding: 32px 20px;
-  font-family: system-ui, -apple-system, sans-serif;
-  color: #1f2937;
-}
-.cqd-options-header h1 { font-size: 20px; margin: 0 0 4px; }
-.cqd-options-sub { font-size: 13px; opacity: 0.65; margin: 0 0 20px; }
-.cqd-options-card {
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 12px;
-  padding: 6px 16px;
-  background: #fff;
-}
-.cqd-options-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 0;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-}
-.cqd-options-row:last-child { border-bottom: none; }
-.cqd-options-row-text { display: grid; gap: 2px; }
-.cqd-options-label { font-size: 14px; font-weight: 600; }
-.cqd-options-label-primary { color: #1a73e8; }
-.cqd-options-description { font-size: 12px; opacity: 0.65; }
-.cqd-options-toggle {
-  width: 42px;
-  height: 24px;
-  border-radius: 999px;
-  border: none;
-  position: relative;
-  cursor: pointer;
-  flex: none;
-  transition: background 0.15s ease;
-}
-.cqd-options-toggle.on { background: #34a853; }
-.cqd-options-toggle.off { background: rgba(0, 0, 0, 0.25); }
-.cqd-options-knob {
-  position: absolute;
-  top: 3px;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #fff;
-  transition: left 0.15s ease;
-}
-.cqd-options-toggle.on .cqd-options-knob { left: 21px; }
-.cqd-options-toggle.off .cqd-options-knob { left: 3px; }
-.cqd-options-note { font-size: 12px; opacity: 0.55; margin-top: 16px; }
+/* The options page's own rules live in entrypoints/options/options.css on
+   the shared foundation sheet (q320) — this sheet no longer carries them. */
 
 /* ── Settings links row (0h4d.1.7/1.8) ─────────────────────────────────── */
 .cqd-settings-links { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -1992,8 +2560,8 @@ body {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   color: #1f2937;
 }
-.cqd-diag-header h1 { font-size: 20px; margin: 0 0 4px; font-family: system-ui, sans-serif; }
-.cqd-diag-sub { font-size: 13px; opacity: 0.65; margin: 0 0 20px; font-family: system-ui, sans-serif; }
+.cqd-diag-header h1 { font-size: var(--cqd-fs-heading); margin: 0 0 4px; font-family: var(--cqd-font); }
+.cqd-diag-sub { font-size: var(--cqd-fs-body); opacity: 0.65; margin: 0 0 20px; font-family: var(--cqd-font); }
 .cqd-diag-card {
   border: 1px solid rgba(0, 0, 0, 0.12);
   border-radius: 12px;
@@ -2002,25 +2570,21 @@ body {
   overflow: auto;
   max-height: 60vh;
 }
-.cqd-diag-report { font-size: 11px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; margin: 0; }
+.cqd-diag-report { font-size: var(--cqd-fs-micro); line-height: 1.5; white-space: pre-wrap; word-break: break-word; margin: 0; }
 .cqd-diag-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
 .cqd-diag-btn {
-  font-size: 13px;
+  font-size: var(--cqd-fs-caption);
+  font-weight: 500;
   padding: 8px 14px;
   border-radius: 8px;
   border: 1px solid rgba(0, 0, 0, 0.15);
   background: transparent;
   cursor: pointer;
-  font-family: system-ui, sans-serif;
+  font-family: var(--cqd-font);
 }
 .cqd-diag-btn-primary { background: #1a73e8; border-color: #1a73e8; color: #fff; }
 .cqd-diag-btn:disabled { opacity: 0.5; cursor: default; }
-.cqd-options-diag-link {
-  margin-top: 12px;
-  font-size: 13px;
-  padding: 8px 14px;
-  border-radius: 8px;
-  border: 1px solid rgba(0, 0, 0, 0.15);
-  background: transparent;
-  cursor: pointer;
-}
+
+/* The in-app reduce-motion collapse (root class + OS query) lives in
+   src/ui/stillwater.css so it holds on every CQD page surface; the popup's
+   surface-specific reduced-motion statics (shimmer, flag pills) stay here. */

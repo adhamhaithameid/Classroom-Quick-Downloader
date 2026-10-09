@@ -90,9 +90,9 @@ body.cqd-theme-dark {
   opacity: 0;
   max-height: 0;
   overflow: hidden;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   text-align: center;
   transition: opacity 0.25s ease, max-height 0.25s ease;
 }
@@ -205,21 +205,53 @@ body[data-cqd-dir="rtl"] .cqd-both-badge {
 }
 
 .cqd-both-value {
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   margin-inline-start: 2px;
 }
 
 .cqd-both-plus {
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 /* --- Dark theme (badges carry .cqd-theme-dark) --- */
 .cqd-flag.cqd-theme-dark {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+/* ====================================================================
+   REDUCE MOTION (Phase 4 batch D1)
+   Two independent gates, same outcome:
+     1. OS-level prefers-reduced-motion — always holds.
+     2. In-app setting — the .cqd-reduce-motion class on <html> mirrors
+        the flat reducedMotionPreferred key (src/ui/settings/store.ts),
+        applied by entrypoints/content/reduce-motion.ts.
+   Scoped to CQD's own badges only — the host page's motion is never
+   touched. Durations collapse to ~0; the badges keep their final look.
+   ==================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .cqd-flag,
+  .cqd-flag *,
+  .cqd-both-badge,
+  .cqd-both-badge *,
+  .cqd-overlay-container {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+html.cqd-reduce-motion .cqd-flag,
+html.cqd-reduce-motion .cqd-flag *,
+html.cqd-reduce-motion .cqd-both-badge,
+html.cqd-reduce-motion .cqd-both-badge *,
+html.cqd-reduce-motion .cqd-overlay-container {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
 }
 `;
 

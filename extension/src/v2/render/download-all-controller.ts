@@ -357,6 +357,11 @@ function updateRunUI(run: GroupRun): void {
 
   // Terminal: every file reached an end state.
   if (!busy) {
+    // The water leaves with the busy gate; terminal visuals are unchanged
+    // (Stillwater D3: the fill is the LOADING state only).
+    btn.classList.remove('cqd-all-busy');
+    btn.style.setProperty('--cqd-progress', '0%');
+
     if (run.cancelPending) {
       btn.classList.remove('cqd-all-success', 'cqd-all-error', 'cqd-all-cancel');
       btn.classList.add('cqd-all-cancelled');
@@ -385,8 +390,15 @@ function updateRunUI(run: GroupRun): void {
     return;
   }
 
-  // Busy: progress sub-text, cancel affordance on hover.
+  // Busy: progress sub-text, cancel affordance on hover, and the water
+  // feed — .cqd-all-busy gates the sheet's tank layers; --cqd-progress is
+  // the fill level (files done ÷ files total, the effects.html A3 math).
   btn.classList.remove('cqd-all-success', 'cqd-all-error');
+  btn.classList.add('cqd-all-busy');
+  btn.style.setProperty(
+    '--cqd-progress',
+    total > 0 ? `${Math.round((done / total) * 100)}%` : '0%',
+  );
   if (main) main.textContent = 'Downloading…';
   if (sub) {
     sub.textContent =
@@ -455,7 +467,9 @@ export function resetGroupButtonVisual(button: HTMLButtonElement): void {
     'cqd-all-error',
     'cqd-all-cancel',
     'cqd-all-cancelled',
+    'cqd-all-busy',
   );
+  button.style.setProperty('--cqd-progress', '0%');
   const main = button.querySelector<HTMLElement>('.cqd-download-all-main');
   const sub = button.querySelector<HTMLElement>('.cqd-download-all-sub');
   const count = button.getAttribute('data-cqd-group-count');

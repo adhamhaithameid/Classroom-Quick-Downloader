@@ -91,7 +91,7 @@ const V2_BUTTON_CSS = `
   background: var(--cqd-btn-bg);
   color: var(--cqd-btn-text);
   font-size: var(--cqd-btn-font-size);
-  font-family: 'Google Sans', Roboto, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-weight: 500;
   cursor: pointer;
   user-select: none;
@@ -220,7 +220,7 @@ const V2_BUTTON_CSS = `
   border-radius: 18px;
   background: var(--cqd-btn-bg);
   color: var(--cqd-btn-text);
-  font-family: 'Google Sans', Roboto, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   cursor: pointer;
   user-select: none;
   transition: var(--cqd-btn-transition);
@@ -304,6 +304,180 @@ const V2_BUTTON_CSS = `
 }
 
 /* ====================================================================
+   WATER FILL (Stillwater Phase 4 batch D3)
+   The approved liquid loading treatment (prototypes/effects.html A1-A3),
+   as CSS-only pseudo-element layers fed by the run machines:
+     ::before = the rising fill, ::after = the drifting SVG crest.
+   - Single pill: indeterminate slosh (registered --cqd-fill oscillates
+     18% → 32% → 18% per the prototype's 0.8s slosh token) while the file
+     is in flight.
+   - Download All: the tank — fill height = files done ÷ files total,
+     fed by --cqd-progress from the group machine's updateRunUI, busy
+     gated by .cqd-all-busy.
+   The water exists ONLY under loading/busy classes — terminal states
+   (success/error/cancelled) keep today's visuals untouched. Hovering a
+   busy control shows the cancel affordance instead of the liquid.
+   ==================================================================== */
+@property --cqd-fill {
+  syntax: '<percentage>';
+  inherits: true;
+  initial-value: 0%;
+}
+
+@keyframes cqd-v2-water-slosh {
+  0% { --cqd-fill: 18%; }
+  50% { --cqd-fill: 32%; }
+  100% { --cqd-fill: 18%; }
+}
+
+@keyframes cqd-v2-wave-slide {
+  from { transform: translateX(0); }
+  to { transform: translateX(50%); }
+}
+
+/* Content rides above the water layers */
+.cqd-download-btn > *,
+.cqd-download-all-btn > * {
+  position: relative;
+  z-index: 2;
+}
+
+/* Clip the liquid to the pill (the base rule above stays untouched) */
+.cqd-download-btn {
+  overflow: hidden;
+}
+
+/* --- Single pill: indeterminate slosh while the file is in flight --- */
+.cqd-download-btn.cqd-loading {
+  animation: cqd-v2-water-slosh 0.8s ease-in-out infinite;
+}
+
+.cqd-download-btn.cqd-loading::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+  height: var(--cqd-fill, 24%);
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(26, 115, 232, 0.16), rgba(26, 115, 232, 0.34));
+  transition: height 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+
+.cqd-download-btn.cqd-loading::after {
+  content: '';
+  position: absolute;
+  left: -50%;
+  width: 200%;
+  height: 8px;
+  z-index: 1;
+  bottom: calc(var(--cqd-fill, 24%) - 4px);
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 15 8' preserveAspectRatio='none'%3E%3Cpath d='M0 5Q3.75 0 7.5 5T15 5V8H0Z' fill='rgba(26,115,232,0.5)'/%3E%3C/svg%3E") repeat-x;
+  background-size: 25% 100%;
+  animation: cqd-v2-wave-slide 2.2s linear infinite;
+  pointer-events: none;
+}
+
+/* --- Download All: the tank — fill height = files done ÷ files total --- */
+.cqd-download-all-btn.cqd-all-busy::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+  height: var(--cqd-progress, 0%);
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(26, 115, 232, 0.16), rgba(26, 115, 232, 0.34));
+  transition: height 300ms cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+
+.cqd-download-all-btn.cqd-all-busy::after {
+  content: '';
+  position: absolute;
+  left: -50%;
+  width: 200%;
+  height: 10px;
+  z-index: 1;
+  bottom: calc(var(--cqd-progress, 0%) - 5px);
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 15 10' preserveAspectRatio='none'%3E%3Cpath d='M0 6Q3.75 0 7.5 6T15 6V10H0Z' fill='rgba(26,115,232,0.5)'/%3E%3C/svg%3E") repeat-x;
+  background-size: 25% 100%;
+  animation: cqd-v2-wave-slide 2.6s linear infinite;
+  pointer-events: none;
+}
+
+/* Hover-to-cancel replaces the liquid with the cancel affordance */
+.cqd-download-btn.cqd-loading:hover::before,
+.cqd-download-btn.cqd-loading:hover::after,
+.cqd-download-all-btn.cqd-all-cancel::before,
+.cqd-download-all-btn.cqd-all-cancel::after {
+  opacity: 0;
+}
+
+/* Dark theme: the same water in the dark loading hue */
+.cqd-download-btn.cqd-theme-dark.cqd-loading::before,
+.cqd-download-all-btn.cqd-theme-dark.cqd-all-busy::before {
+  background: linear-gradient(180deg, rgba(138, 180, 248, 0.2), rgba(138, 180, 248, 0.38));
+}
+
+.cqd-download-btn.cqd-theme-dark.cqd-loading::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 15 8' preserveAspectRatio='none'%3E%3Cpath d='M0 5Q3.75 0 7.5 5T15 5V8H0Z' fill='rgba(138,180,248,0.5)'/%3E%3C/svg%3E");
+}
+
+.cqd-download-all-btn.cqd-theme-dark.cqd-all-busy::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 15 10' preserveAspectRatio='none'%3E%3Cpath d='M0 6Q3.75 0 7.5 6T15 6V10H0Z' fill='rgba(138,180,248,0.5)'/%3E%3C/svg%3E");
+}
+
+/* --- Reduced-motion statics (both gates).
+   The crest dies and the slosh freezes at its mid level (24%) so a
+   loading pill never renders blank; the tank's fill keeps tracking
+   --cqd-progress — progress is content, not decoration. The batch-D1
+   collapse above does NOT reach these pseudo-elements (the universal
+   selectors match elements only), so the water carries its own gates. --- */
+@media (prefers-reduced-motion: reduce) {
+  .cqd-download-btn.cqd-loading::before,
+  .cqd-download-all-btn.cqd-all-busy::before {
+    transition-duration: 0.01ms !important;
+  }
+
+  .cqd-download-btn.cqd-loading {
+    animation: none !important;
+  }
+
+  .cqd-download-btn.cqd-loading::before {
+    height: 24% !important;
+  }
+
+  .cqd-download-btn.cqd-loading::after,
+  .cqd-download-all-btn.cqd-all-busy::after {
+    display: none !important;
+  }
+}
+
+html.cqd-reduce-motion .cqd-download-btn.cqd-loading::before,
+html.cqd-reduce-motion .cqd-download-all-btn.cqd-all-busy::before {
+  transition-duration: 0.01ms !important;
+}
+
+html.cqd-reduce-motion .cqd-download-btn.cqd-loading {
+  animation: none !important;
+}
+
+html.cqd-reduce-motion .cqd-download-btn.cqd-loading::before {
+  height: 24% !important;
+}
+
+html.cqd-reduce-motion .cqd-download-btn.cqd-loading::after,
+html.cqd-reduce-motion .cqd-download-all-btn.cqd-all-busy::after {
+  display: none !important;
+}
+
+/* END WATER FILL */
+
+/* ====================================================================
    DARK MODE — Overrides via .cqd-theme-dark class
    ==================================================================== */
 
@@ -351,6 +525,36 @@ const V2_BUTTON_CSS = `
 
 .cqd-download-btn.cqd-theme-dark .cqd-v2-count {
   background: rgba(255, 255, 255, 0.12);
+}
+
+/* ====================================================================
+   REDUCE MOTION (Phase 4 batch D1)
+   Two independent gates, same outcome:
+     1. OS-level prefers-reduced-motion — always holds.
+     2. In-app setting — the .cqd-reduce-motion class on <html> mirrors
+        the flat reducedMotionPreferred key (src/ui/settings/store.ts),
+        applied by entrypoints/content/reduce-motion.ts.
+   Scoped to CQD's own buttons only — the host page's motion is never
+   touched. Durations collapse to ~0; state and progress stay visible.
+   ==================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .cqd-download-btn,
+  .cqd-download-btn *,
+  .cqd-download-all-btn,
+  .cqd-download-all-btn * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+html.cqd-reduce-motion .cqd-download-btn,
+html.cqd-reduce-motion .cqd-download-btn *,
+html.cqd-reduce-motion .cqd-download-all-btn,
+html.cqd-reduce-motion .cqd-download-all-btn * {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
 }
 `;
 

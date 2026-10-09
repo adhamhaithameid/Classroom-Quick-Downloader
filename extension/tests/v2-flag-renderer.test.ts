@@ -447,6 +447,100 @@ describe('post anchoring (bug 2.4)', () => {
 });
 
 // ============================================================================
+// TEST SUITE: combined flag gating (combinedFlagEnabled — the "Both" pill)
+// ============================================================================
+
+describe('combined flag gating (combinedFlagEnabled)', () => {
+  afterEach(() => {
+    // The enabled state lives at module level — restore the shipped default.
+    applyFlagToggle('combinedFlagEnabled', true);
+  });
+
+  it('renders the merged pill by default (no toggle) — byte-identical to the old behavior', () => {
+    const post = createPost();
+    renderFlagBadge(makeDecision({
+      finalVerdict: 'both',
+      commentScore: 80,
+      editedScore: 50,
+      commentCount: 3,
+    }), post);
+
+    expect(post.querySelector('.cqd-both-badge')).not.toBeNull();
+    expect(post.querySelector('.cqd-comment-badge')).toBeNull();
+  });
+
+  it('renders the comment single when combined is off (merge suppressed)', () => {
+    applyFlagToggle('combinedFlagEnabled', false);
+
+    const post = createPost();
+    renderFlagBadge(makeDecision({
+      finalVerdict: 'both',
+      commentScore: 80,
+      editedScore: 50,
+      commentCount: 3,
+    }), post);
+
+    expect(post.querySelector('.cqd-both-badge')).toBeNull();
+    // One-badge-per-post renderer: the merged pill degrades to the comment
+    // single (same degrade semantics as the other two toggles).
+    expect(post.querySelector('.cqd-comment-badge')).not.toBeNull();
+    expect(post.querySelector('.cqd-edited-badge')).toBeNull();
+  });
+
+  it('live toggle off removes the merged badge and re-renders the comment single', () => {
+    const post = createPost();
+    renderFlagBadge(makeDecision({
+      finalVerdict: 'both',
+      commentScore: 80,
+      editedScore: 50,
+      commentCount: 3,
+    }), post);
+    expect(post.querySelector('.cqd-both-badge')).not.toBeNull();
+
+    applyFlagToggle('combinedFlagEnabled', false);
+
+    expect(post.querySelector('.cqd-both-badge')).toBeNull();
+    expect(post.querySelector('.cqd-comment-badge')).not.toBeNull();
+  });
+
+  it('live toggle on re-merges into the combined pill', () => {
+    applyFlagToggle('combinedFlagEnabled', false);
+    const post = createPost();
+    renderFlagBadge(makeDecision({
+      finalVerdict: 'both',
+      commentScore: 80,
+      editedScore: 50,
+      commentCount: 3,
+    }), post);
+    expect(post.querySelector('.cqd-comment-badge')).not.toBeNull();
+
+    applyFlagToggle('combinedFlagEnabled', true);
+
+    expect(post.querySelector('.cqd-both-badge')).not.toBeNull();
+    expect(post.querySelector('.cqd-comment-badge')).toBeNull();
+  });
+
+  it('combined toggle leaves pure comment and edited verdicts untouched', () => {
+    applyFlagToggle('combinedFlagEnabled', false);
+
+    const commentPost = createPost();
+    renderFlagBadge(makeDecision({
+      finalVerdict: 'comment',
+      commentScore: 80,
+      commentCount: 2,
+    }), commentPost);
+    const editedPost = createPost();
+    renderFlagBadge(makeDecision({
+      finalVerdict: 'edited',
+      editedScore: 50,
+    }), editedPost);
+
+    expect(commentPost.querySelector('.cqd-comment-badge')).not.toBeNull();
+    expect(editedPost.querySelector('.cqd-edited-badge')).not.toBeNull();
+  });
+});
+
+// ============================================================================
 // TEST SUITE: removeStaleBadges
 // ============================================================================
 

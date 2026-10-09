@@ -79,4 +79,56 @@ describe('content/both-badge', () => {
     mod.upgradeCombinedBadge(post);
     expect(post.querySelector('.cqd-both-badge')).toBeNull();
   });
+
+  // ------------------------------------------------------------------
+  // combinedFlagEnabled gate (the popup's "Both" pill): the merge is
+  // suppressed while the flag is off; standalone singles stay intact.
+  // ------------------------------------------------------------------
+
+  it('does not merge while the combined flag is off and leaves singles intact', async () => {
+    const { mod } = await loadBothBadgeModule();
+    const post = document.createElement('div');
+    post.setAttribute(mod.ATTR_COMMENT_COUNT, '5');
+    post.setAttribute(mod.ATTR_EDIT_DIFF, '2d');
+    const single = document.createElement('div');
+    single.className = 'cqd-comment-badge';
+    post.appendChild(single);
+    document.body.appendChild(post);
+
+    mod.upgradeCombinedBadge(post, false);
+
+    expect(post.querySelector('.cqd-both-badge')).toBeNull();
+    expect(post.querySelector('.cqd-comment-badge')).toBe(single);
+  });
+
+  it('combined-off call tears down a previously merged badge and reverts the overlay frame', async () => {
+    const { mod } = await loadBothBadgeModule();
+    const post = document.createElement('div');
+    post.setAttribute(mod.ATTR_COMMENT_COUNT, '5');
+    post.setAttribute(mod.ATTR_EDIT_DIFF, '2d');
+    document.body.appendChild(post);
+
+    mod.upgradeCombinedBadge(post, true);
+    expect(post.querySelector('.cqd-both-badge')).toBeTruthy();
+    const overlay = post.querySelector('.cqd-overlay-container') as HTMLElement;
+    expect(overlay.classList.contains('cqd-both')).toBe(true);
+
+    mod.upgradeCombinedBadge(post, false);
+    expect(post.querySelector('.cqd-both-badge')).toBeNull();
+    expect(post.querySelector('.cqd-overlay-container')!.classList.contains('cqd-both')).toBe(false);
+  });
+
+  it('re-merges when the combined flag turns back on', async () => {
+    const { mod } = await loadBothBadgeModule();
+    const post = document.createElement('div');
+    post.setAttribute(mod.ATTR_COMMENT_COUNT, '5');
+    post.setAttribute(mod.ATTR_EDIT_DIFF, '2d');
+    document.body.appendChild(post);
+
+    mod.upgradeCombinedBadge(post, false);
+    expect(post.querySelector('.cqd-both-badge')).toBeNull();
+
+    mod.upgradeCombinedBadge(post, true);
+    expect(post.querySelector('.cqd-both-badge')).toBeTruthy();
+  });
 });

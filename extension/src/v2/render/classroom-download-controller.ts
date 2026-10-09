@@ -1,7 +1,7 @@
 // filepath: extension/src/v2/render/classroom-download-controller.ts
 /**
  * ============================================================================
- * CLASSROOM DOWNLOAD CONTROLLER — "Download All Classroom" (csaa.6, v1)
+ * CLASSROOM DOWNLOAD CONTROLLER — "Download Classroom" (csaa.6, v1)
  * ============================================================================
  *
  * The whole-classroom download button: rendered on classwork routes
@@ -35,6 +35,7 @@ import type {
 } from '../../contracts/topics';
 import { findHeaderContainer } from '../../download-all/button-controller';
 import { CLASSROOM_ACTION_LABEL } from './classroom-action-label';
+import { ensureCopyrightReminderAcknowledged } from './copyright-reminder';
 import {
   CourseInventoryService,
   GoogleClassroomApiClient,
@@ -64,6 +65,13 @@ export interface ClassroomDownloadDeps {
    * escalation — bug 2.5, user-gesture-scoped).
    */
   createTokenProvider?: () => ClassroomApiTokenProvider;
+  /**
+   * Legal round 2, surface 04 T1: the one-time copyright gate before the
+   * first classroom-wide run (src/v2/render/copyright-reminder.ts). Resolve
+   * true to let the run proceed. Test seam — production uses the real gate
+   * (flat key copyrightReminderAcknowledged + the in-page dialog).
+   */
+  copyrightGate?: (anchor: HTMLElement | null) => Promise<boolean>;
 }
 
 interface ClassroomRun {
@@ -203,6 +211,17 @@ export async function handleClassroomClick(href: string = window.location.href):
   }
 
   if (run) resetRun(run);
+
+  // Legal round 2, surface 04 T1: the one-time copyright gate. Shown before
+  // the FIRST classroom-wide run; "Not now"/Escape blocks the run and writes
+  // nothing; the acknowledgement is the flat copyrightReminderAcknowledged
+  // key and the dialog never shows again once true. Placement: the controller
+  // click path — the controller owns this page's DOM and the popup never
+  // triggers classroom-wide runs (see copyright-reminder.ts).
+  const gateAnchor = document.getElementById(BUTTON_ID);
+  const gate = deps.copyrightGate ?? ensureCopyrightReminderAcknowledged;
+  const allowed = await gate(gateAnchor);
+  if (!allowed) return;
 
   const nextRun: ClassroomRun = {
     courseId: context.courseId,
