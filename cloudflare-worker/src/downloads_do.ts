@@ -22,6 +22,9 @@ import type {
 // Explicit type imports (not the tsconfig global): the extension test suite
 // imports this module, and that program does not load workers-types globals.
 import type { D1Database, DurableObjectState } from "@cloudflare/workers-types";
+// workers-types WebSocket (the lib "WebWorker" global with the same name
+// shadows it inside this file).
+import type { WebSocket as DOWebSocket } from "@cloudflare/workers-types";
 import { archiveBatch, pruneArchive, readArchiveStats } from "./event-archive";
 import { generateSecureRandomString, secureRandom } from "./downloads_do/helpers";
 import { timingSafeStringEqual } from "./timing";
@@ -76,6 +79,14 @@ interface RecentCountReport {
 
 /** Cap for the recentReports ring surfaced on /stats. */
 export const MAX_RECENT_COUNT_REPORTS = 20;
+
+/**
+ * Live stats websocket (/admin/live): server pushes are throttled to at most
+ * one per this interval. The dashboard's live mode is user-initiated and the
+ * client sends nothing after the upgrade (incoming WS messages bill 20:1 on
+ * the free plan), so this throttle bounds the whole feature's cost.
+ */
+export const LIVE_PUSH_MIN_INTERVAL_MS = 5000;
 
 /** Coerce stored recent-report entries; garbage rows are dropped. */
 function normalizeRecentCountReports(input: unknown): RecentCountReport[] {
@@ -2020,6 +2031,13 @@ export class DownloadsDurable {
   private data: DurableStateShape | null = null;
   private loaded: Promise<void>;
 
+  // Live stats websocket bookkeeping (in-memory only; never persisted).
+  // livePushLastAt bounds pushes to one per LIVE_PUSH_MIN_INTERVAL_MS;
+  // livePushTimer holds the single trailing-edge push when a change lands
+  // inside the throttle window.
+  private livePushLastAt = 0;
+  private livePushTimer: ReturnType<typeof setTimeout> | null = null;
+
   constructor(state: DurableObjectState, env: Env) {
     this.state = state;
     this.env = env;
@@ -3001,6 +3019,11 @@ export class DownloadsDurable {
     });
     await this.state.storage.put(STORAGE_KEY_CHANGELOG, { changelog, changelogRevisions });
     await this.state.storage.put(STORAGE_KEY_UNINSTALL, { uninstallSubmissions });
+
+    // Durable-state boundary: persisted changes are what live dashboards
+    // want to see. No-op unless a live websocket is attached, and throttled
+    // to one push per LIVE_PUSH_MIN_INTERVAL_MS.
+    this.notifyLiveStatsChanged();
   }
 
   private get d(): DurableStateShape {
@@ -3230,6 +3253,17 @@ export class DownloadsDurable {
 
     if (pathname === "/pipeline-health" && request.method === "GET") {
       return this.handlePipelineHealth(request);
+    }
+
+    // Live stats websocket (dashboard "Go live" toggle). The worker has
+    // already passed the admin session check; the secret header below is the
+    // session-injected credential. Hibernation API: the DO does not stay
+    // resident for open sockets, and the client sends nothing after connect.
+    if (pathname === "/admin/live" && request.method === "GET") {
+      if (!this.isAuthorizedAdmin(request)) {
+        return json({ ok: false, error: "unauthorized" }, { status: 401 });
+      }
+      return this.handleLiveSocket(request);
     }
 
     if (pathname === "/admin/storage-export" && request.method === "GET") {
@@ -4962,6 +4996,138 @@ export class DownloadsDurable {
     };
 
     return json(payload);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Live stats websocket (/admin/live, hibernation API)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Accept the dashboard's live-stats upgrade. Called only after the admin
+   * secret check passed (worker session check injects the credential).
+   *
+   * Hibernation API: acceptWebSocket lets the DO evict from memory while the
+   * socket stays open — open sockets cost nothing on the free plan. The
+   * client never sends application messages after connect (incoming messages
+   * bill 20:1); protocol pings are answered by the auto-response pair
+   * without waking the DO.
+   */
+  private handleLiveSocket(_request: Request): Response {
+    const upgrade = (_request.headers.get("Upgrade") || "").toLowerCase();
+    if (upgrade !== "websocket") {
+      return json({ ok: false, error: "expected_websocket_upgrade" }, { status: 426 });
+    }
+
+    const hibernatable = this.state as DurableObjectState & {
+      acceptWebSocket?: (ws: DOWebSocket, tags?: string[]) => void;
+      setWebSocketAutoResponse?: (pair?: unknown) => void;
+    };
+    if (typeof hibernatable.acceptWebSocket !== "function") {
+      // Runtime without the hibernation API (unit tests, old runtimes):
+      // refuse instead of silently pinning the DO in memory.
+      return json({ ok: false, error: "websocket_hibernation_unavailable" }, { status: 501 });
+    }
+
+    // lib "WebWorker" declares a DOM-flavored WebSocketPair that shadows the
+    // workers-types one; align the pair with the hibernation API's type.
+    const pair = new WebSocketPair() as unknown as { 0: DOWebSocket; 1: DOWebSocket };
+    hibernatable.acceptWebSocket(pair[1]);
+    if (typeof hibernatable.setWebSocketAutoResponse === "function") {
+      hibernatable.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
+    }
+
+    // One server-initiated hello so a fresh client paints current values.
+    // Strictly server -> client from here on.
+    try {
+      pair[1].send(JSON.stringify(this.buildLiveStatsMessage("hello")));
+    } catch {
+      // Socket died between accept and send; the client will see the close.
+    }
+
+    return new Response(null, {
+      status: 101,
+      statusText: "Switching Protocols",
+      headers: { Upgrade: "websocket" },
+    });
+  }
+
+  /**
+   * Compact live snapshot: the fields the overview cards bind to, plus the
+   * download-count aggregates (worldwide card). Deliberately much smaller
+   * than the full /stats payload — this rides on every throttled push.
+   */
+  private buildLiveStatsMessage(reason: "hello" | "delta"): Record<string, unknown> {
+    const d = this.d;
+    return {
+      type: "stats-delta",
+      reason,
+      ts: Date.now(),
+      stats: {
+        totalEvents: d.totalEvents ?? 0,
+        totalDownloads: d.totalDownloads ?? 0,
+        totalSuccess: d.totalSuccess ?? 0,
+        totalFail: d.totalFail ?? 0,
+        totalCancelled: d.totalCancelled ?? 0,
+        pendingEvents: d.pendingEvents ?? 0,
+        lastEventAt: d.lastEventAt ?? null,
+        lastFlushAt: d.lastFlushAt ?? null,
+        requestsToday: d.reqCountToday ?? 0,
+        doRequestsToday: d.doRequestsToday ?? 0,
+        quota: computeQuotaDescriptor(this.quotaRequestsToday(), d.hardRemoteOff),
+        downloadCountAggregates: {
+          ...computeDownloadCountAggregates(
+            d.downloadCounts,
+            d.processedCountReports.length,
+            d.downloadCountsDropped ?? 0,
+          ),
+          recentReports: (d.recentCountReports ?? []).slice(-MAX_RECENT_COUNT_REPORTS),
+        },
+      },
+    };
+  }
+
+  /** Connected live sockets; [] when the runtime lacks the hibernation API. */
+  private liveSockets(): DOWebSocket[] {
+    const hibernatable = this.state as DurableObjectState & {
+      getWebSockets?: () => DOWebSocket[];
+    };
+    if (typeof hibernatable.getWebSockets !== "function") return [];
+    const sockets = hibernatable.getWebSockets();
+    return Array.isArray(sockets) ? sockets : [];
+  }
+
+  /** Push the current snapshot to every connected live socket. */
+  private sendLiveStats(reason: "hello" | "delta"): void {
+    const sockets = this.liveSockets();
+    if (sockets.length === 0) return;
+    this.livePushLastAt = Date.now();
+    const payload = JSON.stringify(this.buildLiveStatsMessage(reason));
+    for (const ws of sockets) {
+      try {
+        ws.send(payload);
+      } catch {
+        // Closed or hibernated mid-push; the socket cleans itself up.
+      }
+    }
+  }
+
+  /**
+   * Throttle gate for state changes: immediate push when the window has
+   * elapsed, otherwise one trailing push scheduled at the window edge. At
+   * most one push per LIVE_PUSH_MIN_INTERVAL_MS no matter how hot ingest is.
+   */
+  private notifyLiveStatsChanged(): void {
+    if (this.liveSockets().length === 0) return;
+    const waitMs = this.livePushLastAt + LIVE_PUSH_MIN_INTERVAL_MS - Date.now();
+    if (waitMs <= 0) {
+      this.sendLiveStats("delta");
+      return;
+    }
+    if (this.livePushTimer) return;
+    this.livePushTimer = setTimeout(() => {
+      this.livePushTimer = null;
+      this.sendLiveStats("delta");
+    }, waitMs);
   }
 
   /**

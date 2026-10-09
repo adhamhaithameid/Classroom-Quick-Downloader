@@ -2019,6 +2019,52 @@ async function handleWebsiteConsoleAdminEndpoint(
 // Used by dashboard to call admin endpoints without exposing the secret
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Live Stats Websocket Proxy (session-gated upgrade; 101 passthrough)
+// ---------------------------------------------------------------------------
+
+/**
+ * Proxy the /admin/live websocket upgrade to the Durable Object after the
+ * EXISTING admin session check (session cookie or X-Admin-Secret — same
+ * resolveAuthContext as every other /admin route). Unauthenticated upgrades
+ * are rejected with 401 before any upgrade is attempted.
+ *
+ * The DO's 101 response carries the upgraded socket and is returned
+ * verbatim: rebuilding the Response (as withCors does) would drop the
+ * webSocket attachment and break the handshake. Browsers cannot send custom
+ * headers on websocket connects, so session-cookie auth is the path the
+ * dashboard uses; the worker injects the DO secret server-side below.
+ */
+async function handleLiveSocketProxy(request: Request, env: WorkerEnv): Promise<Response> {
+  const auth = await resolveAuthContext(request, env);
+  if (!auth.hasValidSecret && !auth.hasValidSession) {
+    return unauthorizedResponse(request, env);
+  }
+
+  const headers = new Headers(request.headers);
+  // CRITICAL: inject the real admin secret for DO authorization (same
+  // pattern as handleProtectedAdminEndpoint).
+  if (!auth.hasValidSecret) {
+    headers.set("X-Admin-Secret", env.DO_SHARED_SECRET);
+  }
+
+  const stub = getDownloadsStub(env);
+  const upgradeReq = new Request(buildDoRpcForwardUrl(request), {
+    method: "GET",
+    headers,
+    redirect: request.redirect,
+  });
+
+  try {
+    return await stub.fetch(upgradeReq);
+  } catch {
+    return new Response(
+      JSON.stringify({ ok: false, error: "upstream_unavailable" }),
+      { status: 502, headers: { "content-type": "application/json; charset=utf-8" } },
+    );
+  }
+}
+
 async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): Promise<Response> {
   const pathname = new URL(request.url).pathname;
   const auth = await resolveAuthContext(request, env);
@@ -3344,6 +3390,14 @@ export default {
     }
     if (pathname === "/dashboard/website") {
       return handleWebsiteConsoleDashboard(request, env);
+    }
+
+    // Live stats websocket (dashboard "Go live" toggle). Same admin session
+    // check as other /admin routes; the upgrade must fail closed with 401
+    // before any 101. The DO's 101 response is returned verbatim — wrapping
+    // it (withCors) would drop the upgraded socket.
+    if (pathname === "/admin/live" && request.method === "GET") {
+      return handleLiveSocketProxy(request, env);
     }
 
     // Logout

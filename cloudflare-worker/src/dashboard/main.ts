@@ -3404,6 +3404,19 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string, admi
       </section>
       </div>
       <div class="tab-panel" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" data-panel="overview">
+      <section class="card" id="live-updates" data-card>
+        <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+          <label class="toggle-switch" data-tooltip="Opens ONE websocket to the worker and receives pushed stats. Closes after 10 minutes, when the tab hides, or when toggled off. The client sends nothing; the server pushes at most one update per 5 seconds.">
+            <input type="checkbox" id="live-toggle" aria-controls="live-state" />
+            <span class="toggle-slider"></span>
+          </label>
+          <div>
+            <div class="metric-label">Go live</div>
+            <div class="metric-sub" id="live-state" data-live-state="off">Off — press to stream stats over one websocket. No polling, no auto-reconnect.</div>
+          </div>
+          <span class="metric-sub" id="live-last-push" style="margin-left:auto;"></span>
+        </div>
+      </section>
       <!-- Top Cards -->
       <section class="card" id="overview" data-card>
         <div class="grid-5">
@@ -7371,6 +7384,127 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string, admi
       });
 
       fetchWebsiteStatus();
+
+      // ===== LIVE UPDATES (user-initiated websocket; zero standing polling) =====
+      // ON = one websocket to /admin/live; the server pushes throttled stats
+      // deltas and the client sends NOTHING after connect (DO hibernation
+      // bills incoming messages 20:1). OFF / 10 minutes / tab hidden /
+      // unload = close. NO auto-reconnect: going live again is always a
+      // user action. These limits are quota-load-bearing.
+      var LIVE_CLOSE_AFTER_MS = 10 * 60 * 1000; // hard auto-close after 10 minutes
+      var LIVE_WS_PATH = "/admin/live";
+      var LIVE_OFF_TEXT = "Off — press to stream stats over one websocket. No polling, no auto-reconnect.";
+      var liveSocket = null;
+      var liveAutoCloseTimer = null;
+
+      function setLiveStatus(text, stateAttr) {
+        var el = document.getElementById("live-state");
+        if (!el) return;
+        if (el.textContent !== text) el.textContent = text;
+        if (stateAttr) el.setAttribute("data-live-state", stateAttr);
+      }
+
+      function setLiveLastPush(text) {
+        var el = document.getElementById("live-last-push");
+        if (el && el.textContent !== text) el.textContent = text;
+      }
+
+      function clearLiveAutoClose() {
+        if (liveAutoCloseTimer) {
+          clearTimeout(liveAutoCloseTimer);
+          liveAutoCloseTimer = null;
+        }
+      }
+
+      function resetLiveToggle() {
+        var toggle = document.getElementById("live-toggle");
+        if (toggle && toggle.checked) toggle.checked = false;
+      }
+
+      function closeLiveSocket(reason) {
+        clearLiveAutoClose();
+        if (liveSocket) {
+          var ws = liveSocket;
+          liveSocket = null;
+          try {
+            ws.close(1000, reason || "client-close");
+          } catch (e) {
+            // Already closing; nothing to do.
+          }
+        }
+        resetLiveToggle();
+        setLiveStatus(LIVE_OFF_TEXT, "off");
+      }
+
+      function handleLiveMessage(event) {
+        try {
+          var msg = JSON.parse(event.data);
+          if (!msg || msg.type !== "stats-delta" || !msg.stats) return;
+          updateUI(msg.stats);
+          setLiveLastPush("Last push " + formatTs(msg.ts) + " UTC");
+          setLiveStatus("Live — receiving pushed stats.", "live");
+        } catch (e) {
+          // Malformed push: ignore it and keep the socket open.
+        }
+      }
+
+      function openLiveSocket() {
+        if (liveSocket) return;
+        var proto = location.protocol === "https:" ? "wss:" : "ws:";
+        var ws;
+        try {
+          ws = new WebSocket(proto + "//" + location.host + LIVE_WS_PATH);
+        } catch (e) {
+          resetLiveToggle();
+          setLiveStatus("Live unavailable in this browser.", "error");
+          return;
+        }
+        liveSocket = ws;
+        setLiveStatus("Connecting…", "connecting");
+        ws.onopen = function () {
+          if (liveSocket !== ws) return;
+          setLiveStatus("Live — receiving pushed stats.", "live");
+        };
+        ws.onmessage = handleLiveMessage;
+        ws.onclose = function () {
+          // No auto-reconnect by design: only the toggle reopens.
+          if (liveSocket !== ws) return;
+          liveSocket = null;
+          clearLiveAutoClose();
+          resetLiveToggle();
+          setLiveStatus(LIVE_OFF_TEXT, "off");
+        };
+        ws.onerror = function () {
+          // onclose fires after onerror; no extra handling here.
+        };
+        // Quota guard: never hold the socket longer than 10 minutes.
+        liveAutoCloseTimer = setTimeout(function () {
+          closeLiveSocket("auto-close-10m");
+          setLiveLastPush("Auto-closed after 10 minutes");
+        }, LIVE_CLOSE_AFTER_MS);
+      }
+
+      var liveToggle = document.getElementById("live-toggle");
+      if (liveToggle) {
+        liveToggle.addEventListener("change", function () {
+          if (liveToggle.checked) {
+            openLiveSocket();
+          } else {
+            closeLiveSocket("user-off");
+          }
+        });
+      }
+
+      // Close when the tab hides or the page unloads (no background sockets).
+      document.addEventListener("visibilitychange", function () {
+        if (document.hidden && liveSocket) closeLiveSocket("tab-hidden");
+      });
+      window.addEventListener("pagehide", function () {
+        if (liveSocket) closeLiveSocket("page-unload");
+      });
+      window.addEventListener("beforeunload", function () {
+        if (liveSocket) closeLiveSocket("page-unload");
+      });
 
       updateLiveIndicator();
       setInterval(updateLiveIndicator, 5000);
