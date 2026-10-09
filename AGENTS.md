@@ -175,3 +175,11 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 - Keep bash output bounded: pipe through `| head -30`, prefix with `rtk` where it helps (`rtk gain`), and source `scripts/agent-env.sh` for quiet, no-color output.
 - Final reports: at most 6 lines. State result, evidence, next step. No task restatement, no step-by-step narration.
 - Delegate broad searches to the built-in Explore subagent and reviews to the built-in code-reviewer; do not hand-roll custom equivalents.
+
+## Output style: ASD-STE100
+
+Write all prose in ASD-STE100 Simplified Technical English: sentences of 25 words or fewer, active voice, one meaning per word, no idioms, no contractions.
+
+Full rules: docs/ASD_STE100_RULES.md
+
+Scope: chat replies, commit messages, docs. Scope excludes code identifiers and product UI copy.
