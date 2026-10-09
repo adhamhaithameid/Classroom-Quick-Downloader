@@ -50,13 +50,27 @@ Past level 18 the counter keeps counting; the level stays at 18.
 
 - **One celebration per rung.** A settle crossing rungs records only the
   highest one as `milestonePending` — one confetti burst, not a barrage.
-- **Confetti plays once.** The popup clears `milestonePending` after it
-  plays. A missed celebration (popup closed during the download) replays as
-  a toast-only tick on the next popup open.
+- **Two celebration surfaces: the popup AND the active Classroom tab.** The
+  page side lives in `entrypoints/celebration.content.ts` (injected only on
+  classroom.google.com). It watches the same stats record and plays a small
+  bottom-corner banner: confetti burst, close button, Esc, 6-second
+  auto-dismiss. The overlay never blocks Classroom — the positioning layer
+  is `pointer-events: none`; only the banner card is interactive.
+- **One celebration per milestone across surfaces.** Before playing, the
+  page re-reads pending through the checksummed load path: a milestone the
+  popup already cleared never plays on the page. After playing, the clear
+  rides the background's `CQD_STATS_CLEAR_MILESTONE` chain message (the
+  page, like the popup, never writes the stats record itself), so the
+  popup never replays a milestone the page celebrated.
+- **Confetti plays once.** The celebrating surface clears `milestonePending`
+  after it plays. A missed celebration (no surface open during the
+  download) replays as a toast-only tick on the next popup open, or as a
+  banner on the next Classroom page open.
 - **Reduced motion has a double gate.** Confetti fires only when both the
   OS `prefers-reduced-motion` check passes and the in-app
   `reducedMotionPreferred` setting allows it. Either gate alone reduces the
-  celebration to the toast.
+  celebration to the toast (popup) or the banner (page), and collapses the
+  banner's entrance animation.
 - **Toast copy names the level** ("Level 6 reached — 1,000 files!"; level 1
   reads "Level 1 reached — first file downloaded!").
 - **Tracker card.** The popup card shows a level badge next to the lifetime
@@ -87,5 +101,12 @@ stay local either way.
 - `extension/tests/popup-lifetime-tracker.test.ts` — card badge renders
   level 0, mid-ladder, and 18; empty-state copy.
 - `extension/tests/popup-milestone-celebration.test.ts` — toast copy names
-  the level; confetti gates; clear ack.
+  the level; confetti gates; clear ack; the popup stays quiet for a
+  milestone the Classroom page already celebrated and cleared.
+- `extension/tests/celebration-page-overlay.test.ts` — the page overlay:
+  plays on pending, clears through the background chain message, skips a
+  popup-cleared pending (fresh re-check), reduced-motion banner-only,
+  banner dismiss (button + Esc) and the 6-second auto-dismiss.
+- `extension/tests/download-stats-clear-race.test.ts` — the serialized
+  stats chain and the MV3 return-true ack contract for the clear message.
 - `website/src/routes/gamification/` — public page with the same table.
