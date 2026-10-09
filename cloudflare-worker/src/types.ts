@@ -145,6 +145,19 @@ export interface StatsResponse {
   lastFlushAt: number | null;
 
   counters: Counters;
+  /**
+   * 1.9.0: aggregate of per-install lifetime download counts (dormant until
+   * the extension's REMOTE_COUNTS_ENABLED switch flips; absent from old DO
+   * snapshots, so optional).
+   */
+  downloadCountAggregates?: {
+    total: number;
+    installs: number;
+    byBrowser: Record<string, number>;
+    reportsProcessed: number;
+    /** Reports from unknown installs refused at the map cap. */
+    dropped?: number;
+  };
   retryState: RetryState | null;
 
   quota: QuotaDescriptor;

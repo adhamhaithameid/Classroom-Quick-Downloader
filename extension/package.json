@@ -50,6 +50,7 @@
     "test:qa:report": "node ../tests/e2e/qa/report-generator.mjs"
   },
   "dependencies": {
+    "canvas-confetti": "^1.9.4",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
@@ -57,6 +58,7 @@
     "@stryker-mutator/core": "10.0.0",
     "@stryker-mutator/vitest-runner": "10.0.0",
     "@testing-library/dom": "^10.4.2",
+    "@types/canvas-confetti": "^1.9.0",
     "@types/chrome": "^0.2.9",
     "@types/jsdom": "^30.0.0",
     "@types/react": "^19.3.0",

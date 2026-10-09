@@ -32,6 +32,8 @@ import {
   watchSettings,
   type Settings,
 } from '../../src/ui/settings/store';
+import { MilestoneCelebration } from './MilestoneCelebration';
+import { LifetimeTrackerCard } from './LifetimeTrackerCard';
 
 // External Links
 const SURVEY_URL = 'https://forms.gle/wPU2b1Qxa7svHqJa6';
@@ -951,6 +953,8 @@ function App() {
 
   return (
     <main className={`cqd-app ${settings?.reducedMotionPreferred ? 'cqd-reduce-motion' : ''}`}>
+      {/* 1.9.0 confetti: milestone celebration overlay (toast + burst). */}
+      <MilestoneCelebration />
       <div className="cqd-scroll-container" ref={scrollRef}>
         {/* HEADER – always visible */}
         <header
@@ -1348,6 +1352,9 @@ function App() {
                   </div>
                 </section>
               )}
+
+              {/* 1.9.0 confetti: lifetime download tracker (analytics/history area). */}
+              <LifetimeTrackerCard />
 
               {/* Section 1.7: Download history (0h4d.1.6) — search, re-download, clear */}
               <section className="cqd-panel" aria-label="Download history">

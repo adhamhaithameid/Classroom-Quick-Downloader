@@ -759,6 +759,19 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
+
+  // 1.9.0: aggregate per-install lifetime download counts (dormant feature —
+  // free-fleet clients report nothing until the extension switch flips).
+  const downloadCounts = stats.downloadCountAggregates;
+  const downloadCountsTotal = downloadCounts?.total ?? 0;
+  const downloadCountsInstalls = downloadCounts?.installs ?? 0;
+  const downloadCountsBrowserRows = Object.entries(downloadCounts?.byBrowser ?? {})
+    .sort((a, b) => b[1] - a[1])
+    .map(
+      ([browser, count]) =>
+        `<span style="padding:2px 10px; border:1px solid var(--border-subtle); border-radius:999px; font-size:0.78em;" data-tooltip="${escapeHtml(String(count))} reported">${escapeHtml(browser)}: ${count.toLocaleString()}</span>`,
+    )
+    .join(" ");
   const rawHealthJson = JSON.stringify({ ok: true, status: "loading" }, null, 2)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -3265,6 +3278,18 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
           stats.totalEvents > 0 ? " hidden" : ""
         }">
           No events yet – install the extension and trigger a download to see analytics here.
+        </div>
+        <div class="card" id="card-lifetime-downloads" style="margin-top:12px; padding:12px; border:1px solid var(--border-subtle); border-radius:10px; background:rgba(255,255,255,0.03);">
+          <div class="section-header" style="margin-bottom:8px;">Lifetime Downloads (reported by installs)</div>
+          ${
+            downloadCountsTotal > 0
+              ? `<div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;">
+                  <span style="font-size:1.6rem; font-weight:600;" data-bind="lifetimeDownloadsTotal">${downloadCountsTotal.toLocaleString()}</span>
+                  <span style="color:var(--text-muted); font-size:0.8em;">across ${downloadCountsInstalls.toLocaleString()} install${downloadCountsInstalls === 1 ? "" : "s"}</span>
+                </div>
+                ${downloadCountsBrowserRows ? `<div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">${downloadCountsBrowserRows}</div>` : ""}`
+              : `<div style="color:var(--text-muted); font-size:0.85em;" data-bind="lifetimeDownloadsEmpty">No count reports yet — the feature ships dormant until the extension switch flips.</div>`
+          }
         </div>
       </section>
       <section class="card" id="pipeline-health">

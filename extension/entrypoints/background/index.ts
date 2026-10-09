@@ -56,6 +56,8 @@ import {
   clearHistory as clearHistoryEntries,
   searchEntries,
 } from '../../src/history/history-store';
+import { countCompletedDownload, clearMilestonePending } from '../../src/history/download-stats';
+import { reportDownloadCount } from '../utils/analytics/count-reporter';
 import {
   STUDENT_WORK_RESOLVE_PUBLISH_TYPE,
   STUDENT_WORK_RESOLVE_RELAY_TYPE,
@@ -542,6 +544,21 @@ export default defineBackground(() => {
         if (pending.fileMeta?.name) recentDownloads.set(pending.fileMeta.name, Date.now());
         // 0h4d.1.6: one history row per terminal settle.
         void recordDownloadHistory(pending, 'success');
+        // 1.9.0 confetti: one lifetime increment per download id (idempotent,
+        // restart-safe); milestone detection rides the same transaction.
+        void countCompletedDownload(pending.requestId).then((settle) => {
+          if (!settle.changed) return;
+          // Dormant count reporting: milestone crossings plus a cheap
+          // every-100 drift beacon. REMOTE_COUNTS_ENABLED (false) keeps the
+          // fetch off the wire; the call site is wired and tested for the
+          // day the switch flips.
+          if (settle.crossed.length > 0 || settle.stats.lifetimeCount % 100 === 0) {
+            void reportDownloadCount({
+              installId: settle.stats.installId,
+              lifetimeCount: settle.stats.lifetimeCount,
+            });
+          }
+        });
         cleanup(pending, delta.id);
       };
       try {
@@ -749,6 +766,22 @@ export default defineBackground(() => {
         sendResponse({ ok: true });
       })();
       return false;
+    }
+
+    // Fix round 1: the popup never writes the stats record directly. Every
+    // milestone clear rides this message into the service worker's
+    // serialized settle chain, so a settle saving in flight cannot be
+    // overwritten by a stale popup write (lost update during batch storms).
+    // Fix round 2: return true — the ack is async, and in MV3 the response
+    // channel closes when every listener returns false, which would make
+    // every real clear fall back to the popup-context write. Mirrors
+    // handleDownloadRequest below.
+    if (message.type === 'CQD_STATS_CLEAR_MILESTONE') {
+      void (async () => {
+        await clearMilestonePending();
+        sendResponse({ ok: true });
+      })();
+      return true;
     }
 
     // 0h4d.1.6: re-download straight from a history row.

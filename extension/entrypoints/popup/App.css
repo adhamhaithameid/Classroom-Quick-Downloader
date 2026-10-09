@@ -2588,3 +2588,88 @@ body {
 /* The in-app reduce-motion collapse (root class + OS query) lives in
    src/ui/stillwater.css so it holds on every CQD page surface; the popup's
    surface-specific reduced-motion statics (shimmer, flag pills) stay here. */
+
+/* ==========================================================================
+   1.9.0 confetti — milestone celebration toast
+   (the confetti canvas is created and positioned by src/celebration/confetti.ts;
+   the entrance animation flattens under both reduce-motion gates via the
+   global collapse in src/ui/stillwater.css)
+   ========================================================================== */
+.cqd-milestone-toast {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 24px);
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--cqd-text-main);
+  color: #fff;
+  font-family: var(--cqd-font);
+  font-size: var(--cqd-fs-body);
+  font-weight: 600;
+  box-shadow: var(--cqd-shadow-hover);
+  pointer-events: none;
+}
+.cqd-milestone-toast-tick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #22c55e;
+  color: #fff;
+  font-size: var(--cqd-fs-micro);
+  flex: none;
+}
+
+/* ==========================================================================
+   1.9.0 confetti — lifetime download tracker card (direction-A tokens)
+   ========================================================================== */
+.cqd-lifetime-card { display: flex; flex-direction: column; gap: 8px; }
+.cqd-lifetime-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cqd-lifetime-title {
+  font-family: var(--cqd-font);
+  font-size: var(--cqd-fs-caption);
+  font-weight: 600;
+  color: var(--cqd-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cqd-lifetime-count {
+  font-family: var(--cqd-font);
+  font-size: var(--cqd-fs-heading);
+  font-weight: 600;
+  color: var(--cqd-text-main);
+  font-variant-numeric: tabular-nums;
+}
+.cqd-lifetime-progress,
+.cqd-lifetime-empty {
+  margin: 0;
+  font-family: var(--cqd-font);
+  font-size: var(--cqd-fs-caption);
+  color: var(--cqd-text-muted);
+}
+.cqd-lifetime-bar {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--cqd-border-subtle);
+  overflow: hidden;
+}
+.cqd-lifetime-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--cqd-blue);
+  transition: width var(--cqd-transition-fast);
+}

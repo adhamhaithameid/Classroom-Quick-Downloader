@@ -111,6 +111,13 @@ export const TRACK_URL = WORKER_URL;
 
 // --- Remote Config ---
 
+// 1.9.0 confetti, commit 4: DORMANT download-count reporting. The code path
+// exists and is tested (sendCountReport + the worker's aggregate view), but
+// this single switch is the only thing between the extension and the wire —
+// while it is false, reportDownloadCount never issues a fetch. Flip it to
+// true (and only true) to start shipping lifetime-count reports.
+export const REMOTE_COUNTS_ENABLED = false;
+
 // The remote config moves only when the dashboard owner updates it, so one
 // fetch per day per browser is plenty. This gate is what keeps /config from
 // dominating the Worker's free-plan request quota (~95% of traffic was these
