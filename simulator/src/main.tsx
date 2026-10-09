@@ -4,6 +4,7 @@ import { installFixtureChrome } from './fixtures/fixture-chrome';
 import { getPopupState } from './fixtures/states';
 import { parseHash, type Route } from './hash';
 import { MapRoute } from './routes/MapRoute';
+import { ClassroomRoute } from './routes/ClassroomRoute';
 import { OptionsRoute } from './routes/OptionsRoute';
 import { PopupRoute } from './routes/PopupRoute';
 import './styles.css';
@@ -35,6 +36,12 @@ function Root() {
             Popup
           </a>
           <a
+            href="#page=mixed-links-post-en"
+            aria-current={route.kind === 'classroom' ? 'page' : undefined}
+          >
+            Classroom
+          </a>
+          <a
             href="#options=permissions"
             aria-current={route.kind === 'options' ? 'page' : undefined}
           >
@@ -44,6 +51,8 @@ function Root() {
       </header>
       {route.kind === 'popup' ? (
         <PopupRoute stateId={route.stateId} />
+      ) : route.kind === 'classroom' ? (
+        <ClassroomRoute pageId={route.pageId} params={route.params} />
       ) : route.kind === 'options' ? (
         <OptionsRoute stateId={route.stateId} />
       ) : (
