@@ -4,7 +4,7 @@ This is the main engineering changelog for Classroom Quick Downloader.
 It focuses on meaningful product, reliability, security, and architecture changes instead of raw commit history.
 
 ## Versioning Notes
-- Current extension release line: `1.8.7`
+- Current extension release line: `1.9.0`
 - The `1.8.0`→`1.8.7` ladder below materializes the post-1.8.0 work as 0.0.1 steps anchored to commit dates; the `1.5.6`→`1.8.0` ladder remains the internal history of the 1.5→1.8 line: every point version is anchored to the commit record and file-change dates of its window; patches never reach `.10` — the next minor takes over (`1.6.9` → `1.7.0`, `1.7.9` → `1.8.0`, `1.8.9` → `1.9.0` when the Free-completion milestone ships)
 - Planned next engine milestone: post-1.6 acquisition strategy wiring (API download tier behind the consent gate)
 - Pre-`1.0.0` bootstrap work is intentionally omitted from the user-facing release ledger
