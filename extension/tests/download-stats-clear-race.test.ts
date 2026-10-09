@@ -225,9 +225,18 @@ describe('stats clear race (fix round 1, Important)', () => {
     expect((store.get(DOWNLOAD_STATS_KEY) as { milestonePending: number | null }).milestonePending)
       .toBe(1);
 
-    // The clear rides the REAL listener while the chain is live.
-    h.dispatchMessage({ type: CQD_STATS_CLEAR_MILESTONE });
+    // The clear rides the REAL listener while the chain is live. The
+    // response is captured, not simulated: the channel must stay open until
+    // the async ack arrives (MV3 async sendResponse contract).
+    const sendResponse = vi.fn();
+    const messageListeners = (chrome.runtime.onMessage.addListener as any).mock.calls.map(
+      (c: unknown[]) => c[0],
+    );
+    for (const listener of messageListeners) {
+      listener({ type: CQD_STATS_CLEAR_MILESTONE }, { id: (chrome.runtime as { id?: string }).id }, sendResponse);
+    }
     await vi.advanceTimersByTimeAsync(50);
+    expect(sendResponse).toHaveBeenCalledWith({ ok: true });
     expect((store.get(DOWNLOAD_STATS_KEY) as { milestonePending: number | null }).milestonePending)
       .toBeNull();
 
@@ -250,5 +259,25 @@ describe('stats clear race (fix round 1, Important)', () => {
       .filter((kv) => DOWNLOAD_STATS_KEY in kv)
       .map((kv) => (kv[DOWNLOAD_STATS_KEY] as { lifetimeCount: number }).lifetimeCount);
     expect(counts).toEqual([1, 1, 2]);
+  });
+
+  it('keeps the MV3 response channel open: the listener returns true for the clear', async () => {
+    const h = await loadFlowHarness({ downloadScript: ['id'] });
+    // Fix round 2 honesty check: in real Chrome the response channel closes
+    // when every listener returns false, so the async sendResponse would
+    // never arrive and requestMilestoneClear would always fall back to the
+    // popup-context write. The stats-clear branch must return true (async
+    // ack contract), mirroring handleDownloadRequest.
+    const listeners = (chrome.runtime.onMessage.addListener as any).mock.calls.map(
+      (c: unknown[]) => c[0],
+    );
+    const sendResponse = vi.fn();
+    const returns = listeners.map((listener: (m: unknown, s: unknown, r: unknown) => unknown) =>
+      listener({ type: CQD_STATS_CLEAR_MILESTONE }, { id: (chrome.runtime as { id?: string }).id }, sendResponse),
+    );
+    expect(returns).toContain(true);
+    // The ack arrives asynchronously on the kept-open channel.
+    await vi.advanceTimersByTimeAsync(50);
+    expect(sendResponse).toHaveBeenCalledWith({ ok: true });
   });
 });

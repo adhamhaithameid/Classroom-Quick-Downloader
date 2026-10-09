@@ -772,12 +772,16 @@ export default defineBackground(() => {
     // milestone clear rides this message into the service worker's
     // serialized settle chain, so a settle saving in flight cannot be
     // overwritten by a stale popup write (lost update during batch storms).
+    // Fix round 2: return true — the ack is async, and in MV3 the response
+    // channel closes when every listener returns false, which would make
+    // every real clear fall back to the popup-context write. Mirrors
+    // handleDownloadRequest below.
     if (message.type === 'CQD_STATS_CLEAR_MILESTONE') {
       void (async () => {
         await clearMilestonePending();
         sendResponse({ ok: true });
       })();
-      return false;
+      return true;
     }
 
     // 0h4d.1.6: re-download straight from a history row.
