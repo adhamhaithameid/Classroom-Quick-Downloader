@@ -2627,3 +2627,49 @@ body {
   font-size: var(--cqd-fs-micro);
   flex: none;
 }
+
+/* ==========================================================================
+   1.9.0 confetti — lifetime download tracker card (direction-A tokens)
+   ========================================================================== */
+.cqd-lifetime-card { display: flex; flex-direction: column; gap: 8px; }
+.cqd-lifetime-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cqd-lifetime-title {
+  font-family: var(--cqd-font);
+  font-size: var(--cqd-fs-caption);
+  font-weight: 600;
+  color: var(--cqd-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.cqd-lifetime-count {
+  font-family: var(--cqd-font);
+  font-size: var(--cqd-fs-heading);
+  font-weight: 600;
+  color: var(--cqd-text-main);
+  font-variant-numeric: tabular-nums;
+}
+.cqd-lifetime-progress,
+.cqd-lifetime-empty {
+  margin: 0;
+  font-family: var(--cqd-font);
+  font-size: var(--cqd-fs-caption);
+  color: var(--cqd-text-muted);
+}
+.cqd-lifetime-bar {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--cqd-border-subtle);
+  overflow: hidden;
+}
+.cqd-lifetime-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--cqd-blue);
+  transition: width var(--cqd-transition-fast);
+}
