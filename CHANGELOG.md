@@ -4,10 +4,39 @@ This is the main engineering changelog for Classroom Quick Downloader.
 It focuses on meaningful product, reliability, security, and architecture changes instead of raw commit history.
 
 ## Versioning Notes
-- Current extension release line: `1.8.7`
+- Current extension release line: `1.8.9`
 - The `1.8.0`→`1.8.7` ladder below materializes the post-1.8.0 work as 0.0.1 steps anchored to commit dates; the `1.5.6`→`1.8.0` ladder remains the internal history of the 1.5→1.8 line: every point version is anchored to the commit record and file-change dates of its window; patches never reach `.10` — the next minor takes over (`1.6.9` → `1.7.0`, `1.7.9` → `1.8.0`, `1.8.9` → `1.9.0` when the Free-completion milestone ships)
 - Planned next engine milestone: post-1.6 acquisition strategy wiring (API download tier behind the consent gate)
 - Pre-`1.0.0` bootstrap work is intentionally omitted from the user-facing release ledger
+
+## [1.8.9] - 2026-10-03
+
+### Summary
+Phase-1 feature completion plus the New-engine repair wave: post-level and classroom-wide downloads work on the rewritten engine, change-detection highlights land on the changed post, and the popup gains history, an options page, a keyboard shortcut, and diagnostics.
+
+### Added
+- Added popup download history with per-file re-download (0h4d.1.6).
+- Added the options page on the shared settings store (0h4d.1.8).
+- Added the Alt+Shift+D keyboard shortcut for Download All (0h4d.1.9).
+- Added the diagnostics page with Copy / Download / Regenerate and a deny-by-default scrubber (0h4d.1.7).
+- Added the download queue engine with a bounded concurrency cap (0h4d.1.2).
+- Added download size verification (0h4d.1.5).
+- Added specific failure-reason copy for every terminal download state (0h4d.1.4).
+- Added the reliability metric: download retry counts report to the worker (0h4d.1.10).
+- Added bounded exponential backoff for transient download failures (0h4d.1.3).
+- Added the approved Stillwater popup redesign: a segmented engine selector that shows the truthfully selected mode, change-detection pills with a gated combined flag, a liquid water loading effect with per-file progress on Download All, and a star shimmer on the support button.
+- Added an in-app reduce-motion setting; every surface also honors the OS prefers-reduced-motion.
+
+### Changed
+- The extension no longer fetches remote configuration at startup or daily; it runs on built-in defaults, and the remote-config path returns behind the Pro license gate (free-plan quota mitigation).
+- The classroom-wide action is renamed to "Download Classroom".
+- Typography is unified on one scale across the popup and injected pills; the options page shares the same tokens.
+- A "Not affiliated with Google" notice ships in the popup and options footers.
+
+### Fixed
+- New engine: the post-level Download All button now appears on collapsed classwork items, anchored at the post header, with per-post file counts; the decision counts every attachment type; Alt+Shift+D works on the New engine.
+- Change-detection highlights now anchor to the changed post instead of the whole classroom; the anchor is restored on navigation and toggle-off.
+- Classroom-wide download is available on the New engine (behind API config); the API engine asks for consent on click instead of failing silently, and denial settles as a clean failure.
 
 ## [1.8.7] - 2026-09-28
 

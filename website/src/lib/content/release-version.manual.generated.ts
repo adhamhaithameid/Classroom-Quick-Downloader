@@ -1,8 +1,8 @@
 /* AUTO-GENERATED FILE. DO NOT EDIT DIRECTLY. */
 export const WEBSITE_MANUAL_RELEASE_VERSION = {
-  "generatedAt": 1790595943881,
-  "extension": "1.8.7",
+  "generatedAt": 1791502903021,
+  "extension": "1.8.9",
   "cloudflareWorker": "3.0.0",
   "oracleBackend": "6.0.0",
-  "websiteLabel": "v1.8.7"
+  "websiteLabel": "v1.8.9"
 } as const;
