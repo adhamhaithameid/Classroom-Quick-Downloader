@@ -54,8 +54,8 @@ a new state in the registry appears on the map automatically.
    `extension/entrypoints/utils/changelog.ts`, wrapping the
    `fetchChangelogDetailed` export with a `globalThis.__cqdChangelogOverride`
    check. Production's module always succeeds (manual changelog), so the
-   "fetch failed" surface has no live trigger. The extension's own builds
-   never use this config.
+   "fetch failed" and "offline fallback" surfaces have no live trigger. The
+   extension's own builds never use this config.
 3. **Route B style relocation** — the real injectors
    (`injectStyles`, `injectV2Styles`, `injectFlagStyles`) run on the simulator
    document; the produced `<style>` bytes are then copied verbatim into the
@@ -81,7 +81,8 @@ a new state in the registry appears on the map automatically.
 
 `vitest run` in this workspace covers: first-run mount, first-download
 (confetti stubbed), failed history rows, the non-Classroom view, the changelog
-fetch-fail surface, the API gate, the corrupt history record, the options
+fetch-fail and offline (cache-fallback) surfaces, the API gate, the corrupt
+history record, the corrupt stats reset, the pre-schema migration, the options
 page, the state map (at least 20 states), and the classroom driver running the
 real renderers against the real fixture markup.
 

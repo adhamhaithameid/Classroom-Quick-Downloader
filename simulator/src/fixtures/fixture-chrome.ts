@@ -64,6 +64,28 @@ function respond<T>(cb: ((res: T) => void) | undefined, res: T): void {
   }
 }
 
+/**
+ * The cached changelog the offline verdict serves: a ChangelogData-shaped
+ * record for the installed version, so the overlay renders its entries with
+ * the "Current" tag under the offline warn line (production's cache holds
+ * the same shape in cqd_changelog_v1).
+ */
+function cachedChangelogData(): Record<string, unknown> {
+  return {
+    entries: [
+      {
+        id: 'sim-cached-1.9.1',
+        version: '1.9.1',
+        date: '2026-09-15T00:00:00.000Z',
+        changes: ['Cached entry served while the changelog oracle is unreachable.'],
+      },
+    ],
+    config: { rules: [] },
+    revisionToken: 'sim-cache-1',
+    lastFetched: Date.now() - 3_600_000,
+  };
+}
+
 async function handleMessage(msg: { type?: string } & Record<string, unknown>): Promise<unknown> {
   switch (msg?.type) {
     case 'CQD_QUEUE_SNAPSHOT':
@@ -198,7 +220,8 @@ export function installFixtureChrome(next: FixtureState): void {
   (globalThis as { chrome?: unknown }).chrome = chromeMock;
 
   // The changelog seam (vite.config transform) consults this override on
-  // every fetch. Reset it per fixture so 'real' behaves like production.
+  // every fetch. Reset it per fixture so 'real' behaves like production;
+  // 'offline' answers the cache-fallback verdict with a cached entry.
   (globalThis as { __cqdChangelogOverride?: unknown }).__cqdChangelogOverride =
     current.changelog === 'fail'
       ? () => ({
@@ -206,7 +229,13 @@ export function installFixtureChrome(next: FixtureState): void {
           status: 'error',
           error: 'Simulator: the changelog fetch failed.',
         })
-      : undefined;
+      : current.changelog === 'offline'
+        ? () => ({
+            data: cachedChangelogData(),
+            status: 'cache-fallback',
+            error: 'Simulator: Oracle unreachable — serving the cached changelog.',
+          })
+        : undefined;
 
   notifyFixtureChanged();
 }

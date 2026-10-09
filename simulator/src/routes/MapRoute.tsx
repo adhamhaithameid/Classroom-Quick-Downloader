@@ -53,6 +53,7 @@ const GROUP_ORDER = [
   'Queue',
   'History',
   'Changelog',
+  'Storage integrity',
   'Engine selector',
   'Flag pills',
   'Legal',

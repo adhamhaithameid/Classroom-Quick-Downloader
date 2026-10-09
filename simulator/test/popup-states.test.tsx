@@ -7,11 +7,13 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installFixtureChrome } from '../src/fixtures/fixture-chrome';
+import { fixture, installFixtureChrome } from '../src/fixtures/fixture-chrome';
 import {
+  corruptStatsStorage,
   firstRunFixture,
   historyRowsFixtureHelpers,
   localStatsStorage,
+  preSchemaSettingsStorage,
   settingsStorage,
   statsStorage,
   type FixtureState,
@@ -121,6 +123,55 @@ describe('simulator route A — real popup App', () => {
     expect(state).not.toBeNull();
     expect(state?.textContent).toContain('Simulator: the changelog fetch failed.');
     expect(el.querySelector('.cqd-cl-retry-btn')).not.toBeNull();
+  });
+
+  it('changelog offline: the cache-fallback warn line renders with the cached entries', async () => {
+    const el = await renderApp({ ...firstRunFixture(), changelog: 'offline' });
+    await act(async () => {
+      el.querySelector<HTMLButtonElement>('.cqd-brand-version')?.click();
+      await tick(50);
+    });
+    const warn = el.querySelector('.cqd-cl-state-warn');
+    expect(warn).not.toBeNull();
+    expect(warn?.textContent).toContain('cached changelog');
+    // The cached copy renders under the warn line and marks the installed
+    // version "Current" — production's offline view shows the same shape.
+    expect(el.querySelector('.cqd-cl-entry')).not.toBeNull();
+    expect(el.querySelector('.cqd-cl-tag-current')?.textContent).toBe('Current');
+  });
+
+  it('corrupt stats: a checksum-invalid record resets to an honest level 0', async () => {
+    const el = await renderApp({
+      ...firstRunFixture(),
+      storage: {
+        ...settingsStorage(),
+        ...corruptStatsStorage(),
+        ...localStatsStorage({}),
+      },
+    });
+    // The stored record claims 137; the failed integrity check resets it.
+    expect(el.querySelector('.cqd-lifetime-count')?.textContent).toBe('0');
+    expect(el.textContent).toContain('Level 0 — download your first file');
+  });
+
+  it('upgraded install: pre-schema storage migrates and stamps v2 on load', async () => {
+    const el = await renderApp({
+      ...firstRunFixture(),
+      storage: {
+        ...preSchemaSettingsStorage(),
+        ...statsStorage(0),
+        ...localStatsStorage({}),
+      },
+    });
+    // The REAL migration write landed in the fixture store: stored values
+    // survive (Edited off), the new keys back-fill, and the stamp appears.
+    const storage = fixture().storage;
+    expect(storage.cqdSettingsSchemaVersion).toBe(2);
+    expect(storage.editedFlagEnabled).toBe(false);
+    expect(storage.reducedMotionPreferred).toBe(false);
+    // The migrated Edited-off value drives the real pill state.
+    const edited = el.querySelector<HTMLButtonElement>('button[data-flag="editedFlagEnabled"]');
+    expect(edited?.getAttribute('aria-pressed')).toBe('false');
   });
 
   it('engine API gated: the beta segment is disabled with the setup tooltip', async () => {

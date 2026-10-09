@@ -9,10 +9,10 @@ import react from '@vitejs/plugin-react';
 
 /**
  * Commit-2 seam (changelog states): the popup's changelog module resolves
- * successfully by design (manual data), so the "fetch failed" surface has
- * no live trigger. This plugin wraps ONLY that module's export with a
- * simulator override check — the smallest documented test-only seam.
- * The extension's own builds never use this config.
+ * successfully by design (manual data), so the "fetch failed" and "offline
+ * fallback" surfaces have no live trigger. This plugin wraps ONLY that
+ * module's export with a simulator override check — the smallest documented
+ * test-only seam. The extension's own builds never use this config.
  */
 function changelogSeam() {
   return {

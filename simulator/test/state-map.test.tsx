@@ -42,6 +42,7 @@ describe('state map', () => {
       'Queue',
       'History',
       'Changelog',
+      'Storage integrity',
       'Engine selector',
       'Flag pills',
       'Legal',
@@ -50,6 +51,13 @@ describe('state map', () => {
       'Classroom pages',
     ]) {
       expect(text).toContain(group);
+    }
+    // The edge-state cells deep-link their registry ids.
+    const hrefs = new Set(
+      Array.from(cards).map((card) => card.getAttribute('href')),
+    );
+    for (const id of ['changelog-offline', 'stats-corrupt-reset', 'upgraded-install']) {
+      expect(hrefs).toContain(`#popup=${id}`);
     }
   });
 });

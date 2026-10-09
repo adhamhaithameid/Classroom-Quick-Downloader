@@ -41,8 +41,11 @@ export interface HistoryRow {
   url: string;
 }
 
-/** How the changelog module answers fetches ('real' = production behavior). */
-export type ChangelogMode = 'real' | 'fail';
+/**
+ * How the changelog module answers fetches ('real' = production behavior;
+ * 'fail' and 'offline' ride the vite.config override seam).
+ */
+export type ChangelogMode = 'real' | 'fail' | 'offline';
 
 export interface FixtureState {
   /** chrome.storage.local contents. */
@@ -82,6 +85,23 @@ export function statsStorage(
   };
 }
 
+/**
+ * Build a cqd_download_stats_v1 record whose integrity checksum does not
+ * match its content (bit rot / tampering): loadDownloadStats fails the
+ * checksum comparison and resets to an honest empty record.
+ */
+export function corruptStatsStorage(): Record<string, unknown> {
+  const stats: DownloadStats = {
+    ...createEmptyStats(),
+    lifetimeCount: 137,
+    lastMilestoneReached: 100,
+  };
+  return {
+    [DOWNLOAD_STATS_KEY]: stats,
+    [DOWNLOAD_STATS_INTEGRITY_KEY]: computeChecksum('{"corrupted":true}'),
+  };
+}
+
 /** Build the popup's donut-chart record (local_stats). */
 export function localStatsStorage(byType: Record<string, number>): Record<string, unknown> {
   const total = Object.values(byType).reduce((sum, n) => sum + n, 0);
@@ -94,6 +114,22 @@ export function settingsStorage(patch: Partial<Settings> = {}): Record<string, u
     ...DEFAULT_SETTINGS,
     ...patch,
     [SETTINGS_SCHEMA_KEY]: SETTINGS_SCHEMA_VERSION,
+  };
+}
+
+/**
+ * Build a pre-schema settings payload — an install upgraded from a version
+ * before the schema stamp existed: the original flat keys survive (Edited
+ * off proves stored values migrate), the later keys and the
+ * cqdSettingsSchemaVersion marker do not exist. loadSettings back-fills the
+ * missing keys from defaults and stamps v2 on first load.
+ */
+export function preSchemaSettingsStorage(): Record<string, unknown> {
+  return {
+    extensionEnabled: true,
+    downloadAllEnabled: true,
+    commentsFlagEnabled: true,
+    editedFlagEnabled: false,
   };
 }
 

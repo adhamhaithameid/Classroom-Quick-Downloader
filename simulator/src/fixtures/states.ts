@@ -10,9 +10,11 @@
 import {
   CLASSROOM_TAB_URL,
   OTHER_TAB_URL,
+  corruptStatsStorage,
   firstRunFixture,
   historyRowsFixtureHelpers,
   localStatsStorage,
+  preSchemaSettingsStorage,
   queueRowsFixtureHelpers,
   settingsStorage,
   statsStorage,
@@ -243,6 +245,46 @@ export const POPUP_STATES: PopupState[] = [
     description:
       'The fetch answers status "error": the warn/error line with the Retry button.',
     createFixture: () => fixtureWith({ changelog: 'fail' }),
+  },
+  {
+    id: 'changelog-offline',
+    label: 'Changelog offline',
+    group: 'Changelog',
+    description:
+      'The fetch answers "cache-fallback": the offline warn line and the cached entries render under it.',
+    createFixture: () => fixtureWith({ changelog: 'offline' }),
+  },
+
+  // --- Storage integrity ---
+  {
+    id: 'stats-corrupt-reset',
+    label: 'Corrupt stats record',
+    group: 'Storage integrity',
+    description:
+      'A stats record claiming 137 carries a bad checksum: the integrity check resets it to an honest level 0, count 0.',
+    createFixture: () =>
+      fixtureWith({
+        storage: {
+          ...settingsStorage(),
+          ...corruptStatsStorage(),
+          ...localStatsStorage({}),
+        },
+      }),
+  },
+  {
+    id: 'upgraded-install',
+    label: 'Upgraded install (pre-schema)',
+    group: 'Storage integrity',
+    description:
+      'Storage predates the settings schema: loadSettings back-fills the new keys and stamps cqdSettingsSchemaVersion 2 on load.',
+    createFixture: () =>
+      fixtureWith({
+        storage: {
+          ...preSchemaSettingsStorage(),
+          ...statsStorage(0),
+          ...localStatsStorage({}),
+        },
+      }),
   },
 
   // --- Engine selector ---
