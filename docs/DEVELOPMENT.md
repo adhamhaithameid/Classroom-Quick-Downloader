@@ -248,9 +248,43 @@ docker compose logs -f
 
 1. Fork the repository
 2. Create your feature branch: `git checkout -b feature/amazing-feature`
-3. Commit your changes: `git commit -m 'Add amazing feature'`
+3. Commit your changes: `git commit -m 'feat: add amazing feature'` (commitlint enforces conventional format — see `docs/COMMIT_STYLE.md`)
 4. Push to the branch: `git push origin feature/amazing-feature`
 5. Open a Pull Request
+
+---
+
+## ⚠️ Environment Gotchas (agent shells, hooks, CI)
+
+Recurring failures from the 2026-10-03 sessions retro (44 sessions read).
+Check here before debugging anything environment-shaped.
+
+### pnpm is mandatory, and shells may not have it
+
+- The repo is **pnpm-only**: `package.json` `preinstall` runs
+  `tools/enforce-pnpm.cjs`, which rejects any non-pnpm install. `npm install`
+  will always fail here by design.
+- `command not found: pnpm` (24 hits across 13 sessions) usually means one of:
+  1. nvm is not loaded in the current (non-interactive) shell — run
+     `corepack enable && corepack prepare pnpm@latest --activate`, or
+     `source ~/.nvm/nvm.sh` first.
+  2. You are inside a **git hook**: husky hooks inherit git's restricted PATH
+     (`husky - command not found in PATH=node_modules/.bin:...`). Make sure the
+     pnpm shim is on a PATH that survives hook execution
+     (`corepack enable` installs it into the node bin dir).
+- Verify with `pnpm --version` (expect 10.28+) before running installs.
+
+### Worktrees start empty
+
+New git worktrees have no `node_modules`. Hooks that call `npx --no --` (the
+commit-msg commitlint check) fail there until you run `pnpm install` once in
+that worktree. This is expected — not a broken checkout.
+
+### Ports
+
+`Port N is already in use` during dev servers: find and kill the stale listener
+with `lsof -ti :<port> | xargs kill` rather than switching ports, so stored
+URLs and extension dev configs keep working.
 
 ---
 
