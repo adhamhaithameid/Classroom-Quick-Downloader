@@ -18,6 +18,15 @@ import type { StoreHealthDoc } from "./store-stats";
 import { fetchStoreReviews, mergeStoreReviews } from "./store-reviews";
 import type { StoreReview, StoreReviewsSnapshot } from "./store-reviews";
 import { readUptimeSummary, runUptimeSelfCheck, UPTIME_PING_PATH } from "./uptime";
+import {
+  applyDismissals,
+  boundDismissals,
+  buildNotifications,
+  NOTIFICATION_DISMISSALS_KV_KEY,
+  parseDismissals,
+  sanitizeNotificationId,
+} from "./notifications";
+import type { AdminNotification } from "./notifications";
 import { readAmoUsersCache, refreshAmoUsersKv } from "./store-stats";
 import type { Env as WorkerEnv, StatsResponse } from "./types";
 
@@ -1235,10 +1244,29 @@ async function handleDashboard(request: Request, env: WorkerEnv): Promise<Respon
     );
   }
   // Shared admin JSON: one bundle every card reads from (uptime, AMO user
-  // counts, and later slices reuse this seam). No per-card fetching anywhere.
+  // counts, notifications; later slices reuse this seam). No per-card
+  // fetching anywhere.
+  const scrapeHealthDoc = await readStoreHealth(env);
+  const scrapeAlerts = evaluateScrapeHealth(scrapeHealthDoc, {
+    now: Date.now(),
+    failThreshold: SCRAPE_FAIL_THRESHOLD,
+    staleOkMs: SCRAPE_STALE_OK_MS,
+  });
+  const uptimeSummary = await readUptimeSummary(env);
+  const notifications = buildNotifications({
+    stats,
+    pipelineHealth: await fetchPipelineHealthForNotifications(env),
+    scrapeAlerts,
+    uptime: uptimeSummary,
+  });
+  const dismissalState = applyDismissals(notifications, await readNotificationDismissals(env));
   const adminData = {
-    uptime: await readUptimeSummary(env),
+    uptime: uptimeSummary,
     amoUsers: await readAmoUsersCache(env),
+    notifications: {
+      visible: dismissalState.visible,
+      dismissedIds: dismissalState.dismissedIds,
+    },
     generatedAt: Date.now(),
   };
   const nonce = generateCspNonce();
@@ -2051,6 +2079,47 @@ async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): P
     );
   }
 
+  if (pathname === "/admin/notifications/dismiss" && request.method === "POST") {
+    let id = "";
+    try {
+      const body = (await request.json()) as { id?: unknown };
+      id = sanitizeNotificationId(body.id);
+    } catch {
+      id = "";
+    }
+    if (!id) {
+      return withCors(
+        request,
+        new Response(
+          JSON.stringify({ ok: false, error: "invalid_notification_id" }),
+          { status: 400, headers: { "content-type": "application/json; charset=utf-8" } },
+        ),
+        env,
+      );
+    }
+    await dismissNotification(env, id);
+    return withCors(
+      request,
+      new Response(JSON.stringify({ ok: true, dismissed: id }), {
+        status: 200,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      }),
+      env,
+    );
+  }
+
+  if (pathname === "/admin/notifications/reset" && request.method === "POST") {
+    await resetNotificationDismissals(env);
+    return withCors(
+      request,
+      new Response(JSON.stringify({ ok: true, reset: true }), {
+        status: 200,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      }),
+      env,
+    );
+  }
+
   const websiteConsoleResponse = await handleWebsiteConsoleAdminEndpoint(request, env, auth);
   if (websiteConsoleResponse) {
     return websiteConsoleResponse;
@@ -2532,6 +2601,65 @@ async function writeStoreHealth(env: WorkerEnv, doc: StoreHealthDoc): Promise<vo
     });
   } catch {
     // Best-effort health bookkeeping only.
+  }
+}
+
+// --- Notification dismissals (bounded KV ring keyed by notification id) ----
+
+async function readNotificationDismissals(env: WorkerEnv): Promise<Array<{ id: string; ts: number }>> {
+  if (!env.SITE_SNAPSHOT_KV) return [];
+  try {
+    return parseDismissals(await env.SITE_SNAPSHOT_KV.get(NOTIFICATION_DISMISSALS_KV_KEY));
+  } catch {
+    return [];
+  }
+}
+
+async function dismissNotification(env: WorkerEnv, id: string): Promise<void> {
+  if (!env.SITE_SNAPSHOT_KV) return;
+  try {
+    const existing = await readNotificationDismissals(env);
+    existing.push({ id, ts: Date.now() });
+    await env.SITE_SNAPSHOT_KV.put(
+      NOTIFICATION_DISMISSALS_KV_KEY,
+      JSON.stringify(boundDismissals(existing)),
+    );
+  } catch {
+    // Best-effort: losing a dismissal must not error the dashboard.
+  }
+}
+
+async function resetNotificationDismissals(env: WorkerEnv): Promise<void> {
+  if (!env.SITE_SNAPSHOT_KV) return;
+  try {
+    await env.SITE_SNAPSHOT_KV.put(NOTIFICATION_DISMISSALS_KV_KEY, JSON.stringify([]));
+  } catch {
+    // Best-effort.
+  }
+}
+
+/**
+ * Fetch the DO's pipeline-health once per dashboard load (render-time only —
+ * this is not polling; the client keeps its own pre-existing 60s refresh).
+ */
+async function fetchPipelineHealthForNotifications(env: WorkerEnv): Promise<{ status?: string; reasons?: string[] } | null> {
+  try {
+    if (!env.DO_SHARED_SECRET) return null;
+    const stub = getDownloadsStub(env);
+    const res = await stub.fetch(new Request("https://do/pipeline-health", {
+      method: "GET",
+      headers: { "X-Admin-Secret": env.DO_SHARED_SECRET },
+    }));
+    if (!res.ok) return null;
+    const payload = (await res.json()) as { status?: unknown; reasons?: unknown };
+    return {
+      status: typeof payload.status === "string" ? payload.status : undefined,
+      reasons: Array.isArray(payload.reasons)
+        ? payload.reasons.filter((reason): reason is string => typeof reason === "string")
+        : undefined,
+    };
+  } catch {
+    return null;
   }
 }
 
@@ -3300,6 +3428,8 @@ export default {
       pathname === "/admin/storage-export" ||
       pathname === "/admin/update-config" ||
       pathname === "/admin/ip-allowlist" ||
+      pathname === "/admin/notifications/dismiss" ||
+      pathname === "/admin/notifications/reset" ||
       pathname === "/admin/website/status" ||
       pathname === "/admin/website/flush-now" ||
       pathname === "/admin/website/replay-dlq" ||

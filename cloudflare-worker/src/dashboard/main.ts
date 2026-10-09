@@ -4,6 +4,7 @@ import { FAVICON_PNG_DATA_URI } from "../assets";
 import type { UptimeSummary } from "../uptime";
 import { UPTIME_PING_PATH } from "../uptime";
 import { CHROME_STORE_PAGE_URL } from "../store-stats";
+import type { AdminNotification } from "../notifications";
 
 /**
  * Shared admin JSON bundle: worker-side data that is not part of the DO
@@ -13,6 +14,10 @@ import { CHROME_STORE_PAGE_URL } from "../store-stats";
 export interface DashboardAdminData {
   uptime?: UptimeSummary | null;
   amoUsers?: { firefoxUsers: number; fetchedAtUtc: number } | null;
+  notifications?: {
+    visible: AdminNotification[];
+    dismissedIds: string[];
+  } | null;
   generatedAt?: number;
 }
 
@@ -675,6 +680,13 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string, admi
   const recentReports = downloadAggregates?.recentReports ?? [];
   const recentReportsDisplay = [...recentReports].reverse();
 
+  // Notifications center inputs (aggregated server-side from existing
+  // health signals; dismissals filtered worker-side before render).
+  const visibleNotifications = adminData.notifications?.visible ?? [];
+  const dismissedNotificationIds = adminData.notifications?.dismissedIds ?? [];
+  const notificationSeverityColor = (severity: string): string =>
+    severity === "critical" ? "var(--danger)" : severity === "warn" ? "var(--warning)" : "var(--accent)";
+
   const requestsToday = quota?.requestsToday ?? 0;
   const remoteEnabled = quota?.remoteEnabled ?? true;
   const quotaLevel = quota?.quotaLevel ?? "UNKNOWN";
@@ -719,7 +731,6 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string, admi
   const cfgAllowLegacy = remoteConfig.allowLegacyEvents ?? true;
   const cfgRemoteReason = remoteConfig.remoteEnabledReason ?? "ok";
   const pipelineHealthUrl = `${workerUrl}/pipeline-health`;
-  const overviewDashboardUrl = `${workerUrl}/api/public/website/overview`;
   const uptimeStatusUrl = pipelineHealthUrl;
   const cfgHealth = remoteConfig.healthThresholds || {
     warnPendingBatches: 10,
@@ -1214,6 +1225,86 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string, admi
 
     .nav-icon.danger-icon {
       color: var(--danger);
+    }
+
+    /* Notifications tab badge + notification list items */
+    .tab-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      border-radius: 999px;
+      background: var(--danger);
+      color: #fff;
+      font-size: 0.68rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .notif-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .notif-item {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-4);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg-surface);
+    }
+
+    .notif-chip {
+      flex-shrink: 0;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #fff;
+      margin-top: 2px;
+    }
+
+    .notif-body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .notif-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .notif-detail {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .notif-empty {
+      padding: var(--space-4);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      color: var(--text-muted);
+      font-size: 0.88rem;
+    }
+
+    .notif-footer {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: var(--space-3);
+      margin-top: var(--space-3);
+      font-size: 0.8rem;
+      color: var(--text-muted);
     }
 
     /* Tab panels: one visible at a time; search mode shows all */
@@ -3170,6 +3261,10 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string, admi
       />
     </div>
     <div class="tab-bar" id="tab-bar" role="tablist" aria-label="Dashboard sections">
+      <button type="button" class="tab-item" id="tab-notifications" role="tab" data-section="notifications" aria-selected="false" aria-controls="panel-notifications" tabindex="-1">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        Notifications${visibleNotifications.length > 0 ? ` <span class="tab-badge" data-notification-count>${visibleNotifications.length}</span>` : ""}
+      </button>
       <button type="button" class="tab-item active" id="tab-overview" role="tab" data-section="overview" aria-selected="true" aria-controls="panel-overview" tabindex="0">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
         Overview
@@ -3268,6 +3363,38 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string, admi
     </div>
 
     <main>
+      <div class="tab-panel" id="panel-notifications" role="tabpanel" aria-labelledby="tab-notifications" data-panel="notifications" hidden>
+      <section class="card" id="notifications" data-card>
+        <h2>Notifications</h2>
+        <div class="section-subtitle">
+          Health signals aggregated from pipeline health, store scrapes, quota
+          proximity, and uptime checks. In-dashboard only — no email, no
+          external pushes.
+        </div>
+        ${visibleNotifications.length === 0
+          ? `<div class="notif-empty" data-zero-state="notifications">All clear — no active notifications.</div>`
+          : `<div class="notif-list" data-notification-list>
+              ${visibleNotifications
+                .map(
+                  (notification) => `<div class="notif-item" data-notification-id="${escapeHtml(notification.id)}" style="border-left-color:${notificationSeverityColor(notification.severity)};">
+                    <span class="notif-chip" style="background:${notificationSeverityColor(notification.severity)};">${escapeHtml(notification.severity)}</span>
+                    <div class="notif-body">
+                      <div class="notif-title">${escapeHtml(notification.title)}</div>
+                      <div class="notif-detail">${escapeHtml(notification.detail)}</div>
+                    </div>
+                    <button type="button" class="btn btn-secondary" data-dismiss-notification="${escapeHtml(notification.id)}" data-tooltip="Hide this notification until it clears and recurs.">Dismiss</button>
+                  </div>`,
+                )
+                .join("")}
+            </div>`}
+        <div class="notif-footer" data-notification-footer>
+          <span>${dismissedNotificationIds.length > 0 ? `${dismissedNotificationIds.length} dismissed` : ""}</span>
+          ${dismissedNotificationIds.length > 0
+            ? `<button type="button" class="btn btn-secondary" id="notif-reset">Reset dismissed</button>`
+            : ""}
+        </div>
+      </section>
+      </div>
       <div class="tab-panel" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" data-panel="overview">
       <!-- Top Cards -->
       <section class="card" id="overview" data-card>
@@ -7356,6 +7483,49 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string, admi
         searchInput.addEventListener('input', () => {
           if (searchTimer) clearTimeout(searchTimer);
           searchTimer = setTimeout(applyCardSearch, 150);
+        });
+      }
+
+      // ===== NOTIFICATIONS (in-dashboard dismiss; no email, no pushes) =====
+      document.querySelectorAll('[data-dismiss-notification]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const id = button.getAttribute('data-dismiss-notification');
+          if (!id) return;
+          button.disabled = true;
+          try {
+            const res = await fetch('/admin/notifications/dismiss', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin',
+              body: JSON.stringify({ id }),
+            });
+            if (res.ok) {
+              const item = document.querySelector('[data-notification-id="' + id.replace(/"/g, '\\"') + '"]');
+              if (item && item.parentElement) {
+                item.remove();
+              }
+            }
+          } catch (error) {
+            // Leave the item visible when the dismiss call fails.
+          } finally {
+            button.disabled = false;
+          }
+        });
+      });
+
+      const notifReset = document.getElementById('notif-reset');
+      if (notifReset) {
+        notifReset.addEventListener('click', async () => {
+          notifReset.disabled = true;
+          try {
+            const res = await fetch('/admin/notifications/reset', {
+              method: 'POST',
+              credentials: 'same-origin',
+            });
+            if (res.ok) location.reload();
+          } catch (error) {
+            notifReset.disabled = false;
+          }
         });
       }
 

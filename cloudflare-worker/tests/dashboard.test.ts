@@ -150,8 +150,12 @@ describe("Dashboard website console CTA", () => {
     const html = renderDashboard(makeStats());
     expect(html).not.toContain('href="#config"');
     expect(html).not.toContain('href="#release"');
-    expect(html).not.toContain("Notifications");
     expect(html).not.toContain("Releases");
+    // The legacy sidebar had Release Publishing / Notification Styling
+    // entries; they must not come back as nav targets. The new
+    // Notifications tab is a different, intentional feature.
+    expect(html).not.toContain('data-section="release"');
+    expect(html).not.toContain('data-section="config"');
   });
 
   it("renders canonical external links in the dashboard shell", () => {
@@ -258,6 +262,7 @@ describe("Dashboard tabbed navigation", () => {
     expect(html).toContain('aria-label="Dashboard sections"');
 
     const tabIds = [
+      "notifications",
       "overview",
       "breakdown",
       "system",
@@ -337,8 +342,9 @@ describe("Dashboard card search", () => {
   it("marks every filterable card with data-card", () => {
     const html = renderDashboard(makeStats());
     const count = (html.match(/data-card>/g) || []).length;
-    // 14 base cards + uptime + worldwide-activity + downloads-by-browser.
-    expect(count).toBe(16);
+    // 14 base cards + uptime + worldwide-activity + downloads-by-browser
+    // + notifications.
+    expect(count).toBe(17);
     for (const id of [
       "overview",
       "pipeline-health",
@@ -488,5 +494,56 @@ describe("Dashboard worldwide activity card", () => {
     );
     expect(html).not.toContain('<script>alert(1)</script>');
     expect(html).toContain("chrome&quot;&gt;&lt;script&gt;");
+  });
+});
+
+describe("Dashboard notifications tab", () => {
+  it("renders the notifications tab, panel, and all-clear state by default", () => {
+    const html = renderDashboard(makeStats());
+    expect(html).toContain('id="tab-notifications"');
+    expect(html).toContain('id="panel-notifications"');
+    expect(html).toContain("All clear — no active notifications");
+    expect(html).not.toContain("data-notification-count");
+  });
+
+  it("renders notification items with severity chips and dismiss buttons", () => {
+    const html = renderDashboard(makeStats(), undefined, {
+      notifications: {
+        visible: [
+          { id: "scrape:chrome", severity: "warn", title: "Store scrape failing: chrome", detail: "consecutive_failures_3" },
+          { id: "quota:requests-95", severity: "critical", title: "Request quota nearly exhausted", detail: "96,000 of 100,000 daily requests used (>= 95%)." },
+        ],
+        dismissedIds: ["uptime:last-check"],
+      },
+    });
+    expect(html).toContain('data-notification-count>2</span>');
+    expect(html).toContain('data-notification-id="scrape:chrome"');
+    expect(html).toContain('data-notification-id="quota:requests-95"');
+    expect(html).toContain('data-dismiss-notification="scrape:chrome"');
+    expect(html).toContain("critical");
+    expect(html).toContain("1 dismissed");
+    expect(html).toContain('id="notif-reset"');
+    // The dismissed id is not rendered as a visible item.
+    expect(html).not.toContain('data-notification-id="uptime:last-check"');
+  });
+
+  it("escapes hostile notification fields", () => {
+    const html = renderDashboard(makeStats(), undefined, {
+      notifications: {
+        visible: [
+          { id: "scrape:x", severity: "warn", title: '"><script>alert(1)</script>', detail: "<img src=x onerror=alert(2)>" },
+        ],
+        dismissedIds: [],
+      },
+    });
+    expect(html).not.toContain("<script>alert(1)</script>");
+    expect(html).not.toContain("<img src=x onerror=alert(2)>");
+    expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+  });
+
+  it("wires dismiss + reset client handlers", () => {
+    const html = renderDashboard(makeStats());
+    expect(html).toContain("'/admin/notifications/dismiss'");
+    expect(html).toContain("'/admin/notifications/reset'");
   });
 });
