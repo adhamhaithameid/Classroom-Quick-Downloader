@@ -2080,7 +2080,7 @@ async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): P
   }
 
   if (pathname === "/admin/notifications/dismiss" && request.method === "POST") {
-    let id = "";
+    let id: string;
     try {
       const body = (await request.json()) as { id?: unknown };
       id = sanitizeNotificationId(body.id);
