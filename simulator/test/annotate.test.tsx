@@ -10,6 +10,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { cssPath, describeElement, formatElementTarget } from '../src/annotate/describe';
 import { formatAnnotationsMarkdown } from '../src/annotate/export';
+import { routeMeta } from '../src/annotate/route-info';
 import {
   clearAnnotations,
   listAnnotatedStateIds,
@@ -68,7 +69,7 @@ describe('annotate export — deterministic Markdown', () => {
             target: {
               kind: 'element',
               tag: 'button',
-              id: null,
+              id: 'dl-btn',
               classes: ['cqd-download-btn'],
               data: [{ key: 'data-cqd-file-id', value: 'fixture-file-0' }],
               text: 'syllabus.pdf Download',
@@ -119,6 +120,7 @@ describe('annotate export — deterministic Markdown', () => {
       '- Route: popup',
       '- Reproduce: http://localhost:5173/#popup=first-download',
       '- Target: div.luto0c > a.VkhHKd > button.cqd-download-btn "syllabus.pdf Download" @ 42.5,31',
+      '- Data: data-cqd-file-id="fixture-file-0" id="dl-btn"',
       '- Note: Widen this label',
       '',
       '### [1] mixed-links-post-en — Mixed links post (en)',
@@ -240,6 +242,28 @@ describe('annotate store — localStorage per state', () => {
     // The current state (when asked) leads the list.
     const reordered = loadAllGroups('mixed-links-post-en');
     expect(reordered[0]!.stateId).toBe('mixed-links-post-en');
+  });
+
+  it('resolves titles for classroom demo-variant keys', () => {
+    saveAnnotations('mixed-links-post-en?demo=buttons', [
+      baseNote({ id: 'd', route: 'classroom', stateId: 'mixed-links-post-en?demo=buttons' }),
+    ]);
+    const groups = loadAllGroups();
+    expect(groups).toHaveLength(1);
+    expect(groups[0]!.stateId).toBe('mixed-links-post-en?demo=buttons');
+    expect(groups[0]!.title).toBe('Mixed links post (en)');
+  });
+
+  it('scopes classroom demo variants into distinct storage keys', () => {
+    const plain = routeMeta({ kind: 'classroom', pageId: 'mixed-links-post-en', params: new URLSearchParams() });
+    const demo = routeMeta({
+      kind: 'classroom',
+      pageId: 'mixed-links-post-en',
+      params: new URLSearchParams('demo=buttons'),
+    });
+    expect(plain.stateId).toBe('mixed-links-post-en');
+    expect(demo.stateId).toBe('mixed-links-post-en?demo=buttons');
+    expect(demo.deepLink).toBe('#page=mixed-links-post-en&demo=buttons');
   });
 
   it('tolerates corrupt storage', () => {

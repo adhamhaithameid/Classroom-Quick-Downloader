@@ -101,8 +101,11 @@ Workflow:
 
 Notes persist in `localStorage` under
 `cqd-sim-annotations:v1:<state-id>`, so switching states, remounts, and
-reloads keep them. Pin numbers follow the per-state creation order and
-stay dense after deletions.
+reloads keep them. Classroom demo variants key separately
+(`<page-id>?demo=<demo>`), so a note on the buttons demo never leaks onto
+the plain page; the exported deep link reproduces the exact variant. Pin
+numbers follow the per-state creation order and stay dense after
+deletions.
 
 ### Click-target capture
 
@@ -136,7 +139,15 @@ Total: N notes
 A `Target` looks like
 `div.luto0c > a.VkhHKd > button.cqd-download-btn "syllabus.pdf Download" @ 42.5,31`
 (path, visible text, percent center) or falls back to
-`percent 8.3,22.1` when no element sat under the click.
+`percent 8.3,22.1` when no element sat under the click. Element notes add
+a `Data:` line with the strongest re-location anchors, e.g.
+`- Data: data-cqd-file-id="fixture-file-0" id="dl-btn"` (omitted when the
+capture had no data attributes or id).
+
+Real-browser coverage for the parts jsdom cannot see (same-origin iframe
+reads, real-layout pin placement, clipboard export) lives in
+`tests/e2e/simulator/annotate.spec.ts`; run it with
+`pnpm test:simulator-e2e`.
 
 ## Tests
 

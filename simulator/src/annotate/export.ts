@@ -26,6 +26,18 @@ export function formatAnnotationTarget(note: Annotation): string {
     : formatPercentTarget(note.target);
 }
 
+/**
+ * The strongest re-location anchors on their own line: captured data-*
+ * attributes plus the element id, e.g. `data-drive-id="AF…" id="x"`.
+ * Returns null when the note has no element target or no anchors.
+ */
+export function formatAnnotationData(note: Annotation): string | null {
+  if (note.target.kind !== 'element') return null;
+  const parts = note.target.data.map((attr) => `${attr.key}="${attr.value}"`);
+  if (note.target.id) parts.push(`id="${note.target.id}"`);
+  return parts.length > 0 ? parts.join(' ') : null;
+}
+
 export function formatNoteText(note: Annotation): string {
   const body = note.note.replace(/\s+/g, ' ').trim();
   const text = body.length > 0 ? body : '(no text)';
@@ -48,6 +60,8 @@ export function formatAnnotationsMarkdown(
       lines.push(`- Route: ${note.route}`);
       lines.push(`- Reproduce: ${options.baseUrl}${note.deepLink}`);
       lines.push(`- Target: ${formatAnnotationTarget(note)}`);
+      const data = formatAnnotationData(note);
+      if (data) lines.push(`- Data: ${data}`);
       lines.push(`- Note: ${formatNoteText(note)}`);
     });
   }

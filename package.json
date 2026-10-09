@@ -53,6 +53,7 @@
     "test:e2e:firefox": "playwright test --project=qa-firefox",
     "test:e2e:zen": "node tests/e2e/zen/zen-extension.mjs",
     "test:e2e:arc": "node tools/check-arc-support.mjs",
+    "test:simulator-e2e": "playwright test --project=simulator-chromium",
     "test:e2e:matrix": "pnpm run test:e2e && pnpm run test:e2e:edge && pnpm run test:e2e:firefox && pnpm run test:e2e:zen",
     "test:live:login": "node tools/live-classroom-login.mjs",
     "test:live": "LIVE_CLASSROOM=1 playwright test --project=live-chromium",

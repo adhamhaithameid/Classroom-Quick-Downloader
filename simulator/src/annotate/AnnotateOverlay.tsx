@@ -68,6 +68,7 @@ export function AnnotateOverlay({ route, enabled }: { route: Route; enabled: boo
   const [showAll, setShowAll] = useState(false);
   const [groups, setGroups] = useState<AnnotationGroup[]>([]);
   const pendingFocusId = useRef<string | null>(null);
+  const noteFieldRef = useRef<HTMLTextAreaElement | null>(null);
 
   const stateId = meta.stateId;
 
@@ -77,6 +78,12 @@ export function AnnotateOverlay({ route, enabled }: { route: Route; enabled: boo
     setEditingId(null);
     setEditingNew(false);
   }, [stateId]);
+
+  // Dialog pattern: focus lands in the note field when the editor opens,
+  // so Escape (handled inside the dialog) works from the first keystroke.
+  useEffect(() => {
+    if (editingId) noteFieldRef.current?.focus();
+  }, [editingId]);
 
   // Refresh the side panel (all states when toggled, current state leads).
   useEffect(() => {
@@ -370,6 +377,7 @@ export function AnnotateOverlay({ route, enabled }: { route: Route; enabled: boo
           <label className="sim-field">
             <span>Note</span>
             <textarea
+              ref={noteFieldRef}
               rows={3}
               value={draftNote}
               onChange={(event) => setDraftNote(event.target.value)}

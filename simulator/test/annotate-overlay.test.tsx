@@ -160,7 +160,7 @@ describe('annotate overlay — Route A pin placement', () => {
     expect(pin!.getAttribute('aria-label')).toBe('Note 1: Check contrast');
   });
 
-  it('editing an existing pin keeps it; cancel keeps it too', async () => {
+  it('editing an existing pin keeps it; Escape and cancel keep it too', async () => {
     buildSurface();
     saveAnnotations('first-run', [stubNote({ note: 'first text' })]);
     await mountOverlay();
@@ -169,6 +169,21 @@ describe('annotate overlay — Route A pin placement', () => {
       document.querySelector<HTMLButtonElement>('button.sim-pin')!.click();
     });
     expect(document.querySelector('.sim-annotate-editor')).not.toBeNull();
+    // Dialog pattern: focus lands in the note field, so Escape works.
+    const textarea = document.querySelector('.sim-annotate-editor textarea')!;
+    expect(document.activeElement).toBe(textarea);
+    await act(async () => {
+      textarea.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      );
+    });
+    expect(document.querySelector('.sim-annotate-editor')).toBeNull();
+    expect(loadAnnotations('first-run')).toHaveLength(1);
+
+    // Cancel reopens nothing and keeps the note.
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>('button.sim-pin')!.click();
+    });
     await act(async () => {
       clickButton('Cancel')!.click();
     });

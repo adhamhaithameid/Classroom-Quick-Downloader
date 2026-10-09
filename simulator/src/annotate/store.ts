@@ -59,8 +59,10 @@ export function listAnnotatedStateIds(): string[] {
 
 /** Resolve the display title for a stored state id (registry-first). */
 export function resolveStateTitle(route: SimRouteKind, stateId: string): string {
-  if (route === 'popup') return getPopupState(stateId)?.label ?? stateId;
-  if (route === 'classroom') return getClassroomPage(stateId)?.label ?? stateId;
+  // Classroom demo variants store `pageId?demo=x`; registries know the base id.
+  const baseId = stateId.split('?')[0]!;
+  if (route === 'popup') return getPopupState(baseId)?.label ?? stateId;
+  if (route === 'classroom') return getClassroomPage(baseId)?.label ?? stateId;
   if (route === 'options') return 'Permissions rows';
   return 'State map';
 }

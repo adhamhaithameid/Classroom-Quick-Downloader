@@ -26,9 +26,11 @@ export function routeMeta(route: Route): RouteMeta {
     case 'classroom': {
       const page = getClassroomPage(route.pageId);
       const demo = route.params.get('demo') ?? undefined;
+      // Demo variants (buttons/water-fill demos) key their notes separately
+      // so a note pinned on the buttons demo never leaks onto the plain page.
       return {
         kind: 'classroom',
-        stateId: route.pageId,
+        stateId: demo ? `${route.pageId}?demo=${demo}` : route.pageId,
         title: page?.label ?? route.pageId,
         deepLink: window.location.hash || classroomHash(route.pageId, demo),
       };
