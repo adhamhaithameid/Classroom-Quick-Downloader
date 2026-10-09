@@ -32,6 +32,7 @@ import {
   watchSettings,
   type Settings,
 } from '../../src/ui/settings/store';
+import { MilestoneCelebration } from './MilestoneCelebration';
 
 // External Links
 const SURVEY_URL = 'https://forms.gle/wPU2b1Qxa7svHqJa6';
@@ -951,6 +952,8 @@ function App() {
 
   return (
     <main className={`cqd-app ${settings?.reducedMotionPreferred ? 'cqd-reduce-motion' : ''}`}>
+      {/* 1.9.0 confetti: milestone celebration overlay (toast + burst). */}
+      <MilestoneCelebration />
       <div className="cqd-scroll-container" ref={scrollRef}>
         {/* HEADER – always visible */}
         <header

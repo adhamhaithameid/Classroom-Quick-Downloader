@@ -246,3 +246,50 @@ export async function clearMilestonePending(): Promise<DownloadStats> {
   countChain = run.catch(() => undefined);
   return run;
 }
+
+/**
+ * Subscribe to stats-record changes (storage.onChanged, our key only).
+ * The callback re-reads through the checksummed load path — newValue is
+ * never trusted raw. Returns the unsubscribe fn.
+ */
+export function watchDownloadStats(cb: (stats: DownloadStats) => void): () => void {
+  const onChanged = (
+    globalThis as {
+      chrome?: {
+        storage?: {
+          onChanged?: {
+            addListener: (l: unknown) => void;
+            removeListener: (l: unknown) => void;
+          };
+        };
+      };
+    }
+  ).chrome?.storage?.onChanged;
+  if (!onChanged) return () => {};
+  const listener = (
+    changes: Record<string, { newValue?: unknown }>,
+    area: string,
+  ): void => {
+    if (area !== 'local' || !(DOWNLOAD_STATS_KEY in changes)) return;
+    void loadDownloadStats().then(({ stats }) => cb(stats));
+  };
+  onChanged.addListener(listener);
+  return () => onChanged.removeListener(listener);
+}
+
+// --- presentation formatting (shared by the toast and the tracker card) ---
+
+const compactFormat = new Intl.NumberFormat('en-US', {
+  notation: 'compact',
+  maximumFractionDigits: 1,
+});
+
+/**
+ * Compact notation for big counts ("1M"), grouped digits below 10,000
+ * ("5,000"), plain digits below that ("37") — the tracker reads naturally
+ * at every rung of the ladder.
+ */
+export function formatMilestoneCount(count: number): string {
+  if (!Number.isFinite(count) || count <= 0) return '0';
+  return count >= 10000 ? compactFormat.format(count) : count.toLocaleString('en-US');
+}
