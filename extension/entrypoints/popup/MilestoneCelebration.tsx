@@ -45,37 +45,38 @@ export function MilestoneCelebration() {
     void requestMilestoneClear();
   }
 
-  // Initial read: settings settle FIRST so the first play decision sees the
-  // reduced-motion gate; then the pending check runs against the loaded
-  // record.
+  // Initial read, strictly ordered: settings settle FIRST, then the stats
+  // watcher attaches, then the pending check runs. A milestone landing in
+  // the pre-settings window is picked up by the post-settings read — it can
+  // never be evaluated against the mount-time default (motion-on) snapshot.
   useEffect(() => {
     let alive = true;
+    let unwatchStats: (() => void) | undefined;
     void (async () => {
-      const [settings] = await Promise.all([loadSettings(), loadDownloadStats()]);
+      const settings = await loadSettings();
       if (!alive) return;
       settingsRef.current = settings;
+      unwatchStats = watchDownloadStats((stats) => {
+        applyPending(stats.milestonePending);
+      });
       const { stats } = await loadDownloadStats();
       if (!alive) return;
       applyPending(stats.milestonePending);
     })();
     return () => {
       alive = false;
+      unwatchStats?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Live watchers: the storage watch fires while the popup is open (a
-  // milestone landing mid-session celebrates immediately); the settings
-  // watch keeps the reduced-motion gate current.
+  // Live settings watcher: keeps the reduced-motion gate current after the
+  // initial load (the stats watcher lives in the ordered effect above).
   useEffect(() => {
-    const unwatchStats = watchDownloadStats((stats) => {
-      applyPending(stats.milestonePending);
-    });
     const unwatchSettings = watchSettings((patch) => {
       settingsRef.current = { ...settingsRef.current, ...patch };
     });
     return () => {
-      unwatchStats();
       unwatchSettings();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

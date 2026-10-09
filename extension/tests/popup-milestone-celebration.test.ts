@@ -219,6 +219,48 @@ describe('milestone celebration (1.9.0 commit 2)', () => {
     expect((store.get(DOWNLOAD_STATS_KEY) as Record<string, unknown>).milestonePending).toBeNull();
   });
 
+  it('shows toast only when a milestone lands before settings finish loading', async () => {
+    // Reduced-motion user; the settings read is artificially slow.
+    store.set('reducedMotionPreferred', true);
+    seedStats(store, statsRecord({ milestonePending: null, lastMilestoneReached: null }));
+    let releaseSettings!: () => void;
+    const settingsGate = new Promise<void>((r) => {
+      releaseSettings = r;
+    });
+    const fastGet = chrome.storage.local.get as any;
+    (chrome.storage.local.get as any) = vi.fn(
+      (keys: string[], cb: (r: Record<string, unknown>) => void) => {
+        if ((keys as string[]).includes('reducedMotionPreferred')) {
+          void settingsGate.then(() => fastGet(keys, cb));
+          return;
+        }
+        fastGet(keys, cb);
+      },
+    );
+
+    mount();
+    await flushTasks();
+
+    // The milestone lands mid-load: pre-fix, the early stats watcher fired
+    // here against the mount-time settings snapshot and burst.
+    seedStats(store, statsRecord());
+    fireStatsChange();
+    await flushTasks(4);
+
+    // Settings still pending: nothing may have fired yet.
+    expect(burstFn).not.toHaveBeenCalled();
+
+    releaseSettings();
+    await flushTasks();
+
+    // Reduced motion resolved before the play decision: toast only.
+    expect(burstFn).not.toHaveBeenCalled();
+    expect(container.querySelector('.cqd-milestone-toast')?.textContent).toContain(
+      'files downloaded!',
+    );
+    expect((store.get(DOWNLOAD_STATS_KEY) as Record<string, unknown>).milestonePending).toBeNull();
+  });
+
   it('renders nothing (and never bursts) with no pending milestone', async () => {
     seedStats(store, statsRecord({ milestonePending: null }));
     mount();
