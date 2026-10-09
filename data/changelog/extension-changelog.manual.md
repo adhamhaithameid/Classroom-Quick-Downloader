@@ -1,3 +1,15 @@
+## v1.9.1
+### Summary
+Your downloads now celebrate with you: confetti at 18 lifetime milestones and a live download counter in the popup.
+### Added
+- Confetti celebrations when you hit a milestone — from your very first file to one million.
+- A download tracker in the popup showing your lifetime total and how far you are from the next celebration.
+### Changed
+- New celebration points keep milestones coming more often as your total grows (2,500; 7,500; 25,000; 75,000; 750,000).
+- Celebrations respect your reduce-motion setting — you still get the good news, minus the confetti.
+### Fixed
+- Celebrations can no longer duplicate or lose count when many downloads finish at the same time.
+
 ## v1.8.9
 ### Summary
 The New engine grows up: post-level and classroom-wide downloads work, highlights ring the right post, and the popup gains history, settings, and diagnostics.

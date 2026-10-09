@@ -1,6 +1,6 @@
 {
-  "extension": "1.9.0",
+  "extension": "1.9.1",
   "cloudflareWorker": "3.0.0",
   "oracleBackend": "6.0.0",
-  "websiteLabel": "v1.9.0"
+  "websiteLabel": "v1.9.1"
 }

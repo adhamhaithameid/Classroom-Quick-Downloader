@@ -4,10 +4,26 @@ This is the main engineering changelog for Classroom Quick Downloader.
 It focuses on meaningful product, reliability, security, and architecture changes instead of raw commit history.
 
 ## Versioning Notes
-- Current extension release line: `1.9.0`
+- Current extension release line: `1.9.1`
 - The `1.8.0`→`1.8.7` ladder below materializes the post-1.8.0 work as 0.0.1 steps anchored to commit dates; the `1.5.6`→`1.8.0` ladder remains the internal history of the 1.5→1.8 line: every point version is anchored to the commit record and file-change dates of its window; patches never reach `.10` — the next minor takes over (`1.6.9` → `1.7.0`, `1.7.9` → `1.8.0`, `1.8.9` → `1.9.0` when the Free-completion milestone ships)
 - Planned next engine milestone: post-1.6 acquisition strategy wiring (API download tier behind the consent gate)
 - Pre-`1.0.0` bootstrap work is intentionally omitted from the user-facing release ledger
+
+## [1.9.1] - 2026-10-04
+
+### Summary
+Lifetime download milestones: the extension celebrates your progress with confetti and shows a running download counter in the popup.
+
+### Added
+- Added milestone celebrations at 18 lifetime totals (1 through 1,000,000, with celebration points at 2,500, 7,500, 25,000, 75,000, and 750,000).
+- Added the popup download tracker: lifetime count, progress toward the next milestone, and a replayable celebration toast.
+- Added the dormant download-count reporting path: per-install aggregate counts reach the worker and the admin dashboard once enabled.
+
+### Changed
+- Celebrations honor both the OS reduced-motion preference and the in-app reduce-motion setting.
+
+### Fixed
+- Fixed celebrations duplicating or losing count when many downloads finish at once: stats writes are serialized through the background worker, and the celebration acknowledge channel stays open for the asynchronous reply.
 
 ## [1.8.9] - 2026-10-03
 
