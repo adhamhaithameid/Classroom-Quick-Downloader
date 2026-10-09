@@ -56,6 +56,7 @@ import {
   clearHistory as clearHistoryEntries,
   searchEntries,
 } from '../../src/history/history-store';
+import { countCompletedDownload } from '../../src/history/download-stats';
 import {
   STUDENT_WORK_RESOLVE_PUBLISH_TYPE,
   STUDENT_WORK_RESOLVE_RELAY_TYPE,
@@ -542,6 +543,9 @@ export default defineBackground(() => {
         if (pending.fileMeta?.name) recentDownloads.set(pending.fileMeta.name, Date.now());
         // 0h4d.1.6: one history row per terminal settle.
         void recordDownloadHistory(pending, 'success');
+        // 1.9.0 confetti: one lifetime increment per download id (idempotent,
+        // restart-safe); milestone detection rides the same transaction.
+        void countCompletedDownload(pending.requestId);
         cleanup(pending, delta.id);
       };
       try {
