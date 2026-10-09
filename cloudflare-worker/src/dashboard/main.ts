@@ -654,6 +654,14 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string, admi
   const uptimeLastCheck = uptime?.lastCheck ?? null;
   const uptimePercent = (value: number | null | undefined): string =>
     typeof value === "number" ? `${value.toFixed(1)}%` : "—";
+  // 0% must never render green: >=99 success, >=90 warn, below danger,
+  // no data neutral.
+  const uptimePercentColor = (value: number | null | undefined): string => {
+    if (typeof value !== "number") return "var(--text-primary)";
+    if (value >= 99) return "var(--success)";
+    if (value >= 90) return "var(--warning)";
+    return "var(--danger)";
+  };
   const uptimeDotColor = uptimeLastCheck
     ? uptimeLastCheck.ok
       ? "var(--success)"
@@ -3524,12 +3532,12 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string, admi
         <div class="grid-3">
           <div class="metric" id="uptime-24h" data-tooltip="Share of successful self-checks in the last 24h (5-minute ring).">
             <div class="metric-label">Uptime (24h)</div>
-            <div class="metric-value" style="color:var(--success)">${uptimePercent(uptime?.uptime24h)}</div>
+            <div class="metric-value" style="color:${uptimePercentColor(uptime?.uptime24h)}">${uptimePercent(uptime?.uptime24h)}</div>
             <div class="metric-sub">${uptime ? `${uptime.checks24h} checks` : "No checks recorded"}</div>
           </div>
           <div class="metric" id="uptime-7d" data-tooltip="Share of successful self-checks over the last 7 days (hourly rollups).">
             <div class="metric-label">Uptime (7d)</div>
-            <div class="metric-value" style="color:var(--success)">${uptimePercent(uptime?.uptime7d)}</div>
+            <div class="metric-value" style="color:${uptimePercentColor(uptime?.uptime7d)}">${uptimePercent(uptime?.uptime7d)}</div>
             <div class="metric-sub">${uptime ? `${uptime.checks7d} checks` : "No checks recorded"}</div>
           </div>
           <div class="metric" id="uptime-last" data-tooltip="Result of the most recent self-check.">

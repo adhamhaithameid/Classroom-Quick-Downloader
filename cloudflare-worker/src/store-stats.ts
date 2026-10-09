@@ -452,11 +452,16 @@ export async function refreshAmoUsersKv(
     });
     if (!response.ok) return;
     const payload = (await response.json()) as { average_daily_users?: unknown };
-    const users =
-      typeof payload.average_daily_users === "number" && Number.isFinite(payload.average_daily_users)
-        ? Math.max(0, Math.floor(payload.average_daily_users))
-        : 0;
-    const next: AmoUsersCache = { firefoxUsers: users, fetchedAtUtc: now };
+    // A payload without the field is junk (schema drift, error page as JSON).
+    // Keep the previous cached value AND its fetchedAtUtc: writing 0 with a
+    // fresh timestamp would hide a stale-good count behind "n/a" for 24h.
+    if (typeof payload.average_daily_users !== "number" || !Number.isFinite(payload.average_daily_users)) {
+      return;
+    }
+    const next: AmoUsersCache = {
+      firefoxUsers: Math.max(0, Math.floor(payload.average_daily_users)),
+      fetchedAtUtc: now,
+    };
     await kv.put(AMO_USERS_KV_KEY, JSON.stringify(next));
   } catch {
     // Upstream problems must never break the cron.

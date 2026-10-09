@@ -72,3 +72,25 @@ describe("AMO users KV cache (24h TTL, one upstream call per day)", () => {
     expect(parseAmoUsersCache('{"firefoxUsers":"nope","fetchedAtUtc":1}')).toBeNull();
   });
 });
+
+describe("AMO junk payloads", () => {
+  it("keeps the previous cache when the payload lacks average_daily_users", async () => {
+    const kv = memoryKv();
+    kv.store.set(AMO_USERS_KV_KEY, JSON.stringify({ firefoxUsers: 100, fetchedAtUtc: 0 }));
+    // TTL has lapsed; upstream answers 200 but without the field.
+    const junkFetch = vi.fn(async () => new Response(JSON.stringify({ name: { "classroom-quick-downloader": {} } }), { status: 200 }));
+    await refreshAmoUsersKv({ SITE_SNAPSHOT_KV: kv }, { now: 25 * 3_600_000, fetchImpl: junkFetch as unknown as typeof fetch });
+
+    expect(await readAmoUsersCache({ SITE_SNAPSHOT_KV: kv })).toEqual({ firefoxUsers: 100, fetchedAtUtc: 0 });
+  });
+
+  it("overwrites the cache only when the payload carries a real user count", async () => {
+    const kv = memoryKv();
+    kv.store.set(AMO_USERS_KV_KEY, JSON.stringify({ firefoxUsers: 100, fetchedAtUtc: 0 }));
+    const junkFetch = vi.fn(async () => new Response(JSON.stringify({ name: { "classroom-quick-downloader": {} } }), { status: 200 }));
+    await refreshAmoUsersKv({ SITE_SNAPSHOT_KV: kv }, { now: 25 * 3_600_000, fetchImpl: junkFetch as unknown as typeof fetch });
+    const goodFetch = vi.fn(async () => amoResponse(250));
+    await refreshAmoUsersKv({ SITE_SNAPSHOT_KV: kv }, { now: 26 * 3_600_000, fetchImpl: goodFetch as unknown as typeof fetch });
+    expect(await readAmoUsersCache({ SITE_SNAPSHOT_KV: kv })).toEqual({ firefoxUsers: 250, fetchedAtUtc: 26 * 3_600_000 });
+  });
+});

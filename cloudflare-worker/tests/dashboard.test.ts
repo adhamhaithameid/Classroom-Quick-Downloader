@@ -547,3 +547,38 @@ describe("Dashboard notifications tab", () => {
     expect(html).toContain("'/admin/notifications/reset'");
   });
 });
+
+describe("Dashboard uptime card colors", () => {
+  function cardSlice(html: string, id: string): string {
+    const start = html.indexOf(`id="${id}"`);
+    return html.slice(start, start + 400);
+  }
+
+  it("colors 24h/7d green at 99% or above", () => {
+    const html = renderDashboard(makeStats(), undefined, {
+      uptime: { lastCheck: { timestamp: 1, ok: true, latencyMs: 10 }, uptime24h: 99.5, uptime7d: 99.9, checks24h: 288, checks7d: 100, consecutiveFailures: 0 },
+    });
+    expect(cardSlice(html, "uptime-24h")).toContain("var(--success)");
+    expect(cardSlice(html, "uptime-7d")).toContain("var(--success)");
+  });
+
+  it("colors uptime amber between 90% and 99%", () => {
+    const html = renderDashboard(makeStats(), undefined, {
+      uptime: { lastCheck: { timestamp: 1, ok: true, latencyMs: 10 }, uptime24h: 95, uptime7d: 90, checks24h: 200, checks7d: 100, consecutiveFailures: 0 },
+    });
+    expect(cardSlice(html, "uptime-24h")).toContain("var(--warning)");
+    expect(cardSlice(html, "uptime-7d")).toContain("var(--warning)");
+  });
+
+  it("colors uptime red below 90% and neutral without data", () => {
+    const html = renderDashboard(makeStats(), undefined, {
+      uptime: { lastCheck: { timestamp: 1, ok: false, latencyMs: 10 }, uptime24h: 50, uptime7d: 30, checks24h: 200, checks7d: 100, consecutiveFailures: 3 },
+    });
+    expect(cardSlice(html, "uptime-24h")).toContain("var(--danger)");
+    expect(cardSlice(html, "uptime-7d")).toContain("var(--danger)");
+
+    const zeroState = renderDashboard(makeStats());
+    expect(cardSlice(zeroState, "uptime-24h")).not.toContain("var(--success)");
+    expect(cardSlice(zeroState, "uptime-7d")).not.toContain("var(--success)");
+  });
+});
