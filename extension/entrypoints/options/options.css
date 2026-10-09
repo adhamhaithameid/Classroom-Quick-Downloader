@@ -144,6 +144,40 @@ body {
   margin-top: 16px;
 }
 
+/* Legal round 2, surface 05 Treatment 1 (legal-round2.html .opt-block +
+   .lu-line): the Limited Use two-line block. The plain line is body-dim; the
+   exact Chrome Web Store sentence sits under it as the legal footnote step. */
+.cqd-options-lu {
+  margin-top: 14px;
+  border: 1px solid var(--cqd-border-subtle);
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--cqd-surface);
+}
+
+.cqd-options-lu h4 {
+  font-size: var(--cqd-fs-caption);
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.cqd-options-lu p {
+  font-size: var(--cqd-fs-micro);
+  color: var(--cqd-text-muted);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.cqd-options-lu-line {
+  margin-top: 10px;
+  font-size: var(--cqd-fs-legal);
+  color: var(--cqd-text-muted);
+  line-height: 1.55;
+  border-left: 2px solid var(--cqd-blue);
+  padding-left: 10px;
+  opacity: 0.85;
+}
+
 .cqd-options-diag-link {
   margin: 12px 0 24px;
   font-size: var(--cqd-fs-caption);

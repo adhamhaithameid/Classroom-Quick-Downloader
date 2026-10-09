@@ -116,6 +116,20 @@ export function OptionsApp() {
           </div>
         ))}
       </section>
+      {/* Legal round 2, surface 05 Treatment 1 (legal-round2.html): the
+          Limited Use two-line block — the plain-language line first, the
+          exact Chrome Web Store sentence second, smaller and dimmer, fixed
+          order, never merged into one paragraph. Hardcoded English matches
+          this page's convention; the i18n sweep bead will adopt it. */}
+      <section className="cqd-options-lu" aria-label="API beta data use">
+        <h4>API (beta) — data use</h4>
+        <p>The beta only lists and downloads files from classrooms you are enrolled in.</p>
+        <p className="cqd-options-lu-line">
+          The use of information received from Google APIs will adhere to the
+          Chrome Web Store User Data Policy, including the Limited Use
+          requirements.
+        </p>
+      </section>
       <p className="cqd-options-note">
         Everything here stays on your machine. Quick controls live in the toolbar popup.
       </p>

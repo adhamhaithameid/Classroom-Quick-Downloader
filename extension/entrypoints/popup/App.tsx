@@ -23,7 +23,7 @@ import {
   type ChangelogFetchResult
 } from '../utils/changelog';
 import { popupMessage } from './i18n';
-import { CHANGELOG_SITE_URL } from '../utils/analytics/constants';
+import { CHANGELOG_SITE_URL, WEBSITE_BASE_URL } from '../utils/analytics/constants';
 import { isApiConfigured } from '../../src/engines/v3/api/config';
 import {
   DEFAULT_SETTINGS,
@@ -41,6 +41,10 @@ const GITHUB_PROFILE_URL = 'https://github.com/adhamhaithameid';
 const GITHUB_STAR_URL = `${GITHUB_REPO_URL}/stargazers`;
 const GITHUB_AVATAR_URL = avatarSrc;
 const BUY_ME_COFFEE_URL = 'https://buymeacoffee.com/adhamhaithameid';
+// Legal round 2, surface 01 T2: the ledger foot's "Full privacy policy" link
+// (legal-round2.html). The store listing + this site page carry the policy;
+// the ledger stays three lines and never inlines it.
+const PRIVACY_POLICY_URL = `${WEBSITE_BASE_URL}/privacy`;
 
 // Extension Store URLs for each browser
 const EXTENSION_STORE_URLS = {
@@ -1783,6 +1787,14 @@ function App() {
                 <strong>Not affiliated with Google.</strong> Downloads belong
                 to their owners — follow your school's policies.
               </p>
+              {/* Legal round 2, surface 01 Treatment 2 (legal-round2.html): the
+                  "Privacy & data" pill expands the Reads / Keeps / Sends ledger
+                  in place — one tap, three data directions. Copy rules: short
+                  sentences, plain words, and the Sends row tells the truth
+                  about the anonymous usage counts the analytics pipeline sends.
+                  Hardcoded English per the popup convention; i18n sweep will
+                  adopt it. */}
+              <PrivacyLedger />
             </div>
           </footer>
 
@@ -1793,6 +1805,131 @@ function App() {
 }
 
 // --- Subcomponents ---
+
+/** Shared icons for the ledger's three data directions (legal-round2.html
+ *  stage 01 T2: eye = reads, device = keeps, arrow = sends). Purely
+ *  decorative — the text lines carry the meaning. */
+function LedgerIcon({ kind }: { kind: 'reads' | 'keeps' | 'sends' }) {
+  if (kind === 'reads') {
+    return (
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M1.5 8s2.4-4.2 6.5-4.2S14.5 8 14.5 8s-2.4 4.2-6.5 4.2S1.5 8 1.5 8Z" stroke="currentColor" strokeWidth="1.3" />
+        <circle cx="8" cy="8" r="1.8" stroke="currentColor" strokeWidth="1.3" />
+      </svg>
+    );
+  }
+  if (kind === 'keeps') {
+    return (
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <rect x="2.5" y="3" width="11" height="7.5" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+        <path d="M5.5 13h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M2 8h8m0 0L7 5m3 3-3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12.5 3.5h2M12.5 12.5h2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/**
+ * The privacy ledger (legal round 2, surface 01 Treatment 2, owner-approved):
+ * a "Privacy & data" pill in the footer expands a small ledger card in place —
+ * Reads / Keeps on this device / Sends, one question per line. Copy rules:
+ * short sentences, plain words, no fear language, and TRUTHFUL about the
+ * Sends direction — the analytics pipeline (entrypoints/utils/analytics)
+ * sends anonymous usage counts (download outcomes, file types, error types —
+ * no file names, no file contents) to the operator's worker, while the files
+ * themselves travel from Google to the user directly.
+ *
+ * Keyboard: the pill is a real button (aria-expanded/aria-controls); the
+ * collapsed panel is visibility:hidden so nothing inside is tabbable; "Got it"
+ * closes and returns focus to the pill. The collapse animation rides the
+ * shared Stillwater motion token; the global reduce-motion collapse flattens
+ * it (in-app setting and OS preference both).
+ */
+export function PrivacyLedger() {
+  const [open, setOpen] = useState(false);
+  const pillRef = useRef<HTMLButtonElement | null>(null);
+
+  const close = () => {
+    setOpen(false);
+    pillRef.current?.focus();
+  };
+
+  return (
+    <div className="cqd-priv-row">
+      <button
+        type="button"
+        ref={pillRef}
+        className="cqd-priv-pill"
+        aria-expanded={open}
+        aria-controls="cqd-priv-ledger"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+          <path
+            d="M6 1 1.8 2.8v2.9c0 2.5 1.8 4.3 4.2 5.3 2.4-1 4.2-2.8 4.2-5.3V2.8L6 1Z"
+            stroke="currentColor"
+            strokeWidth="1.1"
+            strokeLinejoin="round"
+          />
+        </svg>
+        Privacy &amp; data
+      </button>
+      <div id="cqd-priv-ledger" className={`cqd-priv-ledger-wrap ${open ? 'open' : ''}`}>
+        <div className="cqd-priv-ledger" role="group" aria-label="Privacy and data summary">
+          <h4>Where your files and data go</h4>
+          <div className="cqd-lg-line">
+            <span className="cqd-lg-ic" aria-hidden="true">
+              <LedgerIcon kind="reads" />
+            </span>
+            <span className="cqd-lg-txt">
+              <b>Reads</b>
+              <span>The Classroom pages you open, to find posts and attachments.</span>
+            </span>
+          </div>
+          <div className="cqd-lg-line">
+            <span className="cqd-lg-ic" aria-hidden="true">
+              <LedgerIcon kind="keeps" />
+            </span>
+            <span className="cqd-lg-txt">
+              <b>Keeps on this device</b>
+              <span>Your settings and your download history. They stay on this device.</span>
+            </span>
+          </div>
+          <div className="cqd-lg-line">
+            <span className="cqd-lg-ic" aria-hidden="true">
+              <LedgerIcon kind="sends" />
+            </span>
+            <span className="cqd-lg-txt">
+              <b>Sends</b>
+              <span>
+                Anonymous usage counts — outcomes and file types, never file
+                names. Files travel from Google to you, directly.
+              </span>
+            </span>
+          </div>
+          <div className="cqd-priv-ledger-foot">
+            <a
+              href={PRIVACY_POLICY_URL}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Open the full privacy policy"
+            >
+              Full privacy policy ↗
+            </a>
+            <button type="button" className="cqd-priv-ledger-close" onClick={close}>
+              Got it
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /** The engine modes the popup exposes (#684). S13: the API (beta) option is
  *  the CONSENT surface (#398) — it renders only as a disabled, tooltip'd

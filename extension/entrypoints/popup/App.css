@@ -1015,6 +1015,144 @@ body {
 }
 
 /* ===============================
+ * Privacy & data ledger (legal round 2, surface 01 T2)
+ * =============================== */
+
+/* The footer stays clean: one pill under the approved notice; the ledger
+   expands in place below it (.priv-pill + .collapse + .ledger of
+   legal-round2.html, adapted to the light Stillwater tokens). */
+.cqd-priv-row {
+  margin-top: 8px;
+}
+
+.cqd-priv-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--cqd-fs-micro);
+  font-weight: 500;
+  color: var(--cqd-text-muted);
+  border: 1px solid var(--cqd-border-subtle);
+  background: transparent;
+  border-radius: 999px;
+  padding: 5px 11px;
+  transition: color var(--cqd-transition-fast), border-color var(--cqd-transition-fast);
+}
+
+.cqd-priv-pill:hover {
+  color: var(--cqd-text-main);
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.cqd-priv-pill[aria-expanded="true"] {
+  color: var(--cqd-text-main);
+  border-color: var(--cqd-blue);
+}
+
+/* The collapse: max-height + visibility so a closed ledger leaves the tab
+   order (nothing inside is focusable while hidden). */
+.cqd-priv-ledger-wrap {
+  max-height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  transition: max-height var(--cqd-transition-fast),
+    visibility 0s linear var(--cqd-transition-fast);
+}
+
+.cqd-priv-ledger-wrap.open {
+  max-height: 32rem;
+  visibility: visible;
+  transition: max-height var(--cqd-transition-fast);
+}
+
+.cqd-priv-ledger {
+  margin: 10px auto 2px;
+  max-width: 340px;
+  border: 1px solid var(--cqd-border-subtle);
+  border-radius: 12px;
+  background: var(--cqd-surface);
+  padding: 12px 14px;
+  text-align: left;
+}
+
+.cqd-priv-ledger h4 {
+  font-size: var(--cqd-fs-caption);
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.cqd-lg-line {
+  display: flex;
+  gap: 10px;
+  padding: 7px 0;
+  border-top: 1px solid var(--cqd-border-subtle);
+}
+
+.cqd-lg-line:first-of-type {
+  border-top: none;
+}
+
+.cqd-lg-ic {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.05);
+  display: grid;
+  place-items: center;
+  color: var(--cqd-blue);
+}
+
+.cqd-lg-txt b {
+  display: block;
+  font-size: var(--cqd-fs-caption);
+  font-weight: 600;
+  color: var(--cqd-text-main);
+}
+
+.cqd-lg-txt span {
+  display: block;
+  font-size: var(--cqd-fs-micro);
+  color: var(--cqd-text-muted);
+  line-height: 1.5;
+  margin-top: 1px;
+}
+
+.cqd-priv-ledger-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.cqd-priv-ledger-foot a {
+  font-size: var(--cqd-fs-micro);
+  color: var(--cqd-blue);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.cqd-priv-ledger-foot a:hover {
+  text-decoration: underline;
+}
+
+.cqd-priv-ledger-close {
+  border: none;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--cqd-text-main);
+  font-size: var(--cqd-fs-micro);
+  font-weight: 600;
+  padding: 6px 12px;
+  transition: background var(--cqd-transition-fast);
+}
+
+.cqd-priv-ledger-close:hover {
+  background: rgba(15, 23, 42, 0.1);
+}
+
+/* ===============================
  * Switch styling (Uiverse-inspired)
  * =============================== */
 
