@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Motion Studies — Water Fill & Star Shimmer · CQD 1.8.9</title>
+<style>
+  :root {
+    --bg: #0B0C10;
+    --panel: #14151C;
+    --surface: rgba(255,255,255,.045);
+    --surface2: rgba(255,255,255,.08);
+    --border: rgba(255,255,255,.10);
+    --border2: rgba(255,255,255,.18);
+    --text: #F3F4F8;
+    --text2: #A7ACBD;
+    --text3: #767C90;
+    --accent: #8F7BFF;
+    --accent2: #6E5BFF;
+    --success: #07DA3F;
+    --success-text: #4AE376;
+    --error: #FF4036;
+    --error-text: #FF7A72;
+    --trying: #FFD93D;
+    --cancel: #EC6300;
+    --bmc: #FFDD00;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--font);
+    font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased;
+    padding: 48px 24px 96px;
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; }
+  a { color: var(--accent); }
+  button { font-family: inherit; cursor: pointer; }
+  button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+  .crumb { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--text3); margin-bottom: 8px; }
+  .crumb a { color: var(--accent); text-decoration: none; }
+  h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.25; }
+  .lede { color: var(--text2); font-size: 15px; margin-top: 8px; max-width: 66ch; }
+  .sec { margin-top: 64px; }
+  .sec-label { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+  .sec h2 { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+  .sec p.desc { font-size: 13px; color: var(--text2); max-width: 74ch; margin-bottom: 20px; }
+  code { font-size: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1px 5px; }
+
+  /* ============ Reduce-motion control bar ============ */
+  .rm-bar {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(20,21,28,.92); backdrop-filter: blur(8px);
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px 16px; margin-top: 24px;
+  }
+  .rm-bar .rm-txt { font-size: 13px; font-weight: 600; }
+  .rm-bar .rm-sub { font-size: 11px; color: var(--text3); line-height: 1.4; }
+  .rm-switch {
+    position: relative; width: 40px; height: 22px; border-radius: 999px;
+    border: 1px solid var(--border2); background: rgba(0,0,0,.35);
+    transition: background 200ms var(--ease), border-color 200ms var(--ease);
+    flex: 0 0 auto; margin-left: auto;
+  }
+  .rm-switch::after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 16px; height: 16px; border-radius: 50%; background: var(--text3);
+    transition: transform 200ms var(--ease), background 200ms var(--ease);
+  }
+  .rm-switch[aria-pressed="true"] { background: var(--trying); border-color: var(--trying); }
+  .rm-switch[aria-pressed="true"]::after { transform: translateX(18px); background: #241C00; }
+  .rm-state { font-size: 11px; font-weight: 600; color: var(--trying); min-width: 120px; text-align: right; font-variant-numeric: tabular-nums; }
+
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: stretch; }
+  @media (max-width: 820px) { .duo { grid-template-columns: 1fr; } }
+  .demo-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 16px;
+    padding: 20px; display: flex; flex-direction: column;
+  }
+  .demo-card .tag {
+    align-self: flex-start; font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+    border-radius: 999px; padding: 3px 10px; margin-bottom: 14px;
+  }
+  .tag.std { color: var(--accent); border: 1px solid rgba(143,123,255,.4); }
+  .tag.red { color: var(--trying); border: 1px solid rgba(255,217,61,.4); }
+  .demo-card p { font-size: 12px; color: var(--text2); line-height: 1.55; margin-top: 12px; }
+  .demo-area { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 12px; align-items: center; padding: 8px 0; }
+
+  /* ============ (a1) Single-download pill on a light "Classroom" strip ============ */
+  .classroom-strip {
+    width: 100%; background: #F1F3F4; border-radius: 10px;
+    padding: 12px 14px; display: flex; align-items: center; gap: 10px;
+  }
+  .cs-post { flex: 1; min-width: 0; }
+  .cs-post b { display: block; font-size: 12px; font-weight: 500; color: #202124; line-height: 1.3; }
+  .cs-post small { font-size: 10px; color: #5F6368; }
+  .pill {
+    position: relative; overflow: hidden;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    border-radius: 999px; height: 32px; padding: 0 14px;
+    font-size: 11px; font-weight: 600; letter-spacing: .02em;
+    border: 1px solid #DADCE0; background: #fff; color: #1a73e8;
+    font-variant-numeric: tabular-nums;
+    transition: border-color 200ms var(--ease), color 200ms var(--ease);
+    flex: 0 0 auto;
+  }
+  .pill:hover { border-color: #1a73e8; }
+  .pill .fill {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    height: var(--fill, 0%);
+    background: linear-gradient(180deg, rgba(26,115,232,.16), rgba(26,115,232,.34));
+    transition: height 260ms var(--ease);
+  }
+  .pill .lbl { position: relative; z-index: 2; }
+  .pill .wave {
+    position: absolute; left: -50%; width: 200%; height: 8px; z-index: 1;
+    bottom: calc(var(--fill, 0%) - 4px);
+    opacity: 0; transition: opacity 240ms var(--ease);
+  }
+  .pill .wave svg { display: block; width: 100%; height: 100%; }
+  .pill.loading { border-color: #8ab4f8; color: #174ea6; }
+  .pill.loading .wave { opacity: 1; animation: wave-slide 2.2s linear infinite; }
+  .pill.done { border-color: #07DA3F; color: #0b7a2a; }
+  .pill.done .fill { background: linear-gradient(180deg, rgba(7,218,63,.22), rgba(7,218,63,.42)); }
+  .pill.bad { border-color: #FF4036; color: #c5221f; }
+  .pill.bad .fill { background: linear-gradient(180deg, rgba(255,64,54,.16), rgba(255,64,54,.36)); }
+  @keyframes wave-slide { from { transform: translateX(0); } to { transform: translateX(50%); } }
+  .pill-hint { font-size: 11px; color: var(--text3); }
+
+  /* ============ (a2) Water-fill inside the primary button ============ */
+  .cta {
+    position: relative; overflow: hidden; width: 100%;
+    border: 1px solid rgba(143,123,255,.5);
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(143,123,255,.22), rgba(110,91,255,.14));
+    color: var(--text);
+    padding: 14px 16px; text-align: left;
+    box-shadow: 0 4px 20px rgba(110,91,255,.22), inset 0 1px 0 rgba(255,255,255,.12);
+    transition: border-color 200ms var(--ease);
+  }
+  .cta:hover { border-color: rgba(143,123,255,.85); }
+  .cta .row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; position: relative; z-index: 2; }
+  .cta .t { font-size: 15px; font-weight: 600; }
+  .cta .s { font-size: 11px; color: var(--text2); font-variant-numeric: tabular-nums; }
+  .cta .fill {
+    position: absolute; left: 0; right: 0; bottom: 0; height: var(--fill, 0%);
+    background: linear-gradient(180deg, rgba(143,123,255,.3), rgba(110,91,255,.55));
+    transition: height 300ms var(--ease); z-index: 1;
+  }
+  .cta .wave {
+    position: absolute; left: -50%; width: 200%; height: 10px; z-index: 1;
+    bottom: calc(var(--fill, 0%) - 5px);
+    opacity: 0; transition: opacity 240ms var(--ease);
+  }
+  .cta .wave svg { display: block; width: 100%; height: 100%; }
+  .cta.loading .wave { opacity: 1; animation: wave-slide 2.4s linear infinite; }
+  .cta.is-success { border-color: rgba(7,218,63,.6); }
+  .cta.is-success .fill { background: linear-gradient(180deg, rgba(7,218,63,.25), rgba(7,218,63,.45)); }
+  .cta.is-error { border-color: rgba(255,64,54,.6); }
+  .cta.is-error .fill { background: linear-gradient(180deg, rgba(255,64,54,.2), rgba(255,64,54,.4)); }
+
+  /* ============ (a3) Multi-file tank pill (N of M) ============ */
+  .tank {
+    position: relative; overflow: hidden; width: 100%;
+    border-radius: 12px; border: 1px solid var(--border);
+    background: rgba(0,0,0,.3); color: var(--text);
+    height: 46px; display: flex; align-items: center; justify-content: center; gap: 8px;
+    font-variant-numeric: tabular-nums;
+  }
+  .tank .fill {
+    position: absolute; left: 0; right: 0; bottom: 0; height: var(--fill, 0%);
+    background: linear-gradient(180deg, rgba(143,123,255,.28), rgba(110,91,255,.55));
+    transition: height 300ms var(--ease);
+  }
+  .tank .wave {
+    position: absolute; left: -50%; width: 200%; height: 10px;
+    bottom: calc(var(--fill, 0%) - 5px);
+    opacity: 0; transition: opacity 240ms var(--ease);
+  }
+  .tank .wave svg { display: block; width: 100%; height: 100%; }
+  .tank.loading .wave { opacity: 1; animation: wave-slide 2.6s linear infinite; }
+  .tank .lbl { position: relative; z-index: 2; font-size: 13px; font-weight: 600; }
+  .tank .cnt { position: relative; z-index: 2; font-size: 11px; color: var(--text2); }
+  .tank.done { border-color: rgba(7,218,63,.5); }
+  .tank.done .fill { background: linear-gradient(180deg, rgba(7,218,63,.22), rgba(7,218,63,.42)); }
+  .tank.done .cnt { color: var(--success-text); }
+
+  /* ============ (b) Star shimmer BMC ============ */
+  .bmc-zone {
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+    padding: 24px 0;
+  }
+  .bmc {
+    position: relative; overflow: visible;
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--bmc); color: #241C00;
+    border: none; border-radius: 999px;
+    font-size: 13px; font-weight: 700; padding: 10px 20px;
+    transition: transform 200ms var(--ease), box-shadow 200ms var(--ease);
+  }
+  .bmc:hover { transform: translateY(-1px); box-shadow: 0 6px 22px rgba(255,221,0,.35); }
+  .bmc .sheen {
+    position: absolute; top: 0; bottom: 0; width: 60%;
+    left: 0; border-radius: 999px; overflow: hidden; pointer-events: none;
+  }
+  .bmc .sheen::before {
+    content: ""; position: absolute; top: -20%; bottom: -20%; left: 0; width: 60%;
+    background: linear-gradient(105deg, transparent 20%, rgba(255,255,255,.55) 50%, transparent 80%);
+    transform: translateX(-160%) skewX(-12deg);
+    animation: sheen-pass 6.5s ease-in-out infinite;
+    animation-delay: 1.2s;
+  }
+  @keyframes sheen-pass {
+    0% { transform: translateX(-160%) skewX(-12deg); }
+    16% { transform: translateX(340%) skewX(-12deg); }
+    100% { transform: translateX(340%) skewX(-12deg); }
+  }
+  .star {
+    position: absolute; pointer-events: none;
+    opacity: 0; transform: scale(.4) rotate(0deg);
+    animation: twinkle 4.8s ease-in-out infinite;
+  }
+  @keyframes twinkle {
+    0% { opacity: 0; transform: scale(.3) rotate(0deg); }
+    8% { opacity: .9; transform: scale(1) rotate(24deg); }
+    16% { opacity: .35; transform: scale(.7) rotate(40deg); }
+    26% { opacity: 0; transform: scale(.3) rotate(60deg); }
+    100% { opacity: 0; transform: scale(.3) rotate(60deg); }
+  }
+
+  /* ============ Reduced-motion gating (media query + demo toggle) ============ */
+  /* Waves: hide crest, keep flat fill */
+  @media (prefers-reduced-motion: reduce) { .rm-waves { display: none !important; } }
+  .reduce-motion .rm-waves, .force-reduce .rm-waves { display: none !important; }
+  /* Sheen + twinkle: freeze to a soft static state */
+  @media (prefers-reduced-motion: reduce) {
+    .bmc .sheen::before { animation: none; transform: translateX(-160%) skewX(-12deg); }
+    .star { animation: none; opacity: .3; transform: scale(.8); }
+  }
+  .reduce-motion .bmc .sheen::before, .force-reduce .bmc .sheen::before { animation: none; transform: translateX(-160%) skewX(-12deg); }
+  .reduce-motion .star, .force-reduce .star { animation: none; opacity: .3; transform: scale(.8); }
+  /* Generic: kill transitions and remaining loops */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: 0.01ms !important; }
+  }
+  .reduce-motion *, .reduce-motion *::before, .reduce-motion *::after,
+  .force-reduce *, .force-reduce *::before, .force-reduce *::after { transition-duration: 0.01ms !important; }
+  .reduce-motion .bmc:hover, .force-reduce .bmc:hover { transform: none; }
+
+  /* Static "always reduced" specimens keep a visible mid-fill via inline --fill */
+
+  /* ============ Timing table ============ */
+  table { width: 100%; border-collapse: collapse; font-size: 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--border); }
+  th { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text3); background: rgba(0,0,0,.2); }
+  td { color: var(--text2); font-variant-numeric: tabular-nums; }
+  td:first-child { color: var(--text); font-weight: 500; }
+  tr:last-child td { border-bottom: none; }
+
+  .note-card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px; font-size: 13px; color: var(--text2); line-height: 1.6; }
+  .note-card b { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="crumb"><a href="index.html">← All prototypes</a> · Motion studies</div>
+  <h1>Water fill &amp; star shimmer — motion studies</h1>
+  <p class="lede">Two effects, four surfaces, zero GIFs — everything is CSS + SVG. Each study shows the standard-motion version beside its reduced-motion fallback, and the toggle below simulates the planned in-app "Reduce motion" setting (it also reads your system preference on load).</p>
+
+  <div class="rm-bar">
+    <div>
+      <div class="rm-txt">Reduce motion</div>
+      <div class="rm-sub">Simulates the in-app setting. Maps to <code>prefers-reduced-motion: reduce</code> — system preference is detected on load.</div>
+    </div>
+    <span class="rm-state" id="rm-state">Standard motion</span>
+    <button type="button" class="rm-switch" id="rm-toggle" aria-pressed="false" aria-label="Toggle reduced motion simulation"></button>
+  </div>
+
+  <!-- ================= A1. SINGLE PILL ================= -->
+  <div class="sec">
+    <div class="sec-label">A1 · Water fill — single-download pill</div>
+    <h2>The content-script pill, in its real light-surface context</h2>
+    <p class="desc">On Classroom pages the pill sits on light gray. Idle is outline blue; clicking runs <b>indeterminate slosh</b> (while the file count is unknown, ~0.8s) then a <b>determinate rise</b> with a dual wave crest, then a green settle. Timing follows the research rule: under 1s no loader, 1–10s indeterminate, over 10s determinate — so determinate fill starts the moment the first file reports.</p>
+    <div class="duo">
+      <div class="demo-card">
+        <span class="tag std">Standard motion — live</span>
+        <div class="demo-area">
+          <div class="classroom-strip">
+            <span class="cs-post"><b>Photosynthesis — homework</b><small>3 attachments · Drive</small></span>
+            <button type="button" class="pill" id="pill1" style="--fill:0%">
+              <span class="wave rm-waves" aria-hidden="true">
+                <svg viewBox="0 0 120 8" preserveAspectRatio="none"><path d="M0 5 Q 7.5 0 15 5 T 30 5 T 45 5 T 60 5 T 75 5 T 90 5 T 105 5 T 120 5 V8 H0 Z" fill="rgba(26,115,232,.5)"/></svg>
+              </span>
+              <span class="lbl" id="pill1-lbl">Download (3 files)</span>
+            </button>
+          </div>
+          <span class="pill-hint">Click the pill to run: slosh → rise → settle.</span>
+        </div>
+        <p>The wave is two counter-drifting SVG crests (2.2s / 3.4s) so the surface never visibly repeats. Fill height is the only layout property animated; waves move on <code>transform</code> only (GPU-composited).</p>
+      </div>
+      <div class="demo-card">
+        <span class="tag red">Reduced-motion fallback — frozen</span>
+        <div class="demo-area">
+          <div class="classroom-strip">
+            <span class="cs-post"><b>Photosynthesis — homework</b><small>3 attachments · Drive</small></span>
+            <span class="pill loading" style="--fill:66%;">
+              <span class="lbl">2 of 3 files</span>
+            </span>
+          </div>
+          <span class="pill-hint">No crest, no slosh. The fill still moves (content, not decoration) and the label counts up — progress survives, the liquid does not.</span>
+        </div>
+        <p>Fallback contract: <code>wave → display:none</code>, transitions to 0.01ms, label keeps updating. The pill never loses its progress semantics.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= A2. BUTTON + A3. TANK ================= -->
+  <div class="sec">
+    <div class="sec-label">A2 + A3 · Water fill — primary button and multi-file tank</div>
+    <h2>Single download inside the button · "N of M" tank for Download All</h2>
+    <p class="desc">The primary button fills itself — no separate banner. For multi-file runs the pill becomes a <b>tank</b>: fill height = files done ÷ files total, with the counter as the source of truth. Both are live; click to run.</p>
+    <div class="duo">
+      <div class="demo-card">
+        <span class="tag std">Standard motion — live</span>
+        <div class="demo-area" style="width:100%; max-width:360px; align-self:center;">
+          <button type="button" class="cta" id="cta1" style="--fill:0%">
+            <span class="fill" aria-hidden="true"></span>
+            <span class="wave rm-waves" aria-hidden="true">
+              <svg viewBox="0 0 120 10" preserveAspectRatio="none"><path d="M0 6 Q 7.5 0 15 6 T 30 6 T 45 6 T 60 6 T 75 6 T 90 6 T 105 6 T 120 6 V10 H0 Z" fill="rgba(143,123,255,.55)"/></svg>
+            </span>
+            <span class="row"><span class="t" id="cta1-t">Download Classroom</span><span class="s" id="cta1-s">24 files</span></span>
+          </button>
+          <button type="button" class="cta is-error" style="--fill:87%">
+            <span class="fill" aria-hidden="true"></span>
+            <span class="row"><span class="t">3 of 24 failed</span><span class="s">retry</span></span>
+          </button>
+        </div>
+        <p>Fill color is state-neutral violet while running; success/error repaint the fill and border without moving geometry. Partial failure keeps the fill at the point of failure (87%) — the level itself tells the story.</p>
+      </div>
+      <div class="demo-card">
+        <span class="tag red">Reduced-motion fallback — frozen</span>
+        <div class="demo-area" style="width:100%; max-width:360px; align-self:center;">
+          <div class="cta is-success" style="--fill:100%">
+            <span class="fill" aria-hidden="true"></span>
+            <span class="row"><span class="t">Done — 24 files</span><span class="s">18.4 MB</span></span>
+          </div>
+          <div class="tank loading" style="--fill:58%">
+            <span class="lbl">Chapter 4 — worksheets</span>
+            <span class="cnt">7 / 12 files</span>
+          </div>
+        </div>
+        <p>Static mid-fill (58%) with the counter visible: reduced-motion users get the same information density with zero movement. The counter is the accessible progress (also announced via <code>aria-live</code> in production).</p>
+      </div>
+    </div>
+
+    <div class="duo" style="margin-top:20px;">
+      <div class="demo-card">
+        <span class="tag std">Multi-file tank — live</span>
+        <div class="demo-area" style="width:100%;">
+          <button type="button" class="tank loading" id="tank" style="--fill:0%">
+            <span class="wave rm-waves" aria-hidden="true">
+              <svg viewBox="0 0 120 10" preserveAspectRatio="none"><path d="M0 6 Q 7.5 0 15 6 T 30 6 T 45 6 T 60 6 T 75 6 T 90 6 T 105 6 T 120 6 V10 H0 Z" fill="rgba(143,123,255,.5)"/></svg>
+            </span>
+            <span class="lbl">Chapter 4 — worksheets</span>
+            <span class="cnt" id="tank-cnt">0 / 12 files</span>
+          </button>
+          <span class="pill-hint">Click the tank: fill height = 7/12 → 12/12.</span>
+        </div>
+        <p>Fill = <code>done ÷ total</code>, updated per file, 300ms ease — smooth without lying about pace. Wave only while loading.</p>
+      </div>
+      <div class="demo-card">
+        <span class="tag red">Multi-file tank — reduced</span>
+        <div class="demo-area" style="width:100%;">
+          <div class="tank loading force-reduce" style="--fill:58%">
+            <span class="lbl">Chapter 4 — worksheets</span>
+            <span class="cnt">7 / 12 files</span>
+          </div>
+          <span class="pill-hint"><code>.force-reduce</code> — frozen regardless of the toggle, showing the guaranteed fallback.</span>
+        </div>
+        <p>Same geometry, same counter, no wave. If the in-app setting is ON, <code>.reduce-motion</code> on the app root produces exactly this.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= B. STAR SHIMMER ================= -->
+  <div class="sec">
+    <div class="sec-label">B · Star shimmer — Buy-Me-a-Coffee</div>
+    <h2>Attention by sparkle, not by pulse</h2>
+    <p class="desc">Five four-point stars on staggered 4.8s cycles, each visible only ~25% of the time, plus one sheen pass every 6.5s. Nothing loops fast, nothing scales past the button, and the cup icon never animates — the guidance is uniform: low opacity, transform-only, mostly idle.</p>
+    <div class="duo">
+      <div class="demo-card">
+        <span class="tag std">Standard motion — live</span>
+        <div class="demo-area bmc-zone">
+          <button type="button" class="bmc" id="bmc-live">
+            <svg class="star" style="top:-9px; left:14%; animation-delay:0s;" width="14" height="14" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 0 7.2 4.8 12 6 7.2 7.2 6 12 4.8 7.2 0 6 4.8 4.8Z" fill="#FFE566"/></svg>
+            <svg class="star" style="top:-12px; left:46%; animation-delay:1.4s;" width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 0 7.2 4.8 12 6 7.2 7.2 6 12 4.8 7.2 0 6 4.8 4.8Z" fill="#FFF3B0"/></svg>
+            <svg class="star" style="top:-6px; right:16%; animation-delay:2.6s;" width="13" height="13" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 0 7.2 4.8 12 6 7.2 7.2 6 12 4.8 7.2 0 6 4.8 4.8Z" fill="#FFE566"/></svg>
+            <svg class="star" style="bottom:-9px; left:28%; animation-delay:3.4s;" width="9" height="9" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 0 7.2 4.8 12 6 7.2 7.2 6 12 4.8 7.2 0 6 4.8 4.8Z" fill="#FFF3B0"/></svg>
+            <svg class="star" style="bottom:-11px; right:34%; animation-delay:4.1s;" width="11" height="11" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 0 7.2 4.8 12 6 7.2 7.2 6 12 4.8 7.2 0 6 4.8 4.8Z" fill="#FFE566"/></svg>
+            <span class="sheen" aria-hidden="true"></span>
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M3 6h8v4a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6Z" fill="#241C00"/>
+              <path d="M11 7h1.2a1.8 1.8 0 0 1 0 3.6H11" stroke="#241C00" stroke-width="1.3"/>
+              <path d="M5.2 4.2c0-.8.8-.8.8-1.6M8 4.2c0-.8.8-.8.8-1.6" stroke="#241C00" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
+            Buy me a coffee
+          </button>
+          <span class="pill-hint">Stars: 5 × 4.8s, ≤25% duty cycle · sheen: one pass / 6.5s · decorative only (<code>aria-hidden</code>).</span>
+        </div>
+        <p>Contrast is unaffected: stars live outside the text area at ≤90% peak opacity and the sheen is a 55% white pass over #FFDD00 — the label (700 weight, #241C00 on #FFDD00 ≈ 13.3:1) stays readable throughout.</p>
+      </div>
+      <div class="demo-card">
+        <span class="tag red">Reduced-motion fallback — frozen</span>
+        <div class="demo-area bmc-zone force-reduce">
+          <button type="button" class="bmc">
+            <svg class="star" style="top:-9px; left:14%;" width="14" height="14" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 0 7.2 4.8 12 6 7.2 7.2 6 12 4.8 7.2 0 6 4.8 4.8Z" fill="#FFE566"/></svg>
+            <svg class="star" style="top:-12px; left:46%;" width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 0 7.2 4.8 12 6 7.2 7.2 6 12 4.8 7.2 0 6 4.8 4.8Z" fill="#FFF3B0"/></svg>
+            <svg class="star" style="top:-6px; right:16%;" width="13" height="13" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 0 7.2 4.8 12 6 7.2 7.2 6 12 4.8 7.2 0 6 4.8 4.8Z" fill="#FFE566"/></svg>
+            <span class="sheen" aria-hidden="true"></span>
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M3 6h8v4a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6Z" fill="#241C00"/>
+              <path d="M11 7h1.2a1.8 1.8 0 0 1 0 3.6H11" stroke="#241C00" stroke-width="1.3"/>
+              <path d="M5.2 4.2c0-.8.8-.8.8-1.6M8 4.2c0-.8.8-.8.8-1.6" stroke="#241C00" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
+            Buy me a coffee
+          </button>
+          <span class="pill-hint">Stars hold at a static 30% opacity, sheen parked off-canvas. Still noticeably "special", zero movement — motion off doesn't mean emphasis off.</span>
+        </div>
+        <p>One rule, everywhere: <code>@media (prefers-reduced-motion: reduce)</code> <b>and</b> the in-app <code>.reduce-motion</code> class produce the identical frozen state, so the setting is testable without changing the OS.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= TIMING TOKENS ================= -->
+  <div class="sec">
+    <div class="sec-label">C · Timing &amp; token contract</div>
+    <h2>Numbers to implement in Phase 4</h2>
+    <table>
+      <thead><tr><th>Token</th><th>Value</th><th>Used for</th><th>Reduced motion</th></tr></thead>
+      <tbody>
+        <tr><td>--wave-drift-a</td><td>2.2–2.6s · linear · infinite</td><td>Primary crest</td><td>hidden</td></tr>
+        <tr><td>--wave-drift-b</td><td>3.4–3.6s · linear reverse</td><td>Secondary crest</td><td>hidden</td></tr>
+        <tr><td>--fill-step</td><td>260–300ms · ease-out</td><td>Fill height per file</td><td>0.01ms (still updates)</td></tr>
+        <tr><td>--slosh</td><td>JS, 0.8s, 18%→32%→18%</td><td>Indeterminate phase</td><td>replaced by "Starting…" label</td></tr>
+        <tr><td>--star-cycle</td><td>4.8s × 5, delays 0–4.1s</td><td>Twinkle</td><td>static 30% opacity</td></tr>
+        <tr><td>--sheen-pass</td><td>6.5s · 16% active</td><td>BMC sheen</td><td>parked off-canvas</td></tr>
+        <tr><td>--tick-step</td><td>steps(n, end)</td><td>Gridline per-file fill (direction B)</td><td>0.01ms</td></tr>
+      </tbody>
+    </table>
+    <div class="note-card" style="margin-top:16px;">
+      <b>Package size.</b> Total added weight of both effects ≈ 4 KB of CSS + ~1.5 KB of inline SVG. No GIF, no Lottie, no font. Per the ground rules GIF was rejected without a size report because: waves need per-frame alpha blending (GIF: 256 colors + banding on gradients), the tank fill must track arbitrary progress values live (GIF is fixed timeline), and reduced-motion fallbacks must be CSS-gated (GIF cannot respond to a media query or a setting).
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ---- Reduce motion toggle (simulates the in-app setting) ----
+  (function () {
+    var toggle = document.getElementById('rm-toggle'), state = document.getElementById('rm-state');
+    var mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    function apply(on, fromSystem) {
+      document.body.classList.toggle('reduce-motion', on);
+      toggle.setAttribute('aria-pressed', String(on));
+      state.textContent = on ? 'Reduced motion ON' : 'Standard motion';
+      state.style.color = on ? 'var(--trying)' : 'var(--text2)';
+      if (fromSystem) toggle.setAttribute('aria-label', 'Toggle reduced motion simulation (system preference detected)');
+    }
+    apply(mq.matches, true);
+    mq.addEventListener && mq.addEventListener('change', function (e) { apply(e.matches, true); });
+    toggle.addEventListener('click', function () {
+      apply(toggle.getAttribute('aria-pressed') !== 'true', false);
+    });
+  })();
+
+  // ---- A1: single pill run ----
+  (function () {
+    var pill = document.getElementById('pill1'), lbl = document.getElementById('pill1-lbl');
+    var busy = false;
+    pill.addEventListener('click', function () {
+      if (busy) return; busy = true;
+      pill.className = 'pill loading'; pill.style.setProperty('--fill', '0%');
+      lbl.textContent = 'Starting…';
+      // indeterminate slosh
+      var t0 = Date.now();
+      var slosh = setInterval(function () {
+        var t = (Date.now() - t0) / 800;
+        pill.style.setProperty('--fill', (25 + Math.sin(t * Math.PI) * 7) + '%');
+      }, 60);
+      setTimeout(function () {
+        clearInterval(slosh);
+        // determinate
+        var n = 0, total = 3;
+        var iv = setInterval(function () {
+          n++;
+          pill.style.setProperty('--fill', (n / total * 100) + '%');
+          lbl.textContent = n < total ? (n + ' of ' + total + ' files') : ('Done — ' + total + ' files');
+          if (n >= total) {
+            clearInterval(iv);
+            pill.className = 'pill done';
+            setTimeout(function () {
+              pill.className = 'pill'; pill.style.setProperty('--fill', '0%');
+              lbl.textContent = 'Download (3 files)'; busy = false;
+            }, 2000);
+          }
+        }, 500);
+      }, 800);
+    });
+  })();
+
+  // ---- A2: primary button ----
+  (function () {
+    var cta = document.getElementById('cta1'), t = document.getElementById('cta1-t'), s = document.getElementById('cta1-s');
+    var busy = false;
+    cta.addEventListener('click', function () {
+      if (busy) return; busy = true;
+      cta.classList.add('loading'); cta.classList.remove('is-success', 'is-error');
+      cta.style.setProperty('--fill', '0%');
+      var n = 0, total = 24;
+      var iv = setInterval(function () {
+        n += 2;
+        if (n >= total) {
+          n = total; clearInterval(iv);
+          cta.classList.remove('loading'); cta.classList.add('is-success');
+          cta.style.setProperty('--fill', '100%');
+          t.textContent = 'Done — 24 files'; s.textContent = '18.4 MB';
+          setTimeout(function () {
+            cta.classList.remove('is-success'); cta.style.setProperty('--fill', '0%');
+            t.textContent = 'Download Classroom'; s.textContent = '24 files'; busy = false;
+          }, 2200);
+        } else {
+          cta.style.setProperty('--fill', (n / total * 100) + '%');
+          t.textContent = 'Downloading…'; s.textContent = n + ' / ' + total;
+        }
+      }, 110);
+    });
+  })();
+
+  // ---- A3: tank ----
+  (function () {
+    var tank = document.getElementById('tank'), cnt = document.getElementById('tank-cnt');
+    var busy = false;
+    tank.addEventListener('click', function () {
+      if (busy) return; busy = true;
+      tank.classList.add('loading'); tank.classList.remove('done');
+      tank.style.setProperty('--fill', '0%');
+      var n = 0, total = 12;
+      var iv = setInterval(function () {
+        n++;
+        tank.style.setProperty('--fill', (n / total * 100) + '%');
+        cnt.textContent = n + ' / ' + total + ' files';
+        if (n >= total) {
+          clearInterval(iv);
+          tank.classList.remove('loading'); tank.classList.add('done');
+          setTimeout(function () {
+            tank.classList.remove('done'); tank.style.setProperty('--fill', '0%');
+            cnt.textContent = '0 / 12 files'; busy = false;
+          }, 2200);
+        }
+      }, 260);
+    });
+  })();
+</script>
+</body>
+</html>

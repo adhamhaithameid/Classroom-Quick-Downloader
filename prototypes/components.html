@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shared Components · CQD 1.8.9</title>
+<style>
+  :root {
+    --bg: #0B0C10;
+    --panel: #14151C;
+    --surface: rgba(255,255,255,.045);
+    --surface2: rgba(255,255,255,.08);
+    --border: rgba(255,255,255,.10);
+    --border2: rgba(255,255,255,.18);
+    --text: #F3F4F8;
+    --text2: #A7ACBD;
+    --text3: #767C90;
+    --accent: #8F7BFF;
+    --accent2: #6E5BFF;
+    --success: #07DA3F;
+    --success-text: #4AE376;
+    --error-text: #FF7A72;
+    --trying: #FFD93D;
+    --comment: #9B00FF;
+    --comment-text: #B983FF;
+    --edited: #007F8D;
+    --edited-text: #00D6EE;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--font);
+    font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased;
+    padding: 48px 24px 96px;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+  a { color: var(--accent); }
+  button { font-family: inherit; cursor: pointer; }
+  button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+  .crumb { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--text3); margin-bottom: 8px; }
+  .crumb a { color: var(--accent); text-decoration: none; }
+  h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.25; }
+  .lede { color: var(--text2); font-size: 15px; margin-top: 8px; max-width: 66ch; }
+  .sec { margin-top: 64px; }
+  .sec-label { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+  .sec h2 { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+  .sec p.desc { font-size: 13px; color: var(--text2); max-width: 74ch; margin-bottom: 20px; }
+  code { font-size: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1px 5px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 860px) { .two-col { grid-template-columns: 1fr; } }
+  .opt {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 16px;
+    padding: 20px;
+  }
+  .opt-tag {
+    display: inline-block; font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--accent); border: 1px solid rgba(143,123,255,.4); border-radius: 999px;
+    padding: 2px 8px; margin-bottom: 12px;
+  }
+  .opt h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .opt p.note { font-size: 12px; color: var(--text2); margin-bottom: 16px; line-height: 1.55; }
+  .impl {
+    margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border);
+    font-size: 11px; color: var(--text3); line-height: 1.6;
+  }
+  .impl b { color: var(--text2); font-weight: 600; }
+
+  /* mini popup-width stage to test components at real width */
+  .stage360 {
+    width: 360px; border-radius: 12px;
+    background: #17181F; border: 1px solid rgba(255,255,255,.12);
+    padding: 16px; color: var(--text); font-size: 13px;
+  }
+
+  /* ============ (a) Engine selector ============ */
+  .p-label { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text3); margin-bottom: 6px; }
+  .seg {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2px;
+    background: rgba(0,0,0,.28); border: 1px solid var(--border);
+    border-radius: 11px; padding: 2px;
+  }
+  .seg button {
+    border: none; background: transparent; color: var(--text2);
+    font-size: 12px; font-weight: 500; padding: 8px 4px; border-radius: 9px;
+    transition: background 200ms var(--ease), color 200ms var(--ease), box-shadow 200ms var(--ease);
+  }
+  .seg button:hover { color: var(--text); }
+  .seg button[aria-pressed="true"] {
+    background: linear-gradient(180deg, rgba(143,123,255,.24), rgba(143,123,255,.16));
+    color: var(--text); font-weight: 600;
+    box-shadow: inset 0 0 0 1px rgba(143,123,255,.45);
+  }
+  .seg .beta { font-size: 10px; vertical-align: super; color: var(--trying); }
+  .engine-copy { margin-top: 8px; font-size: 11px; line-height: 1.5; color: var(--text3); }
+  .engine-copy strong { color: var(--text2); font-weight: 600; }
+
+  /* option 2: radio cards */
+  .radio-cards { display: flex; flex-direction: column; gap: 6px; }
+  .rcard {
+    display: flex; align-items: flex-start; gap: 10px; text-align: left;
+    border: 1px solid var(--border); border-radius: 12px;
+    background: var(--surface); color: var(--text);
+    padding: 10px 12px; width: 100%;
+    transition: border-color 200ms var(--ease), background 200ms var(--ease);
+  }
+  .rcard:hover { border-color: var(--border2); background: var(--surface2); }
+  .rcard .rc-check {
+    flex: 0 0 16px; width: 16px; height: 16px; margin-top: 2px;
+    border-radius: 50%; border: 1.5px solid var(--border2);
+    display: grid; place-items: center;
+    transition: border-color 200ms var(--ease), background 200ms var(--ease);
+  }
+  .rcard .rc-check svg { opacity: 0; transition: opacity 200ms var(--ease); }
+  .rcard .rc-body { flex: 1; min-width: 0; }
+  .rcard .rc-title { font-size: 13px; font-weight: 600; line-height: 1.3; }
+  .rcard .rc-title .beta { font-size: 10px; vertical-align: super; color: var(--trying); font-weight: 600; }
+  .rcard .rc-sub { font-size: 11px; color: var(--text3); line-height: 1.45; margin-top: 1px; }
+  .rcard .rc-copy {
+    margin-top: 8px; font-size: 11px; line-height: 1.5; color: var(--text2);
+    border-left: 2px solid rgba(143,123,255,.5); padding-left: 8px;
+  }
+  .rcard[aria-pressed="true"] {
+    border-color: rgba(143,123,255,.55);
+    background: linear-gradient(180deg, rgba(143,123,255,.13), rgba(143,123,255,.06));
+  }
+  .rcard[aria-pressed="true"] .rc-check { border-color: var(--accent); background: var(--accent); }
+  .rcard[aria-pressed="true"] .rc-check svg { opacity: 1; }
+  .rcard[disabled] { opacity: .45; cursor: not-allowed; }
+
+  /* ============ (b) Flag preview cards ============ */
+  .flag-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+  .fp-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 16px;
+    padding: 20px; overflow: hidden;
+  }
+  .fp-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .fp-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+  .fp-dot.comment { background: var(--comment-text); box-shadow: 0 0 8px rgba(185,131,255,.6); }
+  .fp-dot.edited { background: var(--edited-text); box-shadow: 0 0 8px rgba(0,214,238,.6); }
+  .fp-dot.both { background: linear-gradient(135deg, var(--comment-text), var(--edited-text)); box-shadow: 0 0 8px rgba(120,170,255,.6); }
+  .fp-head h3 { font-size: 14px; font-weight: 600; }
+  .fp-desc { font-size: 12px; color: var(--text2); line-height: 1.5; margin-bottom: 14px; min-height: 36px; }
+  .fp-stage {
+    background: #17181F; border: 1px solid rgba(255,255,255,.12); border-radius: 12px;
+    padding: 12px; position: relative;
+  }
+  .fp-caption { font-size: 10px; color: var(--text3); margin-top: 10px; font-variant-numeric: tabular-nums; }
+
+  /* mini post mockup */
+  .post { position: relative; border-radius: 10px; padding: 10px 12px; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.07); }
+  .post-title { font-size: 12px; font-weight: 600; line-height: 1.3; padding-right: 74px; }
+  .post-meta { font-size: 10px; color: var(--text3); margin-top: 2px; }
+  .post-att { display: flex; gap: 6px; margin-top: 8px; }
+  .att {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10px; font-weight: 500; color: var(--text2);
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.09);
+    border-radius: 6px; padding: 3px 7px;
+  }
+  .att svg { flex: 0 0 auto; }
+
+  /* animated ring (base = after state so reduced-motion shows the result) */
+  .ring {
+    position: absolute; inset: -3px; border-radius: 13px; pointer-events: none;
+    opacity: 1;
+  }
+  .ring.comment { box-shadow: 0 0 0 2px rgba(185,131,255,.75), 0 0 18px rgba(185,131,255,.25); }
+  .ring.edited { box-shadow: 0 0 0 2px rgba(0,214,238,.75), 0 0 18px rgba(0,214,238,.25); }
+  .ring.both {
+    border: 2px solid transparent;
+    background: linear-gradient(#1b1c25, #1b1c25) padding-box,
+                linear-gradient(135deg, var(--comment-text), var(--edited-text)) border-box;
+    border-radius: 12px; inset: -2px;
+    box-shadow: 0 0 18px rgba(120,170,255,.3);
+  }
+  .badge {
+    position: absolute; top: 8px; right: 8px; z-index: 2;
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 9px; font-weight: 600; letter-spacing: .02em;
+    border-radius: 999px; padding: 2px 7px;
+    opacity: 1;
+  }
+  .badge.comment { background: rgba(185,131,255,.16); color: var(--comment-text); border: 1px solid rgba(185,131,255,.4); }
+  .badge.edited { background: rgba(0,214,238,.13); color: var(--edited-text); border: 1px solid rgba(0,214,238,.4); }
+  .badge.both {
+    color: #EAF2FF; border: 1px solid transparent;
+    background:
+      linear-gradient(rgba(35,32,54,.95), rgba(35,32,54,.95)) padding-box,
+      linear-gradient(135deg, var(--comment-text), var(--edited-text)) border-box;
+  }
+  /* before/after loop: starts hidden, appears, holds, resets */
+  .fp-stage.live .ring { animation: ring-cycle 5.2s var(--ease) infinite; }
+  .fp-stage.live .badge { animation: badge-cycle 5.2s var(--ease) infinite; }
+  @keyframes ring-cycle {
+    0% { opacity: 0; } 10% { opacity: 1; } 74% { opacity: 1; } 88% { opacity: 0; } 100% { opacity: 0; }
+  }
+  @keyframes badge-cycle {
+    0% { opacity: 0; transform: scale(.6); }
+    10% { opacity: 1; transform: scale(1.04); }
+    14% { transform: scale(1); }
+    74% { opacity: 1; transform: scale(1); }
+    88% { opacity: 0; transform: scale(.9); }
+    100% { opacity: 0; transform: scale(.6); }
+  }
+
+  /* ============ (c) Download mode ============ */
+  .mode-row {
+    display: flex; align-items: center; gap: 8px;
+    background: #17181F; border: 1px solid rgba(255,255,255,.12); border-radius: 12px;
+    padding: 10px 12px;
+  }
+  .mode-row .r-main { flex: 1; min-width: 0; }
+  .mode-row .r-label { font-size: 13px; font-weight: 600; }
+  .mode-row .r-hint { font-size: 11px; color: var(--text3); line-height: 1.4; margin-top: 1px; }
+  .mini-seg { display: inline-flex; background: rgba(0,0,0,.3); border: 1px solid var(--border); border-radius: 8px; padding: 2px; gap: 2px; }
+  .mini-seg button {
+    border: none; background: transparent; color: var(--text2);
+    font-size: 11px; font-weight: 500; padding: 5px 10px; border-radius: 6px;
+    white-space: nowrap;
+    transition: background 200ms var(--ease), color 200ms var(--ease);
+  }
+  .mini-seg button:hover { color: var(--text); }
+  .mini-seg button[aria-pressed="true"] { background: var(--accent); color: #14121F; font-weight: 600; }
+  .chips { display: flex; gap: 6px; margin-top: 12px; }
+  .file-chip {
+    flex: 1; text-align: center; position: relative; overflow: hidden;
+    font-size: 10px; font-weight: 600; font-variant-numeric: tabular-nums;
+    color: var(--text2);
+    background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1);
+    border-radius: 8px; padding: 8px 4px;
+  }
+  .file-chip .f-fill {
+    position: absolute; inset: auto 0 0 0; height: var(--fill, 0%);
+    background: linear-gradient(180deg, rgba(143,123,255,.35), rgba(110,91,255,.55));
+    transition: height 220ms var(--ease);
+  }
+  .file-chip .f-label { position: relative; z-index: 1; }
+  .file-chip.done { color: var(--success-text); border-color: rgba(7,218,63,.4); }
+  .file-chip.done .f-fill { background: linear-gradient(180deg, rgba(7,218,63,.3), rgba(7,218,63,.5)); }
+  .demo-run {
+    margin-top: 12px; border: none; border-radius: 8px;
+    background: var(--surface2); color: var(--text);
+    font-size: 12px; font-weight: 600; padding: 8px 14px;
+    transition: background 200ms var(--ease);
+  }
+  .demo-run:hover { background: rgba(255,255,255,.12); }
+  .demo-run:disabled { opacity: .5; cursor: default; }
+
+  /* ============ (d) Classroom action labels ============ */
+  .label-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+  .lab-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 20px; position: relative; }
+  .lab-card.reco { border-color: rgba(7,218,63,.45); }
+  .reco-tag {
+    position: absolute; top: -10px; right: 16px;
+    font-size: 10px; font-weight: 600; letter-spacing: .08em;
+    background: var(--success); color: #06210F;
+    border-radius: 999px; padding: 2px 10px;
+  }
+  .lab-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+  .lab-btn {
+    width: 100%; display: flex; align-items: center; gap: 8px;
+    border: 1px solid rgba(143,123,255,.5); border-radius: 12px;
+    background: linear-gradient(180deg, rgba(143,123,255,.22), rgba(110,91,255,.14));
+    color: var(--text); padding: 12px 14px; text-align: left;
+    box-shadow: 0 3px 14px rgba(110,91,255,.18), inset 0 1px 0 rgba(255,255,255,.1);
+    transition: transform 200ms var(--ease), border-color 200ms var(--ease), box-shadow 200ms var(--ease);
+  }
+  .lab-btn:hover { transform: translateY(-1px); border-color: rgba(143,123,255,.85); box-shadow: 0 5px 18px rgba(110,91,255,.28), inset 0 1px 0 rgba(255,255,255,.12); }
+  .lab-btn .lb-title { flex: 1; font-size: 14px; font-weight: 600; line-height: 1.25; }
+  .lab-btn .lb-count { font-size: 11px; font-weight: 500; color: var(--text2); font-variant-numeric: tabular-nums; }
+  .pros { margin: 14px 0 0; padding: 0; list-style: none; }
+  .pros li { font-size: 12px; color: var(--text2); line-height: 1.5; padding: 5px 0 5px 20px; position: relative; border-top: 1px solid var(--border); }
+  .pros li:first-child { border-top: none; }
+  .pros li::before { position: absolute; left: 0; font-weight: 700; font-size: 11px; }
+  .pros li.pro::before { content: "+"; color: var(--success-text); }
+  .pros li.con::before { content: "−"; color: var(--error-text); }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+    /* flag previews freeze on their AFTER state — the flagged post — so the design intent still reads */
+    .fp-stage.live .ring, .fp-stage.live .badge { animation: none; }
+    .lab-btn:hover { transform: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="crumb"><a href="index.html">← All prototypes</a> · Components</div>
+  <h1>Shared components — production fidelity</h1>
+  <p class="lede">Direction-agnostic specs at real 360px popup width. Everything interactive is a real control; every loop freezes to a meaningful static state under <code>prefers-reduced-motion</code>.</p>
+
+  <!-- ================= A. ENGINE SELECTOR ================= -->
+  <div class="sec">
+    <div class="sec-label">A · Engine selector — two layout options</div>
+    <h2>Legacy / New / API (beta), New pre-selected</h2>
+    <p class="desc">The trust copy is fixed and must render verbatim: <code>“New runs the rewritten engine. Switch back to Legacy any time — one click rolls everything back.”</code> Both options keep it permanently visible (never behind a tooltip). New is pre-selected as the intended 1.8.9 default, which also resolves the fresh-install label quirk (popup default must read <code>readMode()</code> / <code>DEFAULT_MODE='v2'</code>, not the <code>'legacy'</code> literal at App.tsx:755).</p>
+    <div class="two-col">
+      <div class="opt">
+        <span class="opt-tag">Option 1 · Segmented + caption</span>
+        <h3>Compact, one-line trust copy</h3>
+        <p class="note">Best for both popup directions. Lowest vertical cost (≈64px), engine switching is one click, the caption reads as a permanent footnote under the control.</p>
+        <div class="stage360">
+          <div class="p-label">Engine</div>
+          <div class="seg" role="group" aria-label="Engine selector, option 1">
+            <button type="button" aria-pressed="false">Legacy</button>
+            <button type="button" aria-pressed="true">New</button>
+            <button type="button" aria-pressed="false">API <span class="beta">β</span></button>
+          </div>
+          <p class="engine-copy"><strong>New</strong> runs the rewritten engine. Switch back to Legacy any time — one click rolls everything back.</p>
+        </div>
+        <div class="impl"><b>Specs:</b> 3 equal segments · selected = violet tint + inset ring · caption 11px/400, two lines max · ARIA: <code>role="group"</code> + <code>aria-pressed</code> (radio semantics also acceptable) · keyboard: ← → moves selection.</div>
+      </div>
+      <div class="opt">
+        <span class="opt-tag">Option 2 · Radio cards</span>
+        <h3>Descriptive, self-explaining</h3>
+        <p class="note">Best for Options page or a first-run moment. Each engine gets a one-line descriptor; the trust copy lives inside the New card. API (beta) is disabled with a reason when identity is not configured (mirrors the popup gate at App.tsx:1802–1812).</p>
+        <div class="stage360">
+          <div class="p-label">Engine</div>
+          <div class="radio-cards" role="group" aria-label="Engine selector, option 2">
+            <button type="button" class="rcard" aria-pressed="false">
+              <span class="rc-check" aria-hidden="true"><svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="m1.5 5.5 2.4 2.4L8.5 2.4" stroke="#14121F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+              <span class="rc-body">
+                <span class="rc-title">Legacy</span>
+                <span class="rc-sub" style="display:block;">The original engine. Familiar, unchanged.</span>
+              </span>
+            </button>
+            <button type="button" class="rcard" aria-pressed="true">
+              <span class="rc-check" aria-hidden="true"><svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="m1.5 5.5 2.4 2.4L8.5 2.4" stroke="#14121F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+              <span class="rc-body">
+                <span class="rc-title">New</span>
+                <span class="rc-sub" style="display:block;">The rewritten engine. Faster scans, better button placement.</span>
+                <span class="rc-copy" style="display:block;">New runs the rewritten engine. Switch back to Legacy any time — one click rolls everything back.</span>
+              </span>
+            </button>
+            <button type="button" class="rcard" aria-pressed="false" disabled>
+              <span class="rc-check" aria-hidden="true"><svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="m1.5 5.5 2.4 2.4L8.5 2.4" stroke="#14121F" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+              <span class="rc-body">
+                <span class="rc-title">API <span class="beta">β</span></span>
+                <span class="rc-sub" style="display:block;">Whole-classroom downloads via the Classroom API. Requires sign-in.</span>
+              </span>
+            </button>
+          </div>
+        </div>
+        <div class="impl"><b>Specs:</b> full-width rows · selected = tinted card + filled check · disabled API row at 45% opacity with reason in its subtitle · trust copy bound to the New card so it travels with the choice.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= B. FLAG PREVIEW CARDS ================= -->
+  <div class="sec">
+    <div class="sec-label">B · Flag selection — animated preview cards</div>
+    <h2>Comment · Edited · Both (new in the popup)</h2>
+    <p class="desc">Each card runs a mini before/after loop on a mock Classroom post: the post starts plain, then the flag treatment appears — colored ring on the post card (the bug 2.4 fix: rounded border on the changed post, not the whole classroom) plus a badge. The loop is pure CSS; base styles equal the <b>after</b> state, so under reduced motion the card simply shows the flagged result. Today "Both" only exists in Options (OptionsApp.tsx:48–51) — this unifies all three in the popup.</p>
+    <div class="flag-grid">
+
+      <div class="fp-card">
+        <div class="fp-head"><span class="fp-dot comment" aria-hidden="true"></span><h3>Comment</h3></div>
+        <p class="fp-desc">Marks posts where the teacher left a comment. Purple, the loudest of the two single flags.</p>
+        <div class="fp-stage live" aria-label="Animated preview: post gets a purple ring and a 3 comments badge">
+          <div class="post">
+            <span class="ring comment" aria-hidden="true"></span>
+            <span class="badge comment" aria-hidden="true">
+              <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M1.5 2.2A1.2 1.2 0 0 1 2.7 1h4.6a1.2 1.2 0 0 1 1.2 1.2v3.2a1.2 1.2 0 0 1-1.2 1.2H4.2L2 8.6V2.2Z" fill="currentColor"/></svg>
+              3 comments
+            </span>
+            <div class="post-title">Cell structures — homework</div>
+            <div class="post-meta">Posted yesterday · Due Friday</div>
+            <div class="post-att">
+              <span class="att"><svg width="9" height="9" viewBox="0 0 10 10" fill="none"><rect x="1" y="1" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M3 5h4M3 7h2.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>slides.pdf</span>
+              <span class="att"><svg width="9" height="9" viewBox="0 0 10 10" fill="none"><rect x="1" y="1" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M3 5h4M3 7h2.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>notes.docx</span>
+            </div>
+          </div>
+        </div>
+        <div class="fp-caption">Ring 2px #B983FF @ 75% + soft glow · badge top-right · cycle 5.2s</div>
+      </div>
+
+      <div class="fp-card">
+        <div class="fp-head"><span class="fp-dot edited" aria-hidden="true"></span><h3>Edited</h3></div>
+        <p class="fp-desc">Marks posts whose attachments changed after you last saw them. Cyan reads as "diff", not "danger".</p>
+        <div class="fp-stage live" aria-label="Animated preview: post gets a cyan ring and an edited badge">
+          <div class="post">
+            <span class="ring edited" aria-hidden="true"></span>
+            <span class="badge edited" aria-hidden="true">
+              <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M7.1 1.3l1.6 1.6-4.6 4.6-2 .4.4-2 4.6-4.6Z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>
+              Edited today
+            </span>
+            <div class="post-title">Lab report — template v2</div>
+            <div class="post-meta">Edited 2h ago · 1 file replaced</div>
+            <div class="post-att">
+              <span class="att"><svg width="9" height="9" viewBox="0 0 10 10" fill="none"><rect x="1" y="1" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M3 5h4M3 7h2.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>template-v2.docx</span>
+              <span class="att" style="opacity:.4; text-decoration: line-through;">v1.docx</span>
+            </div>
+          </div>
+        </div>
+        <div class="fp-caption">Ring 2px #00D6EE @ 75% · replaced file shown struck-through · cycle 5.2s</div>
+      </div>
+
+      <div class="fp-card">
+        <div class="fp-head"><span class="fp-dot both" aria-hidden="true"></span><h3>Both — new</h3></div>
+        <p class="fp-desc">Comment + edited on one post. The gradient (purple→cyan) means "both" and deliberately breaks with today's red #FF4036, which collides with the error color.</p>
+        <div class="fp-stage live" aria-label="Animated preview: post gets a purple-to-cyan gradient ring and a combined badge">
+          <div class="post">
+            <span class="ring both" aria-hidden="true"></span>
+            <span class="badge both" aria-hidden="true">
+              <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M1.5 2.2A1.2 1.2 0 0 1 2.7 1h4.6a1.2 1.2 0 0 1 1.2 1.2v3.2a1.2 1.2 0 0 1-1.2 1.2H4.2L2 8.6V2.2Z" fill="currentColor"/></svg>
+              2 comments · edited
+            </span>
+            <div class="post-title">Field trip — permission form</div>
+            <div class="post-meta">Commented today · edited 1h ago</div>
+            <div class="post-att">
+              <span class="att"><svg width="9" height="9" viewBox="0 0 10 10" fill="none"><rect x="1" y="1" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M3 5h4M3 7h2.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>form.pdf</span>
+            </div>
+          </div>
+        </div>
+        <div class="fp-caption">Gradient border (padding-box/border-box trick) · combined badge · cycle 5.2s</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ================= C. DOWNLOAD MODE ================= -->
+  <div class="sec">
+    <div class="sec-label">C · Download mode — Sequential vs Parallel</div>
+    <h2>A setting row, parallel by default, "3 at a time"</h2>
+    <p class="desc">The capability already exists: <code>QUEUE_CONCURRENCY = 3</code> (entrypoints/background/queue.ts:19, applied at :65) driven by <code>selectNext(snap, cap)</code>. Exposing it needs one flat key (<code>downloadConcurrency</code>, 1 = sequential, 3 = parallel — store.ts flat-key constraint) plus this row. Parallel is the default because it is today's behavior and the fastest for multi-file posts.</p>
+    <div class="two-col">
+      <div class="opt">
+        <span class="opt-tag">The row · 360px</span>
+        <h3>Segmented, self-labeling</h3>
+        <p class="note">The values carry their meaning in the labels — "1 at a time" / "3 at a time" — so no jargon like "concurrency" ever reaches the user.</p>
+        <div class="stage360">
+          <div class="mode-row">
+            <span class="r-main">
+              <span class="r-label" style="display:block;">Download mode</span>
+              <span class="r-hint" style="display:block;">Parallel is faster for big posts. Switch any time.</span>
+            </span>
+            <span class="mini-seg" role="group" aria-label="Download mode">
+              <button type="button" id="mode-seq" aria-pressed="false">Sequential · 1</button>
+              <button type="button" id="mode-par" aria-pressed="true">Parallel · 3</button>
+            </span>
+          </div>
+          <div class="chips" aria-hidden="true">
+            <span class="file-chip" id="c1"><span class="f-fill"></span><span class="f-label">1</span></span>
+            <span class="file-chip" id="c2"><span class="f-fill"></span><span class="f-label">2</span></span>
+            <span class="file-chip" id="c3"><span class="f-fill"></span><span class="f-label">3</span></span>
+            <span class="file-chip" id="c4"><span class="f-fill"></span><span class="f-label">4</span></span>
+          </div>
+          <button type="button" class="demo-run" id="run-demo">Run demo on 4 files</button>
+        </div>
+        <div class="impl"><b>Specs:</b> parallel pre-selected · switching mid-download is safe (queue re-reads cap at admission) · chips demo shows the real difference: parallel fills 3 at once, sequential fills one-by-one in order.</div>
+      </div>
+      <div class="opt">
+        <span class="opt-tag">Behavior contract</span>
+        <h3>What each mode promises</h3>
+        <p class="note" style="margin-bottom:8px;"><b style="color:var(--text);">Parallel · 3 at a time (default)</b> — three files download simultaneously; large posts finish roughly 3× sooner; per-file progress still reports individually.</p>
+        <p class="note" style="margin-bottom:8px;"><b style="color:var(--text);">Sequential · 1 at a time</b> — one file at a time, strictly in post order; gentler on weak networks and school machines; total time is longer.</p>
+        <p class="note"><b style="color:var(--text);">Cancel</b> works identically in both: stops admitting new files, in-flight files finish, partial batch is kept and labeled "Canceled at N / M".</p>
+        <div class="impl"><b>Flat key:</b> <code>downloadConcurrency: 1 | 3</code> in <code>src/ui/settings/store.ts</code> · read in background at admission time · no migration needed (absent = 3, today's behavior).</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= D. CLASSROOM ACTION LABEL ================= -->
+  <div class="sec">
+    <div class="sec-label">D · Classroom-wide action — three candidate labels (task 2.7)</div>
+    <h2>"Download All" is retired — pick a replacement at the Stop Gate</h2>
+    <p class="desc">The classroom-level button (v3 only today) must not be called "Download All" — that name is taken by the post-level action and undercounts what this one does. The three candidates below are the same button with different labels; my recommendation is the first. Rename later must be a one-line constant change.</p>
+    <div class="label-grid">
+      <div class="lab-card reco">
+        <span class="reco-tag">RECOMMENDED</span>
+        <h3>Candidate 1</h3>
+        <button type="button" class="lab-btn">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 2v8m0 0 3-3m-3 3L5 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 12.5h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <span class="lb-title">Download Classroom</span>
+          <span class="lb-count">24 files</span>
+        </button>
+        <ul class="pros">
+          <li class="pro">Names the object exactly — everything in this classroom. Shortest label; fits with a count badge at 360px even on 2-line locales.</li>
+          <li class="pro">Unambiguous next to the post-level "Download All (N files)" — no shared word, no confusion.</li>
+          <li class="con">Slightly less explicit that it only covers posted materials (not announcements/grades) — the sub-line covers that.</li>
+        </ul>
+      </div>
+      <div class="lab-card">
+        <span class="reco-tag" style="background:var(--surface2); color:var(--text2); border:1px solid var(--border);">CANDIDATE</span>
+        <h3>Candidate 2</h3>
+        <button type="button" class="lab-btn">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 2v8m0 0 3-3m-3 3L5 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 12.5h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <span class="lb-title">Download All Materials</span>
+          <span class="lb-count">24 files</span>
+        </button>
+        <ul class="pros">
+          <li class="pro">Most descriptive of the payload — "materials" is Classroom's own vocabulary.</li>
+          <li class="pro">Sets correct expectations: materials only, nothing else.</li>
+          <li class="con">21 characters; truncates with the badge on narrow locales and still contains "All", echoing the name we are retiring.</li>
+        </ul>
+      </div>
+      <div class="lab-card">
+        <span class="reco-tag" style="background:var(--surface2); color:var(--text2); border:1px solid var(--border);">CANDIDATE</span>
+        <h3>Candidate 3</h3>
+        <button type="button" class="lab-btn">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 2v8m0 0 3-3m-3 3L5 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 12.5h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <span class="lb-title">Download Everything</span>
+          <span class="lb-count">24 files</span>
+        </button>
+        <ul class="pros">
+          <li class="pro">Energetic and short; reads instantly as "the big one".</li>
+          <li class="pro">Zero overlap with the post-level action.</li>
+          <li class="con">Overclaims — users may expect announcements, grades, or other classes. Risky for trust and for support tickets.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Engine option 1 segments
+  (function () {
+    var seg = document.querySelector('.seg');
+    if (!seg) return;
+    seg.querySelectorAll('button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        seg.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', 'false'); });
+        b.setAttribute('aria-pressed', 'true');
+      });
+    });
+  })();
+  // Engine option 2 radio cards
+  (function () {
+    var group = document.querySelector('.radio-cards');
+    if (!group) return;
+    group.querySelectorAll('.rcard:not([disabled])').forEach(function (b) {
+      b.addEventListener('click', function () {
+        group.querySelectorAll('.rcard').forEach(function (x) { x.setAttribute('aria-pressed', 'false'); });
+        b.setAttribute('aria-pressed', 'true');
+      });
+    });
+  })();
+  // Download mode demo
+  (function () {
+    var seqBtn = document.getElementById('mode-seq'), parBtn = document.getElementById('mode-par');
+    var runBtn = document.getElementById('run-demo');
+    var chips = ['c1', 'c2', 'c3', 'c4'].map(function (id) { return document.getElementById(id); });
+    var parallel = true, running = false, timers = [];
+    function setMode(isParallel) {
+      parallel = isParallel;
+      seqBtn.setAttribute('aria-pressed', String(!isParallel));
+      parBtn.setAttribute('aria-pressed', String(isParallel));
+    }
+    seqBtn.addEventListener('click', function () { setMode(false); });
+    parBtn.addEventListener('click', function () { setMode(true); });
+    function reset() {
+      timers.forEach(clearInterval); timers = [];
+      chips.forEach(function (c) {
+        c.classList.remove('done');
+        c.style.setProperty('--fill', '0%');
+      });
+    }
+    runBtn.addEventListener('click', function () {
+      if (running) return;
+      reset(); running = true; runBtn.disabled = true;
+      function finishChip(c) { c.classList.add('done'); }
+      if (parallel) {
+        chips.forEach(function (c, i) {
+          if (i === 3) { // 4th starts when 1st finishes (cap 3)
+            timers.push(setTimeout(function () { animate(c); }, 1300));
+          } else { animate(c); }
+        });
+      } else {
+        chips.forEach(function (c, i) {
+          timers.push(setTimeout(function () { animate(c); }, i * 1300));
+        });
+      }
+      function animate(c) {
+        var p = 0;
+        var iv = setInterval(function () {
+          p += 10;
+          if (p >= 100) { clearInterval(iv); finishChip(c); checkDone(); }
+          else c.style.setProperty('--fill', p + '%');
+        }, 120);
+        timers.push(iv);
+      }
+      function checkDone() {
+        if (chips.every(function (c) { return c.classList.contains('done'); })) {
+          running = false; runBtn.disabled = false;
+          timers.push(setTimeout(reset, 1400));
+        }
+      }
+    });
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Classroom Quick Downloader — 1.8.9 Design Prototypes</title>
+<style>
+  :root {
+    --bg: #0B0C10;
+    --panel: #14151C;
+    --surface: rgba(255,255,255,.045);
+    --surface2: rgba(255,255,255,.08);
+    --border: rgba(255,255,255,.10);
+    --border2: rgba(255,255,255,.18);
+    --text: #F3F4F8;
+    --text2: #A7ACBD;
+    --text3: #767C90;
+    --accent: #8F7BFF;
+    --success: #07DA3F;
+    --error-text: #FF7A72;
+    --trying: #FFD93D;
+    --bmc: #FFDD00;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 48px 24px 96px; }
+  .kicker {
+    font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 8px;
+  }
+  h1 { font-size: 20px; font-weight: 600; line-height: 1.25; letter-spacing: -0.01em; }
+  .lede { color: var(--text2); font-size: 15px; margin-top: 8px; max-width: 60ch; }
+  .meta-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+  .chip {
+    font-size: 11px; font-weight: 500; color: var(--text2);
+    border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px;
+    background: var(--surface);
+  }
+  .grid { margin-top: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid-wide { grid-template-columns: 1fr; }
+  @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+  a.card {
+    display: block; text-decoration: none; color: inherit;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 16px;
+    padding: 20px; transition: border-color 160ms ease, transform 160ms ease, background 160ms ease;
+    position: relative;
+  }
+  a.card:hover { border-color: var(--border2); background: var(--surface2); transform: translateY(-2px); }
+  a.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .card .num {
+    font-size: 11px; font-weight: 600; letter-spacing: .1em; color: var(--text3);
+    text-transform: uppercase; margin-bottom: 8px;
+  }
+  .card h2 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+  .card p { font-size: 12px; color: var(--text2); line-height: 1.5; }
+  .card .go {
+    margin-top: 12px; font-size: 12px; font-weight: 600; color: var(--accent);
+  }
+  footer {
+    margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--border);
+    font-size: 11px; color: var(--text3); line-height: 1.6;
+  }
+  .note {
+    margin-top: 32px; background: var(--panel); border: 1px solid var(--border);
+    border-left: 3px solid var(--trying); border-radius: 12px; padding: 16px;
+    font-size: 12px; color: var(--text2); line-height: 1.6;
+  }
+  .note strong { color: var(--text); font-weight: 600; }
+  .card.card-start {
+    grid-column: 1 / -1;
+    border-color: rgba(143,123,255,.55);
+    background: linear-gradient(180deg, rgba(143,123,255,.12), rgba(20,21,28,.5));
+  }
+  .card.card-start:hover { border-color: rgba(143,123,255,.85); }
+  .card.card-start .num { color: var(--accent); }
+  .card.card-fresh { border-color: rgba(143,123,255,.4); }
+  .card.card-fresh:hover { border-color: rgba(143,123,255,.7); }
+  .card.card-fresh .num { color: var(--accent); }
+  .card .verdict { margin-top: 8px; font-size: 11px; font-weight: 600; color: var(--trying); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="kicker">Phase 3 · Audit + Prototypes · Branch prototypes/1.8.9</div>
+  <h1>Classroom Quick Downloader — UI Redesign Prototypes</h1>
+  <p class="lede">Two full popup directions plus shared components, motion studies, and trust surfaces. Every file is self-contained (inline CSS/JS, system fonts), opens standalone, and respects <code>prefers-reduced-motion</code>. No production code was touched.</p>
+  <div class="meta-row">
+    <span class="chip">360 × 600 popup frame</span>
+    <span class="chip">4 / 8px spacing scale</span>
+    <span class="chip">Type scale 11 · 12 · 13 · 15 · 17</span>
+    <span class="chip">CSS + SVG only, no GIF</span>
+  </div>
+
+  <div class="grid">
+    <a class="card card-start" href="decide.html">
+      <div class="num">Start here — make your picks</div>
+      <h2>Decision center — Phase 3/4 ballot</h2>
+      <p>Both directions side by side on one shared state switcher (idle / loading / success / error / history), every Phase-4 component as an A/B face-off with a pick control, the three classroom-action names rendered in context, and the six legal surfaces with per-item approval. Choices collect into a copy-ready ballot and persist on this device.</p>
+      <div class="go">Open the decision center →</div>
+    </a>
+    <a class="card" href="popup-direction-a.html">
+      <div class="num">Direction A</div>
+      <h2>Stillwater — Calm Glass</h2>
+      <p>Relaxed hierarchy, generous spacing, layered translucent glass, soft 240–360ms eases. The popup feels like still water: one primary action, everything else recedes.</p>
+      <div class="go">Open direction A →</div>
+    </a>
+    <a class="card" href="popup-direction-b.html">
+      <div class="num">Direction B</div>
+      <h2>Gridline — Compact Utility</h2>
+      <p>Dense, glanceable, instrument-panel feel: tabular numbers, status dots, 90–200ms snappy motion. Built for users who run batches daily and read the popup like a dashboard.</p>
+      <div class="go">Open direction B →</div>
+    </a>
+    <a class="card" href="components.html">
+      <div class="num">Shared components</div>
+      <h2>Engine selector, flag preview cards, download mode, classroom action</h2>
+      <p>Production-fidelity specs: engine selector with the exact rollback copy (New pre-selected), animated Comment / Edited / Both preview cards, Sequential vs Parallel row ("3 at a time"), and the three classroom-wide button labels side by side.</p>
+      <div class="go">Open components →</div>
+    </a>
+    <a class="card" href="effects.html">
+      <div class="num">Motion studies</div>
+      <h2>Water-fill loading, star shimmer, reduced-motion control</h2>
+      <p>Water-fill loading for pills and buttons (single + N-of-M multi-file), star shimmer over the Buy-Me-a-Coffee button, and a working "Reduce motion" toggle mirroring the planned in-app setting.</p>
+      <div class="go">Open effects →</div>
+    </a>
+    <a class="card" href="legal.html">
+      <div class="num">Trust surfaces</div>
+      <h2>Legal &amp; policy prototypes</h2>
+      <p>Privacy disclosure row, permissions explainer, "Not affiliated with Google" notice, API-beta risk warning, and the copyright reminder — each labeled REQUIRED vs RECOMMENDED per Chrome Web Store policy.</p>
+      <p class="verdict">1/6 approved 2026-10-04; 5 surfaces in round 2 ↓</p>
+      <div class="go">Open legal surfaces →</div>
+    </a>
+    <a class="card card-fresh" href="legal-round2.html">
+      <div class="num">Trust surfaces · Round 2</div>
+      <h2>Legal round 2 — five surfaces, two treatments each</h2>
+      <p>The five surfaces that went back for redesign, rebuilt in the winning Stillwater language. Each surface gets two genuinely different treatments (placement, verbosity, tone differ — not wording swaps), rendered at 360px popup width or in an Options context, with a per-surface ballot and a copy-ready "LEGAL ROUND 2 BALLOT" block.</p>
+      <div class="go">Open legal round 2 →</div>
+    </a>
+    <a class="card" href="AUDIT.md">
+      <div class="num">Document</div>
+      <h2>AUDIT.md — findings, decisions, names, policy</h2>
+      <p>The review document: audit findings (starting from the 5 typography issues), design decisions per direction, the 3 name proposals with recommendation, policy notes, citations, and open questions for the owner.</p>
+      <div class="go">Open audit →</div>
+    </a>
+  </div>
+
+  <div class="note">
+    <strong>How to review:</strong> start at <a href="decide.html">decide.html</a> — it puts both directions on the same state switcher and collects every pick into a copy-ready ballot. The pages below are the underlying studies; open them for full-width detail, then record your calls in the decision center. The classroom action name needs your pick at the Stop Gate (task 2.7). Nothing here ships; all files live under <code>/prototypes</code>.
+  </div>
+
+  <footer>
+    Classroom Quick Downloader · design prototypes for 1.8.9 · committed on branch prototypes/1.8.9 · not for distribution.
+  </footer>
+</div>
+</body>
+</html>

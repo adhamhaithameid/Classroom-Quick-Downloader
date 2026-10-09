@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Legal &amp; Trust Surfaces · CQD 1.8.9</title>
+<style>
+  :root {
+    --bg: #0B0C10;
+    --panel: #14151C;
+    --surface: rgba(255,255,255,.045);
+    --surface2: rgba(255,255,255,.08);
+    --border: rgba(255,255,255,.10);
+    --border2: rgba(255,255,255,.18);
+    --text: #F3F4F8;
+    --text2: #A7ACBD;
+    --text3: #767C90;
+    --accent: #8F7BFF;
+    --success: #07DA3F;
+    --trying: #FFD93D;
+    --error-text: #FF7A72;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--font);
+    font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased;
+    padding: 48px 24px 96px;
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; }
+  a { color: var(--accent); }
+  button { font-family: inherit; cursor: pointer; }
+  button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+  .crumb { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--text3); margin-bottom: 8px; }
+  .crumb a { color: var(--accent); text-decoration: none; }
+  h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.25; }
+  .lede { color: var(--text2); font-size: 15px; margin-top: 8px; max-width: 70ch; }
+  .sec { margin-top: 64px; }
+  .sec-label { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+  .sec h2 { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+  .sec p.desc { font-size: 13px; color: var(--text2); max-width: 76ch; margin-bottom: 20px; }
+  code { font-size: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1px 5px; }
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 860px) { .duo { grid-template-columns: 1fr; } }
+
+  /* requirement labels */
+  .req {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 10px; font-weight: 700; letter-spacing: .08em;
+    border-radius: 999px; padding: 3px 10px; margin-bottom: 12px;
+  }
+  .req.required { background: rgba(255,64,54,.14); color: var(--error-text); border: 1px solid rgba(255,64,54,.4); }
+  .req.recommended { background: rgba(143,123,255,.13); color: #B4A6FF; border: 1px solid rgba(143,123,255,.4); }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 20px;
+  }
+  .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .card p.why { font-size: 12px; color: var(--text2); line-height: 1.55; margin-bottom: 16px; }
+  .card p.why b { color: var(--text); }
+  .policy-note {
+    margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border);
+    font-size: 11px; color: var(--text3); line-height: 1.6;
+  }
+  .policy-note b { color: var(--text2); }
+
+  /* mini popup width stage */
+  .stage360 {
+    width: 360px; max-width: 100%; border-radius: 12px;
+    background: #17181F; border: 1px solid rgba(255,255,255,.12);
+    color: var(--text); font-size: 13px; overflow: hidden;
+  }
+  .stage-title { font-size: 10px; color: var(--text3); letter-spacing: .08em; text-transform: uppercase; padding: 8px 14px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,.2); }
+
+  /* 1. privacy row in popup footer */
+  .p-foot {
+    display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+  }
+  .p-foot .priv {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 500; color: var(--text2);
+    border: 1px solid var(--border); background: var(--surface);
+    border-radius: 999px; padding: 5px 11px;
+    transition: border-color 200ms var(--ease), color 200ms var(--ease);
+  }
+  .p-foot .priv:hover { border-color: var(--border2); color: var(--text); }
+  .p-foot .affil { margin-left: auto; font-size: 10px; color: var(--text3); }
+  /* expanded privacy panel (click demo) */
+  .priv-panel { padding: 14px; border-top: 1px solid var(--border); background: rgba(0,0,0,.18); display: none; }
+  .priv-panel.open { display: block; }
+  .priv-panel h4 { font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+  .priv-panel p { font-size: 11px; color: var(--text2); line-height: 1.55; margin-bottom: 8px; }
+  .priv-panel ul { margin: 0 0 8px 16px; }
+  .priv-panel li { font-size: 11px; color: var(--text2); line-height: 1.6; }
+  .priv-panel a { font-size: 11px; }
+
+  /* 2. permissions explainer rows */
+  .perm-row { display: flex; gap: 10px; padding: 12px 14px; border-top: 1px solid var(--border); }
+  .perm-row:first-of-type { border-top: none; }
+  .perm-ic {
+    flex: 0 0 30px; width: 30px; height: 30px; border-radius: 9px;
+    background: var(--surface2); display: grid; place-items: center; color: var(--accent);
+  }
+  .perm-txt b { display: block; font-size: 12px; font-weight: 600; }
+  .perm-txt span { display: block; font-size: 11px; color: var(--text2); line-height: 1.5; margin-top: 1px; }
+  .perm-txt em { font-style: normal; font-size: 10px; color: var(--text3); display: block; margin-top: 3px; }
+
+  /* 3. not affiliated footer (inside popup footer) */
+  .affil-row { padding: 8px 14px 12px; border-top: 1px solid var(--border); font-size: 10px; color: var(--text3); line-height: 1.5; }
+  .affil-row b { color: var(--text2); font-weight: 600; }
+
+  /* 4. API beta warning */
+  .warn {
+    margin: 14px; border: 1px solid rgba(255,217,61,.4); border-radius: 12px;
+    background: rgba(255,217,61,.07); padding: 12px 14px;
+    display: flex; gap: 10px;
+  }
+  .warn-ic { flex: 0 0 auto; color: var(--trying); margin-top: 1px; }
+  .warn-txt b { display: block; font-size: 12px; font-weight: 600; color: var(--trying); }
+  .warn-txt p { font-size: 11px; color: var(--text2); line-height: 1.55; margin-top: 2px; }
+
+  /* 5. copyright reminder dialog */
+  .dlg-scrim { margin: 14px; border-radius: 12px; background: rgba(0,0,0,.35); padding: 22px 14px; display: grid; place-items: center; }
+  .dlg {
+    width: 100%; max-width: 300px; border-radius: 14px;
+    background: #1D1E28; border: 1px solid var(--border2);
+    padding: 16px; box-shadow: 0 12px 40px rgba(0,0,0,.5);
+  }
+  .dlg h4 { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .dlg p { font-size: 11px; color: var(--text2); line-height: 1.55; margin-bottom: 10px; }
+  .dlg label { display: flex; gap: 8px; align-items: flex-start; font-size: 11px; color: var(--text2); line-height: 1.5; margin-bottom: 12px; cursor: pointer; }
+  .dlg input { margin-top: 2px; accent-color: var(--accent); }
+  .dlg .dlg-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .dlg .btn {
+    border: none; border-radius: 8px; font-size: 11px; font-weight: 600; padding: 7px 12px;
+  }
+  .dlg .btn-ghost { background: var(--surface2); color: var(--text2); }
+  .dlg .btn-ghost:hover { background: rgba(255,255,255,.12); }
+  .dlg .btn-primary { background: var(--accent); color: #14121F; }
+  .dlg .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* 6. limited use statement (options page style) */
+  .opt-block { margin: 14px; border: 1px solid var(--border); border-radius: 12px; padding: 14px; background: var(--surface); }
+  .opt-block h4 { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+  .opt-block p { font-size: 11px; color: var(--text2); line-height: 1.55; }
+  .opt-block .lu {
+    margin-top: 10px; font-size: 10.5px; color: var(--text3); line-height: 1.55;
+    border-left: 2px solid rgba(143,123,255,.5); padding-left: 10px;
+  }
+
+  .summary-table { width: 100%; border-collapse: collapse; font-size: 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .summary-table th, .summary-table td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .summary-table th { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text3); background: rgba(0,0,0,.2); }
+  .summary-table td { color: var(--text2); line-height: 1.5; }
+  .summary-table td:first-child { color: var(--text); font-weight: 500; white-space: nowrap; }
+  .summary-table tr:last-child td { border-bottom: none; }
+  .pill-r { font-size: 9px; font-weight: 700; letter-spacing: .06em; border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+  .pill-r.req { background: rgba(255,64,54,.14); color: var(--error-text); border: 1px solid rgba(255,64,54,.4); }
+  .pill-r.rec { background: rgba(143,123,255,.13); color: #B4A6FF; border: 1px solid rgba(143,123,255,.4); }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { transition-duration: 0.01ms !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="crumb"><a href="index.html">← All prototypes</a> · Legal &amp; trust surfaces</div>
+  <h1>Legal &amp; trust surfaces</h1>
+  <p class="lede">What users must see to keep the extension compliant and trusted: privacy disclosure, permission explanations, the "Not affiliated with Google" notice, the API-beta risk warning, and a copyright reminder for downloaded materials. Each is rendered as it would ship, labeled <b>REQUIRED</b> (store policy demands it) or <b>RECOMMENDED</b> (not demanded, but protects users and the listing). Full mapping in the summary table below.</p>
+
+  <!-- ================= 1. PRIVACY ROW ================= -->
+  <div class="sec" id="surface-privacy">
+    <div class="sec-label">01 · Privacy / data-use disclosure</div>
+    <h2>A footer row in the popup, expanding in place</h2>
+    <p class="desc">Store level: the privacy policy itself is <b>REQUIRED</b> (dashboard + listing) and data practices must be "prominently disclosed" with affirmative consent before install. In-product, the popup gets a one-tap summary row — users should never leave the popup to learn where their files go. Click the row to expand it.</p>
+    <div class="duo">
+      <div class="card">
+        <span class="req required">REQUIRED · store + dashboard</span>
+        <h3>In-product summary row</h3>
+        <p class="why"><b>Why:</b> the store listing can carry the full policy, but the moment of truth is in the popup. The summary states the three facts users care about: what is read, what is stored, what leaves the machine.</p>
+        <div class="stage360">
+          <div class="stage-title">Popup · footer</div>
+          <div class="p-foot">
+            <button type="button" class="priv" id="priv-toggle" aria-expanded="false" aria-controls="priv-panel">
+              <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 1v3.4M4.2 10.8 3 8.4 1.8 5.6 3 4.4h6l1.2 1.2L9 8.4l-1.2 2.4" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+              Privacy &amp; data
+            </button>
+            <span class="affil">v1.8.9</span>
+          </div>
+          <div class="priv-panel" id="priv-panel">
+            <h4>Where your files and data go</h4>
+            <p>Classroom Quick Downloader reads the page you are on and downloads its attachments to your computer.</p>
+            <ul>
+              <li>Reads: the Classroom pages you open, to find posts and attachments.</li>
+              <li>Stores: your settings on this device. No account, no analytics.</li>
+              <li>Sends: nothing to the developer. Downloads go from Google to you, directly.</li>
+            </ul>
+            <a href="#" aria-label="Open the full privacy policy">Full privacy policy ↗</a>
+          </div>
+        </div>
+        <div class="policy-note"><b>Placement:</b> popup footer (collapsed) + Options page (same content, expanded) + store listing (policy link). One source of truth so the three never contradict — contradictions are grounds for removal.</div>
+      </div>
+      <div class="card">
+        <span class="req recommended">RECOMMENDED · in-product</span>
+        <h3>Copy rules for the summary</h3>
+        <p class="why"><b>Why:</b> disclosure copy fails when it is vague ("we may collect data to improve the product"). The summary uses concrete nouns: pages, settings, nothing.</p>
+        <ul style="list-style:none; font-size:12px; color:var(--text2); line-height:1.7;">
+          <li>· Lead with the data direction (in / stored / out), not with legal hedging.</li>
+          <li>· "No account, no analytics" — say what you do <b>not</b> do.</li>
+          <li>· Link the full policy; never inline the whole policy in the popup.</li>
+          <li>· Same three lines verbatim in Options and on first run (if adopted).</li>
+          <li>· Update the store listing <b>before</b> shipping any change in data practice — post-install changes must be prominently disclosed.</li>
+        </ul>
+        <div class="policy-note"><b>Store-side REQUIRED items this supports:</b> accurate privacy policy posted and linked in the dashboard; data-use disclosures in the dashboard matching real behavior; the Limited Use affirmation (surface 06).</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 2. PERMISSIONS ================= -->
+  <div class="sec" id="surface-permissions">
+    <div class="sec-label">02 · Permissions explainer</div>
+    <h2>Every permission, one plain-language reason</h2>
+    <p class="desc">Store level: justifications are <b>REQUIRED</b> in the dashboard — "request access to the narrowest permissions necessary" and explain each one. In-product: <b>RECOMMENDED</b>, best shown in Options and at first run, not only on the listing. The API-beta permission only appears once the beta is relevant.</p>
+    <div class="duo">
+      <div class="card">
+        <span class="req required">REQUIRED · dashboard justification</span>
+        <h3>Options page · "Permissions we use"</h3>
+        <div class="stage360" style="margin-top:12px;">
+          <div class="stage-title">Options · Permissions section</div>
+          <div class="perm-row">
+            <span class="perm-ic" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0 3-3m-3 3L5 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 12.5h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+            <span class="perm-txt">
+              <b>Downloads</b>
+              <span>Saves attachments to your computer's Downloads folder and shows their progress.</span>
+              <em>chrome.downloads · core feature</em>
+            </span>
+          </div>
+          <div class="perm-row">
+            <span class="perm-ic" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="2.5" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 6.5h5M5.5 9.5h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+            <span class="perm-txt">
+              <b>Storage</b>
+              <span>Remembers your engine choice and highlight settings on this device.</span>
+              <em>chrome.storage.local · settings only, never files</em>
+            </span>
+          </div>
+          <div class="perm-row">
+            <span class="perm-ic" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5.5" r="2.5" stroke="currentColor" stroke-width="1.4"/><path d="M3 13.5c.7-2.4 2.7-3.5 5-3.5s4.3 1.1 5 3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></span>
+            <span class="perm-txt">
+              <b>Your Google account — API beta only</b>
+              <span>Lets the beta list your own Classroom files via Google's official API. The token stays in the browser and is never sent to the developer.</span>
+              <em>chrome.identity · appears only when the beta is offered</em>
+            </span>
+          </div>
+        </div>
+        <div class="policy-note"><b>Rule applied:</b> narrowest-permission first — identity is presented as scoped to the beta, which matches the registry behavior (v3 activates only when <code>isApiConfigured()</code>).</div>
+      </div>
+      <div class="card">
+        <span class="req recommended">RECOMMENDED · in-product</span>
+        <h3>Why show this in-product at all</h3>
+        <p class="why"><b>Why:</b> Chrome shows a coarse permission prompt ("Read and change your data on classroom.google.com"); users still file distrust complaints. A precise, friendly mapping of permission → benefit closes the gap the OS prompt creates.</p>
+        <ul style="list-style:none; font-size:12px; color:var(--text2); line-height:1.7;">
+          <li>· One row per permission, verb-first ("Saves…", "Remembers…", "Lets…").</li>
+          <li>· Name the mechanism in faint text (chrome.downloads) — trust through specificity.</li>
+          <li>· The identity row only renders for users who see the API beta.</li>
+          <li>· Reuse these exact strings in the store listing's permission justifications.</li>
+        </ul>
+        <div class="policy-note"><b>Store-side REQUIRED anchor:</b> the dashboard justification text itself (one per permission). This prototype supplies copy that can be pasted there, keeping store and product aligned.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 3. NOT AFFILIATED ================= -->
+  <div class="sec" id="surface-affiliation">
+    <div class="sec-label">03 · "Not affiliated with Google"</div>
+    <h2>Footer notice, always visible, never hidden in a menu</h2>
+    <p class="desc">Store level: impersonation and false-endorsement policy — the extension must not "represent that your product is authorized by, endorsed by, or produced by" Google. The product name and the Classroom integration make a standing disclaimer the only safe posture, so it is treated as <b>REQUIRED</b> mitigation.</p>
+    <div class="duo">
+      <div class="card">
+        <span class="req required">REQUIRED · mitigation</span>
+        <h3>Popup footer + About card</h3>
+        <div class="stage360" style="margin-top:12px;">
+          <div class="stage-title">Popup · footer</div>
+          <div class="affil-row"><b>Not affiliated with Google.</b> Classroom Quick Downloader is an independent tool and is not endorsed by Google. Downloads belong to their owners — follow your school's policies.</div>
+        </div>
+        <div class="policy-note"><b>Copy rules:</b> one line, 10px, in the permanent footer of the popup and in the Options About card · first sentence is the disclaimer itself (not buried after marketing copy) · same sentence on the store listing description, first paragraph.</div>
+      </div>
+      <div class="card">
+        <span class="req recommended">RECOMMENDED · listing hygiene</span>
+        <h3>Where else it must (and must not) appear</h3>
+        <ul style="list-style:none; font-size:12px; color:var(--text2); line-height:1.7;">
+          <li>· <b>Required:</b> store listing — disclaimer in the description; no Google logos, Classroom UI screenshots recolored, or "for Google Classroom ™" wordmarks that imply production by Google.</li>
+          <li>· <b>Required:</b> no fake system-dialog styling anywhere in the UI (policy prohibits simulating system warnings).</li>
+          <li>· <b>Recommended:</b> keep "Google Classroom" out of the extension's display name if a reviewer ever pushes back on trademark grounds — the current name "Classroom Quick Downloader" was a good call.</li>
+        </ul>
+        <div class="policy-note"><b>Why REQUIRED here:</b> the notice is the cheapest, most robust mitigation against an impersonation strike; omitting it while naming Classroom in copy is the risk combination.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 4. API BETA WARNING ================= -->
+  <div class="sec" id="surface-api-warning">
+    <div class="sec-label">04 · API (beta) risk warning</div>
+    <h2>Shown at selection time, inside the selector's context</h2>
+    <p class="desc">No store rule mandates a beta warning, but "features must be stated clearly and in a transparent manner" — and the beta changes the trust model (an OAuth scope is added). Marked <b>RECOMMENDED</b>, strongly advised; it renders when the user selects API (beta) and in Options next to the engine cards.</p>
+    <div class="duo">
+      <div class="card">
+        <span class="req recommended">RECOMMENDED · transparency</span>
+        <h3>Warning card on beta selection</h3>
+        <div class="stage360" style="margin-top:12px;">
+          <div class="stage-title">Popup · below engine selector</div>
+          <div class="warn" role="note">
+            <span class="warn-ic" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 2 1.5 13h13L8 2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 6.5v3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="11.4" r=".9" fill="currentColor"/></svg></span>
+            <span class="warn-txt">
+              <b>API (beta) is experimental</b>
+              <p>Uses Google's official Classroom API with your sign-in. It can be slower to start and may break when Google changes. Legacy and New stay one click away.</p>
+            </span>
+          </div>
+        </div>
+        <div class="policy-note"><b>Copy rules:</b> name the risk ("experimental", "may break"), name the mechanism ("Google's official API"), and end with the rollback promise — fear first, safety last line.</div>
+      </div>
+      <div class="card">
+        <span class="req recommended">RECOMMENDED · consent trail</span>
+        <h3>What the warning must connect to</h3>
+        <ul style="list-style:none; font-size:12px; color:var(--text2); line-height:1.7;">
+          <li>· The OAuth consent screen (Google's own) is where the user actually grants access — this card only prepares them for it.</li>
+          <li>· If <code>getAuthToken(interactive:false)</code> fails and interactive consent is about to trigger (engine-v3 token path), show the same card once before the prompt.</li>
+          <li>· Options page repeats it verbatim next to the API radio card.</li>
+        </ul>
+        <div class="policy-note"><b>Escalation path:</b> if Google requires a verification for the scope, the dashboard disclosure (REQUIRED) carries the legal weight; this card carries the user trust.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 5. COPYRIGHT REMINDER ================= -->
+  <div class="sec" id="surface-copyright">
+    <div class="sec-label">05 · Copyright / ToS reminder for downloaded materials</div>
+    <h2>One-time dialog before the first classroom-wide download</h2>
+    <p class="desc">No CWS clause demands this verbatim, but the policy prohibits facilitating illegal activity, and bulk-downloading an entire classroom is exactly where overzealous use begins. A one-time, check-box-gated reminder before the first big run is marked <b>RECOMMENDED</b> (strongly). It fires once per profile, then the classroom button carries a one-line footer echo.</p>
+    <div class="duo">
+      <div class="card">
+        <span class="req recommended">RECOMMENDED · strongly advised</span>
+        <h3>First-run dialog · classroom action</h3>
+        <div class="stage360" style="margin-top:12px;">
+          <div class="dlg-scrim">
+            <div class="dlg" role="dialog" aria-label="Before you download everything">
+              <h4>Before you download everything</h4>
+              <p>Materials in this classroom belong to their owners — your teachers and school.</p>
+              <p>Keep downloaded files for your own study. Follow your school's rules and the Google Workspace for Education terms. Do not share or repost them.</p>
+              <label>
+                <input type="checkbox" id="ip-check">
+                <span>I'll use these files responsibly</span>
+              </label>
+              <div class="dlg-actions">
+                <button type="button" class="btn btn-ghost">Cancel</button>
+                <button type="button" class="btn btn-primary" id="ip-continue" disabled>Download</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="policy-note"><b>Copy rules:</b> "belong to their owners" names the duty holder; the checkbox is affirmative and specific ("responsibly", not "I agree" — nobody reads "I agree"); dismiss without checking = no download. Try the checkbox — the button unlocks.</div>
+      </div>
+      <div class="card">
+        <span class="req recommended">RECOMMENDED · persistence</span>
+        <h3>After the first time</h3>
+        <ul style="list-style:none; font-size:12px; color:var(--text2); line-height:1.7;">
+          <li>· Store the acknowledgment as a flat key (e.g. <code>ipReminderAcknowledged</code>) — matches the store's flat-key constraint.</li>
+          <li>· The classroom button's sub-line keeps a standing echo: "Files belong to their owners."</li>
+          <li>· The popup footer already carries the same line (surface 03) — one rule, three echoes, no dialogs after the first.</li>
+        </ul>
+        <div class="policy-note"><b>Why not REQUIRED:</b> a downloader is a neutral tool; Google Drive files the user already has classroom access to are not "circumvention". But when the tool scales from 3 files to 3,000, the reminder is cheap insurance for the listing and the right nudge for the user.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 6. LIMITED USE ================= -->
+  <div class="sec" id="surface-limited-use">
+    <div class="sec-label">06 · Limited Use affirmation</div>
+    <h2>The one-line API statement, in Options</h2>
+    <p class="desc">Because the API beta uses Google APIs, the store requires an affirmative statement that data use complies with the Chrome Web Store User Data Policy (Limited Use). Store level: <b>REQUIRED</b> (dashboard + policy page). In-product echo in Options: <b>RECOMMENDED</b>.</p>
+    <div class="duo">
+      <div class="card">
+        <span class="req required">REQUIRED · store + dashboard</span>
+        <h3>Options · About card, API section</h3>
+        <div class="stage360" style="margin-top:12px;">
+          <div class="opt-block">
+            <h4>API (beta) — data use</h4>
+            <p>Only used to list and download files from classrooms you are enrolled in.</p>
+            <div class="lu">The use of information received from Google APIs will adhere to the Chrome Web Store User Data Policy, including the Limited Use requirements.</div>
+          </div>
+        </div>
+        <div class="policy-note"><b>Placement:</b> the exact sentence must appear in the dashboard disclosure and the linked privacy policy; showing it in-product costs one line and preempts review questions.</div>
+      </div>
+      <div class="card">
+        <span class="req recommended">RECOMMENDED · keep it human</span>
+        <h3>The human line above the legal line</h3>
+        <ul style="list-style:none; font-size:12px; color:var(--text2); line-height:1.7;">
+          <li>· Plain line first: "Only used to list and download files from classrooms you are enrolled in."</li>
+          <li>· Legal sentence second, verbatim from policy, smaller and dimmer.</li>
+          <li>· Never merge the two into one paragraph — reviewers look for the exact sentence; users read only the plain one.</li>
+        </ul>
+        <div class="policy-note"><b>Summary of store-level items:</b> privacy policy posted + linked · data disclosures accurate · Limited Use affirmation · permission justifications. All four live in the dashboard; surfaces 01–02 keep the product consistent with them.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= SUMMARY ================= -->
+  <div class="sec">
+    <div class="sec-label">Summary · required vs recommended</div>
+    <h2>One table for the Stop Gate</h2>
+    <table class="summary-table">
+      <thead><tr><th>Surface</th><th>Where it appears</th><th>Status</th><th>Basis</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Privacy policy + data disclosures</td>
+          <td>Store listing, dashboard; summary row in popup/Options (this proto)</td>
+          <td><span class="pill-r req">REQUIRED</span></td>
+          <td>Policies: prominent disclosure + affirmative consent; accurate privacy policy mandatory when data is handled.</td>
+        </tr>
+        <tr>
+          <td>Permission justifications (downloads, storage, identity)</td>
+          <td>Dashboard (required); Options explainer + first-run (this proto)</td>
+          <td><span class="pill-r req">REQUIRED</span> / <span class="pill-r rec">RECOMMENDED</span></td>
+          <td>"Narrowest permissions necessary" + explanation required; in-product explainer is best practice.</td>
+        </tr>
+        <tr>
+          <td>"Not affiliated with Google" notice</td>
+          <td>Popup footer, Options About, store listing</td>
+          <td><span class="pill-r req">REQUIRED</span></td>
+          <td>Impersonation &amp; IP: no false endorsement; disclaimer is the standing mitigation for a Classroom-focused tool.</td>
+        </tr>
+        <tr>
+          <td>Limited Use affirmation</td>
+          <td>Dashboard, privacy policy; Options API section (this proto)</td>
+          <td><span class="pill-r req">REQUIRED</span></td>
+          <td>Required affirmation when Google API data is used.</td>
+        </tr>
+        <tr>
+          <td>API (beta) risk warning</td>
+          <td>Popup (on selection), Options engine cards</td>
+          <td><span class="pill-r rec">RECOMMENDED</span></td>
+          <td>Transparent marketing/feature claims; scope changes deserve an in-product heads-up.</td>
+        </tr>
+        <tr>
+          <td>Copyright / ToS reminder</td>
+          <td>One-time dialog before first classroom-wide run; standing footer echo</td>
+          <td><span class="pill-r rec">RECOMMENDED</span></td>
+          <td>Prohibition on facilitating illegal activity; bulk scale makes the reminder prudent.</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="desc" style="margin-top:14px;">Policy text summarized from the Chrome Web Store Program Policies (developer.chrome.com/docs/webstore/program-policies). Not legal advice — final wording should get a quick pass from the owner before the 1.8.9 listing update.</p>
+  </div>
+
+</div>
+
+<script>
+  // Privacy row expand/collapse
+  (function () {
+    var t = document.getElementById('priv-toggle'), p = document.getElementById('priv-panel');
+    t.addEventListener('click', function () {
+      var open = p.classList.toggle('open');
+      t.setAttribute('aria-expanded', String(open));
+    });
+  })();
+  // Copyright dialog checkbox
+  (function () {
+    var c = document.getElementById('ip-check'), b = document.getElementById('ip-continue');
+    c.addEventListener('change', function () { b.disabled = !c.checked; });
+    b.addEventListener('click', function () {
+      b.textContent = 'Downloading…';
+      setTimeout(function () { b.textContent = 'Download'; }, 1600);
+    });
+  })();
+</script>
+</body>
+</html>

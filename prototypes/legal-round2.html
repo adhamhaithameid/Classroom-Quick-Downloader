@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Legal Round 2 — Five Surfaces, Two Treatments · CQD 1.8.9</title>
+<style>
+  /* ============ Shell (documentation chrome) — Stillwater tokens ============ */
+  :root {
+    --bg: #0B0C10;
+    --panel: #14151C;
+    --surface: rgba(255,255,255,.045);
+    --surface2: rgba(255,255,255,.08);
+    --border: rgba(255,255,255,.10);
+    --border2: rgba(255,255,255,.18);
+    --text: #F3F4F8;
+    --text2: #A7ACBD;
+    --text3: #767C90;
+    --accent: #8F7BFF;
+    --accent2: #6E5BFF;
+    --success: #07DA3F;
+    --success-text: #4AE376;
+    --success-soft: rgba(7,218,63,.13);
+    --error: #FF4036;
+    --error-text: #FF7A72;
+    --trying: #FFD93D;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1); /* Stillwater: settles, never snaps */
+    --fast: 200ms; --mid: 280ms; --slow: 360ms;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--font);
+    font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased;
+    padding: 48px 24px 96px;
+  }
+  a { color: var(--accent); }
+  button { font-family: inherit; cursor: pointer; }
+  button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px;
+  }
+  code { font-size: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1px 5px; font-family: var(--mono); }
+
+  .layout {
+    max-width: 1140px; margin: 0 auto; display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "ballot" "main"; /* narrow: stacked, ballot first (DOM order) */
+    gap: 28px;
+  }
+  .layout > .ballot { grid-area: ballot; }
+  .layout > main { grid-area: main; }
+  @media (min-width: 1161px) {
+    .layout {
+      grid-template-columns: minmax(0, 1fr) 300px;
+      grid-template-areas: "main ballot"; /* desktop: content wide, ballot rail */
+      align-items: start;
+    }
+  }
+
+  .crumb { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--text3); margin-bottom: 8px; }
+  .crumb a { color: var(--accent); text-decoration: none; }
+  .crumb a:hover { text-decoration: underline; }
+  h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.25; }
+  .lede { color: var(--text2); font-size: 15px; margin-top: 8px; max-width: 66ch; }
+  .lede b, .desc b { color: var(--text); }
+  .identity { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .identity span, .identity a.chip {
+    font-size: 11px; font-weight: 500; color: var(--text2);
+    border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; background: var(--surface);
+    text-decoration: none;
+  }
+  .identity a.chip:hover { border-color: var(--border2); color: var(--text); }
+
+  .sec { margin-top: 56px; }
+  .sec-label { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+  .sec-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .sec h2 { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+  .sec p.desc { font-size: 13px; color: var(--text2); max-width: 76ch; margin-bottom: 20px; }
+  .page-foot { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text3); line-height: 1.6; }
+
+  /* ============ Reduce-motion demo bar (in-app setting convention) ============ */
+  .rm-bar {
+    margin-top: 20px; display: flex; align-items: center; gap: 12px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 12px 16px;
+  }
+  .rm-bar .rm-txt { font-size: 13px; font-weight: 600; }
+  .rm-bar .rm-sub { font-size: 11px; color: var(--text3); line-height: 1.4; }
+  .rm-switch {
+    position: relative; width: 40px; height: 22px; border-radius: 999px; flex: 0 0 auto;
+    border: 1px solid var(--border2); background: rgba(0,0,0,.35);
+    transition: background var(--fast) var(--ease), border-color var(--fast) var(--ease);
+  }
+  .rm-switch::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--text3); transition: transform var(--fast) var(--ease), background var(--fast) var(--ease);
+  }
+  .rm-switch[aria-pressed="true"] { background: var(--trying); border-color: var(--trying); }
+  .rm-switch[aria-pressed="true"]::after { transform: translateX(18px); background: #241C00; }
+  .rm-state { font-size: 11px; font-weight: 600; color: var(--text2); min-width: 118px; text-align: right; font-variant-numeric: tabular-nums; }
+  .rm-bar .spacer { flex: 1; }
+
+  /* ============ Requirement labels (kept from round 1) ============ */
+  .req {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 10px; font-weight: 700; letter-spacing: .08em;
+    border-radius: 999px; padding: 3px 10px;
+  }
+  .req.required { background: rgba(255,64,54,.14); color: var(--error-text); border: 1px solid rgba(255,64,54,.4); }
+  .req.recommended { background: rgba(143,123,255,.13); color: #B4A6FF; border: 1px solid rgba(143,123,255,.4); }
+
+  /* ============ Treatment cards ============ */
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 900px) { .duo { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 20px;
+    display: flex; flex-direction: column;
+  }
+  .card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .t-tag {
+    font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--accent); background: rgba(143,123,255,.12); border: 1px solid rgba(143,123,255,.4);
+    border-radius: 999px; padding: 3px 10px;
+  }
+  .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .card p.why { font-size: 12px; color: var(--text2); line-height: 1.55; margin-bottom: 16px; }
+  .card p.why b { color: var(--text); }
+  .policy-note {
+    margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border);
+    font-size: 11px; color: var(--text3); line-height: 1.6;
+  }
+  .policy-note b { color: var(--text2); }
+  .ia-note { margin-top: 12px; font-size: 11px; color: var(--text3); line-height: 1.6; }
+  .ia-note b { color: var(--text2); }
+
+  /* ============ Stages — 360px popup context + options context, Stillwater glass ============ */
+  .stage360 {
+    width: 360px; max-width: 100%;
+    background: linear-gradient(175deg, #1B1C26 0%, #16161E 60%, #141420 100%);
+    border: 1px solid rgba(255,255,255,.14); border-radius: 14px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06);
+    color: var(--text); font-size: 13px; overflow: hidden;
+  }
+  .stage-opt {
+    width: 480px; max-width: 100%;
+    background: linear-gradient(175deg, #1B1C26 0%, #16161E 60%, #141420 100%);
+    border: 1px solid rgba(255,255,255,.14); border-radius: 14px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06);
+    color: var(--text); font-size: 13px; overflow: hidden;
+  }
+  .stage-title {
+    font-size: 10px; color: var(--text3); letter-spacing: .08em; text-transform: uppercase;
+    padding: 8px 14px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,.22);
+  }
+  .stage-pad { padding: 14px 16px 16px; }
+  .demo-hint { font-size: 10px; color: var(--text3); margin-top: 10px; text-align: center; }
+  .demo-hint button {
+    border: none; background: transparent; color: var(--accent); font-size: 10px; font-weight: 600;
+    text-decoration: underline; text-underline-offset: 2px; padding: 0;
+  }
+
+  /* ---- popup footer composite ---- */
+  .p-foot {
+    padding: 10px 16px 12px; border-top: 1px solid var(--border); background: rgba(0,0,0,.2);
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .bmc {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #FFDD00; color: #241C00; border: none; border-radius: 999px;
+    font-size: 11px; font-weight: 600; padding: 6px 12px;
+    transition: transform var(--fast) var(--ease), box-shadow var(--fast) var(--ease);
+  }
+  .bmc:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(255,221,0,.3); }
+  .p-foot .legal-links { margin-left: auto; display: flex; gap: 10px; }
+  .p-foot .legal-links a { font-size: 11px; color: var(--text3); text-decoration: none; transition: color var(--fast) var(--ease); }
+  .p-foot .legal-links a:hover { color: var(--text); }
+  .foot-line { flex-basis: 100%; font-size: 10px; color: var(--text3); line-height: 1.45; margin-top: 2px; }
+  .foot-line b { color: var(--text2); font-weight: 600; }
+  .foot-line.quiet { color: var(--text2); }
+
+  /* ---- S1 T2: privacy pill + reassurance ledger ---- */
+  .priv-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 500; color: var(--text2);
+    border: 1px solid var(--border); background: var(--surface);
+    border-radius: 999px; padding: 5px 11px;
+    transition: border-color var(--fast) var(--ease), color var(--fast) var(--ease), background var(--fast) var(--ease);
+  }
+  .priv-pill:hover { border-color: var(--border2); color: var(--text); background: var(--surface2); }
+  .priv-pill[aria-expanded="true"] { border-color: rgba(143,123,255,.55); color: var(--text); }
+  .collapse { max-height: 0; overflow: hidden; transition: max-height var(--mid) var(--ease); }
+  .collapse.open { max-height: 420px; }
+  .ledger {
+    margin: 0 14px 14px; border: 1px solid var(--border); border-radius: 12px;
+    background: rgba(0,0,0,.22); padding: 12px 14px;
+  }
+  .ledger h4 { font-size: 12px; font-weight: 600; margin-bottom: 8px; }
+  .lg-line { display: flex; gap: 10px; padding: 7px 0; border-top: 1px solid var(--border); }
+  .lg-line:first-of-type { border-top: none; }
+  .lg-ic { flex: 0 0 26px; width: 26px; height: 26px; border-radius: 8px; background: var(--surface2); display: grid; place-items: center; color: var(--accent); }
+  .lg-txt b { display: block; font-size: 12px; font-weight: 600; }
+  .lg-txt span { display: block; font-size: 11px; color: var(--text2); line-height: 1.5; margin-top: 1px; }
+  .ledger-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+  .ledger-foot a { font-size: 11px; }
+  .ledger-foot button {
+    border: none; border-radius: 8px; background: var(--surface2); color: var(--text);
+    font-size: 11px; font-weight: 600; padding: 6px 12px;
+    transition: background var(--fast) var(--ease);
+  }
+  .ledger-foot button:hover { background: rgba(255,255,255,.14); }
+
+  /* ---- S2 T1: first-run sheet ---- */
+  .sheet { margin: 14px; border: 1px solid rgba(143,123,255,.4); border-radius: 14px; background: rgba(143,123,255,.07); padding: 14px; }
+  .sheet h4 { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
+  .sheet .sheet-sub { font-size: 11px; color: var(--text3); margin-bottom: 10px; }
+  .sheet .lg-line { border-top: 1px solid rgba(255,255,255,.08); }
+  .sheet-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+  .btn { border: none; border-radius: 9px; font-size: 12px; font-weight: 600; padding: 8px 14px; transition: background var(--fast) var(--ease), filter var(--fast) var(--ease); }
+  .btn-ghost { background: var(--surface2); color: var(--text2); }
+  .btn-ghost:hover { background: rgba(255,255,255,.12); color: var(--text); }
+  .btn-primary { background: var(--accent); color: #14121F; }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .sheet-gone { padding: 12px 14px; font-size: 11px; color: var(--text3); text-align: center; }
+
+  /* ---- S2 T2: options accordion ---- */
+  .acc-row { border-top: 1px solid var(--border); }
+  .acc-row:first-of-type { border-top: none; }
+  .acc-head {
+    width: 100%; display: flex; align-items: center; gap: 10px; text-align: left;
+    background: transparent; border: none; color: var(--text); padding: 12px 16px;
+    transition: background var(--fast) var(--ease);
+  }
+  .acc-head:hover { background: rgba(255,255,255,.04); }
+  .acc-ic { flex: 0 0 28px; width: 28px; height: 28px; border-radius: 9px; background: var(--surface2); display: grid; place-items: center; color: var(--accent); }
+  .acc-name { flex: 1; min-width: 0; }
+  .acc-name b { display: block; font-size: 12px; font-weight: 600; }
+  .acc-name small { display: block; font-size: 10px; color: var(--text3); font-family: var(--mono); }
+  .acc-chevron { flex: 0 0 auto; color: var(--text3); transition: transform var(--mid) var(--ease); }
+  .acc-row.open .acc-chevron { transform: rotate(180deg); }
+  .acc-body { padding: 0 16px 0 54px; }
+  .acc-body p { font-size: 11px; color: var(--text2); line-height: 1.55; padding-bottom: 12px; }
+  .acc-body p em { font-style: normal; color: var(--text3); display: block; margin-top: 4px; }
+
+  /* ---- engine segmented (Stillwater, from direction A) ---- */
+  .seg {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2px;
+    background: rgba(0,0,0,.28); border: 1px solid var(--border);
+    border-radius: 11px; padding: 2px;
+  }
+  .seg button {
+    border: none; background: transparent; color: var(--text2);
+    font-size: 12px; font-weight: 500; padding: 8px 4px; border-radius: 9px;
+    transition: background var(--fast) var(--ease), color var(--fast) var(--ease), box-shadow var(--fast) var(--ease);
+  }
+  .seg button:hover { color: var(--text); }
+  .seg button[aria-pressed="true"] {
+    background: linear-gradient(180deg, rgba(143,123,255,.24), rgba(143,123,255,.16));
+    color: var(--text); font-weight: 600;
+    box-shadow: inset 0 0 0 1px rgba(143,123,255,.45);
+  }
+  .seg .beta { font-size: 10px; vertical-align: super; color: var(--trying); }
+
+  /* ---- S3 T1: calm caption ---- */
+  .api-caption {
+    display: flex; gap: 8px; margin-top: 10px; padding: 10px 12px;
+    border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
+    visibility: hidden; opacity: 0; transform: translateY(4px);
+    transition: opacity var(--mid) var(--ease), transform var(--mid) var(--ease), visibility 0s linear var(--mid);
+  }
+  .api-caption.show { visibility: visible; opacity: 1; transform: none; transition: opacity var(--mid) var(--ease), transform var(--mid) var(--ease); }
+  .api-caption .cap-ic { flex: 0 0 auto; color: var(--text2); margin-top: 1px; }
+  .api-caption p { font-size: 11px; color: var(--text2); line-height: 1.55; }
+  .api-caption p b { color: var(--text); font-weight: 600; }
+
+  /* ---- S3 T2: confirm card ---- */
+  .confirm {
+    margin-top: 10px; border: 1px solid rgba(143,123,255,.45); border-radius: 12px;
+    background: rgba(143,123,255,.07); padding: 12px 14px;
+    visibility: hidden; opacity: 0; transform: translateY(4px);
+    transition: opacity var(--mid) var(--ease), transform var(--mid) var(--ease), visibility 0s linear var(--mid);
+  }
+  .confirm.show { visibility: visible; opacity: 1; transform: none; transition: opacity var(--mid) var(--ease), transform var(--mid) var(--ease); }
+  .confirm h5 { font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+  .confirm ul { margin: 0 0 10px 14px; }
+  .confirm li { font-size: 11px; color: var(--text2); line-height: 1.55; margin-bottom: 3px; }
+  .confirm .confirm-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .confirm.beta-on { border-color: rgba(7,218,63,.45); background: rgba(7,218,63,.06); }
+  .confirm.beta-on h5 { color: var(--success-text); }
+  .confirm .way-back {
+    border: none; background: transparent; color: var(--accent); font-size: 11px; font-weight: 600;
+    text-decoration: underline; text-underline-offset: 2px; padding: 0; margin-top: 8px;
+  }
+
+  /* ---- S4 T1: one-time dialog ---- */
+  .dlg-scrim { margin: 14px; border-radius: 12px; background: rgba(0,0,0,.4); padding: 20px 12px; display: grid; place-items: center; }
+  .dlg {
+    width: 100%; max-width: 304px; border-radius: 14px;
+    background: linear-gradient(175deg, #1D1E28, #16161E);
+    border: 1px solid var(--border2);
+    padding: 16px; box-shadow: 0 12px 40px rgba(0,0,0,.5);
+  }
+  .dlg h4 { font-size: 13px; font-weight: 600; margin-bottom: 6px; line-height: 1.35; }
+  .dlg p { font-size: 11px; color: var(--text2); line-height: 1.55; margin-bottom: 8px; }
+  .dlg label { display: flex; gap: 8px; align-items: flex-start; font-size: 11px; color: var(--text2); line-height: 1.5; margin: 10px 0 12px; cursor: pointer; }
+  .dlg input { margin-top: 2px; accent-color: var(--accent); }
+  .dlg .dlg-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .dlg .btn { font-size: 11px; padding: 7px 12px; border-radius: 8px; }
+  .dlg .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* ---- S4 T2: standing echo cells ---- */
+  .echo-cells { display: grid; gap: 10px; }
+  .cta {
+    position: relative; overflow: hidden; width: 100%; text-align: left;
+    border: 1px solid rgba(143,123,255,.5); border-radius: 14px;
+    background: linear-gradient(180deg, rgba(143,123,255,.22), rgba(110,91,255,.14));
+    color: var(--text); padding: 12px 14px;
+    box-shadow: 0 4px 20px rgba(110,91,255,.22), inset 0 1px 0 rgba(255,255,255,.12);
+    transition: transform var(--fast) var(--ease), border-color var(--fast) var(--ease);
+  }
+  .cta .cta-row { display: flex; align-items: center; gap: 10px; }
+  .cta .cta-ic { flex: 0 0 auto; display: grid; place-items: center; }
+  .cta .cta-txt b { display: block; font-size: 15px; font-weight: 600; line-height: 1.25; }
+  .cta .cta-txt small { display: block; font-size: 11px; font-weight: 400; color: var(--text2); line-height: 1.4; margin-top: 1px; font-variant-numeric: tabular-nums; }
+  .cta.is-success { border-color: rgba(7,218,63,.6); background: linear-gradient(180deg, rgba(7,218,63,.16), rgba(7,218,63,.08)); box-shadow: 0 4px 20px rgba(7,218,63,.18), inset 0 1px 0 rgba(255,255,255,.1); }
+  .cell-label { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+
+  /* ---- S5: options disclosure blocks ---- */
+  .opt-block { margin: 14px; border: 1px solid var(--border); border-radius: 12px; padding: 14px; background: var(--surface); }
+  .opt-block h4 { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+  .opt-block > p { font-size: 11px; color: var(--text2); line-height: 1.55; }
+  .lu-line {
+    margin-top: 10px; font-size: 10.5px; color: var(--text3); line-height: 1.55;
+    border-left: 2px solid rgba(143,123,255,.5); padding-left: 10px;
+  }
+  .qa { margin: 14px; border: 1px solid var(--border); border-radius: 12px; padding: 14px; background: var(--surface); }
+  .qa h4 { font-size: 12px; font-weight: 600; margin-bottom: 8px; }
+  .qa-row { padding: 8px 0; border-top: 1px solid var(--border); }
+  .qa-row:first-of-type { border-top: none; }
+  .qa-row b { display: block; font-size: 11px; font-weight: 600; color: var(--text); }
+  .qa-row span { display: block; font-size: 11px; color: var(--text2); line-height: 1.55; margin-top: 1px; }
+
+  /* ============ Pick bar (radio pills) ============ */
+  .pick-bar {
+    margin-top: 16px; background: rgba(0,0,0,.22); border: 1px solid var(--border);
+    border-radius: 14px; padding: 12px 16px;
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .pick-bar .pick-label { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text3); }
+  .pick { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+  .pick button[role="radio"] {
+    border: 1px solid var(--border); background: var(--surface); color: var(--text2);
+    border-radius: 999px; font-size: 12px; font-weight: 500; padding: 7px 14px;
+    transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease), color var(--fast) var(--ease), box-shadow var(--fast) var(--ease);
+  }
+  .pick button[role="radio"]:hover { border-color: var(--border2); color: var(--text); }
+  .pick button[role="radio"][aria-checked="true"] {
+    border-color: rgba(143,123,255,.55); background: rgba(143,123,255,.14); color: var(--text);
+    font-weight: 600; box-shadow: inset 0 0 0 1px rgba(143,123,255,.4);
+  }
+  .pick button[role="radio"][aria-checked="true"][data-val="edit"] {
+    border-color: rgba(255,217,61,.55); background: rgba(255,217,61,.1); color: var(--trying);
+    box-shadow: inset 0 0 0 1px rgba(255,217,61,.3);
+  }
+  .pick-bar .pick-state { margin-left: auto; font-size: 11px; color: var(--text3); font-variant-numeric: tabular-nums; }
+
+  /* ============ Ballot panel (sticky summary) ============ */
+  .ballot {
+    background: var(--panel); border: 1px solid rgba(143,123,255,.4); border-radius: 16px;
+    padding: 16px 18px; scroll-margin-top: 20px;
+  }
+  @media (min-width: 1161px) {
+    .ballot { position: sticky; top: 20px; max-height: calc(100vh - 40px); overflow: auto; }
+  }
+  .ballot-head { display: flex; align-items: flex-start; gap: 8px; }
+  .ballot-title { font-size: 13px; font-weight: 600; }
+  .ballot-sub { font-size: 10px; color: var(--text3); margin-top: 1px; }
+  .ballot-collapse {
+    margin-left: auto; flex: 0 0 auto;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text2);
+    border-radius: 999px; font-size: 10px; font-weight: 600; padding: 4px 10px;
+    transition: color var(--fast) var(--ease), border-color var(--fast) var(--ease);
+  }
+  .ballot-collapse:hover { color: var(--text); border-color: var(--border2); }
+  .ballot.collapsed .ballot-body { display: none; }
+  .ballot-body { margin-top: 8px; }
+  .ballot-progress { font-size: 11px; font-weight: 600; color: var(--trying); font-variant-numeric: tabular-nums; padding: 8px 0 2px; }
+  .ballot-list { display: flex; flex-direction: column; }
+  .bl-row { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .bl-row dt { color: var(--text3); font-weight: 500; flex: 0 0 auto; }
+  .bl-row dd { color: var(--text2); text-align: right; min-width: 0; overflow-wrap: anywhere; }
+  .bl-row dd.set { color: var(--text); font-weight: 600; }
+  .ballot label.notes-label { display: block; font-size: 11px; font-weight: 600; color: var(--text3); margin: 12px 0 6px; }
+  #ballot-notes {
+    width: 100%; resize: vertical; min-height: 60px;
+    background: rgba(0,0,0,.25); border: 1px solid var(--border); border-radius: 10px;
+    color: var(--text); font-family: inherit; font-size: 12px; line-height: 1.5; padding: 8px 10px;
+  }
+  #ballot-notes::placeholder { color: var(--text3); }
+  .ballot-copy {
+    width: 100%; margin-top: 12px;
+    border: none; border-radius: 10px;
+    background: var(--accent); color: #14121F;
+    font-size: 13px; font-weight: 600; padding: 10px 0;
+    transition: filter var(--fast) var(--ease), background var(--fast) var(--ease);
+  }
+  .ballot-copy:hover { filter: brightness(1.08); }
+  .ballot-copy.copied { background: var(--success); }
+  .ballot-secondary { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; gap: 8px; }
+  #ballot-reset {
+    border: none; background: transparent; color: var(--text3);
+    font-size: 11px; font-weight: 500; text-decoration: underline; text-underline-offset: 2px;
+    transition: color var(--fast) var(--ease);
+  }
+  #ballot-reset:hover { color: var(--error-text); }
+  .ballot-preview summary { font-size: 11px; color: var(--text3); cursor: pointer; }
+  .ballot-preview summary:hover { color: var(--text2); }
+  .ballot-preview pre {
+    margin-top: 8px; padding: 10px; border-radius: 8px;
+    background: rgba(0,0,0,.3); border: 1px solid var(--border);
+    font-size: 10.5px; line-height: 1.55; color: var(--text2);
+    font-family: var(--mono);
+    white-space: pre-wrap; overflow-wrap: anywhere;
+  }
+  .ballot-store { margin-top: 10px; font-size: 10px; color: var(--text3); line-height: 1.5; }
+  .ballot-store code { font-size: 9.5px; }
+
+  /* ============ Reduced motion — media query + demo toggle convention ============ */
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      transition-delay: 0s !important; /* visibility flips instantly, no 280ms hold */
+    }
+    .bmc:hover, .cta:hover { transform: none; }
+  }
+  html.reduce-motion { scroll-behavior: auto; }
+  body.reduce-motion *, body.reduce-motion *::before, body.reduce-motion *::after {
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  body.reduce-motion .bmc:hover, body.reduce-motion .cta:hover { transform: none; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ================= STICKY BALLOT ================= -->
+  <aside class="ballot" id="ballot" aria-label="My legal round 2 choices">
+    <div class="ballot-head">
+      <div>
+        <div class="ballot-title">My choices — legal round 2</div>
+        <div class="ballot-sub">One pick per surface · saved on this device</div>
+      </div>
+      <button type="button" class="ballot-collapse" id="ballot-collapse" aria-expanded="true" aria-controls="ballot-body">Hide</button>
+    </div>
+    <div class="ballot-body" id="ballot-body">
+      <div class="ballot-progress" id="ballot-progress">0 of 5 decided</div>
+      <dl class="ballot-list" id="ballot-list"></dl>
+      <label class="notes-label" for="ballot-notes">Notes (optional — included in the ballot)</label>
+      <textarea id="ballot-notes" rows="3" placeholder="Copy tweaks, hybrids, what to change in round 3…"></textarea>
+      <button type="button" class="ballot-copy" id="ballot-copy">Copy my choices</button>
+      <div class="ballot-secondary">
+        <button type="button" id="ballot-reset">Reset all picks</button>
+        <details class="ballot-preview">
+          <summary>Preview markdown</summary>
+          <pre id="ballot-md"></pre>
+        </details>
+      </div>
+      <p class="ballot-store">Picks persist in this browser under <code>cqd-189-legal-r2</code>. Round-1 picks in <code>cqd-189-decide</code> are not touched.</p>
+    </div>
+  </aside>
+
+  <!-- ================= MAIN ================= -->
+  <main>
+    <div class="crumb"><a href="index.html">← All prototypes</a> · Legal round 2</div>
+    <h1>Legal round 2 — five surfaces, two treatments each</h1>
+    <p class="lede">Round 1 approved the "Not affiliated with Google" notice. The other five surfaces return here, rebuilt in the winning <b>Stillwater</b> language. Each surface gets two treatments that differ in <b>placement, verbosity, and tone</b> — not wording swaps. Pick one per surface, or send it back. REQUIRED vs RECOMMENDED labels carry over from round 1's Chrome Web Store policy research.</p>
+    <div class="identity">
+      <span>Direction A — Stillwater, calm glass</span>
+      <span>Motion: soft · 200–360ms · cubic-bezier(0.22, 1, 0.36, 1)</span>
+      <span>Type: 10 legal · 11 · 12 · 13 · 15, weights 400–600</span>
+      <a class="chip" href="#ballot">My choices ↑</a>
+    </div>
+
+    <div class="rm-bar">
+      <div>
+        <div class="rm-txt">Reduce motion</div>
+        <div class="rm-sub">Simulates the planned in-app setting. System preference detected on load.</div>
+      </div>
+      <span class="spacer"></span>
+      <span class="rm-state" id="rm-state">Standard motion</span>
+      <button type="button" class="rm-switch" id="rm-toggle" aria-pressed="false" aria-label="Toggle reduced motion simulation"></button>
+    </div>
+
+    <!-- ================= 01 · PRIVACY / DATA-USE ================= -->
+    <div class="sec" id="surface-privacy">
+      <div class="sec-head">
+        <div class="sec-label">01 · Privacy / data-use disclosure</div>
+        <span class="req required">REQUIRED · store + dashboard</span>
+        <span class="req recommended">RECOMMENDED · in-product</span>
+      </div>
+      <h2>Where your files and data go — ambient line vs one-tap ledger</h2>
+      <p class="desc">The store listing carries the full policy. In the popup, the user should learn the three facts without leaving: what is read, what stays on the device, what is sent. Two ways to carry that.</p>
+      <div class="duo">
+
+        <div class="card">
+          <div class="card-head"><span class="t-tag">Treatment 1</span><span class="req recommended">RECOMMENDED</span></div>
+          <h3>The quiet line — always visible, zero interaction</h3>
+          <p class="why"><b>The idea:</b> the facts live in the footer next to the approved affiliation notice. One short sentence per fact. No tap, no panel, nothing to discover.</p>
+          <div class="stage360">
+            <div class="stage-title">Popup · footer</div>
+            <div class="p-foot">
+              <button type="button" class="bmc" tabindex="-1">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 6h8v4a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6Z" fill="#241C00"/><path d="M11 7h1.2a1.8 1.8 0 0 1 0 3.6H11" stroke="#241C00" stroke-width="1.3"/></svg>
+                Buy me a coffee
+              </button>
+              <span class="legal-links"><a href="#" aria-label="Open the full privacy policy">Privacy policy</a></span>
+              <span class="foot-line"><b>Not affiliated with Google.</b> Downloads belong to their owners — follow your school's policies.</span>
+              <span class="foot-line quiet">Downloads run in your browser. Your history stays on this device. Nothing is sent to the developer.</span>
+            </div>
+          </div>
+          <div class="ia-note"><b>Information architecture:</b> ambient disclosure. The line is always present, in the same glance as the approved notice. Options repeats it verbatim under About. Cost: two footer lines.</div>
+          <div class="policy-note"><b>Keeps round 1's rule:</b> concrete nouns only — pages, settings, history, nothing. The full policy stays a link, never inlined.</div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="t-tag">Treatment 2</span><span class="req recommended">RECOMMENDED</span></div>
+          <h3>The reassurance ledger — one tap, three directions</h3>
+          <p class="why"><b>The idea:</b> the footer stays clean. A "Privacy &amp; data" pill expands a small ledger in place: Reads / Keeps on this device / Sends. Users who want detail get structure, not a wall of text.</p>
+          <div class="stage360">
+            <div class="stage-title">Popup · footer, expanded (live)</div>
+            <div class="p-foot">
+              <button type="button" class="priv-pill" id="priv-ledger-toggle" aria-expanded="false" aria-controls="priv-ledger">
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 1 1.8 2.8v2.9c0 2.5 1.8 4.3 4.2 5.3 2.4-1 4.2-2.8 4.2-5.3V2.8L6 1Z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>
+                Privacy &amp; data
+              </button>
+              <span class="legal-links" aria-hidden="true"><span style="font-size:11px;color:var(--text3);">v1.8.9</span></span>
+            </div>
+            <div class="collapse" id="priv-ledger">
+              <div class="ledger" role="group" aria-label="Privacy and data summary">
+                <h4>Where your files and data go</h4>
+                <div class="lg-line">
+                  <span class="lg-ic" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M1.5 8s2.4-4.2 6.5-4.2S14.5 8 14.5 8s-2.4 4.2-6.5 4.2S1.5 8 1.5 8Z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="1.8" stroke="currentColor" stroke-width="1.3"/></svg></span>
+                  <span class="lg-txt"><b>Reads</b><span>The Classroom pages you open, to find posts and attachments.</span></span>
+                </div>
+                <div class="lg-line">
+                  <span class="lg-ic" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="3" width="11" height="7.5" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 13h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+                  <span class="lg-txt"><b>Keeps on this device</b><span>Your settings and download history. No account, no analytics.</span></span>
+                </div>
+                <div class="lg-line">
+                  <span class="lg-ic" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 8h8m0 0L7 5m3 3-3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M12.5 3.5h2M12.5 12.5h2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+                  <span class="lg-txt"><b>Sends</b><span>Nothing to the developer. Files travel from Google to you, directly.</span></span>
+                </div>
+                <div class="ledger-foot">
+                  <a href="#" aria-label="Open the full privacy policy">Full privacy policy ↗</a>
+                  <button type="button" id="priv-ledger-close">Got it</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="demo-hint">Click the pill to expand and collapse. "Got it" closes it too.</p>
+          <div class="ia-note"><b>Information architecture:</b> disclosure on demand. Footer costs one pill; the detail is structured by data direction, so each line answers one question.</div>
+          <div class="policy-note"><b>Keeps round 1's rule:</b> same three lines verbatim in Options and the store listing — one source of truth, no contradictions.</div>
+        </div>
+
+      </div>
+      <div class="pick-bar">
+        <span class="pick-label">Your pick · 01 privacy row</span>
+        <div class="pick" role="radiogroup" aria-label="Pick for privacy row">
+          <button type="button" role="radio" aria-checked="false" data-key="privacy" data-val="t1">Treatment 1 — quiet line</button>
+          <button type="button" role="radio" aria-checked="false" data-key="privacy" data-val="t2">Treatment 2 — ledger</button>
+          <button type="button" role="radio" aria-checked="false" data-key="privacy" data-val="edit">Edit again</button>
+        </div>
+        <span class="pick-state" id="state-privacy">not decided</span>
+      </div>
+    </div>
+
+    <!-- ================= 02 · PERMISSIONS ================= -->
+    <div class="sec" id="surface-permissions">
+      <div class="sec-head">
+        <div class="sec-label">02 · Permissions explainer</div>
+        <span class="req required">REQUIRED · dashboard justification</span>
+        <span class="req recommended">RECOMMENDED · in-product</span>
+      </div>
+      <h2>Why each permission exists — one front-loaded sheet vs a standing reference</h2>
+      <p class="desc">The dashboard justification is required; the in-product explainer is recommended. Chrome's own prompt is coarse ("Read and change your data on classroom.google.com"), so the product closes the gap. Two placements, two moments.</p>
+      <div class="duo">
+
+        <div class="card">
+          <div class="card-head"><span class="t-tag">Treatment 1</span><span class="req recommended">RECOMMENDED</span></div>
+          <h3>The first-run sheet — explained once, at the moment of attention</h3>
+          <p class="why"><b>The idea:</b> a small sheet in the popup on first run names all three permissions in plain words, then never again. Front-load the "why" once; keep every later session clean.</p>
+          <div class="stage360">
+            <div class="stage-title">Popup · first run (live)</div>
+            <div id="perm-sheet-host">
+              <div class="sheet" role="group" aria-label="What we ask for, and why">
+                <h4>What Classroom Quick Downloader asks for</h4>
+                <div class="sheet-sub">Three permissions. Each does one job.</div>
+                <div class="lg-line">
+                  <span class="lg-ic" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0 3-3m-3 3L5 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 12.5h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
+                  <span class="lg-txt"><b>Downloads</b><span>Saves the files you choose into your Downloads folder.</span></span>
+                </div>
+                <div class="lg-line">
+                  <span class="lg-ic" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="2.5" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 6.5h5M5.5 9.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg></span>
+                  <span class="lg-txt"><b>Storage</b><span>Remembers your settings on this device.</span></span>
+                </div>
+                <div class="lg-line">
+                  <span class="lg-ic" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5.5" r="2.5" stroke="currentColor" stroke-width="1.3"/><path d="M3 13.5c.7-2.4 2.7-3.5 5-3.5s4.3 1.1 5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+                  <span class="lg-txt"><b>Google sign-in</b><span>Used only when you start the API beta. The token never reaches the developer.</span></span>
+                </div>
+                <div class="sheet-actions">
+                  <button type="button" class="btn btn-ghost" id="perm-more">More detail</button>
+                  <button type="button" class="btn btn-primary" id="perm-ok">Sounds good</button>
+                </div>
+              </div>
+            </div>
+            <div class="sheet-gone" id="perm-gone" hidden>Saved on this device — the sheet shows once. <button type="button" id="perm-again">Show it again</button></div>
+          </div>
+          <p class="demo-hint">"Sounds good" dismisses the sheet for good (demo restores it).</p>
+          <div class="ia-note"><b>Information architecture:</b> episodic. One interruption at install, then silence. The same strings paste into the dashboard justifications.</div>
+          <div class="policy-note"><b>Keeps round 1's rule:</b> verb-first lines; identity scoped to the beta, matching the registry behavior (<code>isApiConfigured()</code> gates v3).</div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="t-tag">Treatment 2</span><span class="req recommended">RECOMMENDED</span></div>
+          <h3>The standing reference — Options rows that expand on tap</h3>
+          <p class="why"><b>The idea:</b> no first-run interruption at all. Options carries a permanent "Permissions" section; each row expands to the plain-language reason plus the exact mechanism, in faint type. Trust through specificity, on demand.</p>
+          <div class="stage-opt">
+            <div class="stage-title">Options · Permissions section (live)</div>
+            <div style="padding: 4px 0 6px;">
+              <div class="acc-row open" id="acc-1">
+                <button type="button" class="acc-head" aria-expanded="true" aria-controls="acc-body-1">
+                  <span class="acc-ic" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0 3-3m-3 3L5 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 12.5h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
+                  <span class="acc-name"><b>Downloads</b><small>chrome.downloads</small></span>
+                  <span class="acc-chevron" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="m4 6 4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                </button>
+                <div class="collapse open" id="acc-body-1">
+                  <div class="acc-body"><p>Saves the attachments you choose into your Downloads folder, and shows progress as they arrive.<em>Core feature — nothing downloads without this.</em></p></div>
+                </div>
+              </div>
+              <div class="acc-row" id="acc-2">
+                <button type="button" class="acc-head" aria-expanded="false" aria-controls="acc-body-2">
+                  <span class="acc-ic" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="2.5" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 6.5h5M5.5 9.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg></span>
+                  <span class="acc-name"><b>Storage</b><small>chrome.storage.local</small></span>
+                  <span class="acc-chevron" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="m4 6 4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                </button>
+                <div class="collapse" id="acc-body-2">
+                  <div class="acc-body"><p>Remembers your settings on this device. It never stores your files.<em>Settings only — engine choice, highlights, flags.</em></p></div>
+                </div>
+              </div>
+              <div class="acc-row" id="acc-3">
+                <button type="button" class="acc-head" aria-expanded="false" aria-controls="acc-body-3">
+                  <span class="acc-ic" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5.5" r="2.5" stroke="currentColor" stroke-width="1.3"/><path d="M3 13.5c.7-2.4 2.7-3.5 5-3.5s4.3 1.1 5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></span>
+                  <span class="acc-name"><b>Your Google account</b><small>chrome.identity · beta only</small></span>
+                  <span class="acc-chevron" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="m4 6 4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                </button>
+                <div class="collapse" id="acc-body-3">
+                  <div class="acc-body"><p>Used only when you start the API beta. It lists your own Classroom files through Google's official API. The sign-in token stays in your browser and never reaches the developer.<em>This row appears only for users who see the beta.</em></p></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="demo-hint">Click a row to expand or collapse it.</p>
+          <div class="ia-note"><b>Information architecture:</b> reference. Always available, progressive disclosure per row, mechanism named. Zero interruptions anywhere else.</div>
+          <div class="policy-note"><b>Keeps round 1's rule:</b> narrowest-permission framing; the same three reasons back the required dashboard justifications.</div>
+        </div>
+
+      </div>
+      <div class="pick-bar">
+        <span class="pick-label">Your pick · 02 permissions explainer</span>
+        <div class="pick" role="radiogroup" aria-label="Pick for permissions explainer">
+          <button type="button" role="radio" aria-checked="false" data-key="permissions" data-val="t1">Treatment 1 — first-run sheet</button>
+          <button type="button" role="radio" aria-checked="false" data-key="permissions" data-val="t2">Treatment 2 — reference rows</button>
+          <button type="button" role="radio" aria-checked="false" data-key="permissions" data-val="edit">Edit again</button>
+        </div>
+        <span class="pick-state" id="state-permissions">not decided</span>
+      </div>
+    </div>
+
+    <!-- ================= 03 · API BETA WARNING ================= -->
+    <div class="sec" id="surface-api-warning">
+      <div class="sec-head">
+        <div class="sec-label">03 · API (beta) risk warning</div>
+        <span class="req recommended">RECOMMENDED · transparency</span>
+      </div>
+      <h2>Heads-up at the selector — a calm caption vs an explicit confirm</h2>
+      <p class="desc">No store rule demands a beta warning, but the beta changes the trust model: a Google sign-in scope is added. Stillwater reframes the warning as a note, not an alarm. The question is how active the moment should be.</p>
+      <div class="duo">
+
+        <div class="card">
+          <div class="card-head"><span class="t-tag">Treatment 1</span><span class="req recommended">RECOMMENDED</span></div>
+          <h3>The calm caption — a note where the eye already is</h3>
+          <p class="why"><b>The idea:</b> selecting API β reveals a quiet note under the selector. It names what changes and promises the way back, in body-gray rather than warning-yellow. It leaves when the engine changes.</p>
+          <div class="stage360">
+            <div class="stage-title">Popup · engine selector (live)</div>
+            <div class="stage-pad">
+              <div class="p-label" style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:6px;">Engine</div>
+              <div class="seg" id="api-seg1" role="group" aria-label="Engine selector, caption demo">
+                <button type="button" aria-pressed="false" data-eng="legacy">Legacy</button>
+                <button type="button" aria-pressed="true" data-eng="new">New</button>
+                <button type="button" aria-pressed="false" data-eng="api">API <span class="beta">β</span></button>
+              </div>
+              <div class="api-caption" id="api-caption1" role="note">
+                <span class="cap-ic" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.2" stroke="currentColor" stroke-width="1.3"/><path d="M8 7.2v3.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="5" r=".9" fill="currentColor"/></svg></span>
+                <p><b>API (beta) is new.</b> It signs you in with Google and lists your files through Google's official API. It can be slower to start, and it can break when Google changes. Legacy and New stay one click away.</p>
+              </div>
+            </div>
+          </div>
+          <p class="demo-hint">Click API β to show the caption; Legacy or New hides it.</p>
+          <div class="ia-note"><b>Information architecture:</b> passive and contextual. Zero friction; the note lives exactly where the choice happens and never blocks it.</div>
+          <div class="policy-note"><b>Tone shift from round 1:</b> the yellow warning card becomes a body-gray note — Stillwater keeps the facts (experimental, may break, way back) and drops the alarm.</div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="t-tag">Treatment 2</span><span class="req recommended">RECOMMENDED</span></div>
+          <h3>The confirm — one explicit "try it" with the way back shown first</h3>
+          <p class="why"><b>The idea:</b> the first API β pick opens a small card that states the three facts as choices, and the user confirms. After that first confirm, the calm caption from Treatment 1 takes over. One active moment, then quiet.</p>
+          <div class="stage360">
+            <div class="stage-title">Popup · engine selector, first beta pick (live)</div>
+            <div class="stage-pad">
+              <div class="p-label" style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:6px;">Engine</div>
+              <div class="seg" id="api-seg2" role="group" aria-label="Engine selector, confirm demo">
+                <button type="button" aria-pressed="false" data-eng="legacy">Legacy</button>
+                <button type="button" aria-pressed="true" data-eng="new">New</button>
+                <button type="button" aria-pressed="false" data-eng="api">API <span class="beta">β</span></button>
+              </div>
+              <div class="confirm" id="api-confirm" role="group" aria-label="Before you switch to the beta">
+                <div id="api-confirm-ask">
+                  <h5>Before you switch to the beta</h5>
+                  <ul>
+                    <li>Google asks for permission on Google's own screen.</li>
+                    <li>Your sign-in is used only while you run a beta download — never in the background.</li>
+                    <li>One click returns you to New at any time.</li>
+                  </ul>
+                  <div class="confirm-actions">
+                    <button type="button" class="btn btn-ghost" id="api-stay">Stay on New</button>
+                    <button type="button" class="btn btn-primary" id="api-try">Try the beta</button>
+                  </div>
+                </div>
+                <div id="api-confirm-on" hidden>
+                  <h5>Beta on</h5>
+                  <ul><li>Listing and downloading now run through Google's official API.</li></ul>
+                  <button type="button" class="way-back" id="api-back">Back to New — one click, everything rolls back</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="demo-hint">Click API β → confirm or stay. After "Try the beta", the way back is one click.</p>
+          <div class="ia-note"><b>Information architecture:</b> active consent. The scope change gets a decision, not just a note. Once confirmed, the standing echo is a single line, not a card.</div>
+          <div class="policy-note"><b>Connects to round 1's consent trail:</b> Google's own OAuth screen carries the legal grant; this card prepares the user and names the rollback.</div>
+        </div>
+
+      </div>
+      <div class="pick-bar">
+        <span class="pick-label">Your pick · 03 API-beta warning</span>
+        <div class="pick" role="radiogroup" aria-label="Pick for API beta warning">
+          <button type="button" role="radio" aria-checked="false" data-key="api" data-val="t1">Treatment 1 — calm caption</button>
+          <button type="button" role="radio" aria-checked="false" data-key="api" data-val="t2">Treatment 2 — confirm</button>
+          <button type="button" role="radio" aria-checked="false" data-key="api" data-val="edit">Edit again</button>
+        </div>
+        <span class="pick-state" id="state-api">not decided</span>
+      </div>
+    </div>
+
+    <!-- ================= 04 · COPYRIGHT / TOS REMINDER ================= -->
+    <div class="sec" id="surface-copyright">
+      <div class="sec-head">
+        <div class="sec-label">04 · Copyright / ToS reminder for downloaded materials</div>
+        <span class="req recommended">RECOMMENDED · strongly advised</span>
+      </div>
+      <h2>Responsible use — one gate before the first big run vs an echo that never interrupts</h2>
+      <p class="desc">A downloader is a neutral tool, but classroom-wide scale is where overzealous use begins. Round 1 prototyped a checkbox dialog. Round 2 asks a sharper question: interrupt once, or never interrupt and carry the reminder in the action itself?</p>
+      <div class="duo">
+
+        <div class="card">
+          <div class="card-head"><span class="t-tag">Treatment 1</span><span class="req recommended">RECOMMENDED</span></div>
+          <h3>The one-time gate — a short word before the first full download</h3>
+          <p class="why"><b>The idea:</b> before the first classroom-wide run, a small dialog states the duty in two sentences and asks for one specific check. Shown once per profile. Every later run stays silent.</p>
+          <div class="stage360">
+            <div class="stage-title">Popup · before first classroom-wide download (live)</div>
+            <div id="gate-host">
+              <div class="dlg-scrim">
+                <div class="dlg" role="dialog" aria-label="One quick word before your first full download">
+                  <h4>One quick word before your first full download</h4>
+                  <p>Materials in a classroom belong to the people who made them — your teachers and school.</p>
+                  <p>Keep the files for your own study, and follow your school's rules.</p>
+                  <label>
+                    <input type="checkbox" id="gate-check">
+                    <span>I will use these files for my own study</span>
+                  </label>
+                  <div class="dlg-actions">
+                    <button type="button" class="btn btn-ghost" id="gate-cancel">Not now</button>
+                    <button type="button" class="btn btn-primary" id="gate-go" disabled>Download</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="sheet-gone" id="gate-gone" hidden><span id="gate-gone-txt">Acknowledged once — stored on this device.</span> <button type="button" id="gate-again">Show it again</button></div>
+          </div>
+          <p class="demo-hint">The check unlocks Download. "Not now" means no download.</p>
+          <div class="ia-note"><b>Information architecture:</b> interrupt once, then silence. The specific check ("for my own study") replaces a hollow "I agree". Afterward, the approved footer notice carries the echo.</div>
+          <div class="policy-note"><b>Keeps round 1's rule:</b> dismissal without the check blocks the run; the acknowledgment is a flat key (e.g. <code>ipReminderAcknowledged</code>).</div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="t-tag">Treatment 2</span><span class="req recommended">RECOMMENDED</span></div>
+          <h3>The standing echo — context in the action, zero interruptions</h3>
+          <p class="why"><b>The idea:</b> no dialog, ever. The reminder lives in the same glance as the action: the button's sub-line says who the files are for, and the success state closes the loop. Options About repeats the line.</p>
+          <div class="stage360">
+            <div class="stage-title">Popup · classroom action (static states)</div>
+            <div class="stage-pad">
+              <div class="echo-cells">
+                <div>
+                  <div class="cell-label">Idle</div>
+                  <div class="cta">
+                    <span class="cta-row">
+                      <span class="cta-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0 3-3m-3 3L5 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 12.5h11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+                      <span class="cta-txt"><b>Download Classroom</b><small>24 files across 4 posts · for your own study</small></span>
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <div class="cell-label">Success</div>
+                  <div class="cta is-success" role="status">
+                    <span class="cta-row">
+                      <span class="cta-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="m3.5 8.5 3 3 6-7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                      <span class="cta-txt"><b>Done — 24 files</b><small>In your Downloads folder · files belong to their owners</small></span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="demo-hint">Static cells — the full water-fill motion lives in popup-direction-a.html.</p>
+          <div class="ia-note"><b>Information architecture:</b> ambient. The reminder is inseparable from the action, so it cannot be skipped and never interrupts. Repetition does the work the dialog did.</div>
+          <div class="policy-note"><b>Same legal ground as round 1:</b> no facilitation of infringement; naming the duty holder ("their owners") on the two highest-attention surfaces.</div>
+        </div>
+
+      </div>
+      <div class="pick-bar">
+        <span class="pick-label">Your pick · 04 copyright reminder</span>
+        <div class="pick" role="radiogroup" aria-label="Pick for copyright reminder">
+          <button type="button" role="radio" aria-checked="false" data-key="copyright" data-val="t1">Treatment 1 — one-time gate</button>
+          <button type="button" role="radio" aria-checked="false" data-key="copyright" data-val="t2">Treatment 2 — standing echo</button>
+          <button type="button" role="radio" aria-checked="false" data-key="copyright" data-val="edit">Edit again</button>
+        </div>
+        <span class="pick-state" id="state-copyright">not decided</span>
+      </div>
+    </div>
+
+    <!-- ================= 05 · LIMITED USE ================= -->
+    <div class="sec" id="surface-limited-use">
+      <div class="sec-head">
+        <div class="sec-label">05 · Limited Use disclosure</div>
+        <span class="req required">REQUIRED · store + dashboard</span>
+        <span class="req recommended">RECOMMENDED · in-product echo</span>
+      </div>
+      <h2>The API affirmation — the terse legal pair vs an answered-questions block</h2>
+      <p class="desc">Because the beta uses Google APIs, the store requires the exact Limited Use sentence in the dashboard and the privacy policy. The in-product echo is recommended. Both treatments keep the sentence verbatim; they differ in how much human framing surrounds it.</p>
+      <div class="duo">
+
+        <div class="card">
+          <div class="card-head"><span class="t-tag">Treatment 1</span><span class="req recommended">RECOMMENDED</span></div>
+          <h3>The two-line block — plain first, legal second, nothing else</h3>
+          <p class="why"><b>The idea:</b> the minimum honest echo. One plain sentence a student understands, then the exact policy sentence, smaller and dimmer. Reviewers find their sentence; users read theirs.</p>
+          <div class="stage-opt">
+            <div class="stage-title">Options · API section</div>
+            <div class="opt-block">
+              <h4>API (beta) — data use</h4>
+              <p>The beta only lists and downloads files from classrooms you are enrolled in.</p>
+              <div class="lu-line">The use of information received from Google APIs will adhere to the Chrome Web Store User Data Policy, including the Limited Use requirements.</div>
+            </div>
+          </div>
+          <div class="ia-note"><b>Information architecture:</b> terse. Two lines, fixed order, never merged into one paragraph. The sentence stays verbatim for review.</div>
+          <div class="policy-note"><b>Keeps round 1's rule:</b> the exact sentence appears in the dashboard disclosure and the privacy policy; this echo costs two lines and preempts review questions.</div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="t-tag">Treatment 2</span><span class="req recommended">RECOMMENDED</span></div>
+          <h3>The answered-questions block — the why, then the legal line as a footnote</h3>
+          <p class="why"><b>The idea:</b> the affirmation arrives with receipts. Three questions cover read / kept / shared, including that the sign-in token is used only when the user starts a beta download. The exact sentence closes the block as a footnote.</p>
+          <div class="stage-opt">
+            <div class="stage-title">Options · API section, expanded disclosure</div>
+            <div class="qa">
+              <h4>How the beta handles your data</h4>
+              <div class="qa-row"><b>What does it read?</b><span>Titles and download links for files in classrooms you are enrolled in.</span></div>
+              <div class="qa-row"><b>What stays on this device?</b><span>Your sign-in token and your download history. The token is used only when you start a beta download.</span></div>
+              <div class="qa-row"><b>Who gets a copy?</b><span>No one. Nothing is sent to the developer.</span></div>
+              <div class="lu-line" style="margin-top:10px;">The use of information received from Google APIs will adhere to the Chrome Web Store User Data Policy, including the Limited Use requirements.</div>
+            </div>
+          </div>
+          <div class="ia-note"><b>Information architecture:</b> reassurance-shaped. Each line answers one user question; the legal sentence remains verbatim, visually a footnote, for reviewers.</div>
+          <div class="policy-note"><b>Store-side anchor (REQUIRED):</b> the dashboard affirmation and the privacy policy carry the legal weight; this block keeps the product consistent with them.</div>
+        </div>
+
+      </div>
+      <div class="pick-bar">
+        <span class="pick-label">Your pick · 05 Limited Use disclosure</span>
+        <div class="pick" role="radiogroup" aria-label="Pick for Limited Use disclosure">
+          <button type="button" role="radio" aria-checked="false" data-key="limited" data-val="t1">Treatment 1 — two-line block</button>
+          <button type="button" role="radio" aria-checked="false" data-key="limited" data-val="t2">Treatment 2 — answered questions</button>
+          <button type="button" role="radio" aria-checked="false" data-key="limited" data-val="edit">Edit again</button>
+        </div>
+        <span class="pick-state" id="state-limited">not decided</span>
+      </div>
+    </div>
+
+    <div class="page-foot">
+      Classroom Quick Downloader · legal round 2 prototypes · branch prototypes/1.8.9 · Stillwater tokens from popup-direction-a.html · ballot mechanics from decide.html · picks stay in this browser (localStorage) and leave only through "Copy my choices" · nothing here ships.
+    </div>
+  </main>
+
+</div>
+
+<script>
+  /* ============ Ballot state — localStorage key cqd-189-legal-r2 (round-1 keys untouched) ============ */
+  var STORE_KEY = 'cqd-189-legal-r2';
+  var state = { privacy: null, permissions: null, api: null, copyright: null, limited: null, notes: '' };
+  var SURFACES = [
+    { key: 'privacy',     num: '01', name: 'privacy row',           vals: { t1: 'Treatment 1 — quiet line',        t2: 'Treatment 2 — ledger',            edit: 'Edit again' } },
+    { key: 'permissions', num: '02', name: 'permissions explainer', vals: { t1: 'Treatment 1 — first-run sheet',   t2: 'Treatment 2 — reference rows',    edit: 'Edit again' } },
+    { key: 'api',         num: '03', name: 'API-beta warning',      vals: { t1: 'Treatment 1 — calm caption',      t2: 'Treatment 2 — confirm',           edit: 'Edit again' } },
+    { key: 'copyright',   num: '04', name: 'copyright reminder',    vals: { t1: 'Treatment 1 — one-time gate',     t2: 'Treatment 2 — standing echo',     edit: 'Edit again' } },
+    { key: 'limited',     num: '05', name: 'Limited Use disclosure',vals: { t1: 'Treatment 1 — two-line block',    t2: 'Treatment 2 — answered questions',edit: 'Edit again' } }
+  ];
+  var SURFACE_KEYS = SURFACES.map(function (s) { return s.key; });
+
+  function save() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* private mode etc. */ }
+  }
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return;
+      var saved = JSON.parse(raw);
+      SURFACE_KEYS.forEach(function (k) { if (saved[k]) state[k] = saved[k]; });
+      if (typeof saved.notes === 'string') state.notes = saved.notes;
+    } catch (e) { /* corrupted store — start clean */ }
+  }
+
+  function buildMarkdown() {
+    var L = ['LEGAL ROUND 2 BALLOT'];
+    SURFACES.forEach(function (s) {
+      var v = state[s.key];
+      L.push(s.num + ' ' + s.name + ': ' + (v ? s.vals[v] : '—'));
+    });
+    if (state.notes.trim()) L.push('notes: ' + state.notes.trim());
+    return L.join('\n');
+  }
+  function renderBallot() {
+    document.getElementById('ballot-list').innerHTML = SURFACES.map(function (s) {
+      var v = state[s.key];
+      return '<div class="bl-row"><dt>' + s.num + ' ' + s.name + '</dt><dd class="' + (v ? 'set' : '') + '">' + (v ? s.vals[v] : '—') + '</dd></div>';
+    }).join('');
+    var decided = SURFACE_KEYS.filter(function (k) { return state[k]; }).length;
+    document.getElementById('ballot-progress').textContent = decided + ' of ' + SURFACE_KEYS.length + ' decided';
+    SURFACES.forEach(function (s) {
+      var el = document.getElementById('state-' + s.key);
+      if (el) el.textContent = state[s.key] ? 'picked: ' + state[s.key] : 'not decided';
+    });
+    document.getElementById('ballot-md').textContent = buildMarkdown();
+  }
+
+  /* ============ Pick controls — radio pills with arrow-key nav (decide.html pattern) ============ */
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('button[role="radio"][data-key]');
+    if (!btn) return;
+    state[btn.dataset.key] = btn.dataset.val;
+    document.querySelectorAll('button[role="radio"][data-key="' + btn.dataset.key + '"]').forEach(function (b) {
+      b.setAttribute('aria-checked', String(b === btn));
+    });
+    renderBallot(); save();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].indexOf(e.key) === -1) return;
+    var btn = e.target.closest ? e.target.closest('button[role="radio"][data-key]') : null;
+    if (!btn) return;
+    var group = Array.prototype.slice.call(document.querySelectorAll('button[role="radio"][data-key="' + btn.dataset.key + '"]'));
+    var idx = group.indexOf(btn);
+    var next = (idx + (e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : -1) + group.length) % group.length;
+    group[next].focus(); group[next].click();
+    e.preventDefault();
+  });
+
+  /* ============ Notes ============ */
+  document.getElementById('ballot-notes').addEventListener('input', function () {
+    state.notes = this.value;
+    document.getElementById('ballot-md').textContent = buildMarkdown();
+    save();
+  });
+
+  /* ============ Copy + reset (decide.html clipboard fallback pattern) ============ */
+  function flashCopied() {
+    var b = document.getElementById('ballot-copy');
+    b.textContent = 'Copied to clipboard ✓'; b.classList.add('copied');
+    setTimeout(function () { b.textContent = 'Copy my choices'; b.classList.remove('copied'); }, 2200);
+  }
+  function fallbackCopy(text, done) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (err) {}
+    document.body.removeChild(ta);
+    if (ok) done();
+    else {
+      document.querySelector('.ballot-preview').open = true;
+      alert('Clipboard blocked — the ballot is shown under "Preview markdown"; select and copy it there.');
+    }
+  }
+  document.getElementById('ballot-copy').addEventListener('click', function () {
+    var md = buildMarkdown();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(md).then(flashCopied, function () { fallbackCopy(md, flashCopied); });
+    } else {
+      fallbackCopy(md, flashCopied);
+    }
+  });
+  (function () {
+    var btn = document.getElementById('ballot-reset'), armed = false, t = null;
+    btn.addEventListener('click', function () {
+      if (!armed) {
+        armed = true; btn.textContent = 'Click again to confirm';
+        t = setTimeout(function () { armed = false; btn.textContent = 'Reset all picks'; }, 3000);
+        return;
+      }
+      clearTimeout(t); armed = false; btn.textContent = 'Reset all picks';
+      SURFACE_KEYS.forEach(function (k) { state[k] = null; });
+      state.notes = '';
+      document.querySelectorAll('button[role="radio"][data-key]').forEach(function (b) {
+        b.setAttribute('aria-checked', 'false');
+      });
+      document.getElementById('ballot-notes').value = '';
+      try { localStorage.removeItem(STORE_KEY); } catch (err) {}
+      renderBallot();
+    });
+  })();
+
+  /* ============ Ballot collapse ============ */
+  (function () {
+    var panel = document.getElementById('ballot'), btn = document.getElementById('ballot-collapse');
+    btn.addEventListener('click', function () {
+      var collapsed = panel.classList.toggle('collapsed');
+      btn.textContent = collapsed ? 'Show' : 'Hide';
+      btn.setAttribute('aria-expanded', String(!collapsed));
+    });
+    if (window.innerWidth < 700) {
+      panel.classList.add('collapsed'); btn.textContent = 'Show'; btn.setAttribute('aria-expanded', 'false');
+    }
+  })();
+
+  /* ============ Reduce motion — system detect + demo toggle ============ */
+  (function () {
+    var btn = document.getElementById('rm-toggle'), label = document.getElementById('rm-state');
+    function apply(on) {
+      document.body.classList.toggle('reduce-motion', on);
+      document.documentElement.classList.toggle('reduce-motion', on); /* mirrors media query: scroll-behavior auto */
+      btn.setAttribute('aria-pressed', String(on));
+      label.textContent = on ? 'Reduced motion' : 'Standard motion';
+    }
+    btn.addEventListener('click', function () { apply(!document.body.classList.contains('reduce-motion')); });
+    try { if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) apply(true); } catch (err) {}
+  })();
+
+  /* ============ 01 T2 — privacy ledger expand/collapse ============ */
+  (function () {
+    var t = document.getElementById('priv-ledger-toggle'), p = document.getElementById('priv-ledger'), close = document.getElementById('priv-ledger-close');
+    function set(open) {
+      p.classList.toggle('open', open);
+      t.setAttribute('aria-expanded', String(open));
+    }
+    t.addEventListener('click', function () { set(!p.classList.contains('open')); });
+    close.addEventListener('click', function () { set(false); t.focus(); });
+  })();
+
+  /* ============ 02 T1 — first-run sheet dismiss (demo restores) ============ */
+  (function () {
+    var host = document.getElementById('perm-sheet-host'), gone = document.getElementById('perm-gone');
+    document.getElementById('perm-ok').addEventListener('click', function () {
+      host.hidden = true; gone.hidden = false;
+    });
+    document.getElementById('perm-again').addEventListener('click', function () {
+      host.hidden = false; gone.hidden = true;
+    });
+  })();
+
+  /* ============ 02 T2 — options accordion ============ */
+  document.querySelectorAll('.acc-head').forEach(function (h) {
+    h.addEventListener('click', function () {
+      var row = h.parentElement;
+      var body = document.getElementById(h.getAttribute('aria-controls'));
+      var open = !row.classList.contains('open');
+      row.classList.toggle('open', open);
+      body.classList.toggle('open', open);
+      h.setAttribute('aria-expanded', String(open));
+    });
+  });
+
+  /* ============ 03 T1 — calm caption on engine pick ============ */
+  (function () {
+    var btns = document.querySelectorAll('#api-seg1 button');
+    var cap = document.getElementById('api-caption1');
+    btns.forEach(function (b) {
+      b.addEventListener('click', function () {
+        btns.forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+        var show = b.dataset.eng === 'api';
+        cap.classList.toggle('show', show);
+        cap.setAttribute('aria-hidden', String(!show));
+      });
+    });
+    cap.setAttribute('aria-hidden', 'true');
+  })();
+
+  /* ============ 03 T2 — confirm card state machine ============ */
+  (function () {
+    var btns = document.querySelectorAll('#api-seg2 button');
+    var card = document.getElementById('api-confirm');
+    var ask = document.getElementById('api-confirm-ask'), on = document.getElementById('api-confirm-on');
+    var current = 'new', betaOn = false;
+    function select(engine) {
+      btns.forEach(function (x) { x.setAttribute('aria-pressed', String(x.dataset.eng === engine)); });
+    }
+    function showCard(show) {
+      card.classList.toggle('show', show);
+      card.setAttribute('aria-hidden', String(!show));
+    }
+    function setMode(mode) {
+      ask.hidden = mode !== 'ask';
+      on.hidden = mode !== 'on';
+      card.classList.toggle('beta-on', mode === 'on');
+    }
+    btns.forEach(function (b) {
+      b.addEventListener('click', function () {
+        var eng = b.dataset.eng;
+        if (eng === 'api' && !betaOn) {
+          setMode('ask');
+          showCard(true);
+          // keep the previous engine lit until the user confirms
+          select(current === 'api' ? 'new' : current);
+        } else if (eng === 'api' && betaOn) {
+          select('api'); showCard(false);
+        } else {
+          betaOn = false; current = eng;
+          select(eng); showCard(false); setMode('ask');
+        }
+      });
+    });
+    document.getElementById('api-try').addEventListener('click', function () {
+      betaOn = true; current = 'api';
+      select('api'); setMode('on');
+    });
+    document.getElementById('api-stay').addEventListener('click', function () {
+      current = 'new'; select('new'); showCard(false);
+    });
+    document.getElementById('api-back').addEventListener('click', function () {
+      betaOn = false; current = 'new';
+      select('new'); showCard(false); setMode('ask');
+    });
+    card.setAttribute('aria-hidden', 'true');
+  })();
+
+  /* ============ 04 T1 — one-time gate dialog (demo restores) ============ */
+  (function () {
+    var check = document.getElementById('gate-check'), go = document.getElementById('gate-go');
+    var host = document.getElementById('gate-host'), gone = document.getElementById('gate-gone'), goneTxt = document.getElementById('gate-gone-txt');
+    check.addEventListener('change', function () { go.disabled = !check.checked; });
+    go.addEventListener('click', function () {
+      go.textContent = 'Downloading…';
+      setTimeout(function () {
+        host.hidden = true;
+        goneTxt.textContent = 'Acknowledged once — stored on this device.';
+        gone.hidden = false;
+        go.textContent = 'Download';
+      }, 1200);
+    });
+    document.getElementById('gate-cancel').addEventListener('click', function () {
+      host.hidden = true;
+      goneTxt.textContent = 'Dismissed without the check — no download ran.';
+      gone.hidden = false;
+      check.checked = false; go.disabled = true;
+    });
+    document.getElementById('gate-again').addEventListener('click', function () {
+      host.hidden = false; gone.hidden = true;
+    });
+  })();
+
+  /* ============ Init ============ */
+  load();
+  renderBallot();
+</script>
+</body>
+</html>
