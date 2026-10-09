@@ -865,7 +865,6 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
       --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
       
       /* Layout */
-      --sidebar-width: 220px;
       --content-max-width: 1200px;
       --header-height: 64px;
     }
@@ -932,11 +931,6 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
       to { opacity: 1; transform: translateY(0); }
     }
     
-    @keyframes slideInLeft {
-      from { opacity: 0; transform: translateX(-100%); }
-      to { opacity: 1; transform: translateX(0); }
-    }
-    
     @keyframes fadeIn {
       from { opacity: 0; }
       to { opacity: 1; }
@@ -970,7 +964,7 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
     }
     
     /* ===== GLOBAL CURSOR STYLES ===== */
-    a, button, .btn, .nav-item, .clickable, .toggle-switch, [role="button"] {
+    a, button, .btn, .tab-item, .clickable, .toggle-switch, [role="button"] {
       cursor: pointer;
     }
     
@@ -978,41 +972,31 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
       cursor: help;
     }
     
-    /* ===== LAYOUT WRAPPER ===== */
-    .dashboard-layout {
-      display: flex;
-      min-height: 100vh;
-    }
-    
-    /* ===== SIDEBAR NAVIGATION ===== */
-    .sidebar-nav {
-      position: fixed;
-      left: 0;
+    /* ===== TAB BAR NAVIGATION (was fixed sidebar) ===== */
+    .tab-bar-wrap {
+      position: sticky;
       top: 0;
-      width: var(--sidebar-width);
-      height: 100vh;
-      background: var(--bg-card);
-      border-right: 1px solid var(--border);
-      padding: 0;
-      display: flex;
-      flex-direction: column;
       z-index: 1000;
-      overflow-y: auto;
-      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: var(--shadow-lg);
-    }
-    
-    .nav-header {
-      padding: var(--space-2) var(--space-2);
-      margin-bottom: var(--space-4);
+      background: var(--bg-base);
       border-bottom: 1px solid var(--border);
+      padding: var(--space-3) 0;
+      margin: calc(var(--space-6) * -1) 0 var(--space-5);
     }
 
     @keyframes pulse-accent {
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: 0.6; transform: scale(0.85); }
     }
-    
+
+    .tab-bar-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: var(--space-3);
+      margin-bottom: var(--space-3);
+    }
+
     .nav-brand {
       font-size: 0.95rem;
       font-weight: 700;
@@ -1028,7 +1012,7 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
       font-variant-numeric: tabular-nums;
       font-size: 0.95rem;
       color: var(--text-primary);
-      padding: 10px 12px;
+      padding: 6px 12px;
       border-radius: 10px;
       border: 1px solid var(--border-subtle);
       background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
@@ -1061,7 +1045,7 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
     }
 
     .nav-utc-time {
-      font-size: 1.5rem;
+      font-size: 1.1rem;
       color: var(--text-primary);
       letter-spacing: 0.06em;
       white-space: nowrap;
@@ -1069,112 +1053,142 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
     }
 
     .nav-utc-time.is-12h {
-      font-size: 1.1rem;
+      font-size: 0.95rem;
     }
-    
-    .nav-subtitle {
-      font-size: 0.7rem;
-      color: var(--text-muted);
-      margin-top: 2px;
+
+    /* Card search input (tab bar) */
+    .card-search {
+      flex: 1;
+      min-width: 180px;
+      max-width: 340px;
+      padding: 8px 14px;
+      border-radius: var(--radius-full);
+      border: 1px solid var(--border);
+      background: var(--bg-input);
+      color: var(--text-primary);
+      font-size: 0.85rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
     }
-    
-    .nav-section {
-      padding: var(--space-3) var(--space-4);
-      font-size: 0.65rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
+
+    .card-search:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.18);
+    }
+
+    .card-search::placeholder {
       color: var(--text-disabled);
     }
-    
-    .nav-item {
-      display: flex;
-      align-items: center;
-      gap: var(--space-3);
-      padding: var(--space-3) var(--space-5);
-      margin: var(--space-1) var(--space-2);
-      border-radius: var(--radius-sm);
+
+    .search-empty {
+      display: none;
+      margin-top: var(--space-3);
+      padding: var(--space-3) var(--space-4);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      background: var(--bg-surface);
       color: var(--text-muted);
-      text-decoration: none;
       font-size: 0.85rem;
-      font-weight: 500;
-      transition: all 0.2s ease;
-      cursor: pointer;
     }
-    
-    .nav-item:hover {
+
+    .search-empty.visible {
+      display: block;
+    }
+
+    /* Horizontal tab list */
+    .tab-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-1);
+      padding: var(--space-1);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      overflow-x: auto;
+    }
+
+    .tab-item {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-3);
+      margin: 0;
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      font-weight: 500;
+      font-family: inherit;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+    }
+
+    .tab-item:hover {
       color: var(--text-secondary);
       background: var(--bg-hover);
     }
-    
-    .nav-item.active {
+
+    .tab-item[aria-selected="true"] {
       color: var(--accent-hover);
-      background: rgba(59, 130, 246, 0.3);
-      border-left: 2px solid var(--accent);
-      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-      margin-left: 0;
-      padding-left: calc(var(--space-5) - 2px);
+      background: rgba(59, 130, 246, 0.22);
+      border-color: rgba(59, 130, 246, 0.45);
     }
-    
-    .nav-item.active .nav-icon {
+
+    .tab-item[aria-selected="true"] .nav-icon {
       color: var(--accent);
     }
-    
-    /* Scroll offset for section anchors */
-    section[id] {
-      scroll-margin-top: 24px;
+
+    .tab-item:focus-visible,
+    .card-search:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 2px;
     }
-    
-    .nav-icon {
-      width: 18px;
-      height: 18px;
-      flex-shrink: 0;
-    }
-    
-    .nav-item.danger-nav {
+
+    .tab-item.danger-nav {
       color: var(--danger);
     }
-    
-    .nav-item.danger-nav:hover {
+
+    .tab-item.danger-nav:hover {
       background: var(--danger-bg);
     }
-    
-    /* Hamburger Menu */
-    .hamburger-btn {
-      display: none;
-      position: fixed;
-      top: var(--space-4);
-      left: var(--space-4);
-      z-index: 1100;
-      width: 44px;
-      height: 44px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      align-items: center;
-      justify-content: center;
-      color: var(--text-primary);
+
+    .tab-item.danger-nav[aria-selected="true"] {
+      color: #fca5a5;
+      background: var(--danger-bg);
+      border-color: rgba(239, 68, 68, 0.45);
     }
-    
-    .hamburger-btn svg {
-      width: 22px;
-      height: 22px;
+
+    .nav-icon {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
     }
-    
-    .sidebar-overlay {
+
+    .nav-icon.danger-icon {
+      color: var(--danger);
+    }
+
+    /* Tab panels: one visible at a time; search mode shows all */
+    .tab-panel[hidden] {
       display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.6);
-      z-index: 999;
-      backdrop-filter: blur(4px);
+    }
+
+    body.searching .tab-panel[hidden] {
+      display: block;
+    }
+
+    /* Scroll offset for section anchors */
+    section[id] {
+      scroll-margin-top: 96px;
     }
     
     /* ===== MAIN CONTENT ===== */
     .main-content {
       flex: 1;
-      margin-left: var(--sidebar-width);
+      margin-left: 0;
       padding: var(--space-6);
       max-width: 100%;
       overflow-x: hidden;
@@ -2623,29 +2637,22 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
     }
     
     @media (max-width: 768px) {
-      /* Hide sidebar, show hamburger */
-      .sidebar-nav {
-        transform: translateX(-100%);
+      /* Tab bar: single horizontal scroll strip on small screens */
+      .tab-bar {
+        flex-wrap: nowrap;
       }
-      
-      .sidebar-nav.open {
-        transform: translateX(0);
-        animation: slideInLeft 0.3s ease;
+
+      .tab-item {
+        padding: var(--space-2);
+        font-size: 0.78rem;
       }
-      
-      .hamburger-btn {
-        display: flex;
+
+      .card-search {
+        max-width: none;
       }
-      
-      .sidebar-overlay.active {
-        display: block;
-        animation: fadeIn 0.2s ease;
-      }
-      
+
       .main-content {
-        margin-left: 0;
         padding: var(--space-4);
-        padding-top: calc(var(--space-4) + 60px); /* Space for hamburger */
       }
       
       .page {
@@ -3097,21 +3104,9 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
   </style>
 </head>
 <body>
-  <!-- Hamburger Menu Button -->
-  <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle navigation">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <line x1="3" y1="6" x2="21" y2="6"/>
-      <line x1="3" y1="12" x2="21" y2="12"/>
-      <line x1="3" y1="18" x2="21" y2="18"/>
-    </svg>
-  </button>
-  
-  <!-- Sidebar Overlay -->
-  <div class="sidebar-overlay" id="sidebar-overlay"></div>
-
-  <!-- Sidebar Navigation -->
-  <nav class="sidebar-nav" id="sidebar">
-    <div class="nav-header">
+  <!-- Tab Bar Navigation (was fixed sidebar; same sections, IA only) -->
+  <div class="tab-bar-wrap" id="tab-bar-wrap">
+    <div class="tab-bar-top">
       <div class="nav-brand nav-utc" id="nav-utc-clock" data-tooltip="Current UTC time. All analytics and flush windows use UTC.">
         <div class="nav-utc-row">
           <span class="nav-utc-dot"></span>
@@ -3119,60 +3114,60 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
         </div>
         <span class="nav-utc-time">--:--:--</span>
       </div>
+      <input
+        type="search"
+        id="card-search"
+        class="card-search"
+        data-card-search
+        placeholder="Search cards across all tabs…"
+        aria-label="Search cards across all tabs"
+        autocomplete="off"
+      />
     </div>
-    
-    <div class="nav-section">Analytics</div>
-    <a href="#overview" class="nav-item active" data-section="overview">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-      Overview
-    </a>
-    <a href="#breakdown" class="nav-item" data-section="breakdown">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
-      Breakdown
-    </a>
-    
-    <div class="nav-section">System</div>
-    <a href="#system" class="nav-item" data-section="system">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.82 1.18V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0-1.18-2.82H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08z"/></svg>
-      Environment
-    </a>
-    <a href="#quota" class="nav-item" data-section="quota">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-      Quota & Mode
-    </a>
-    <a href="#remote-config" class="nav-item" data-section="remote-config">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v6"/><path d="M12 17v6"/><path d="M4.22 4.22l4.24 4.24"/><path d="M15.54 15.54l4.24 4.24"/><path d="M1 12h6"/><path d="M17 12h6"/><path d="M4.22 19.78l4.24-4.24"/><path d="M15.54 8.46l4.24-4.24"/></svg>
-      Remote Config
-    </a>
-    
-    <div class="nav-section">Tools</div>
-    <a href="#debug" class="nav-item" data-section="debug">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      Debug & Actions
-    </a>
-    <a href="#raw" class="nav-item" data-section="raw">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-      Raw JSON
-    </a>
-    
-    <div class="nav-section">Security</div>
-    <a href="#security" class="nav-item" data-section="security">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-      Security Settings
-    </a>
-    
-    <div class="nav-section">Data</div>
-    <a href="#datahub" class="nav-item" data-section="datahub">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
-      Data Hub
-    </a>
-    
-    <div class="nav-section">Admin</div>
-    <a href="#danger" class="nav-item danger-nav" data-section="danger">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      Danger Zone
-    </a>
-  </nav>
+    <div class="tab-bar" id="tab-bar" role="tablist" aria-label="Dashboard sections">
+      <button type="button" class="tab-item active" id="tab-overview" role="tab" data-section="overview" aria-selected="true" aria-controls="panel-overview" tabindex="0">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Overview
+      </button>
+      <button type="button" class="tab-item" id="tab-breakdown" role="tab" data-section="breakdown" aria-selected="false" aria-controls="panel-breakdown" tabindex="-1">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+        Breakdown
+      </button>
+      <button type="button" class="tab-item" id="tab-system" role="tab" data-section="system" aria-selected="false" aria-controls="panel-system" tabindex="-1">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.82 1.18V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0-1.18-2.82H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08z"/></svg>
+        Environment
+      </button>
+      <button type="button" class="tab-item" id="tab-quota" role="tab" data-section="quota" aria-selected="false" aria-controls="panel-quota" tabindex="-1">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        Quota &amp; Mode
+      </button>
+      <button type="button" class="tab-item" id="tab-remote-config" role="tab" data-section="remote-config" aria-selected="false" aria-controls="panel-remote-config" tabindex="-1">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v6"/><path d="M12 17v6"/><path d="M4.22 4.22l4.24 4.24"/><path d="M15.54 15.54l4.24 4.24"/><path d="M1 12h6"/><path d="M17 12h6"/><path d="M4.22 19.78l4.24-4.24"/><path d="M15.54 8.46l4.24-4.24"/></svg>
+        Remote Config
+      </button>
+      <button type="button" class="tab-item" id="tab-debug" role="tab" data-section="debug" aria-selected="false" aria-controls="panel-debug" tabindex="-1">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Debug &amp; Actions
+      </button>
+      <button type="button" class="tab-item" id="tab-raw" role="tab" data-section="raw" aria-selected="false" aria-controls="panel-raw" tabindex="-1">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        Raw JSON
+      </button>
+      <button type="button" class="tab-item" id="tab-security" role="tab" data-section="security" aria-selected="false" aria-controls="panel-security" tabindex="-1">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Security Settings
+      </button>
+      <button type="button" class="tab-item" id="tab-datahub" role="tab" data-section="datahub" aria-selected="false" aria-controls="panel-datahub" tabindex="-1">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        Data Hub
+      </button>
+      <button type="button" class="tab-item danger-nav" id="tab-danger" role="tab" data-section="danger" aria-selected="false" aria-controls="panel-danger" tabindex="-1">
+        <svg class="nav-icon danger-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Danger Zone
+      </button>
+    </div>
+    <div class="search-empty" id="search-empty" data-search-empty role="status">No cards match your search. Clear the query to see every tab.</div>
+  </div>
 
   <!-- Main Content -->
   <div class="main-content">
@@ -3228,8 +3223,9 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
     </div>
 
     <main>
+      <div class="tab-panel" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" data-panel="overview">
       <!-- Top Cards -->
-      <section class="card" id="overview">
+      <section class="card" id="overview" data-card>
         <div class="grid-5">
           <div class="metric" id="card-downloads" data-tooltip="Downloads completed successfully (status=success)">
             <div class="metric-label">Total Downloads</div>
@@ -3292,7 +3288,7 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
           }
         </div>
       </section>
-      <section class="card" id="pipeline-health">
+      <section class="card" id="pipeline-health" data-card>
         <div class="health-header">
           <h2>Pipeline Health</h2>
           <span class="health-chip ok" id="pipeline-health-chip">OK</span>
@@ -3345,7 +3341,9 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
           </div>
         </div>
       </section>
-      <section class="card" id="breakdown">
+      </div>
+      <div class="tab-panel" id="panel-breakdown" role="tabpanel" aria-labelledby="tab-breakdown" data-panel="breakdown" hidden>
+      <section class="card" id="breakdown" data-card>
         <div class="section-title-row">
           <h2>Breakdown by Dimensions</h2>
           <button id="breakdown-toggle-all" class="btn-toggle-all" type="button" data-expanded="false">
@@ -3497,10 +3495,11 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
           </div>
         </div>
       </section>
-
+      </div>
+      <div class="tab-panel" id="panel-system" role="tabpanel" aria-labelledby="tab-system" data-panel="system" hidden>
 
       <!-- Buffer, Timing & Environment -->
-      <section class="card" id="system">
+      <section class="card" id="system" data-card>
         <h2>Buffer, Timing & Environment</h2>
         <div class="grid-3">
           <div id="card-buffer">
@@ -3539,9 +3538,11 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
           </div>
         </div>
       </section>
+      </div>
+      <div class="tab-panel" id="panel-quota" role="tabpanel" aria-labelledby="tab-quota" data-panel="quota" hidden>
 
       <!-- Worker Quota & Mode -->
-      <section class="card" id="quota">
+      <section class="card" id="quota" data-card>
         <h2>Worker Quota & Mode</h2>
         <div class="split-section">
           <!-- Left: Usage -->
@@ -3611,9 +3612,11 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
           </div>
         </div>
       </section>
+      </div>
+      <div class="tab-panel" id="panel-remote-config" role="tabpanel" aria-labelledby="tab-remote-config" data-panel="remote-config" hidden>
 
       <!-- Remote Config -->
-      <section class="card" id="remote-config">
+      <section class="card" id="remote-config" data-card>
         <h2>Remote Config</h2>
         <div class="section-subtitle">
           Controls pushed to the extension. Changes apply on the next config fetch.
@@ -3776,9 +3779,11 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
         </div>
         <div class="rc-status" id="config-status" data-tooltip="Status of the last config operation.">Idle</div>
       </section>
+      </div>
+      <div class="tab-panel" id="panel-debug" role="tabpanel" aria-labelledby="tab-debug" data-panel="debug" hidden>
 
       <!-- Debug & Actions -->
-      <section class="card" id="debug">
+      <section class="card" id="debug" data-card>
         <h2>Debug & Actions</h2>
         <div class="split-section">
           <!-- Debug & Endpoints -->
@@ -3844,7 +3849,7 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
         </div>
       </section>
 
-      <section class="card" id="legacy-changelog-disabled">
+      <section class="card" id="legacy-changelog-disabled" data-card>
         <h2>Extension Changelog Controls Moved</h2>
         <div class="section-subtitle" style="margin-bottom: 12px;">
           Legacy Cloudflare sections <strong>📢 Release Publishing</strong> and
@@ -3855,25 +3860,29 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
           analytics dashboard under <code>Extension Changelog</code>.
         </div>
       </section>
+      </div>
+      <div class="tab-panel" id="panel-raw" role="tabpanel" aria-labelledby="tab-raw" data-panel="raw" hidden>
 
       <!-- Raw /stats payload -->
-      <section class="card" id="raw">
+      <section class="card" id="raw" data-card>
         <h2>Raw /stats payload</h2>
         <div class="metric-sub">
           Direct JSON returned by <code>/stats</code>
         </div>
         <pre id="raw-stats-json" class="code-block code-block-large">${rawStatsJson}</pre>
       </section>
-      <section class="card" id="raw-pipeline-health">
+      <section class="card" id="raw-pipeline-health" data-card>
         <h2>Raw /pipeline-health payload</h2>
         <div class="metric-sub">
           Direct JSON returned by <code>/pipeline-health</code>
         </div>
         <pre id="raw-health-json" class="code-block code-block-large">${rawHealthJson}</pre>
       </section>
+      </div>
+      <div class="tab-panel" id="panel-security" role="tabpanel" aria-labelledby="tab-security" data-panel="security" hidden>
 
       <!-- Security Settings -->
-      <section class="card" id="security">
+      <section class="card" id="security" data-card>
         <h2>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
           Security Settings
@@ -4016,9 +4025,11 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
           </div>
         </div>
       </section>
+      </div>
+      <div class="tab-panel" id="panel-datahub" role="tabpanel" aria-labelledby="tab-datahub" data-panel="datahub" hidden>
 
       <!-- Data Hub -->
-      <section class="card" id="datahub">
+      <section class="card" id="datahub" data-card>
         <h2>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
           Data Hub
@@ -4144,9 +4155,11 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
           </div>
         </div>
       </section>
+      </div>
+      <div class="tab-panel" id="panel-danger" role="tabpanel" aria-labelledby="tab-danger" data-panel="danger" hidden>
 
       <!-- Admin Controls / Danger Zone -->
-      <section class="card danger-zone" id="danger">
+      <section class="card danger-zone" id="danger" data-card>
         <div class="danger-header">
           <div>
             <div class="danger-title">Admin Controls / Danger Zone</div>
@@ -4265,6 +4278,7 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
           </div>
         </div>
       </section>
+      </div>
     </main>
 
     <!-- Context Modal -->
@@ -7091,69 +7105,126 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string): str
       fetchPipelineHealth();
       setInterval(fetchPipelineHealth, 60000);
       
-      // ===== SCROLL TRACKING FOR SIDEBAR NAV =====
-      const sections = document.querySelectorAll('section[id]');
-      const navItems = document.querySelectorAll('.nav-item[data-section]');
-      
-      const observerOptions = {
-        root: null,
-        rootMargin: '-20% 0px -60% 0px',
-        threshold: 0
-      };
-      
-      const observerCallback = (entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            const sectionId = entry.target.getAttribute('id');
-            navItems.forEach(item => {
-              if (item.getAttribute('data-section') === sectionId) {
-                item.classList.add('active');
-              } else {
-                item.classList.remove('active');
-              }
-            });
+      // ===== TAB NAVIGATION + CARD SEARCH =====
+      // Sidebar sections became tabs (same sections, same content, IA only).
+      // Active tab persists via location.hash; existing #anchors keep working:
+      // any hash resolves to the tab panel that contains the target section.
+      const tabs = Array.prototype.slice.call(document.querySelectorAll('.tab-item[data-section]'));
+      const panels = Array.prototype.slice.call(document.querySelectorAll('.tab-panel[data-panel]'));
+      const sections = Array.prototype.slice.call(document.querySelectorAll('section[id]'));
+
+      // Map every section id to the panel that contains it.
+      const panelForSection = {};
+      panels.forEach((panel) => {
+        const name = panel.getAttribute('data-panel');
+        panel.querySelectorAll('section[id]').forEach((section) => {
+          panelForSection[section.getAttribute('id')] = name;
+        });
+        panelForSection[name] = name;
+      });
+
+      function selectTab(name, opts) {
+        const options = opts || {};
+        const known = panels.some((panel) => panel.getAttribute('data-panel') === name);
+        if (!known) return false;
+        tabs.forEach((tab) => {
+          const isTarget = tab.getAttribute('data-section') === name;
+          tab.setAttribute('aria-selected', isTarget ? 'true' : 'false');
+          tab.setAttribute('tabindex', isTarget ? '0' : '-1');
+          tab.classList.toggle('active', isTarget);
+        });
+        panels.forEach((panel) => {
+          const isTarget = panel.getAttribute('data-panel') === name;
+          if (document.body.classList.contains('searching')) {
+            // Search mode shows every panel; hidden is driven by the search filter.
+            panel.hidden = false;
+          } else {
+            panel.hidden = !isTarget;
           }
         });
-      };
-      
-      const observer = new IntersectionObserver(observerCallback, observerOptions);
-      sections.forEach(section => observer.observe(section));
-      
+        if (options.updateHash && location.hash !== '#' + name) {
+          history.replaceState(null, '', '#' + name);
+        }
+        if (options.focusSection) {
+          const target = document.getElementById(name);
+          if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        return true;
+      }
+
+      tabs.forEach((tab, idx) => {
+        tab.addEventListener('click', () => {
+          selectTab(tab.getAttribute('data-section'), { updateHash: true, focusSection: true });
+        });
+        tab.addEventListener('keydown', (event) => {
+          // APG tabs pattern: Left/Right move, Home/End jump, focus activates.
+          const key = event.key;
+          let nextIdx = null;
+          if (key === 'ArrowRight') nextIdx = (idx + 1) % tabs.length;
+          else if (key === 'ArrowLeft') nextIdx = (idx - 1 + tabs.length) % tabs.length;
+          else if (key === 'Home') nextIdx = 0;
+          else if (key === 'End') nextIdx = tabs.length - 1;
+          if (nextIdx === null) return;
+          event.preventDefault();
+          tabs[nextIdx].focus();
+          selectTab(tabs[nextIdx].getAttribute('data-section'), { updateHash: true });
+        });
+      });
+
+      function activateFromHash() {
+        const raw = (location.hash || '').replace(/^#/, '');
+        if (!raw) {
+          selectTab('overview');
+          return;
+        }
+        const panelName = panelForSection[raw] || null;
+        if (panelName) {
+          selectTab(panelName, { focusSection: raw !== panelName });
+        }
+      }
+      window.addEventListener('hashchange', activateFromHash);
+      activateFromHash();
+
+      // ===== CARD SEARCH (client-side, debounced; filters cards across tabs) =====
+      const searchInput = document.getElementById('card-search');
+      const searchEmpty = document.getElementById('search-empty');
+      const searchCards = Array.prototype.slice.call(document.querySelectorAll('main section[data-card]'));
+      let searchTimer = null;
+
+      function applyCardSearch() {
+        const query = (searchInput.value || '').trim().toLowerCase();
+        const searching = query.length > 0;
+        document.body.classList.toggle('searching', searching);
+        let matches = 0;
+        searchCards.forEach((card) => {
+          const hit = !searching || (card.textContent || '').toLowerCase().indexOf(query) !== -1;
+          card.hidden = searching && !hit;
+          if (hit) matches += 1;
+        });
+        tabs.forEach((tab) => {
+          tab.disabled = searching;
+        });
+        panels.forEach((panel) => {
+          panel.hidden = false;
+        });
+        if (searchEmpty) {
+          searchEmpty.classList.toggle('visible', searching && matches === 0);
+        }
+        if (!searching) {
+          activateFromHash();
+        }
+      }
+
+      if (searchInput) {
+        searchInput.addEventListener('input', () => {
+          if (searchTimer) clearTimeout(searchTimer);
+          searchTimer = setTimeout(applyCardSearch, 150);
+        });
+      }
+
       // Add staggered entrance animation to cards
       document.querySelectorAll('.card').forEach((card, i) => {
         card.style.animationDelay = (i * 0.06) + 's';
-      });
-      
-      // ===== HAMBURGER MENU TOGGLE =====
-      const hamburgerBtn = document.getElementById('hamburger-btn');
-      const sidebar = document.getElementById('sidebar');
-      const sidebarOverlay = document.getElementById('sidebar-overlay');
-      
-      function toggleSidebar() {
-        sidebar.classList.toggle('open');
-        sidebarOverlay.classList.toggle('active');
-      }
-      
-      function closeSidebar() {
-        sidebar.classList.remove('open');
-        sidebarOverlay.classList.remove('active');
-      }
-      
-      if (hamburgerBtn) {
-        hamburgerBtn.addEventListener('click', toggleSidebar);
-      }
-      
-      if (sidebarOverlay) {
-        sidebarOverlay.addEventListener('click', closeSidebar);
-      }
-      
-      // Close sidebar on nav item click (mobile)
-      navItems.forEach(item => {
-        item.addEventListener('click', () => {
-          if (window.innerWidth <= 768) {
-            closeSidebar();
-          }
-        });
       });
     })();
   </script>

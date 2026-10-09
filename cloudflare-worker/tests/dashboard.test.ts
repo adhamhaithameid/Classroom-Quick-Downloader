@@ -250,3 +250,103 @@ describe("Dashboard security rendering", () => {
     expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
   });
 });
+
+describe("Dashboard tabbed navigation", () => {
+  it("renders an accessible tablist with a tab and panel per section", () => {
+    const html = renderDashboard(makeStats());
+    expect(html).toContain('role="tablist"');
+    expect(html).toContain('aria-label="Dashboard sections"');
+
+    const tabIds = [
+      "overview",
+      "breakdown",
+      "system",
+      "quota",
+      "remote-config",
+      "debug",
+      "raw",
+      "security",
+      "datahub",
+      "danger",
+    ];
+    for (const id of tabIds) {
+      expect(html).toContain(`id="tab-${id}"`);
+      expect(html).toContain(`id="panel-${id}"`);
+      expect(html).toContain(`aria-controls="panel-${id}"`);
+      expect(html).toContain(`aria-labelledby="tab-${id}"`);
+    }
+    expect((html.match(/role="tab"/g) || []).length).toBe(tabIds.length);
+    expect((html.match(/role="tabpanel"/g) || []).length).toBe(tabIds.length);
+    // Roving tabindex: exactly one focusable tab at render time.
+    expect((html.match(/tabindex="0"/g) || []).length).toBe(1);
+  });
+
+  it("keeps overview as the default active tab and marks the rest hidden", () => {
+    const html = renderDashboard(makeStats());
+    expect(html).toContain('id="tab-overview"');
+    expect(/id="tab-overview"[^>]*aria-selected="true"/.test(html)).toBe(true);
+    expect(/id="panel-overview"[^>]*(\s|)hidden/.test(html)).toBe(false);
+    expect(/id="panel-danger"[^>]*hidden/.test(html)).toBe(true);
+  });
+
+  it("keeps existing section anchors inside their panels for deep links", () => {
+    const html = renderDashboard(makeStats());
+    // pipeline-health lives inside the overview panel; raw-pipeline-health in raw.
+    const overviewPanel = html.slice(
+      html.indexOf('id="panel-overview"'),
+      html.indexOf('id="panel-breakdown"'),
+    );
+    expect(overviewPanel).toContain('id="pipeline-health"');
+    const rawPanel = html.slice(
+      html.indexOf('id="panel-raw"'),
+      html.indexOf('id="panel-security"'),
+    );
+    expect(rawPanel).toContain('id="raw-pipeline-health"');
+  });
+
+  it("drops the old sidebar and hamburger markup", () => {
+    const html = renderDashboard(makeStats());
+    expect(html).not.toContain("sidebar-nav");
+    expect(html).not.toContain("hamburger-btn");
+    expect(html).not.toContain("sidebar-overlay");
+    expect(html).not.toContain("nav-item");
+  });
+
+  it("wires keyboard operability and hash persistence in the client script", () => {
+    const html = renderDashboard(makeStats());
+    expect(html).toContain("hashchange");
+    expect(html).toContain("history.replaceState");
+    expect(html).toContain("'ArrowRight'");
+    expect(html).toContain("'ArrowLeft'");
+    expect(html).toContain("'Home'");
+    expect(html).toContain("'End'");
+    expect(html).toContain("focus-visible");
+  });
+});
+
+describe("Dashboard card search", () => {
+  it("renders the search box with data-* filter hooks and the empty state", () => {
+    const html = renderDashboard(makeStats());
+    expect(html).toContain('id="card-search"');
+    expect(html).toContain("data-card-search");
+    expect(html).toContain('data-search-empty');
+    expect(html).toContain('id="search-empty"');
+    expect(html).toContain("No cards match your search");
+  });
+
+  it("marks every filterable card with data-card", () => {
+    const html = renderDashboard(makeStats());
+    const count = (html.match(/data-card>/g) || []).length;
+    expect(count).toBe(13);
+    for (const id of ["overview", "pipeline-health", "breakdown", "raw-pipeline-health", "danger"]) {
+      expect(html).toContain(`id="${id}" data-card>`);
+    }
+  });
+
+  it("debounces search input at ~150ms and searches card text client-side", () => {
+    const html = renderDashboard(makeStats());
+    expect(html).toContain("setTimeout(applyCardSearch, 150)");
+    expect(html).toContain("main section[data-card]");
+    expect(html).toContain("body.classList.toggle('searching'");
+  });
+});
