@@ -5,9 +5,16 @@
  * The background cannot render, so celebration lives here: on mount and on
  * every stats-record change the component looks at milestonePending, plays
  * ONE confetti burst (skipped entirely under the reduced-motion double gate
- * — OS query OR the in-app setting), shows an aria-live=polite toast, and
- * clears the pending flag so the same milestone never plays twice. The
- * confetti canvas is aria-hidden; keyboard behavior is untouched.
+ * — OS query OR the in-app setting), and shows an aria-live=polite toast.
+ * The confetti canvas is aria-hidden; keyboard behavior is untouched.
+ *
+ * Celebration fix round: the popup CLAIMS before it plays. The claim (see
+ * claimMilestoneCelebration) atomically read-and-clears pending inside the
+ * background's serialized chain, replacing the old play-then-clear — so
+ * with the popup AND a Classroom page open, exactly one surface wins each
+ * milestone. Only a { claimed: true } ack plays; a lost ack (dead channel)
+ * means no play and no write — the pending milestone replays later instead
+ * of risking a double celebration.
  *
  * Ordering guarantee: the reduced-motion setting loads BEFORE the first play
  * decision — a popup opened straight onto a pending milestone never bursts
@@ -18,7 +25,7 @@ import {
   formatMilestoneCount,
   levelFor,
   loadDownloadStats,
-  requestMilestoneClear,
+  claimMilestoneCelebration,
   watchDownloadStats,
 } from '../../src/history/download-stats';
 import { celebrationUsesConfetti, fireConfettiBurst } from '../../src/celebration/confetti';
@@ -36,14 +43,19 @@ export function MilestoneCelebration() {
     // One play per pending value, even if storage re-fires the same record.
     if (playedPendingRef.current === pending) return;
     playedPendingRef.current = pending;
+    void claimAndPlay();
+  }
+
+  // The claim decides WHO plays; the ack's milestone (not the watcher's
+  // hint) decides WHAT plays — a batch may have superseded the hint with a
+  // higher rung between the read and the ack.
+  async function claimAndPlay(): Promise<void> {
+    const claim = await claimMilestoneCelebration();
+    if (!claim.ok || !claim.claimed || claim.milestone === null) return;
     if (celebrationUsesConfetti(settingsRef.current.reducedMotionPreferred)) {
       void fireConfettiBurst();
     }
-    setToast(pending);
-    // Hand the milestone off through the background message: the clear runs
-    // on the service worker's serialized settle chain, so it can never
-    // revert an in-flight settle write. The popup never touches the record.
-    void requestMilestoneClear();
+    setToast(claim.milestone);
   }
 
   // Initial read, strictly ordered: settings settle FIRST, then the stats

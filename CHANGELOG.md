@@ -18,6 +18,7 @@ Lifetime download milestones: the extension celebrates your progress with confet
 - Levels: start at level 0 and climb to level 18 — every milestone is a level.
 - Added milestone celebrations at 18 lifetime totals (1 through 1,000,000, with celebration points at 2,500, 7,500, 25,000, 75,000, and 750,000).
 - Added the popup download tracker: lifetime count, progress toward the next milestone, and a replayable celebration toast.
+- Added milestone celebrations on the active Classroom tab: a dedicated classroom-only content script plays the same once-per-milestone overlay (banner plus confetti unless reduced motion applies), and the popup stays quiet for a milestone the page already played.
 - Added the dormant download-count reporting path: per-install aggregate counts reach the worker and the admin dashboard once enabled.
 
 ### Changed

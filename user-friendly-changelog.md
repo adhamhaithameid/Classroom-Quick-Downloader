@@ -5,6 +5,7 @@ Your downloads now celebrate with you: confetti at 18 lifetime milestones and a 
 - Levels: you start at level 0 and climb to level 18 — every milestone is a level.
 - Confetti celebrations when you hit a milestone — from your very first file to one million.
 - A download tracker in the popup showing your lifetime total and how far you are from the next celebration.
+- Milestones now celebrate right on the Classroom page — a small corner banner (with confetti) plays once per milestone, shared with the popup.
 ### Changed
 - New celebration points keep milestones coming more often as your total grows (2,500; 7,500; 25,000; 75,000; 750,000).
 - Celebrations respect your reduce-motion setting — you still get the good news, minus the confetti.

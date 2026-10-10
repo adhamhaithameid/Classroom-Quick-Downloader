@@ -266,10 +266,105 @@ export async function clearMilestonePending(): Promise<DownloadStats> {
 }
 
 /**
+ * Fix round 1 — atomic celebration claim. Read-and-clear pending in ONE
+ * turn of the serialized settle chain: the first surface to claim wins and
+ * receives the rung; every later claim answers null. There is no window
+ * where two surfaces both read a set pending — the chain serializes the
+ * claim against settles and clears alike.
+ *
+ * Returns the claimed rung, or null when nothing was pending. A false
+ * return (chain rejection) must be treated as "not claimed".
+ */
+export async function claimMilestonePending(): Promise<number | null> {
+  const run = countChain.then(async (): Promise<number | null> => {
+    const { stats } = await loadDownloadStats();
+    if (stats.milestonePending === null) return null;
+    const claimed = stats.milestonePending;
+    const next = { ...stats, milestonePending: null };
+    await saveDownloadStats(next);
+    return claimed;
+  });
+  countChain = run.catch(() => undefined);
+  return run;
+}
+
+/**
+ * Message type a celebration surface (popup OR the Classroom page) sends to
+ * claim the pending milestone. The background answers
+ * { ok: true, claimed, milestone } after running claimMilestonePending on
+ * the serialized chain — the single atomic arbiter of who plays.
+ */
+export const CQD_STATS_CLAIM_CELEBRATION = 'CQD_STATS_CLAIM_CELEBRATION';
+
+export interface MilestoneClaimResult {
+  /** True when the background acked at all (false: no channel or timeout). */
+  ok: boolean;
+  /** True when this surface's claim won the pending milestone. */
+  claimed: boolean;
+  /** The claimed rung (valid only when claimed). */
+  milestone: number | null;
+}
+
+const CLAIM_ACK_TIMEOUT_MS = 1500;
+
+const CLAIM_LOST: MilestoneClaimResult = { ok: false, claimed: false, milestone: null };
+
+/**
+ * Surface-side claim: ask the background to atomically claim-and-clear the
+ * pending milestone. ONLY a { ok, claimed: true } answer may play — a lost
+ * ack (no messaging channel, hostile background, timeout) means NO play and
+ * NO local write: playing unclaimed risks a double celebration, and a
+ * content-script fallback write would violate the one-writer record rule.
+ * A celebration missed on a dead channel replays on the next surface open.
+ */
+export async function claimMilestoneCelebration(): Promise<MilestoneClaimResult> {
+  const chromeRef = globalThis as {
+    chrome?: {
+      runtime?: {
+        sendMessage?: (msg: unknown, cb: (res?: MilestoneClaimResult) => void) => void;
+        lastError?: unknown;
+      };
+    };
+  };
+  const sendMessage = chromeRef.chrome?.runtime?.sendMessage;
+  if (typeof sendMessage !== 'function') return CLAIM_LOST;
+  return new Promise<MilestoneClaimResult>((resolve) => {
+    let settled = false;
+    const finish = (value: MilestoneClaimResult): void => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish(CLAIM_LOST), CLAIM_ACK_TIMEOUT_MS);
+    try {
+      sendMessage({ type: CQD_STATS_CLAIM_CELEBRATION }, (res?: MilestoneClaimResult) => {
+        void chromeRef.chrome?.runtime?.lastError;
+        clearTimeout(timer);
+        finish({
+          ok: res?.ok === true,
+          claimed: res?.ok === true && res?.claimed === true,
+          milestone: res?.ok === true && res?.claimed === true ? (res.milestone ?? null) : null,
+        });
+      });
+    } catch {
+      clearTimeout(timer);
+      finish(CLAIM_LOST);
+    }
+  });
+}
+
+/**
  * Message type the popup sends to clear a milestone pending. Every stats
  * write lives in the background service worker's serialized settle chain —
  * a popup-context load-then-set could revert a settle saving in flight
  * (lost update during batch storms with the popup open).
+ *
+ * Fix round 1: the celebration surfaces now CLAIM instead (see
+ * claimMilestoneCelebration). This clear path remains for callers that
+ * already know a milestone played and want the record tidied; its
+ * ack-timeout fallback writes the record from the CALLING context, so it
+ * must never be called from a content script — gate the fallback off there
+ * (localFallback: false). The page never writes the record.
  */
 export const CQD_STATS_CLEAR_MILESTONE = 'CQD_STATS_CLEAR_MILESTONE';
 
@@ -279,9 +374,15 @@ const CLEAR_ACK_TIMEOUT_MS = 1500;
  * Popup-side clear: ask the background to clear the pending flag on the
  * serialized chain. Falls back to the local chain only when no messaging
  * channel exists (tests, non-extension contexts) or the background never
- * acks — the record then behaves exactly as before fix round 1.
+ * acks — the record then behaves exactly as before fix round 1. The
+ * fallback is a POPUP-context resilience net: callers outside the
+ * extension pages must pass { localFallback: false } (a content-script
+ * write would race the chain the fallback exists to protect).
  */
-export async function requestMilestoneClear(): Promise<void> {
+export async function requestMilestoneClear(
+  opts: { localFallback?: boolean } = {},
+): Promise<void> {
+  const localFallback = opts.localFallback !== false;
   const chromeRef = globalThis as {
     chrome?: {
       runtime?: {
@@ -292,7 +393,7 @@ export async function requestMilestoneClear(): Promise<void> {
   };
   const sendMessage = chromeRef.chrome?.runtime?.sendMessage;
   if (typeof sendMessage !== 'function') {
-    await clearMilestonePending();
+    if (localFallback) await clearMilestonePending();
     return;
   }
   const acked = await new Promise<boolean>((resolve) => {
@@ -314,7 +415,7 @@ export async function requestMilestoneClear(): Promise<void> {
       finish(false);
     }
   });
-  if (!acked) await clearMilestonePending();
+  if (!acked && localFallback) await clearMilestonePending();
 }
 
 /**

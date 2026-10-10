@@ -1,9 +1,11 @@
 // filepath: extension/tests/popup-milestone-celebration.test.ts
 /**
- * 1.9.0 confetti, commit 2 — the popup celebration. Contract: ONE burst per
- * pending milestone, pending cleared after play, the reduced-motion double
- * gate (OS query OR in-app setting) leaves the toast only, and a milestone
- * landing while the popup is open celebrates live through the storage watch.
+ * 1.9.0 confetti, commit 2; celebration fix round — the popup celebration.
+ * Contract: the popup CLAIMS the milestone through the background's atomic
+ * chain arbiter and only a claimed:true ack plays ONE burst; the reduced-
+ * motion double gate (OS query OR in-app setting) leaves the toast only; a
+ * milestone landing while the popup is open celebrates live through the
+ * storage watch; a claim lost to the Classroom page plays nothing.
  * canvas-confetti is module-mocked: the burst is asserted by call, not drawn.
  */
 import { createElement } from 'react';
@@ -14,7 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MilestoneCelebration } from '../entrypoints/popup/MilestoneCelebration';
 import { celebrationUsesConfetti, prefersReducedMotionOS } from '../src/celebration/confetti';
 import {
-  CQD_STATS_CLEAR_MILESTONE,
+  CQD_STATS_CLAIM_CELEBRATION,
   DOWNLOAD_STATS_INTEGRITY_KEY,
   DOWNLOAD_STATS_KEY,
 } from '../src/history/download-stats';
@@ -59,13 +61,16 @@ function installMemoryStore(): Store {
     for (const [k, v] of Object.entries(kv)) store.set(k, v);
     cb?.();
   });
-  // Fix round 1: simulated background. It acks the clear message and does
-  // the record write itself, exactly like the service worker's chain.
+  // Fix round 1 + celebration fix round: simulated background arbiter. The
+  // claim branch clears the pending atomically in the same turn it answers,
+  // exactly like claimMilestonePending on the serialized settle chain.
   (chrome.runtime as { sendMessage?: unknown }).sendMessage = vi.fn(
-    (msg: { type?: string }, cb?: (res?: { ok?: boolean }) => void) => {
-      if (msg?.type === CQD_STATS_CLEAR_MILESTONE) {
+    (msg: { type?: string }, cb?: (res?: Record<string, unknown>) => void) => {
+      if (msg?.type === CQD_STATS_CLAIM_CELEBRATION) {
         const stats = store.get(DOWNLOAD_STATS_KEY) as Record<string, unknown> | undefined;
-        if (stats) {
+        const milestone =
+          stats && typeof stats.milestonePending === 'number' ? stats.milestonePending : null;
+        if (milestone !== null) {
           const next = { ...stats, milestonePending: null };
           store.set(DOWNLOAD_STATS_KEY, next);
           store.set(
@@ -73,8 +78,8 @@ function installMemoryStore(): Store {
             computeChecksum(JSON.stringify(next)),
           );
         }
+        cb?.({ ok: true, claimed: milestone !== null, milestone });
       }
-      cb?.({ ok: true });
     },
   );
   return store;
@@ -269,6 +274,41 @@ describe('milestone celebration (1.9.0 commit 2)', () => {
     await flushTasks();
     expect(burstFn).not.toHaveBeenCalled();
     expect(container.querySelector('.cqd-milestone-toast')).toBeNull();
+  });
+
+  it('stays quiet for a milestone a Classroom page already celebrated and cleared', async () => {
+    // Cross-surface dedupe (1.9.1): the page played the celebration and its
+    // clear already rode the background chain, so the record carries no
+    // pending when the popup opens — and the page's clear write arriving as
+    // a storage change while the popup is open must not replay either.
+    seedStats(store, statsRecord({ milestonePending: null }));
+    mount();
+    await flushTasks();
+    expect(burstFn).not.toHaveBeenCalled();
+    expect(container.querySelector('.cqd-milestone-toast')).toBeNull();
+    fireStatsChange();
+    await flushTasks(4);
+    expect(burstFn).not.toHaveBeenCalled();
+    expect(container.querySelector('.cqd-milestone-toast')).toBeNull();
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('does not play when its claim loses to the Classroom page', async () => {
+    // The page's claim won at the arbiter before the popup's arrived; the
+    // honest claimed:false loss must not play and must not write.
+    seedStats(store, statsRecord());
+    (chrome.runtime as { sendMessage?: unknown }).sendMessage = vi.fn(
+      (msg: { type?: string }, cb?: (res?: Record<string, unknown>) => void) => {
+        if (msg?.type === CQD_STATS_CLAIM_CELEBRATION) {
+          cb?.({ ok: true, claimed: false, milestone: null });
+        }
+      },
+    );
+    mount();
+    await flushTasks();
+    expect(burstFn).not.toHaveBeenCalled();
+    expect(container.querySelector('.cqd-milestone-toast')).toBeNull();
+    expect((store.get(DOWNLOAD_STATS_KEY) as Record<string, unknown>).milestonePending).toBe(100);
   });
 
   it('announces the first file with singular copy that names level 1', async () => {
