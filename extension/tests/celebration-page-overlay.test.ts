@@ -1,19 +1,23 @@
 // filepath: extension/tests/celebration-page-overlay.test.ts
 /**
- * 1.9.1 page celebrations — the Classroom-tab surface. Contract: the page
- * plays ONE overlay per pending milestone (confetti burst + banner), clears
- * pending through the existing background chain message, never re-celebrates
- * a pending the popup already cleared (fresh re-check before playing), and
- * collapses to banner-only under the reduced-motion double gate. The banner
- * is interactive-but-small: close button, Esc, auto-dismiss; the positioning
- * layer never intercepts Classroom clicks.
+ * 1.9.1 page celebrations, celebration fix round — the Classroom-tab
+ * surface. Contract: the page CLAIMS the pending milestone through the
+ * background's atomic chain arbiter (CQD_STATS_CLAIM_CELEBRATION) and plays
+ * ONE overlay only on a claimed:true ack — confetti burst + banner. A
+ * claim lost to the popup plays nothing; a claim that never acks plays
+ * nothing and writes nothing (no local fallback — the page never writes
+ * the stats record). The reduced-motion double gate collapses the
+ * celebration to banner-only. The banner is interactive-but-small: close
+ * button, Esc, auto-dismiss; the positioning layer never intercepts
+ * Classroom clicks.
  *
- * canvas-confetti is module-mocked: the burst is asserted by call, not drawn.
- * The entrypoint module is re-imported per test (vi.resetModules) so the
- * claimed-pending guard starts fresh.
+ * canvas-confetti is module-mocked: the burst is asserted by call, not
+ * drawn. The entrypoint module is re-imported per test (vi.resetModules)
+ * so module state starts fresh.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  CQD_STATS_CLAIM_CELEBRATION,
   CQD_STATS_CLEAR_MILESTONE,
   DOWNLOAD_STATS_INTEGRITY_KEY,
   DOWNLOAD_STATS_KEY,
@@ -50,6 +54,11 @@ function statsRecord(overrides: Record<string, unknown> = {}): Record<string, un
   };
 }
 
+/**
+ * Simulated background: the claim branch IS the service worker's arbiter —
+ * it clears the pending atomically in the same turn it answers, exactly
+ * like claimMilestonePending on the serialized chain.
+ */
 function installMemoryStore(): Store {
   const store: Store = new Map();
   (chrome.storage.local.get as any) = vi.fn(
@@ -63,13 +72,13 @@ function installMemoryStore(): Store {
     for (const [k, v] of Object.entries(kv)) store.set(k, v);
     cb?.();
   });
-  // Simulated background: acks the clear message and performs the chained
-  // record write itself, exactly like the service worker's settle chain.
   (chrome.runtime as { sendMessage?: unknown }).sendMessage = vi.fn(
-    (msg: { type?: string }, cb?: (res?: { ok?: boolean }) => void) => {
-      if (msg?.type === CQD_STATS_CLEAR_MILESTONE) {
+    (msg: { type?: string }, cb?: (res?: Record<string, unknown>) => void) => {
+      if (msg?.type === CQD_STATS_CLAIM_CELEBRATION) {
         const stats = store.get(DOWNLOAD_STATS_KEY) as Record<string, unknown> | undefined;
-        if (stats) {
+        const milestone =
+          stats && typeof stats.milestonePending === 'number' ? stats.milestonePending : null;
+        if (milestone !== null) {
           const next = { ...stats, milestonePending: null };
           store.set(DOWNLOAD_STATS_KEY, next);
           store.set(
@@ -77,8 +86,10 @@ function installMemoryStore(): Store {
             computeChecksum(JSON.stringify(next)),
           );
         }
+        cb?.({ ok: true, claimed: milestone !== null, milestone });
+        return;
       }
-      cb?.({ ok: true });
+      if (msg?.type === CQD_STATS_CLEAR_MILESTONE) cb?.({ ok: true });
     },
   );
   return store;
@@ -104,7 +115,7 @@ function fireStatsChange(): void {
 
 /**
  * Deep flush: the boot chain is settings load (with migration write) →
- * watcher attach → stats load → the fresh re-check load → the overlay, and
+ * watcher attach → stats load → the claim round-trip → the overlay, and
  * the burst lands a couple of microtask rounds after the banner (the
  * dynamic canvas-confetti import). Microtask work is deterministic, so a
  * generous fixed depth is exact, not a sleep.
@@ -113,7 +124,7 @@ async function flushTasks(rounds = 40): Promise<void> {
   for (let i = 0; i < rounds; i++) await Promise.resolve();
 }
 
-/** Fresh entrypoint module per test: the claimed-pending guard resets. */
+/** Fresh entrypoint module per test: module state resets. */
 async function boot(): Promise<void> {
   vi.resetModules();
   const mod = await import('../entrypoints/celebration.content');
@@ -129,13 +140,19 @@ function banner(): HTMLElement | null {
   return document.querySelector('.cqd-celebration-banner');
 }
 
-function clearCalls(): number {
+function claimCalls(): number {
+  return ((chrome.runtime.sendMessage as any) as ReturnType<typeof vi.fn>).mock.calls.filter(
+    (c: unknown[]) => (c[0] as { type?: string })?.type === CQD_STATS_CLAIM_CELEBRATION,
+  ).length;
+}
+
+function clearMessageCalls(): number {
   return ((chrome.runtime.sendMessage as any) as ReturnType<typeof vi.fn>).mock.calls.filter(
     (c: unknown[]) => (c[0] as { type?: string })?.type === CQD_STATS_CLEAR_MILESTONE,
   ).length;
 }
 
-describe('milestone celebration on Classroom pages (1.9.1)', () => {
+describe('milestone celebration on Classroom pages (claim arbiter)', () => {
   let store: Store;
 
   beforeEach(() => {
@@ -147,7 +164,8 @@ describe('milestone celebration on Classroom pages (1.9.1)', () => {
   });
 
   afterEach(async () => {
-    // Drain any pending dismiss timers so they never leak into the next test.
+    // Drain pending dismiss + claim-timeout timers so they never leak into
+    // the next test.
     await vi.advanceTimersByTimeAsync(PAGE_BANNER_DISMISS_MS + 3000);
     bannerLayer()?.remove();
     document.body.querySelectorAll(':scope > canvas').forEach((c) => c.remove());
@@ -162,7 +180,7 @@ describe('milestone celebration on Classroom pages (1.9.1)', () => {
     expect(typeof script.main).toBe('function');
   });
 
-  it('plays the overlay when a milestone is pending at page open', async () => {
+  it('plays the overlay when its claim wins a pending milestone at page open', async () => {
     seedStats(store, statsRecord());
     await boot();
     expect(burstFn).toHaveBeenCalledTimes(1);
@@ -179,76 +197,91 @@ describe('milestone celebration on Classroom pages (1.9.1)', () => {
     expect(document.activeElement).toBe(document.body);
   });
 
-  it('clears pending through the background chain message after playing', async () => {
+  it('claims through the background chain and never sends the popup clear message', async () => {
     seedStats(store, statsRecord());
     await boot();
     expect(burstFn).toHaveBeenCalledTimes(1);
     const sendMessage = (chrome.runtime.sendMessage as any) as ReturnType<typeof vi.fn>;
-    // The clear rides CQD_STATS_CLEAR_MILESTONE with a response callback —
+    // The claim rides CQD_STATS_CLAIM_CELEBRATION with a response callback —
     // the ack channel the background's return-true listener keeps open.
     expect(sendMessage).toHaveBeenCalledWith(
-      { type: CQD_STATS_CLEAR_MILESTONE },
+      { type: CQD_STATS_CLAIM_CELEBRATION },
       expect.any(Function),
     );
-    expect(clearCalls()).toBe(1);
+    expect(claimCalls()).toBe(1);
+    // The page never writes and never uses the popup-context clear path:
+    // the claim itself cleared the record inside the background.
+    expect(clearMessageCalls()).toBe(0);
     const cleared = store.get(DOWNLOAD_STATS_KEY) as Record<string, unknown>;
     expect(cleared.milestonePending).toBeNull();
   });
 
-  it('does not celebrate a pending the popup already cleared', async () => {
+  it('does not claim a pending the popup already cleared before page open', async () => {
     // The popup played first: the record carries no pending when the page
-    // boots (the page load is the onChanged dispatch it missed).
+    // boots, so the watcher hint never fires and no claim is even sent.
     seedStats(store, statsRecord({ milestonePending: null }));
     await boot();
     expect(burstFn).not.toHaveBeenCalled();
     expect(banner()).toBeNull();
-    expect(clearCalls()).toBe(0);
+    expect(claimCalls()).toBe(0);
   });
 
-  it('re-checks pending before playing: a clear landing mid-flight wins', async () => {
+  it('does not play when its claim loses to the popup (claimed:false ack)', async () => {
     seedStats(
       store,
       statsRecord({ lifetimeCount: 37, milestonePending: null, lastMilestoneReached: null }),
     );
     await boot();
-    expect(burstFn).not.toHaveBeenCalled();
+    expect(claimCalls()).toBe(0);
 
-    // The settle writes pending=50 and storage fires. The popup clears the
-    // record between the watcher's read and the page's fresh re-check, so
-    // the second stats-key read serves the cleared record.
-    seedStats(
-      store,
-      statsRecord({ lifetimeCount: 50, milestonePending: 50, lastMilestoneReached: 50 }),
-    );
-    let statsKeyReads = 0;
-    const fastGet = chrome.storage.local.get as any;
-    (chrome.storage.local.get as any) = vi.fn(
-      (keys: string[], cb: (r: Record<string, unknown>) => void) => {
-        if ((keys as string[]).includes(DOWNLOAD_STATS_KEY)) {
-          statsKeyReads += 1;
-          if (statsKeyReads === 2) {
-            const cleared = statsRecord({
-              lifetimeCount: 50,
-              lastMilestoneReached: 50,
-              milestonePending: null,
-            });
-            cb({
-              [DOWNLOAD_STATS_KEY]: cleared,
-              [DOWNLOAD_STATS_INTEGRITY_KEY]: computeChecksum(JSON.stringify(cleared)),
-            });
-            return;
-          }
+    // The popup's claim won at the arbiter in the window between the page's
+    // watcher dispatch and the page's own claim: the watcher saw pending
+    // set, but by the time the claim lands the record is cleared and the
+    // arbiter answers an honest claimed:false. The page must not play.
+    (chrome.runtime as { sendMessage?: unknown }).sendMessage = vi.fn(
+      (msg: { type?: string }, cb?: (res?: Record<string, unknown>) => void) => {
+        if (msg?.type === CQD_STATS_CLAIM_CELEBRATION) {
+          cb?.({ ok: true, claimed: false, milestone: null });
         }
-        fastGet(keys, cb);
       },
     );
-
+    seedStats(
+      store,
+      statsRecord({ lifetimeCount: 100, milestonePending: 100, lastMilestoneReached: 100 }),
+    );
     fireStatsChange();
     await flushTasks();
 
+    expect(claimCalls()).toBe(1);
     expect(burstFn).not.toHaveBeenCalled();
     expect(banner()).toBeNull();
-    expect(clearCalls()).toBe(0);
+    expect(clearMessageCalls()).toBe(0);
+  });
+
+  it('does not play or write when the claim never acks (dead MV3 channel)', async () => {
+    seedStats(store, statsRecord());
+    // A hostile channel: the message goes out, no ack ever comes back.
+    (chrome.runtime as { sendMessage?: unknown }).sendMessage = vi.fn(() => undefined);
+    const setSpy = (chrome.storage.local.set as any) as ReturnType<typeof vi.fn>;
+    const statsWrites = (): number =>
+      setSpy.mock.calls.filter(
+        (c: unknown[]) => DOWNLOAD_STATS_KEY in (c[0] as Record<string, unknown>),
+      ).length;
+
+    await boot();
+    // No play before the claim timeout either.
+    expect(burstFn).not.toHaveBeenCalled();
+    expect(banner()).toBeNull();
+    await vi.advanceTimersByTimeAsync(1500);
+    await flushTasks(4);
+
+    expect(burstFn).not.toHaveBeenCalled();
+    expect(banner()).toBeNull();
+    // No local fallback write: the record keeps its pending value. (The
+    // boot's own settings migration write touches settings keys only.)
+    expect(statsWrites()).toBe(0);
+    const after = store.get(DOWNLOAD_STATS_KEY) as Record<string, unknown>;
+    expect(after.milestonePending).toBe(100);
   });
 
   it('celebrates live when a milestone lands while the page is open', async () => {
@@ -273,17 +306,33 @@ describe('milestone celebration on Classroom pages (1.9.1)', () => {
     expect((store.get(DOWNLOAD_STATS_KEY) as Record<string, unknown>).milestonePending).toBeNull();
   });
 
-  it('does not replay for duplicate storage re-fires of the same pending', async () => {
+  it('ignores duplicate storage re-fires of an already-cleared record', async () => {
     seedStats(store, statsRecord());
     await boot();
     expect(burstFn).toHaveBeenCalledTimes(1);
-    // A duplicate onChanged dispatch (or another settle rewrite) must not
-    // burst again: the claimed-pending guard pins one play per value.
-    seedStats(store, statsRecord());
+    // A duplicate onChanged dispatch for the same settle: the claim already
+    // cleared the record, so the hint guard skips — no second claim, no
+    // second play. One play per milestone is guaranteed by the arbiter,
+    // not by page-local state.
     fireStatsChange();
     await flushTasks();
     expect(burstFn).toHaveBeenCalledTimes(1);
-    expect(clearCalls()).toBe(1);
+    expect(claimCalls()).toBe(1);
+  });
+
+  it('replaces the banner when a second milestone claims while one is up', async () => {
+    seedStats(store, statsRecord());
+    await boot();
+    expect(banner()?.textContent).toContain('Level 3 reached — 100 files!');
+    seedStats(
+      store,
+      statsRecord({ lifetimeCount: 250, milestonePending: 250, lastMilestoneReached: 250 }),
+    );
+    fireStatsChange();
+    await flushTasks();
+    const layers = document.querySelectorAll('.cqd-celebration-layer');
+    expect(layers).toHaveLength(1);
+    expect(banner()?.textContent).toContain('Level 4 reached — 250 files!');
   });
 
   it('shows banner only under the OS reduced-motion gate', async () => {

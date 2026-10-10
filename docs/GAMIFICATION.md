@@ -52,20 +52,29 @@ Past level 18 the counter keeps counting; the level stays at 18.
   highest one as `milestonePending` — one confetti burst, not a barrage.
 - **Two celebration surfaces: the popup AND the active Classroom tab.** The
   page side lives in `entrypoints/celebration.content.ts` (injected only on
-  classroom.google.com). It watches the same stats record and plays a small
+  classroom.google.com). It watches the same stats record and shows a small
   bottom-corner banner: confetti burst, close button, Esc, 6-second
   auto-dismiss. The overlay never blocks Classroom — the positioning layer
   is `pointer-events: none`; only the banner card is interactive.
-- **One celebration per milestone across surfaces.** Before playing, the
-  page re-reads pending through the checksummed load path: a milestone the
-  popup already cleared never plays on the page. After playing, the clear
-  rides the background's `CQD_STATS_CLEAR_MILESTONE` chain message (the
-  page, like the popup, never writes the stats record itself), so the
-  popup never replays a milestone the page celebrated.
-- **Confetti plays once.** The celebrating surface clears `milestonePending`
-  after it plays. A missed celebration (no surface open during the
-  download) replays as a toast-only tick on the next popup open, or as a
-  banner on the next Classroom page open.
+- **One celebration per milestone across surfaces — the background is the
+  arbiter.** Before playing, a surface (popup or page) sends
+  `CQD_STATS_CLAIM_CELEBRATION`; the handler runs `claimMilestonePending` —
+  read-and-clear pending in ONE turn of the serialized settle chain — and
+  answers `{claimed: true, milestone}` to exactly one claimant. Only a won
+  claim plays; the loser's ack says `claimed: false`. There is no read-
+  clear window: with the popup and the page open at once, one milestone
+  plays once. If the claim never acks (dead MV3 channel, 1.5s timeout),
+  the surface does not play and writes nothing — a dead channel can skip
+  one celebration (it replays on the next surface open), never double it.
+  The page has no local fallback and never writes the stats record.
+- **Confetti plays once.** Playing and clearing are one atomic step: the
+  winning claim clears `milestonePending` inside the chain. A missed
+  celebration (no surface open during the download) replays as a toast on
+  the next popup open, or as a banner on the next Classroom page open.
+- **The clear path stays popup-only.** `requestMilestoneClear` (and its
+  ack-timeout local write fallback) serves popup-context callers that
+  already know a milestone played; content-script callers must use the
+  claim (or pass `localFallback: false`) — the one-writer rule stands.
 - **Reduced motion has a double gate.** Confetti fires only when both the
   OS `prefers-reduced-motion` check passes and the in-app
   `reducedMotionPreferred` setting allows it. Either gate alone reduces the

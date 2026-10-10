@@ -56,7 +56,12 @@ import {
   clearHistory as clearHistoryEntries,
   searchEntries,
 } from '../../src/history/history-store';
-import { countCompletedDownload, clearMilestonePending } from '../../src/history/download-stats';
+import {
+  countCompletedDownload,
+  clearMilestonePending,
+  claimMilestonePending,
+  CQD_STATS_CLAIM_CELEBRATION,
+} from '../../src/history/download-stats';
 import { reportDownloadCount } from '../utils/analytics/count-reporter';
 import {
   STUDENT_WORK_RESOLVE_PUBLISH_TYPE,
@@ -780,6 +785,21 @@ export default defineBackground(() => {
       void (async () => {
         await clearMilestonePending();
         sendResponse({ ok: true });
+      })();
+      return true;
+    }
+
+    // Celebration fix round: the single atomic arbiter of who plays a
+    // milestone. A surface (popup or the Classroom page) claims before it
+    // plays; claimMilestonePending runs read-and-clear in ONE turn of the
+    // serialized settle chain, so exactly one claimant gets
+    // { claimed: true, milestone } and the loser gets { claimed: false } —
+    // there is no read-clear window to lose. Async ack: return true, same
+    // MV3 contract as the clear branch above.
+    if (message.type === CQD_STATS_CLAIM_CELEBRATION) {
+      void (async () => {
+        const milestone = await claimMilestonePending();
+        sendResponse({ ok: true, claimed: milestone !== null, milestone });
       })();
       return true;
     }
