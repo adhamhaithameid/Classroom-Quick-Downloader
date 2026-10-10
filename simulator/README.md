@@ -81,6 +81,10 @@ a new state in the registry appears on the map automatically.
 - **Live network.** The changelog oracle path is already disabled in the
   production module; no other network calls exist.
 
+## User view
+
+The simulator opens in **User view**: the real extension surface alone — no controls, no notes, exactly what a user sees. A floating pill (bottom-right) offers **Controls** (back to the full scenario UI) and **Annotate**. The choice persists (localStorage `cqd-sim-userview`).
+
 ## Annotate mode (dev tool)
 
 Press **Annotate** in the top bar to leave notes for a fixing agent. It never

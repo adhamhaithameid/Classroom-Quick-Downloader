@@ -32,7 +32,15 @@ const BUTTON_STATES = [
  * runtime: button state classes, flag verdicts, the group water fill, and
  * the copyright gate.
  */
-export function ClassroomRoute({ pageId, params }: { pageId: string; params: URLSearchParams }) {
+export function ClassroomRoute({
+  pageId,
+  params,
+  userView = false,
+}: {
+  pageId: string;
+  params: URLSearchParams;
+  userView?: boolean;
+}) {
   const page = getClassroomPage(pageId) ?? CLASSROOM_PAGES[0]!;
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [options, setOptions] = useState<DriverOptions>({
@@ -75,6 +83,7 @@ export function ClassroomRoute({ pageId, params }: { pageId: string; params: URL
 
   return (
     <div className="sim-classroom">
+      {!userView && (
       <aside className="sim-panel" aria-label="Classroom simulator controls">
         <fieldset className="sim-group">
           <legend>Fixture page</legend>
@@ -233,13 +242,22 @@ export function ClassroomRoute({ pageId, params }: { pageId: string; params: URL
           </div>
         </fieldset>
       </aside>
+      )}
 
-      <main className="sim-stage" aria-label="Simulated Classroom page">
+      <main
+        className={userView ? 'sim-user-stage' : 'sim-stage'}
+        aria-label="Simulated Classroom page"
+      >
+        {!userView && (
         <p className="sim-stage-note">
           Captured fixture markup with the REAL injected stylesheets and renderers.
           {page.rtl ? ' RTL page: body[data-cqd-dir] mirrors production applyDirection.' : ''}
         </p>
-        <div className="sim-frame-wrap" data-testid="classroom-frame-wrap">
+        )}
+        <div
+          className={userView ? 'sim-frame-wrap sim-frame-fullbleed' : 'sim-frame-wrap'}
+          data-testid="classroom-frame-wrap"
+        >
           <iframe
             ref={iframeRef}
             className="sim-classroom-frame"

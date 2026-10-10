@@ -8,7 +8,10 @@
  * stats record, queue/history messages).
  */
 
-import { clearMilestonePending } from '../../../extension/src/history/download-stats';
+import {
+  claimMilestonePending,
+  clearMilestonePending,
+} from '../../../extension/src/history/download-stats';
 import { firstRunFixture, type FixtureState } from './fixture-state';
 
 type ChangeRecord = Record<string, { oldValue?: unknown; newValue: unknown }>;
@@ -117,6 +120,14 @@ async function handleMessage(msg: { type?: string } & Record<string, unknown>): 
     case 'CQD_STATS_CLEAR_MILESTONE':
       await clearMilestonePending();
       return { ok: true };
+    // The real background ARBITRATES celebrations: surfaces claim-and-clear
+    // pending in one turn of the serialized chain. The simulator runs the
+    // REAL claim against the fixture record and answers the production
+    // shape, so the popup's claim-before-play behaves exactly as shipped.
+    case 'CQD_STATS_CLAIM_CELEBRATION': {
+      const milestone = await claimMilestonePending();
+      return { ok: true, claimed: milestone !== null, milestone };
+    }
     default:
       return { ok: false };
   }
