@@ -521,3 +521,105 @@ a {
   background: #f5c518;
   color: #101318;
 }
+
+/* ── Chrome popup presentation (User view) ─────────────────────────────
+   The popup iframe is the production document (360x600 via App.css);
+   everything here imitates what Chrome draws AROUND it: the toolbar, the
+   page behind, the dim, and the bubble's radius + shadow. */
+.sim-browser-stage {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: 0;
+}
+
+.sim-chrome-toolbar {
+  height: 40px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  background: #f8f9fa;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.sim-chrome-tool-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #dde1e6;
+}
+
+.sim-chrome-omnibox {
+  flex: 1;
+  height: 24px;
+  border-radius: 12px;
+  background: #eceff1;
+  margin: 0 4px;
+}
+
+.sim-chrome-tool-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #dde1e6;
+}
+
+.sim-chrome-ext-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 0;
+  padding: 2px;
+  background: #e8eaed;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sim-chrome-ext-icon img {
+  display: block;
+}
+
+.sim-browser-page {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+}
+
+.sim-page-behind {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.sim-page-dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.32);
+}
+
+.sim-chrome-bubble {
+  position: absolute;
+  top: 8px;
+  right: 16px;
+  width: 360px;
+  height: 600px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.1),
+    0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
+.sim-chrome-popup-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}

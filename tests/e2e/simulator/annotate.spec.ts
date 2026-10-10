@@ -108,7 +108,11 @@ test.describe('simulator annotate mode (dev tool)', () => {
   });
 
   test('Route A: annotate toggle, pin placement, editor focus, Escape', async ({ page }) => {
+    // These two tests exercise the direct-mount surface, which lives in
+    // Controls mode (User view renders the chrome bubble instead).
     await page.goto(`${BASE}/#popup=first-run`);
+    await page.evaluate(() => localStorage.setItem('cqd-sim-userview', '0'));
+    await page.reload();
     await page.waitForSelector('.sim-popup-frame .cqd-app');
     await toggleAnnotate(page);
 
@@ -175,7 +179,11 @@ test.describe('simulator annotate mode (dev tool)', () => {
   });
 
   test('Copy notes as Markdown emits Target and Note lines', async ({ page }) => {
+    // These two tests exercise the direct-mount surface, which lives in
+    // Controls mode (User view renders the chrome bubble instead).
     await page.goto(`${BASE}/#popup=first-run`);
+    await page.evaluate(() => localStorage.setItem('cqd-sim-userview', '0'));
+    await page.reload();
     await page.waitForSelector('.sim-popup-frame .cqd-app');
     await toggleAnnotate(page);
     const frame = await page.locator('.sim-popup-frame').boundingBox();

@@ -83,7 +83,7 @@ a new state in the registry appears on the map automatically.
 
 ## User view
 
-The simulator opens in **User view**: the real extension surface alone — no controls, no notes, exactly what a user sees. A floating pill (bottom-right) offers **Controls** (back to the full scenario UI) and **Annotate**. The choice persists (localStorage `cqd-sim-userview`).
+The simulator opens in **User view**: for popup states that means the REAL Chrome presentation — the popup document (only the extension's own stylesheets, 360x600 via App.css) inside a browser-drawn bubble (10px radius, Chrome shadow), anchored under a mock toolbar with the extension icon, over a dimmed captured Classroom page. Click the page to dismiss; click the toolbar icon to reopen — no controls, no notes, exactly what a user sees. A floating pill (bottom-right) offers **Controls** (back to the full scenario UI) and **Annotate**. The choice persists (localStorage `cqd-sim-userview`).
 
 ## Annotate mode (dev tool)
 

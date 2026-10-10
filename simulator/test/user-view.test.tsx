@@ -33,17 +33,25 @@ async function mount(ui: React.ReactElement): Promise<void> {
 }
 
 describe('user view (default on in Root; route-level contract here)', () => {
-  it('user view: renders the real popup WITHOUT scenario controls', async () => {
+  it('popup user view: Chrome bubble + popup iframe, no scenario controls', async () => {
     await mount(<PopupRoute stateId="first-run" userView />);
-    expect(document.querySelector('[data-testid="popup-frame"]')).toBeTruthy();
+    const iframe = document.querySelector<HTMLIFrameElement>(
+      '[data-testid="chrome-popup-iframe"]',
+    );
+    expect(iframe).toBeTruthy();
+    expect(iframe!.getAttribute('src')).toContain('/popup.html?state=first-run');
+    expect(document.querySelector('[data-testid="chrome-bubble"]')).toBeTruthy();
+    expect(document.querySelector('[data-testid="chrome-ext-icon"]')).toBeTruthy();
     expect(document.querySelector('[aria-label="Simulator controls"]')).toBeNull();
-    expect(document.querySelector('.sim-user-stage')).toBeTruthy();
+    // The old direct-mount frame is gone from user view.
+    expect(document.querySelector('[data-testid="popup-frame"]')).toBeNull();
   });
 
-  it('controls mode: keeps the scenario controls and the popup frame', async () => {
+  it('controls mode: keeps the scenario controls and the direct-mount frame', async () => {
     await mount(<PopupRoute stateId="first-run" userView={false} />);
     expect(document.querySelector('[aria-label="Simulator controls"]')).toBeTruthy();
     expect(document.querySelector('[data-testid="popup-frame"]')).toBeTruthy();
+    expect(document.querySelector('[data-testid="chrome-bubble"]')).toBeNull();
   });
 
   it('user view: hides classroom controls, keeps the frame', async () => {

@@ -91,14 +91,26 @@ export function AnnotateOverlay({ route, enabled }: { route: Route; enabled: boo
   }, [notes, showAll, stateId]);
 
   // Find the surface that hosts the pin layer (after the route committed).
+  // Popup user view has no .sim-popup-frame: the pins live on the Chrome
+  // bubble wrapper (.sim-chrome-bubble) over the popup iframe. The bubble
+  // mounts/unmounts on dismiss, so the query re-runs on the
+  // `cqd-sim-surface-changed` ping from the route.
   useEffect(() => {
     if (!enabled) {
       setSurfaceEl(null);
       return;
     }
-    const host =
-      document.querySelector<HTMLElement>(surfaceSelector(meta.kind)) ?? null;
-    setSurfaceEl(host && host.isConnected ? host : null);
+    const resolve = (): void => {
+      const host =
+        document.querySelector<HTMLElement>(surfaceSelector(meta.kind)) ??
+        (meta.kind === 'popup'
+          ? document.querySelector<HTMLElement>('.sim-chrome-bubble')
+          : null);
+      setSurfaceEl(host && host.isConnected ? host : null);
+    };
+    resolve();
+    window.addEventListener('cqd-sim-surface-changed', resolve);
+    return () => window.removeEventListener('cqd-sim-surface-changed', resolve);
   }, [enabled, routeKey, meta.kind]);
 
   const openEditor = useCallback((id: string, isNew: boolean) => {
@@ -153,10 +165,22 @@ export function AnnotateOverlay({ route, enabled }: { route: Route; enabled: boo
     return () => surfaceEl.removeEventListener('click', handler, true);
   }, [enabled, surfaceEl, meta.kind, createAnnotation]);
 
-  // Click capture inside the same-origin classroom iframe document.
+  // Click capture inside same-origin iframe documents: the classroom fixture
+  // pages (Route B) and the popup iframe in User view (the bubble wraps the
+  // popup document — direct-mount controls mode uses the surface handler
+  // above instead).
   useEffect(() => {
-    if (!enabled || meta.kind !== 'classroom') return;
-    const iframe = document.querySelector<HTMLIFrameElement>('.sim-classroom-frame');
+    if (!enabled) return;
+    const popupUsesIframe =
+      meta.kind === 'popup' && !document.querySelector('.sim-popup-frame');
+    const iframeSelector =
+      meta.kind === 'classroom'
+        ? '.sim-classroom-frame'
+        : popupUsesIframe
+          ? '.sim-chrome-popup-frame'
+          : null;
+    if (!iframeSelector) return;
+    const iframe = document.querySelector<HTMLIFrameElement>(iframeSelector);
     if (!iframe) return;
     let attachedDoc: Document | null = null;
     const inner = (ev: MouseEvent) => {
