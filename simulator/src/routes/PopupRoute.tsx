@@ -62,6 +62,12 @@ export function PopupRoute({
     return () => window.removeEventListener('message', onMessage);
   }, [stateId, userView, bubbleOpen]);
 
+  // Tell the annotation overlay the surface set changed (bubble mounted or
+  // unmounted) so its pin layer re-resolves.
+  useEffect(() => {
+    window.dispatchEvent(new Event('cqd-sim-surface-changed'));
+  }, [bubbleOpen, stateId, userView]);
+
   // User view: the Chrome presentation.
   if (userView) {
     return (
