@@ -8,7 +8,13 @@ import { ControlPanel } from '../ui/ControlPanel';
  * Route A — the REAL popup App mounted inside a phone-sized frame, with a
  * control panel driving the fixture chrome beside it.
  */
-export function PopupRoute({ stateId }: { stateId: string }) {
+export function PopupRoute({
+  stateId,
+  userView = false,
+}: {
+  stateId: string;
+  userView?: boolean;
+}) {
   const [appKey, setAppKey] = useState(0);
 
   // Applying a scenario rebuilds the fixture storage and remounts the App so
@@ -26,6 +32,18 @@ export function PopupRoute({ stateId }: { stateId: string }) {
     const timer = window.setTimeout(() => state.drive?.(document), 400);
     return () => window.clearTimeout(timer);
   }, [stateId, appKey]);
+
+  // User view: the popup ALONE, exactly as a user sees it — no controls, no
+  // notes, no scenario chrome. The floating pill (see Root) stays to leave.
+  if (userView) {
+    return (
+      <main className="sim-user-stage" aria-label="Simulated popup (user view)">
+        <div className="sim-popup-frame" data-testid="popup-frame">
+          <App key={appKey} />
+        </div>
+      </main>
+    );
+  }
 
   const state = getPopupState(stateId);
 

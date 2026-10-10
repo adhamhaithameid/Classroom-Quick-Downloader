@@ -8,7 +8,13 @@ import { firstRunFixture } from '../fixtures/fixture-state';
  * live there (PermissionsExplainer), and the surface shares the popup's
  * settings store, so the same fixture chrome drives it.
  */
-export function OptionsRoute({ stateId }: { stateId: string }) {
+export function OptionsRoute({
+  stateId,
+  userView = false,
+}: {
+  stateId: string;
+  userView?: boolean;
+}) {
   const [appKey, setAppKey] = useState(0);
 
   useEffect(() => {
@@ -20,6 +26,7 @@ export function OptionsRoute({ stateId }: { stateId: string }) {
 
   return (
     <div className="sim-layout">
+      {!userView && (
       <aside className="sim-panel" aria-label="Options simulator controls">
         <fieldset className="sim-group">
           <legend>About this route</legend>
@@ -38,7 +45,11 @@ export function OptionsRoute({ stateId }: { stateId: string }) {
           </div>
         </fieldset>
       </aside>
-      <main className="sim-stage" aria-label="Simulated options page">
+      )}
+      <main
+        className={userView ? 'sim-user-stage' : 'sim-stage'}
+        aria-label="Simulated options page"
+      >
         <div className="sim-options-frame" data-testid="options-frame">
           <OptionsApp key={appKey} />
         </div>
