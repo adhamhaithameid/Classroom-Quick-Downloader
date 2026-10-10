@@ -92,5 +92,14 @@ export default defineConfig({
   plugins: [react(), changelogSeam(), classroomFixtureServer()],
   build: {
     target: 'esnext',
+    rollupOptions: {
+      // Two documents: the simulator shell and the popup iframe document
+      // (User view renders the REAL popup in `popup.html` so only the
+      // extension's own stylesheets exist in that document).
+      input: {
+        main: new URL('./index.html', import.meta.url).pathname,
+        popup: new URL('./popup.html', import.meta.url).pathname,
+      },
+    },
   },
 });
