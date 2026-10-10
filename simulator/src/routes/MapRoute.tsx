@@ -98,6 +98,7 @@ export function MapRoute() {
         {total} states across {groups.length} groups. Each card deep-links the REAL
         extension surface with a fixture; nothing here is a lookalike rebuild.
       </p>
+      <p className="sim-note">Press Annotate to leave notes.</p>
       <div className="sim-map-groups">
         {groups.map((group) => (
           <section key={group.name} className="sim-map-group" aria-label={group.name}>

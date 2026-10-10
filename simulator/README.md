@@ -65,6 +65,10 @@ a new state in the registry appears on the map automatically.
    on the iframe body so the badge CSS reads it.
 5. **Group water fill** — forced through the real CSS contract
    (`.cqd-all-busy` + `--cqd-progress`); the group machine normally feeds it.
+6. **Route B same-origin serving** — production Classroom pages come from
+   google.com; the simulator serves its captured fixtures from its own
+   dev-server origin (`/sim/classroom/<id>.html`) so the Annotate tool can
+   read `contentDocument` and capture click targets inside the frame.
 
 ## Known-impossible in the simulator
 
@@ -77,6 +81,74 @@ a new state in the registry appears on the map automatically.
 - **Live network.** The changelog oracle path is already disabled in the
   production module; no other network calls exist.
 
+## Annotate mode (dev tool)
+
+Press **Annotate** in the top bar to leave notes for a fixing agent. It never
+ships in the extension; it only exists in the simulator.
+
+Workflow:
+
+1. Toggle **Annotate**. Clicking the rendered surface places a numbered pin
+   (the click does not reach the UI underneath while the mode is on).
+2. Clicking a pin opens a tiny editor: optional short label, note text,
+   Save, Delete, Cancel. Pins are buttons — Tab to a pin, press Enter.
+3. The side panel lists the notes for the CURRENT state; flip on
+   "Show all states" to list every state's notes. Each entry jumps to its
+   pin (navigating first when the note lives on another state).
+4. **Copy notes as Markdown** puts the export (shape below) on the
+   clipboard; **Clear notes** deletes the current state's notes after a
+   confirm.
+
+Notes persist in `localStorage` under
+`cqd-sim-annotations:v1:<state-id>`, so switching states, remounts, and
+reloads keep them. Classroom demo variants key separately
+(`<page-id>?demo=<demo>`), so a note on the buttons demo never leaks onto
+the plain page; the exported deep link reproduces the exact variant. Pin
+numbers follow the per-state creation order and stay dense after
+deletions.
+
+### Click-target capture
+
+Each note stores what makes it actionable: tag, id, significant classes
+(all `cqd-*`, up to 3 others), key `data-*` attributes (`data-cqd-*`
+first), 60 chars of visible text, a 4-step CSS-ish path, and percent
+coordinates inside the surface. Route A (popup) and Route C (options)
+capture in the simulator DOM; Route B captures inside the classroom
+iframe, which is same-origin by construction: fixture pages are SERVED
+by the dev/preview server at `/sim/classroom/<page-id>.html` (see
+`src/fixtures/page-html.ts` + the plugin in `vite.config.ts`, which also
+emits the pages into the build output), so `contentDocument` is always
+readable.
+
+### Export format
+
+"Copy notes as Markdown" writes exactly this shape (groups sorted by
+state id, note numbers per state):
+
+```
+## SIMULATOR ANNOTATIONS — <ISO date>
+Total: N notes
+
+### [<n>] <state id> — <state title>
+- Route: <popup|classroom|options|map>
+- Reproduce: <deep link, e.g. http://localhost:5173/#popup=first-download>
+- Target: <element descriptor or "percent x,y">
+- Note: <the note text>
+```
+
+A `Target` looks like
+`div.luto0c > a.VkhHKd > button.cqd-download-btn "syllabus.pdf Download" @ 42.5,31`
+(path, visible text, percent center) or falls back to
+`percent 8.3,22.1` when no element sat under the click. Element notes add
+a `Data:` line with the strongest re-location anchors, e.g.
+`- Data: data-cqd-file-id="fixture-file-0" id="dl-btn"` (omitted when the
+capture had no data attributes or id).
+
+Real-browser coverage for the parts jsdom cannot see (same-origin iframe
+reads, real-layout pin placement, clipboard export) lives in
+`tests/e2e/simulator/annotate.spec.ts`; run it with
+`pnpm test:simulator-e2e`.
+
 ## Tests
 
 `vitest run` in this workspace covers: first-run mount, first-download
@@ -84,7 +156,10 @@ a new state in the registry appears on the map automatically.
 fetch-fail and offline (cache-fallback) surfaces, the API gate, the corrupt
 history record, the corrupt stats reset, the pre-schema migration, the options
 page, the state map (at least 20 states), and the classroom driver running the
-real renderers against the real fixture markup.
+real renderers against the real fixture markup. The annotate suites cover the
+Markdown export (golden string), click-target capture, pin placement, the
+localStorage store, the same-origin fixture server, and Route B capture
+inside a readable frame document.
 
 The extension's own suite is untouched; this workspace adds no runtime
 dependency beyond react tooling already in the monorepo (canvas-confetti

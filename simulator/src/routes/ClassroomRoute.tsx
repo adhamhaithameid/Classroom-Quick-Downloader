@@ -10,11 +10,11 @@ import {
   renderButtonsIn,
   renderFlagVerdictIn,
   runCopyrightGate,
-  wrapPageHtml,
   type DriverOptions,
   type FlagVerdict,
 } from '../fixtures/classroom-driver';
 import { CLASSROOM_PAGES, getClassroomPage } from '../fixtures/pages';
+import { classroomFixtureUrl } from '../fixtures/page-html';
 import { classroomHash } from '../hash';
 
 const BUTTON_STATES = [
@@ -239,13 +239,15 @@ export function ClassroomRoute({ pageId, params }: { pageId: string; params: URL
           Captured fixture markup with the REAL injected stylesheets and renderers.
           {page.rtl ? ' RTL page: body[data-cqd-dir] mirrors production applyDirection.' : ''}
         </p>
-        <iframe
-          ref={iframeRef}
-          className="sim-classroom-frame"
-          title={`Simulated Classroom fixture: ${page.label}`}
-          onLoad={handleLoad}
-          srcDoc={wrapPageHtml(page)}
-        />
+        <div className="sim-frame-wrap" data-testid="classroom-frame-wrap">
+          <iframe
+            ref={iframeRef}
+            className="sim-classroom-frame"
+            title={`Simulated Classroom fixture: ${page.label}`}
+            onLoad={handleLoad}
+            src={classroomFixtureUrl(page)}
+          />
+        </div>
       </main>
     </div>
   );

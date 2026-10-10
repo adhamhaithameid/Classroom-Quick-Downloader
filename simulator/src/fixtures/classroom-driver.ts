@@ -28,6 +28,8 @@ import type { ScannedFile } from '../../../extension/src/v2/model/dom-scanner';
 import { ensureCopyrightReminderAcknowledged } from '../../../extension/src/v2/render/copyright-reminder';
 import type { ClassroomPage } from './pages';
 
+export { wrapPageHtml } from './page-html';
+
 export type FlagVerdict = 'none' | 'comment' | 'edited' | 'both';
 
 export interface DriverOptions {
@@ -45,37 +47,6 @@ export const DEFAULT_DRIVER_OPTIONS: DriverOptions = {
   renderDownloadAll: false,
   legacyV1Sheet: false,
 };
-
-const WRAPPER_CSS = `
-    body { margin: 0; padding: 16px; background: #fff; color: #202124;
-           font-family: Roboto, Arial, sans-serif; }
-    .n4xnA { border: 1px solid #dadce0; border-radius: 8px; padding: 12px 16px;
-             margin: 0 0 12px; background: #fff; }
-    header.IMvYId { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-    .author-row { font-weight: 600; font-size: 13px; }
-    .meta-row { font-size: 12px; color: #5f6368; }
-    .attachments-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-                        gap: 8px; margin-top: 8px; }
-    .luto0c { border: 1px solid #dadce0; border-radius: 8px; }
-    a.VkhHKd { display: flex; align-items: center; gap: 10px; padding: 10px 12px;
-               text-decoration: none; color: #202124; }
-    .YVvGBb { font-size: 13px; }
-    .comment-shell { margin-top: 8px; padding-top: 8px; border-top: 1px solid #f1f3f4; }
-    .comment-count { font-size: 12px; color: #5f6368; }
-    .asQXV { font-size: 14px; line-height: 1.5; }
-    .toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
-    .toolbar button { border: 1px solid #dadce0; border-radius: 4px; background: #fff;
-                      padding: 6px 12px; font-size: 13px; }
-    .metric { display: inline-block; margin-right: 12px; font-size: 13px; color: #5f6368; }
-`;
-
-export function wrapPageHtml(page: ClassroomPage): string {
-  return `<!doctype html>
-<html lang="${page.rtl ? 'ar' : 'en'}"${page.rtl ? ' dir="rtl"' : ''}>
-<head><meta charset="utf-8"><style>${WRAPPER_CSS}</style></head>
-<body>${page.html}</body>
-</html>`;
-}
 
 function styleId(id: string): string {
   return `sim-${id}`;

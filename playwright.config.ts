@@ -68,7 +68,9 @@ export default defineConfig({
       name: 'extension-chromium',
       // live/ is excluded like qa/: those specs launch their own persistent
       // contexts on the dedicated signed-in profile (tests/e2e/live/).
-      testIgnore: /[/\\](qa|live|headed)[/\\]/,
+      // simulator/ is excluded too: it runs its own Vite server on the
+      // dedicated simulator-chromium project below.
+      testIgnore: /[/\\](qa|live|headed|simulator)[/\\]/,
       use: {
         ...devices['Desktop Chrome'],
         // channel 'chromium' = new headless, the build that supports extensions.
@@ -112,7 +114,7 @@ export default defineConfig({
     // ────────────────────────────────────────────────────────────────────
     {
       name: 'extension-edge',
-      testIgnore: /[/\\](qa|live|headed)[/\\]/,
+      testIgnore: /[/\\](qa|live|headed|simulator)[/\\]/,
       use: {
         ...devices['Desktop Chrome'],
         channel: 'msedge',
@@ -127,6 +129,21 @@ export default defineConfig({
             '--disable-default-apps',
           ],
         },
+      },
+    },
+
+    // ────────────────────────────────────────────────────────────────────
+    // SIMULATOR dev-tool suite (tests/e2e/simulator/) — the CQD simulator is
+    // a plain Vite app (no extension), so this project runs WITHOUT the
+    // extension launch args; the spec starts and stops its own dev server.
+    // Deliberately NOT part of test:e2e / the matrix lanes — run it with
+    // `pnpm test:simulator-e2e`.
+    // ────────────────────────────────────────────────────────────────────
+    {
+      name: 'simulator-chromium',
+      testMatch: /tests\/e2e\/simulator\/.*\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
       },
     },
 

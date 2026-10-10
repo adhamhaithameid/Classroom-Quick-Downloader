@@ -1,5 +1,6 @@
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { AnnotateOverlay } from './annotate/AnnotateOverlay';
 import { installFixtureChrome } from './fixtures/fixture-chrome';
 import { getPopupState } from './fixtures/states';
 import { parseHash, type Route } from './hash';
@@ -21,6 +22,7 @@ function useHashRoute(): Route {
 
 function Root() {
   const route = useHashRoute();
+  const [annotateOn, setAnnotateOn] = useState(false);
   return (
     <>
       <header className="sim-header">
@@ -48,6 +50,15 @@ function Root() {
             Options
           </a>
         </nav>
+        <span className="sim-header-spacer" />
+        <button
+          type="button"
+          className="sim-annotate-toggle"
+          aria-pressed={annotateOn}
+          onClick={() => setAnnotateOn((on) => !on)}
+        >
+          Annotate
+        </button>
       </header>
       {route.kind === 'popup' ? (
         <PopupRoute stateId={route.stateId} />
@@ -58,6 +69,7 @@ function Root() {
       ) : (
         <MapRoute />
       )}
+      <AnnotateOverlay route={route} enabled={annotateOn} />
     </>
   );
 }

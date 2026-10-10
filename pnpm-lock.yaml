@@ -172,6 +172,9 @@ importers:
       '@types/chrome':
         specifier: ^0.2.9
         version: 0.2.9
+      '@types/node':
+        specifier: ^26.6.1
+        version: 26.6.1
       '@types/react':
         specifier: ^19.3.0
         version: 19.3.0
