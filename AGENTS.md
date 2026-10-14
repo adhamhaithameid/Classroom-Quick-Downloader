@@ -25,6 +25,20 @@ bd close <id>         # Complete work
 Note: `bd dolt push` (tracker sync) belongs to the Team-maintainer profile
 below — do not run it under the default Conservative profile.
 
+## Bead Me Up (mandatory bead-change report)
+
+The owner must see every tracker change in chat. After ANY `bd` mutation —
+create, close, reopen, claim, status change, defer, delete — print this block
+before doing any other work in that turn:
+
+```text
+BEAD ME UP
+<id> <short title> — <old state> → <new state>
+```
+
+One line per affected bead. A failed mutation prints the exact error instead.
+No `bd` state change may pass silently.
+
 ## Non-Interactive Shell Commands
 
 **ALWAYS use non-interactive flags** with file operations to avoid hanging on confirmation prompts.
@@ -80,6 +94,9 @@ Workflow facts:
 - Parallel sessions share this checkout: do significant work in a dedicated
   worktree (e.g. `git worktree add ../CQD-wt-<topic> -b <branch> origin/main`),
   and never assume `git status` describes only your changes.
+- Worktree notifications are mandatory: announce in chat BEFORE creating any
+  worktree (path, branch, purpose), and report the created path AFTER. Never
+  create a worktree silently.
 - Verify doc claims against code before relying on them — dated reports and
   Oracle-era docs describe a world that has changed.
 
