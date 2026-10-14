@@ -2079,53 +2079,55 @@ body {
   padding: 0 4px;
 }
 
-/* ── Engine segmented control (Stillwater, prototypes/components.html
-   option 1: three equal segments, selected = violet tint + inset ring,
-   2px inner track padding, 11px track radius, 9px segment radius). The
-   light-surface adaptation keeps the prototype's violet accent. ───────── */
+/* ── Engine segmented control (Stillwater). Restyled to the approved
+   flag-pill language (App.css .cqd-flag-pill): three equal pills on the
+   surface token, subtle border, 999px radius, 8px touch padding. The
+   selected state keeps the prototype's violet tint + inset ring. ───────── */
 .cqd-engine-mode {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 2px;
-  background: rgba(0, 0, 0, 0.05);
-  border: 1px solid var(--cqd-border-subtle);
-  border-radius: 11px;
-  padding: 2px;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
 }
 
 .cqd-engine-mode-option {
-  border: none;
-  background: transparent;
+  border: 1px solid var(--cqd-border-subtle);
+  background: var(--cqd-surface);
   color: var(--cqd-text-muted);
   font-family: var(--cqd-font);
   font-size: var(--cqd-fs-caption);
   font-weight: 500;
-  padding: 7px 4px;
-  border-radius: 9px;
+  padding: 8px 4px;
+  border-radius: 999px;
   cursor: pointer;
   transition: background var(--cqd-transition-fast), color var(--cqd-transition-fast),
-    box-shadow var(--cqd-transition-fast);
+    border-color var(--cqd-transition-fast), box-shadow var(--cqd-transition-fast);
 }
 
 .cqd-engine-mode-option:hover:not(:disabled) {
+  border-color: var(--cqd-text-muted);
   color: var(--cqd-text-main);
 }
 
 .cqd-engine-mode-option[aria-checked='true'] {
-  background: linear-gradient(180deg, rgba(143, 123, 255, 0.24), rgba(143, 123, 255, 0.16));
+  border-color: rgba(143, 123, 255, 0.55);
+  background: linear-gradient(180deg, rgba(143, 123, 255, 0.14), rgba(143, 123, 255, 0.08));
   color: var(--cqd-text-main);
   font-weight: 600;
-  box-shadow: inset 0 0 0 1px rgba(143, 123, 255, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(143, 123, 255, 0.3);
 }
 
 .cqd-engine-mode-option:disabled {
-  opacity: 0.45;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
 .cqd-engine-mode-option:focus-visible {
   outline: 2px solid var(--cqd-blue);
-  outline-offset: -2px; /* inside the segment so the track never clips it */
+  outline-offset: 2px;
 }
 
 /* ===============================
