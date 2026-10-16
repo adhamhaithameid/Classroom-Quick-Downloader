@@ -261,6 +261,10 @@ export async function loadFlowHarness(options: FlowHarnessOptions = {}) {
   const dispatchMessage = (message: any, sender: any = { tab: { id: 5 } }) => {
     for (const listener of onMessageListeners) listener(message, sender, vi.fn());
   };
+  /** Per-listener return values — the MV3 ack contract: the sendResponse
+   *  channel stays open only while ANY listener returns true (cr9w). */
+  const dispatchMessageReturns = (message: any, sender: any = { tab: { id: 5 } }) =>
+    onMessageListeners.map((listener) => listener(message, sender, vi.fn()));
 
   return {
     stateModule,
@@ -271,6 +275,7 @@ export async function loadFlowHarness(options: FlowHarnessOptions = {}) {
     cleanupSpy,
     recordSpy,
     dispatchMessage,
+    dispatchMessageReturns,
     requestDownload: (url: string = ORIGINAL_URL, requestId = 'req-corpus', fileMeta: any = { name: 'lecture.pdf', ext: 'pdf' }) =>
       dispatchMessage({ type: 'CQD_DOWNLOAD', url, requestId, fileMeta }),
     dispatchDownloadChange: (delta: any) => {

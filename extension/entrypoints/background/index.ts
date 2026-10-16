@@ -762,7 +762,7 @@ export default defineBackground(() => {
         const rows = searchEntries(entries, query).slice(-50).reverse();
         sendResponse({ ok: true, rows });
       })();
-      return false;
+      return true; // async ack (cr9w): false closed the channel before sendResponse ran
     }
 
     if (message.type === 'CQD_HISTORY_CLEAR') {
@@ -770,7 +770,7 @@ export default defineBackground(() => {
         await clearHistoryEntries();
         sendResponse({ ok: true });
       })();
-      return false;
+      return true; // async ack (cr9w)
     }
 
     // Fix round 1: the popup never writes the stats record directly. Every
