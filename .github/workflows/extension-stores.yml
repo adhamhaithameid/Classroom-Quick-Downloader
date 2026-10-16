@@ -181,8 +181,8 @@ jobs:
             -d refresh_token="$CWS_REFRESH_TOKEN_S" \
             -d grant_type=refresh_token | jq -r .access_token)
           STATUS=$(curl -s -H "Authorization: Bearer $TOKEN" \
-            "https://www.googleapis.com/chromewebstore/v1.1/items/oemoongiefmpmomjikcjmkkkhffcbdid?projection=PUBLISH" \
-            | jq -r .status // empty)
+            "https://www.googleapis.com/chromewebstore/v1.1/items/oemoongiefmpmomjikcjmkkkhffcbdid?projection=DRAFT" \
+            | jq -r '.status // empty')
           echo "status=$STATUS" >> "$GITHUB_OUTPUT"
           if [ "$STATUS" = "inReview" ] || [ "$STATUS" = "pendingReview" ]; then
             echo "in_review=true" >> "$GITHUB_OUTPUT"
