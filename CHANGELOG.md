@@ -15,17 +15,22 @@ It focuses on meaningful product, reliability, security, and architecture change
 Lifetime download milestones: the extension celebrates your progress with confetti and shows a running download counter in the popup.
 
 ### Added
-- Levels: start at level 0 and climb to level 18 — every milestone is a level.
-- Added milestone celebrations at 18 lifetime totals (1 through 1,000,000, with celebration points at 2,500, 7,500, 25,000, 75,000, and 750,000).
-- Added the popup download tracker: lifetime count, progress toward the next milestone, and a replayable celebration toast.
-- Added milestone celebrations on the active Classroom tab: a dedicated classroom-only content script plays the same once-per-milestone overlay (banner plus confetti unless reduced motion applies), and the popup stays quiet for a milestone the page already played.
-- Added the dormant download-count reporting path: per-install aggregate counts reach the worker and the admin dashboard once enabled.
+- Levels: you start at level 0 and climb one level per milestone, up to level 18.
+- Milestone celebrations fire at 18 lifetime totals, from 1 through 1,000,000.
+- Extra celebration points at 2,500, 7,500, 25,000, 75,000, and 750,000 keep milestones coming as the total grows.
+- The popup shows a lifetime download counter.
+- The popup shows progress toward the next milestone.
+- The popup can replay a celebration toast.
+- The active Classroom tab plays a once-per-milestone banner with confetti.
+- The popup stays quiet for a milestone the Classroom page already played.
+- A dormant per-install count reporting path feeds the worker and the admin dashboard once enabled.
 
 ### Changed
 - Celebrations honor both the OS reduced-motion preference and the in-app reduce-motion setting.
 
 ### Fixed
-- Fixed celebrations duplicating or losing count when many downloads finish at once: stats writes are serialized through the background worker, and the celebration acknowledge channel stays open for the asynchronous reply.
+- Fixed celebrations duplicating or losing count when many downloads finish at once.
+- Stats writes serialize through the background worker; the celebration ack channel stays open for the asynchronous reply.
 
 ## [1.8.9] - 2026-10-03
 
@@ -42,7 +47,11 @@ Phase-1 feature completion plus the New-engine repair wave: post-level and class
 - Added specific failure-reason copy for every terminal download state (0h4d.1.4).
 - Added the reliability metric: download retry counts report to the worker (0h4d.1.10).
 - Added bounded exponential backoff for transient download failures (0h4d.1.3).
-- Added the approved Stillwater popup redesign: a segmented engine selector that shows the truthfully selected mode, change-detection pills with a gated combined flag, a liquid water loading effect with per-file progress on Download All, and a star shimmer on the support button.
+- Added the approved Stillwater popup redesign.
+- Added a segmented engine selector; it shows the truthfully selected mode.
+- Added change-detection pills with the gated combined-flag pill.
+- Added a liquid water loading effect with per-file progress on Download All.
+- Added a star shimmer on the support button.
 - Added an in-app reduce-motion setting; every surface also honors the OS prefers-reduced-motion.
 
 ### Changed
@@ -52,9 +61,12 @@ Phase-1 feature completion plus the New-engine repair wave: post-level and class
 - A "Not affiliated with Google" notice ships in the popup and options footers.
 
 ### Fixed
-- New engine: the post-level Download All button now appears on collapsed classwork items, anchored at the post header, with per-post file counts; the decision counts every attachment type; Alt+Shift+D works on the New engine.
+- The post-level Download All button now appears on collapsed classwork items, anchored at the post header.
+- The button shows each post's own file count, and the download decision counts every attachment type.
+- Alt+Shift+D works on the New engine.
 - Change-detection highlights now anchor to the changed post instead of the whole classroom; the anchor is restored on navigation and toggle-off.
-- Classroom-wide download is available on the New engine (behind API config); the API engine asks for consent on click instead of failing silently, and denial settles as a clean failure.
+- Classroom-wide download is available on the New engine (behind API config).
+- The API engine asks for consent on click instead of failing silently, and denial settles as a clean failure.
 
 ## [1.8.7] - 2026-09-28
 
