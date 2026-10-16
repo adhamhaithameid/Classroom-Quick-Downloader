@@ -121,6 +121,9 @@ jobs:
           AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
           AMO_ADDON_ID: classroom-quick-downloader@adhamhaitham.dev
           AMO_CHANNEL: listed
+          # The zip is packaged at the repo root above; the signer's default
+          # search path (extension/.output) does not exist on the runner.
+          AMO_XPI_PATH: classroom-quick-downloader-${{ env.AMO_VERSION }}-firefox.zip
           # AMO indexing can lag past the default 180s poll; give it room.
           AMO_POLL_TIMEOUT_MS: "600000"
         run: node extension/tools/sign-extension.mjs
@@ -137,18 +140,20 @@ jobs:
           path: ./
       - name: Publish via Edge Add-ons API
         # secrets context is not available in step `if`; bridge via env.
+        # wdzeng/edge-addon v2 contract: client-id + api-key (client-secret
+        # input no longer exists in v2; create the API key in Partner Center).
         env:
-          HAVE_EDGE: ${{ secrets.EDGE_CLIENT_ID != '' && secrets.EDGE_CLIENT_SECRET != '' }}
+          HAVE_EDGE: ${{ secrets.EDGE_CLIENT_ID != '' && secrets.EDGE_API_KEY != '' }}
         if: env.HAVE_EDGE == 'true'
         uses: wdzeng/edge-addon@v2
         with:
           product-id: ${{ secrets.EDGE_PRODUCT_ID }}
           client-id: ${{ secrets.EDGE_CLIENT_ID }}
-          client-secret: ${{ secrets.EDGE_CLIENT_SECRET }}
+          api-key: ${{ secrets.EDGE_API_KEY }}
           zip-path: ./cqd-edge.zip
       - name: Edge publish skipped (secrets not set yet)
         if: env.HAVE_EDGE != 'true'
-        run: echo "::notice::Edge secrets not configured — add EDGE_PRODUCT_ID, EDGE_CLIENT_ID, EDGE_CLIENT_SECRET to enable automated Edge publishing."
+        run: echo "::notice::Edge secrets not configured — add EDGE_PRODUCT_ID, EDGE_CLIENT_ID, EDGE_API_KEY to enable automated Edge publishing."
 
   publish-chrome:
     name: Publish to Chrome Web Store
@@ -165,7 +170,7 @@ jobs:
         env:
           HAVE_CWS: ${{ secrets.CWS_REFRESH_TOKEN != '' }}
         if: env.HAVE_CWS == 'true'
-        uses: mnao305/chrome-extension-upload@e7dd8e69b4bb5ec34901b9a94f0cc4a7b47f56d8 # v5.0.0
+        uses: mnao305/chrome-extension-upload@4008e29e13c144d0f6725462cbd49b7c291b4928 # v5.0.0
         with:
           file-path: ./cqd-chrome.zip
           extension-id: oemoongiefmpmomjikcjmkkkhffcbdid
