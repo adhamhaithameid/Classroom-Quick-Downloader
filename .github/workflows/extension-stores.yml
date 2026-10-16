@@ -165,11 +165,35 @@ jobs:
         with:
           name: cqd-chrome-zip
           path: ./
+      - name: Skip upload while the version is already in review
+        # CWS rejects uploads with ITEM_NOT_UPDATABLE while a version is in
+        # review — that state means the upload already succeeded, so it is
+        # not a failure. Query the item status and skip instead.
+        id: cws_status
+        env:
+          CWS_CLIENT_ID_S: ${{ secrets.CWS_CLIENT_ID }}
+          CWS_CLIENT_SECRET_S: ${{ secrets.CWS_CLIENT_SECRET }}
+          CWS_REFRESH_TOKEN_S: ${{ secrets.CWS_REFRESH_TOKEN }}
+        run: |
+          TOKEN=$(curl -s -X POST https://oauth2.googleapis.com/token \
+            -d client_id="$CWS_CLIENT_ID_S" \
+            -d client_secret="$CWS_CLIENT_SECRET_S" \
+            -d refresh_token="$CWS_REFRESH_TOKEN_S" \
+            -d grant_type=refresh_token | jq -r .access_token)
+          STATUS=$(curl -s -H "Authorization: Bearer $TOKEN" \
+            "https://www.googleapis.com/chromewebstore/v1.1/items/oemoongiefmpmomjikcjmkkkhffcbdid?projection=PUBLISH" \
+            | jq -r .status // empty)
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+          if [ "$STATUS" = "inReview" ] || [ "$STATUS" = "pendingReview" ]; then
+            echo "in_review=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "in_review=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Publish via Chrome Web Store API
         # secrets context is not available in step `if`; bridge via env.
         env:
           HAVE_CWS: ${{ secrets.CWS_REFRESH_TOKEN != '' }}
-        if: env.HAVE_CWS == 'true'
+        if: env.HAVE_CWS == 'true' && steps.cws_status.outputs.in_review != 'true'
         uses: mnao305/chrome-extension-upload@4008e29e13c144d0f6725462cbd49b7c291b4928 # v5.0.0
         with:
           file-path: ./cqd-chrome.zip
@@ -178,6 +202,9 @@ jobs:
           client-secret: ${{ secrets.CWS_CLIENT_SECRET }}
           refresh-token: ${{ secrets.CWS_REFRESH_TOKEN }}
           publish: true
+      - name: CWS version already in review — upload skipped
+        if: env.HAVE_CWS == 'true' && steps.cws_status.outputs.in_review == 'true'
+        run: echo "::notice::CWS item status is ${{ steps.cws_status.outputs.status }} — the earlier upload is in review; nothing to do."
       - name: CWS publish skipped (secrets not set yet)
         if: env.HAVE_CWS != 'true'
         run: echo "::notice::CWS secrets not configured — add CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN to enable automated Chrome publishing."
