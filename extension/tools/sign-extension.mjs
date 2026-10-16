@@ -241,10 +241,27 @@ async function main() {
     body: form,
   });
   if (putRes.status === 404) {
-    // The version PUT cannot create a NEW add-on (addons-server returns 404).
-    // Fallback: the documented create flow — POST the file to /upload/,
-    // poll validation, then PUT the addon resource with the upload uuid.
-    console.log('ℹ Version endpoint 404 — add-on not on AMO yet; running the create flow…');
+    // The version PUT 404s both when the add-on is genuinely new AND when
+    // the JWT account cannot see an existing listing (0h4d.12.9: 2026-10-16
+    // run created a DUPLICATE add-on that way). The public endpoint decides:
+    // a listed add-on is publicly readable regardless of JWT ownership.
+    const probe = await fetch(
+      `${env.baseUrl}/api/v5/addons/addon/${encodeURIComponent(env.addonId)}/`,
+    );
+    if (probe.ok) {
+      fail(
+        `add-on ${env.addonId} exists publicly but the JWT account cannot see it ` +
+          `(version PUT 404, version list 404). The AMO API keys belong to a ` +
+          `different addons.mozilla.org account than the listing owner. ` +
+          `Create API keys while signed in as the listing owner ` +
+          `(https://addons.mozilla.org/developers/addon/api/key/) and update ` +
+          `AMO_JWT_ISSUER / AMO_JWT_SECRET. NOT running the create flow — ` +
+          `it would create a duplicate add-on.`,
+      );
+    }
+    // Genuinely new add-on: the documented create flow — POST the file to
+    // /upload/, poll validation, then PUT the addon resource with the uuid.
+    console.log('ℹ Version endpoint 404 and add-on is publicly unknown; running the create flow…');
     const created = await createNewAddon(env, jwt, xpiPath, versionUrl, version);
     if (!created) {
       fail((await apiError('upload', putRes.status, await putRes.text())).message);
