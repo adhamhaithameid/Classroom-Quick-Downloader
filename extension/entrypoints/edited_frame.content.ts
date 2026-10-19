@@ -107,10 +107,13 @@ function applyCombinedFlagState(enabled: boolean): void {
 const _browserApi = (globalThis as any).chrome;
 if (_browserApi?.storage?.local) {
   _browserApi.storage.local.get('editedFlagEnabled', (res: { editedFlagEnabled?: boolean }) => {
-    editedFlagEnabled = res.editedFlagEnabled !== false; // default true
+    // Apply-path, not bare assignment: the first scan can win the race and
+    // render with the default; a false read must remove those artifacts
+    // (survey #819).
+    applyEditedFlagState(res.editedFlagEnabled !== false); // default true
   });
   _browserApi.storage.local.get('combinedFlagEnabled', (res: { combinedFlagEnabled?: boolean }) => {
-    combinedFlagEnabled = res.combinedFlagEnabled !== false; // default true
+    applyCombinedFlagState(res.combinedFlagEnabled !== false); // default true
   });
   _browserApi.storage.onChanged.addListener((changes: any, area: string) => {
     if (area === 'local' && 'editedFlagEnabled' in changes) {
