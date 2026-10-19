@@ -96,6 +96,9 @@ describe('background/index', () => {
     vi.doMock('../entrypoints/background/url-helpers', () => ({
       getFilenameExt: () => 'pdf',
       buildUrlWithAuthUser: (url: string) => url,
+      // Fixture names carry extensions; mirror the real pass-through shape.
+      composeSuggestedFilename: (o: { name?: string }) => o.name?.trim() || 'classroom_download',
+      extForMime: () => undefined,
     }));
     vi.doMock('../entrypoints/background/cleanup', () => ({
       cleanup: vi.fn(),
@@ -193,6 +196,9 @@ describe('background/index', () => {
     vi.doMock('../entrypoints/background/url-helpers', () => ({
       getFilenameExt: () => 'pdf',
       buildUrlWithAuthUser: (url: string) => url,
+      // Fixture names carry extensions; mirror the real pass-through shape.
+      composeSuggestedFilename: (o: { name?: string }) => o.name?.trim() || 'classroom_download',
+      extForMime: () => undefined,
     }));
     vi.doMock('../entrypoints/background/cleanup', () => ({
       cleanup,
@@ -263,6 +269,9 @@ describe('background/index', () => {
     vi.doMock('../entrypoints/background/url-helpers', () => ({
       getFilenameExt: () => 'pdf',
       buildUrlWithAuthUser: (url: string) => url,
+      // Fixture names carry extensions; mirror the real pass-through shape.
+      composeSuggestedFilename: (o: { name?: string }) => o.name?.trim() || 'classroom_download',
+      extForMime: () => undefined,
     }));
     vi.doMock('../entrypoints/background/cleanup', () => ({
       cleanup: vi.fn(),
@@ -325,6 +334,9 @@ describe('background/index', () => {
     vi.doMock('../entrypoints/background/url-helpers', () => ({
       getFilenameExt: () => 'pdf',
       buildUrlWithAuthUser: (url: string) => url,
+      // Fixture names carry extensions; mirror the real pass-through shape.
+      composeSuggestedFilename: (o: { name?: string }) => o.name?.trim() || 'classroom_download',
+      extForMime: () => undefined,
     }));
     vi.doMock('../entrypoints/background/cleanup', () => ({
       cleanup: vi.fn(),
@@ -482,6 +494,9 @@ describe('background/index', () => {
     vi.doMock('../entrypoints/background/url-helpers', () => ({
       getFilenameExt: (f: string) => f?.split('.').pop()?.toLowerCase() ?? '',
       buildUrlWithAuthUser: (url: string) => url,
+      // Fixture names carry extensions; mirror the real pass-through shape.
+      composeSuggestedFilename: (o: { name?: string }) => o.name?.trim() || 'classroom_download',
+      extForMime: () => undefined,
     }));
     vi.doMock('../entrypoints/background/cleanup', () => ({
       cleanup,
