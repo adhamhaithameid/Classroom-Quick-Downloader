@@ -1,18 +1,23 @@
 // filepath: extension/entrypoints/background/analytics-alarm.ts
 /**
- * Analytics alarm setup for periodic flush and changelog refresh.
+ * Analytics alarm setup for the periodic flush.
  */
 
 import { Analytics } from '../utils/analytics';
-import { fetchChangelogDetailed } from '../utils/changelog';
 import { IS_FIREFOX, recentDownloads } from './state';
 
 let analyticsAlarmInitialized = false;
 
 /**
- * Set up Chrome alarms for periodic analytics operations.
- * - Flush events every 5 minutes
- * - Refresh changelog once/day at 6pm UTC
+ * Set up Chrome alarms for the periodic analytics flush.
+ *
+ * pu8n (2026-10): the flush alarm runs every 60 minutes (was 5) and the
+ * CQD_CHANGELOG_DAILY alarm is gone — the changelog went fully manual
+ * (fetchChangelogDetailed never touches the network), so its daily SW wake
+ * was a pure no-op costing one service-worker start per install per day.
+ * Stale changelog alarms on installed bases are cleared explicitly; the
+ * flush alarm replaces by name, so existing installs pick up the new period
+ * on the next service-worker start.
  *
  * Remote-config refresh is intentionally NOT scheduled: on the free model the
  * extension never fetches /config (it drove ~95% of the Worker's API traffic
@@ -25,30 +30,14 @@ export function ensureAnalyticsAlarm(): void {
   analyticsAlarmInitialized = true;
 
   try {
-    chrome.alarms.create('CQD_ANALYTICS_FLUSH', { periodInMinutes: 5 });
+    chrome.alarms.create('CQD_ANALYTICS_FLUSH', { periodInMinutes: 60 });
 
-    // Changelog: once/day at 6pm UTC
-    const now = new Date();
-    const next6pmUtc = new Date(Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate(),
-      18, 0, 0, 0
-    ));
-    // If 6pm UTC has already passed today, schedule for tomorrow
-    if (next6pmUtc.getTime() <= now.getTime()) {
-      next6pmUtc.setUTCDate(next6pmUtc.getUTCDate() + 1);
-    }
-    chrome.alarms.create('CQD_CHANGELOG_DAILY', {
-      when: next6pmUtc.getTime(),
-      periodInMinutes: 1440, // 24 hours
-    });
+    // Installed bases may still carry the retired daily changelog alarm.
+    void chrome.alarms.clear('CQD_CHANGELOG_DAILY');
 
     chrome.alarms.onAlarm.addListener((alarm) => {
       if (alarm.name === 'CQD_ANALYTICS_FLUSH') {
         Analytics.flush();
-      } else if (alarm.name === 'CQD_CHANGELOG_DAILY') {
-        fetchChangelogDetailed(true).catch(() => {});
       }
     });
   } catch {

@@ -42,15 +42,21 @@ retry_http_code() {
   return 1
 }
 
-require_var ORACLE_ENDPOINT
 require_var PUBLIC_WORKER_BASE_URL
 require_var PUBLIC_SITE_URL
 
-ORACLE_ENDPOINT="${ORACLE_ENDPOINT%/}"
+# ORACLE_ENDPOINT is optional: the Oracle backend was severed from the live
+# data path (2026-09) and its host may not resolve. Unset = skip the Oracle
+# checks (mirrors SKIP_ORACLE_CHECK in verify-production.mjs).
+ORACLE_CHECKS_ENABLED=0
+if [ -n "${ORACLE_ENDPOINT:-}" ]; then
+  ORACLE_CHECKS_ENABLED=1
+  ORACLE_ENDPOINT="${ORACLE_ENDPOINT%/}"
+  assert_https_url "ORACLE_ENDPOINT" "$ORACLE_ENDPOINT"
+fi
 PUBLIC_WORKER_BASE_URL="${PUBLIC_WORKER_BASE_URL%/}"
 PUBLIC_SITE_URL="${PUBLIC_SITE_URL%/}"
 
-assert_https_url "ORACLE_ENDPOINT" "$ORACLE_ENDPOINT"
 assert_https_url "PUBLIC_WORKER_BASE_URL" "$PUBLIC_WORKER_BASE_URL"
 assert_https_url "PUBLIC_SITE_URL" "$PUBLIC_SITE_URL"
 
@@ -76,13 +82,17 @@ ingest_response="$(curl -fsS -X POST "${PUBLIC_WORKER_BASE_URL}/api/public/websi
   --data "${ingest_payload}")"
 echo "${ingest_response}" | grep -Eq '"ok"[[:space:]]*:[[:space:]]*true'
 
-echo "[https-smoke] oracle health"
-retry_http_code "${ORACLE_ENDPOINT}/health" "200" "20" "3"
-grep -Eq '"ok"[[:space:]]*:[[:space:]]*true' /tmp/https-smoke-body.txt
+if [ "$ORACLE_CHECKS_ENABLED" = "1" ]; then
+  echo "[https-smoke] oracle health"
+  retry_http_code "${ORACLE_ENDPOINT}/health" "200" "20" "3"
+  grep -Eq '"ok"[[:space:]]*:[[:space:]]*true' /tmp/https-smoke-body.txt
 
-echo "[https-smoke] oracle public snapshot"
-oracle_snapshot_payload="$(curl -fsS "${ORACLE_ENDPOINT}/api/public/website/snapshot")"
-echo "${oracle_snapshot_payload}" | grep -Eq '"schemaVersion"[[:space:]]*:[[:space:]]*"1"'
+  echo "[https-smoke] oracle public snapshot"
+  oracle_snapshot_payload="$(curl -fsS "${ORACLE_ENDPOINT}/api/public/website/snapshot")"
+  echo "${oracle_snapshot_payload}" | grep -Eq '"schemaVersion"[[:space:]]*:[[:space:]]*"1"'
+else
+  echo "[https-smoke] oracle checks skipped (ORACLE_ENDPOINT unset — Oracle severed from the live path)"
+fi
 
 echo "[https-smoke] website health"
 retry_http_code "${PUBLIC_SITE_URL}" "200" "20" "3"

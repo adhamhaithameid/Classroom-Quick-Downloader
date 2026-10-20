@@ -274,8 +274,8 @@ async function main() {
   // 2. Poll until the signed file object exists (validation is async).
   // The single-version detail endpoint 404s for some server-side states
   // even when the addon-resource PUT reports the version as existing, so
-  // every round also walks the add-on's full version list (filter=all is
-  // required to see unlisted versions) looking for the signed file.
+  // every round also walks the add-on's version list looking for the
+  // signed file.
   const findSignedFile = async () => {
     const getRes = await fetch(versionUrl, { headers: { Authorization: `JWT ${jwt}` } });
     if (getRes.ok) {
@@ -286,7 +286,10 @@ async function main() {
       if (json.file?.url) return json.file;
     }
     const listRes = await fetch(
-      `${env.baseUrl}/api/v5/addons/${encodeURIComponent(env.addonId)}/versions/?filter=all`,
+      // No `?filter=all`: AMO now rejects that param with 404 on this
+      // endpoint (verified 2026-10-16 with owner JWT; the plain list
+      // already includes unreviewed versions for the owner).
+      `${env.baseUrl}/api/v5/addons/${encodeURIComponent(env.addonId)}/versions/`,
       { headers: { Authorization: `JWT ${jwt}` } },
     );
     if (listRes.ok) {
@@ -306,7 +309,7 @@ async function main() {
       lastDiagAt = Date.now();
       const detail = await fetch(versionUrl, { headers: { Authorization: `JWT ${jwt}` } });
       const list = await fetch(
-        `${env.baseUrl}/api/v5/addons/${encodeURIComponent(env.addonId)}/versions/?filter=all`,
+        `${env.baseUrl}/api/v5/addons/${encodeURIComponent(env.addonId)}/versions/`,
         { headers: { Authorization: `JWT ${jwt}` } },
       );
       const listBody = list.ok ? await list.json().catch(() => null) : null;

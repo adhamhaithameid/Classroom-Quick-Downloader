@@ -43,10 +43,11 @@ await check('robots.txt serves + references sitemap', async () => {
   expectContains(body, `Sitemap: ${BASE}/sitemap.xml`, 'robots');
   expectContains(body, 'GPTBot', 'AI crawler allows');
 });
-await check('sitemap.xml has 22 canonical URLs, no legacy domain', async () => {
+await check('sitemap.xml has 22+ canonical URLs, no legacy domain', async () => {
   const body = await fetchOk('/sitemap.xml');
   const urls = (body.match(/<loc>/g) ?? []).length;
-  if (urls !== 22) throw new Error(`expected 22 URLs, got ${urls}`);
+  // Floor, not exact: new canonical pages must not break this check.
+  if (urls < 22) throw new Error(`expected at least 22 URLs, got ${urls}`);
   if (body.includes('pages.dev')) throw new Error('legacy domain leaked into sitemap');
 });
 await check('llms.txt states source-available license + version + support', async () => {
