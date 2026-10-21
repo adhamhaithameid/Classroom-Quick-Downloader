@@ -4,7 +4,9 @@ export interface BendParams {
 }
 
 export const GRID_PITCH = 60;
-export const BEND_DEFAULTS: BendParams = { radius: 190, strength: 10 };
+// Frozen (bead 82r): the tuning constants are validated values, and every
+// consumer spreads before use — freezing costs nothing and blocks accidents.
+export const BEND_DEFAULTS: Readonly<BendParams> = Object.freeze({ radius: 190, strength: 10 });
 export const FOLLOW = 0.16;
 export const DPR_CAP = 2;
 export const SAMPLE_PX = 16;

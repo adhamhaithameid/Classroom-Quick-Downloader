@@ -263,8 +263,18 @@ export function gridBend(
   }
 
   /* No auto-activation at mount either — pointer-gated for life. */
-  finePointer.addEventListener?.('change', onGatesChange);
-  reducedMotion.addEventListener?.('change', onGatesChange);
+  /* Gate changes: addEventListener plus the pre-2020 Safari addListener
+     fallback (bead 82r) — without it old Safari silently skips re-checks. */
+  if (typeof finePointer.addEventListener === 'function') {
+    finePointer.addEventListener('change', onGatesChange);
+  } else {
+    (finePointer as unknown as { addListener?: (cb: () => void) => void }).addListener?.(onGatesChange);
+  }
+  if (typeof reducedMotion.addEventListener === 'function') {
+    reducedMotion.addEventListener('change', onGatesChange);
+  } else {
+    (reducedMotion as unknown as { addListener?: (cb: () => void) => void }).addListener?.(onGatesChange);
+  }
   window.addEventListener('pointermove', onPointerMove, { passive: true });
   window.addEventListener('scroll', onScroll, { passive: true });
   window.addEventListener('resize', onResize, { passive: true });
@@ -277,8 +287,16 @@ export function gridBend(
     },
     destroy(): void {
       deactivate();
-      finePointer.removeEventListener?.('change', onGatesChange);
-      reducedMotion.removeEventListener?.('change', onGatesChange);
+      if (typeof finePointer.removeEventListener === 'function') {
+        finePointer.removeEventListener('change', onGatesChange);
+      } else {
+        (finePointer as unknown as { removeListener?: (cb: () => void) => void }).removeListener?.(onGatesChange);
+      }
+      if (typeof reducedMotion.removeEventListener === 'function') {
+        reducedMotion.removeEventListener('change', onGatesChange);
+      } else {
+        (reducedMotion as unknown as { removeListener?: (cb: () => void) => void }).removeListener?.(onGatesChange);
+      }
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onResize);
