@@ -26,14 +26,12 @@ describe('bendOffset (lens)', () => {
     expect(bendOffset(-4 * r, 5 * r, 0, 0, BEND_DEFAULTS)).toBeNull();
   });
 
-  it('offset at the cursor is exactly {dx: 0, dy: 0} and finite', () => {
+  it('offset at the cursor is exactly {dx: 0, dy: 0} (which is finite)', () => {
     const o = bendOffset(120, 80, 120, 80, BEND_DEFAULTS);
     expect(o).toEqual({ dx: 0, dy: 0 });
-    expect(Number.isFinite(o?.dx ?? NaN)).toBe(true);
-    expect(Number.isFinite(o?.dy ?? NaN)).toBe(true);
   });
 
-  it('offset points directly away from the cursor (point right of cursor: dx > 0, dy === 0)', () => {
+  it('offset at a point right of the cursor is +dx, zero dy (screen coords, y-down)', () => {
     const o = expectOffset(bendOffset(400, 300, 300, 300, BEND_DEFAULTS));
     expect(o.dx).toBeGreaterThan(0);
     expect(o.dy).toBe(0);

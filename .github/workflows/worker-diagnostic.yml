@@ -58,7 +58,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "## D1 event_archive — last 5 archived batches" >> "$GITHUB_STEP_SUMMARY"
-          npx --yes wrangler@latest d1 execute SITE_CACHE_DB --remote --json \
+          npx --yes wrangler@latest d1 execute cqd_site_cache --remote --json \
             --command "SELECT batch_id, kind, event_count, weighted_count, archived_at_utc FROM event_archive ORDER BY archived_at_utc DESC LIMIT 5" \
             > /tmp/d1-last.json 2>/tmp/d1-error.txt \
           && node -e '
@@ -67,4 +67,4 @@ jobs:
             const rows = Array.isArray(d) ? d[0]?.results : d.results;
             fs.writeFileSync(process.env.GITHUB_STEP_SUMMARY, "```json\n" + JSON.stringify(rows, null, 2) + "\n```\n");
           ' \
-          || echo "::warning::D1 query failed: $(head -c 200 /tmp/d1-error.txt)"
+          || echo "::warning::D1 query failed: stderr=$(head -c 200 /tmp/d1-error.txt) stdout=$(head -c 200 /tmp/d1-last.json)"

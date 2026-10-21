@@ -36,9 +36,13 @@ demand via `workflow_dispatch`).
 
 Steps:
 
-1. **D1 export** — `wrangler d1 execute SITE_CACHE_DB --remote --json` selects
-   every row of `event_archive`. If the table does not exist yet (fresh
-   deployment), the step degrades to an empty sheet instead of failing.
+1. **D1 export** — `wrangler d1 execute cqd_site_cache --remote --json` selects
+   every row of `event_archive`. `cqd_site_cache` is the database NAME from
+   `cloudflare-worker/wrangler.toml`; `SITE_CACHE_DB` is only the worker
+   binding and `d1 execute` does not resolve it. The `CLOUDFLARE_API_TOKEN`
+   secret must carry the Account → D1 → Read permission, or the export fails
+   with `Authentication error [code: 10000]`. If the table does not exist yet
+   (fresh deployment), the step degrades to an empty sheet instead of failing.
 2. **Sheet build** — `tools/backup-to-sheet.mjs` converts the rows to
    `event-archive.csv` plus a per-kind `backup-summary.csv`.
 3. **DO state dump** — `GET /admin/storage-export` with the
@@ -68,7 +72,7 @@ Steps:
 gh workflow run data-backups.yml --repo adhamhaithameid/Classroom-Quick-Downloader
 
 # Local sheet build only (no Cloudflare auth needed for the CSV step):
-wrangler d1 execute SITE_CACHE_DB --remote --json \
+wrangler d1 execute cqd_site_cache --remote --json \
   "SELECT batch_id, kind, created_at_utc, event_count, weighted_count, archived_at_utc FROM event_archive ORDER BY created_at_utc ASC" \
   > /tmp/event-archive.json
 node tools/backup-to-sheet.mjs /tmp/event-archive.json /tmp/backups
@@ -111,7 +115,7 @@ The private key file is kept locally outside the repo (never commit it).
 ## 4. Restore procedures
 
 **Archive rows → D1:** the CSV/JSON is a faithful copy of `event_archive`.
-Re-import via `wrangler d1 execute SITE_CACHE_DB --remote --file=<dump>` if a
+Re-import via `wrangler d1 execute cqd_site_cache --remote --file=<dump>` if a
 database is ever recreated (the table schema lives in
 `cloudflare-worker/src/event-archive.ts`).
 

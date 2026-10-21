@@ -1,0 +1,23 @@
+#!/usr/bin/env sh
+
+# Secret scan on the staged diff (bead i338.35). GitGuardian scans every
+# commit of a PR range on the remote; this catches credential-shaped
+# literals BEFORE they enter history, where the only cure is a squash.
+# Guarded on binary presence: machines without gitleaks commit as before.
+# Skip for one commit: --no-verify. Known false positives: .gitleaksignore.
+#
+# Piped through stdin on purpose: gitleaks' own --staged modes are backed
+# by go-git, which cannot read the index, so they silently scan 0 commits
+# (verified on v8.30.1). `git diff --cached | gitleaks stdin` works in
+# every checkout shape, linked worktrees included.
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "husky(pre-commit): gitleaks not installed, secret scan skipped (brew install gitleaks)" >&2
+  exit 0
+fi
+
+staged_diff="$(git diff --cached -U0 --no-color)"
+if [ -z "$staged_diff" ]; then
+  exit 0
+fi
+
+printf '%s\n' "$staged_diff" | gitleaks stdin --redact --verbose

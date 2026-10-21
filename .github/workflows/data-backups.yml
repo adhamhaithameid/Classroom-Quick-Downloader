@@ -46,7 +46,10 @@ jobs:
           mkdir -p backups/latest
           # The event_archive table appears once the new worker code has flushed
           # its first batch; until then fall back to an empty sheet.
-          if ! npx --yes wrangler@latest d1 execute SITE_CACHE_DB --remote --json \
+          # d1 execute resolves the DATABASE NAME (cqd_site_cache per
+          # cloudflare-worker/wrangler.toml), not the worker binding
+          # SITE_CACHE_DB — the binding name made every daily export fail.
+          if ! npx --yes wrangler@latest d1 execute cqd_site_cache --remote --json \
             --command "SELECT batch_id, kind, created_at_utc, event_count, weighted_count, archived_at_utc FROM event_archive ORDER BY created_at_utc ASC" \
             > backups/latest/event-archive.json 2>/tmp/d1-export-error.txt; then
             if grep -qi "no such table" /tmp/d1-export-error.txt; then
@@ -55,9 +58,15 @@ jobs:
             else
               # Non-fatal: a broken export must not turn every daily run red.
               # The warning stays loud in the log; investigate failures from
-              # the workflow log, not the run status.
-              echo "::warning::D1 export failed (export kept empty):"
+              # the workflow log, not the run status. Dump BOTH captures:
+              # with --json, wrangler errors can land on stdout.
+              echo "::warning::D1 export failed (export kept empty) — stderr:"
               cat /tmp/d1-export-error.txt >&2 || true
+              echo "::warning::D1 export failed (export kept empty) — captured stdout:"
+              head -c 2000 backups/latest/event-archive.json >&2 || true
+              if grep -q '"code": 10000' /tmp/d1-export-error.txt; then
+                echo "::warning::CLOUDFLARE_API_TOKEN cannot read D1 (Authentication error 10000). Grant Account → D1 → Read to the token this workflow uses; the deploy-only scope is not enough."
+              fi
               echo '{"results":[]}' > backups/latest/event-archive.json
             fi
           fi

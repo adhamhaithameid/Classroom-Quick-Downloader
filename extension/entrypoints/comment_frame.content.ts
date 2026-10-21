@@ -117,10 +117,13 @@ function applyCombinedFlagState(enabled: boolean): void {
 const _browserApi = (globalThis as any).chrome;
 if (_browserApi?.storage?.local) {
   _browserApi.storage.local.get('commentsFlagEnabled', (res: { commentsFlagEnabled?: boolean }) => {
-    commentsFlagEnabled = res.commentsFlagEnabled !== false; // default true
+    // Apply-path, not bare assignment: the first scan can win the race and
+    // render with the default; a false read must remove those artifacts
+    // (survey #819).
+    applyCommentsFlagState(res.commentsFlagEnabled !== false); // default true
   });
   _browserApi.storage.local.get('combinedFlagEnabled', (res: { combinedFlagEnabled?: boolean }) => {
-    combinedFlagEnabled = res.combinedFlagEnabled !== false; // default true
+    applyCombinedFlagState(res.combinedFlagEnabled !== false); // default true
   });
   _browserApi.storage.onChanged.addListener((changes: any, area: string) => {
     if (area === 'local' && 'commentsFlagEnabled' in changes) {

@@ -22,6 +22,7 @@ import type {
   ExclusionTrace,
   ViewKind,
 } from '../../engines/types';
+import type { Detector } from '../../contracts/detection';
 
 import { keywordDetector } from '../../detect/keyword/keyword-detector';
 import { scoreComments, scoreEdited } from '../../detect/keyword/keyword-scoring';
@@ -45,6 +46,11 @@ export { scoreComments, scoreEdited };
  * @param postId - Canonical post ID
  * @param viewKind - Current page type
  * @param lang - Page language (auto-detected if not provided)
+ * @param detector - Optional corroborating Detector (csaa.1 / p8tq): when
+ *   provided (EngineV3 hands over its ApiDetector), observe runs through it
+ *   and its additive-only API floor can raise a real DOM numeral's strength
+ *   to comment_show. Default: the bare keyword singleton — byte-identical
+ *   behavior for every caller that does not pass one.
  * @returns FlagDecision with verdict, scores, and trace
  */
 export function scoreFlagsForPost(
@@ -52,8 +58,9 @@ export function scoreFlagsForPost(
   postId: string,
   viewKind: ViewKind,
   lang?: string,
+  detector: Detector = keywordDetector,
 ): FlagDecision {
-  const observation = keywordDetector.observe(post, { postId, viewKind, lang });
+  const observation = detector.observe(post, { postId, viewKind, lang });
   const decision = decideFlags(observation);
 
   // ExclusionTrace declares `reason: string` and `matchedText: string` — both

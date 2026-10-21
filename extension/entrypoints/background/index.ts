@@ -29,7 +29,7 @@ import { createStoragePersistence, reconcilePersistedJobs } from './job-persiste
 import { queueSettled, queueRecoverActive, getQueueSnapshot, setQueuePaused } from './queue';
 import { createIconUpdaters, isClassroomUrl, setActionIcon, GRAY_ICON_PATHS } from './icon-manager';
 import { extractDriveFileId } from './auth-utils';
-import { getFilenameExt, buildUrlWithAuthUser } from './url-helpers';
+import { composeSuggestedFilename, getFilenameExt, buildUrlWithAuthUser } from './url-helpers';
 import { cleanup, cleanupOrphanedPendingDownloads } from './cleanup';
 import { ensureAnalyticsAlarm, checkAndCloseFileTab } from './analytics-alarm';
 import { sendStatusToTab } from './message-sender';
@@ -403,11 +403,17 @@ export default defineBackground(() => {
       }
 
       sendStatusToTab(pending, 'success');
-      if (pending.fileMeta?.name) {
-        suggest({ filename: pending.fileMeta.name, conflictAction: 'uniquify' });
-      } else {
-        suggest({ filename: 'classroom_download', conflictAction: 'uniquify' });
-      }
+      // Survey #821: a Classroom title without an extension used to land on
+      // disk without one. Compose with the wire-known extension or the
+      // response MIME before suggesting.
+      suggest({
+        filename: composeSuggestedFilename({
+          name: pending.fileMeta?.name,
+          knownExt: pending.finalExtension || pending.fileMeta?.ext,
+          mime: actualMime,
+        }),
+        conflictAction: 'uniquify',
+      });
     });
   }
 

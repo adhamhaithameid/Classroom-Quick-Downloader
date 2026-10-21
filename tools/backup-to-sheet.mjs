@@ -6,7 +6,7 @@
 // Usage:
 //   node tools/backup-to-sheet.mjs <event-archive.json> <out-dir>
 //     1st arg: JSON output of:
-//       wrangler d1 execute SITE_CACHE_DB --remote --json \
+//       wrangler d1 execute cqd_site_cache --remote --json \
 //         "SELECT batch_id, kind, created_at_utc, event_count, weighted_count, archived_at_utc
 //          FROM event_archive ORDER BY created_at_utc ASC"
 //     2nd arg: directory that receives event-archive.csv + backup-summary.csv

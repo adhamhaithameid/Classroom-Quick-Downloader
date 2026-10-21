@@ -61,3 +61,54 @@ export function getFilenameExt(filename?: string): string | undefined {
   const m = filename.match(/\.([a-zA-Z0-9]{1,10})$/);
   return m ? m[1].toLowerCase() : undefined;
 }
+
+/**
+ * Wire MIME type → file extension for the attachment types Classroom
+ * actually serves. The suggested filename must never leave an
+ * extension-less title on disk (survey #821): when the Classroom title
+ * carries no extension, the download's own MIME names the type.
+ */
+const MIME_EXT: Record<string, string> = {
+  'application/pdf': 'pdf',
+  'application/zip': 'zip',
+  'application/x-zip-compressed': 'zip',
+  'application/rtf': 'rtf',
+  'application/msword': 'doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'application/vnd.ms-powerpoint': 'ppt',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+  'application/vnd.ms-excel': 'xls',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+  'text/plain': 'txt',
+  'text/csv': 'csv',
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'video/mp4': 'mp4',
+  'video/webm': 'webm',
+  'audio/mpeg': 'mp3',
+  'audio/wav': 'wav',
+};
+
+export function extForMime(mime?: string): string | undefined {
+  if (!mime) return undefined;
+  return MIME_EXT[mime.trim().toLowerCase()];
+}
+
+/**
+ * Compose the filename the download pipeline suggests. Order of trust for
+ * the extension: an extension present in the name itself, then the
+ * wire-known extension, then the response MIME type. The name keeps the
+ * Classroom title when one exists and falls back to a fixed base.
+ */
+export function composeSuggestedFilename(opts: {
+  name?: string;
+  knownExt?: string;
+  mime?: string;
+}): string {
+  const base = opts.name?.trim() ? opts.name.trim() : 'classroom_download';
+  if (getFilenameExt(base)) return base;
+  const ext = opts.knownExt?.toLowerCase() || extForMime(opts.mime);
+  return ext ? `${base}.${ext}` : base;
+}

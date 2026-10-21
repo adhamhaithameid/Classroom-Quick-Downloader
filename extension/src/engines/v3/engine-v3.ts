@@ -115,6 +115,10 @@ export class EngineV3 implements CQDEngine {
       getToken: () => this.tokenProvider.getAccessToken(false),
       getSnapshot: async () => this.latestApiSnapshot,
     });
+    // csaa.1 / p8tq: rendered decisions now flow through the ApiDetector, so
+    // its additive-only floor upgrades real-but-sub-threshold comment
+    // findings. Plain V2 (no API layer) never sets the field.
+    this.v2.flagCorroborator = this.apiDetector;
   }
 
   // ========================================================================
@@ -129,6 +133,7 @@ export class EngineV3 implements CQDEngine {
     // signal this is the real init scan; on an aborted one (tests, teardown
     // races) it is a no-op and fullScan picks the posts up instead.
     this.runApiCorroborationPass();
+    this.rescanCorroboratedFlags();
     // csaa.6 / bug 2.2: the whole-classroom button is driven by the
     // ORCHESTRATOR (orchestrator.syncClassroomButton, on the view-change
     // path) for every EngineV2-DOM mode — v2 and v3 alike. This engine no
@@ -170,7 +175,10 @@ export class EngineV3 implements CQDEngine {
     if (this.currentView && isStudentWorkView(this.currentView)) {
       // Refresh the cache, THEN corroborate the posts V2 just tracked — the
       // pass reads the detector's cache, so it must not race the refresh.
-      void this.refreshApiSnapshot().then(() => this.runApiCorroborationPass());
+      void this.refreshApiSnapshot().then(() => {
+        this.runApiCorroborationPass();
+        this.rescanCorroboratedFlags();
+      });
     }
   }
 
@@ -246,6 +254,19 @@ export class EngineV3 implements CQDEngine {
    * mismatch) — the pass is silent by construction. Results feed
    * getApiCorroborationTrace.
    */
+  /**
+   * csaa.1 / p8tq: one V2-LEVEL full scan after the snapshot refresh. The
+   * first scan on a student-work view necessarily renders unfloored (the
+   * snapshot is async); this re-detects every tracked post through the
+   * corroborator now that its cache is warm, so late badges appear — never
+   * wrong. V2-level ON PURPOSE: a V3 fullScan here would re-discover the
+   * snapshot and re-arm this chain — an infinite ping-pong. Budget-bounded
+   * like every scan; the freshness check makes the next refresh a no-op.
+   */
+  private rescanCorroboratedFlags(): void {
+    this.v2.fullScan();
+  }
+
   private runApiCorroborationPass(): void {
     if (!this.currentView || !isStudentWorkView(this.currentView)) return;
 

@@ -72,6 +72,7 @@ import { engineRegistry } from '../engine-registry';
 import type { SelectorScorer } from '../../v2/selectors/selector-scorer';
 import { computePlacement, countSingleButtonEligibleFiles } from '../../v2/decision/file-placement';
 import { scoreFlagsForPost } from '../../v2/decision/flag-scoring';
+import type { Detector } from '../../contracts/detection';
 import { keywordDetector } from '../../detect/keyword/keyword-detector';
 import { runComparison, installCompareGlobals } from '../../compare/compare-runner';
 import type { ScannedPost, ScannedFile } from '../../v2/model/dom-scanner';
@@ -154,6 +155,10 @@ export class EngineV2 implements CQDEngine {
   private exclusionScorer: SelectorScorer | null = null;
 
   // -- Decision history --
+  /** csaa.1 / p8tq: optional corroborating Detector. EngineV3 assigns its
+   * ApiDetector so rendered decisions get the additive-only API floor; a
+   * plain V2 (mode 'v2') never sets it and stays byte-identical. */
+  flagCorroborator?: Detector;
   private flagDecisions: Map<string, FlagDecision> = new Map();
   private placementDecisions: PlacementDecision[] = [];
   private decisionTraces: Map<string, DecisionTrace> = new Map();
@@ -894,6 +899,8 @@ export class EngineV2 implements CQDEngine {
         postEl,
         postId,
         this.currentView,
+        undefined,
+        this.flagCorroborator,
       );
 
       this.flagDecisions.set(postId, decision);

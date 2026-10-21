@@ -1,3 +1,12 @@
+## v1.9.2
+### Summary
+A fixes release: downloaded files always keep their file extension, turned-off highlights stay off, and the extension checks in with our servers far less often.
+### Changed
+- The extension sends usage stats once an hour instead of every five minutes, and no longer wakes up for a daily changelog check — much lighter on the network.
+### Fixed
+- Downloaded files always get their file extension, even when the Classroom post title has none (a PowerPoint titled "Unit V" now saves as "Unit V.pptx").
+- Turning off the Comment or Edited highlights now stays off after you close and reopen Classroom.
+
 ## v1.9.1
 ### Summary
 Your downloads now celebrate with you: confetti at 18 lifetime milestones and a live download counter in the popup.

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildUrlWithAuthUser,
+  composeSuggestedFilename,
+  extForMime,
   getFilenameExt,
   normalizeUrl,
 } from '../entrypoints/background/url-helpers';
@@ -93,5 +95,59 @@ describe('background url helpers', () => {
     expect(result.baseUrl).toContain('drive.usercontent.google.com/download');
     expect(result.baseUrl).toContain('id=abc123');
     expect(result.baseUrl).not.toContain('authuser=');
+  });
+});
+
+describe('composeSuggestedFilename (survey #821)', () => {
+  it('keeps a name that already carries an extension', () => {
+    expect(
+      composeSuggestedFilename({
+        name: 'Lecture 5.pptx',
+        knownExt: 'pptx',
+        mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      }),
+    ).toBe('Lecture 5.pptx');
+  });
+
+  it('appends the known extension to an extension-less Classroom title', () => {
+    expect(
+      composeSuggestedFilename({ name: 'Unit V. Socialization', knownExt: 'pptx' }),
+    ).toBe('Unit V. Socialization.pptx');
+  });
+
+  it('falls back to the download MIME when nothing else knows the extension', () => {
+    expect(
+      composeSuggestedFilename({
+        name: 'Worksheet',
+        mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }),
+    ).toBe('Worksheet.xlsx');
+  });
+
+  it('prefers the wire-known extension over the MIME mapping', () => {
+    expect(
+      composeSuggestedFilename({
+        name: 'Slides',
+        knownExt: 'pdf',
+        mime: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      }),
+    ).toBe('Slides.pdf');
+  });
+
+  it('gives the no-name fallback both a base and an extension', () => {
+    expect(
+      composeSuggestedFilename({ mime: 'application/pdf' }),
+    ).toBe('classroom_download.pdf');
+    expect(composeSuggestedFilename({})).toBe('classroom_download');
+  });
+
+  it('maps common Classroom MIME types and leaves unknown ones alone', () => {
+    expect(extForMime('application/vnd.ms-powerpoint')).toBe('ppt');
+    expect(extForMime('application/vnd.openxmlformats-officedocument.wordprocessingml.document')).toBe('docx');
+    expect(extForMime('application/pdf')).toBe('pdf');
+    expect(extForMime('image/png')).toBe('png');
+    expect(extForMime('video/mp4')).toBe('mp4');
+    expect(extForMime('application/octet-stream')).toBeUndefined();
+    expect(extForMime(undefined)).toBeUndefined();
   });
 });
