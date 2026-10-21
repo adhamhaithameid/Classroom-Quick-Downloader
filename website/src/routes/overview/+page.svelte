@@ -7,6 +7,7 @@
   import { base } from '$app/paths';
   import { APP_VERSION, SITE_URL, STORE_LINKS } from '$lib/config';
   import SeoMeta from '$lib/components/SeoMeta.svelte';
+  import { AGGREGATE_RATING } from '$lib/seo/aggregate-rating';
   import { detectBrowserFromNavigator, type BrowserKey } from '$lib/browser/detect';
   import { refreshWebsiteSnapshotStore, websiteSnapshotStore } from '$lib/stores/websiteSnapshot';
   import type { MapResponse, OverviewResponse } from '$lib/types/public';
@@ -151,6 +152,9 @@
     isAccessibleForFree: true,
     softwareVersion: latestReleaseVersion.replace(/^v/, ''),
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+    // Real, rating-count-weighted store ratings (bead 6dq); omitted entirely
+    // when the bootstrap snapshot carries no usable rating data.
+    ...(AGGREGATE_RATING ? { aggregateRating: AGGREGATE_RATING } : {}),
     publisher: { '@id': `${SITE_URL}/#organization` },
     author: { '@type': 'Person', name: 'Adham Haitham', url: STORE_LINKS.github },
     url: buildCanonicalUrl(seoPath),

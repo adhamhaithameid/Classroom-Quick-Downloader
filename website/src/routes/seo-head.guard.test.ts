@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { render } from 'svelte/server';
 import RootRedirectPage from './+page.svelte';
 import { SITE_URL } from '$lib/config';
 
-/* SERP head guard (2026-10-03 SEO pass).
+/* SERP head guard (2026-10-03 SEO pass; rating contract updated 2026-10-21).
    Google truncated the previous 59-char homepage title mid-word ("Bulk ...")
    because it rendered past the ~580px title-link display width. This guard
    pins the exact title/description/canonical/OG contract and the
    SoftwareApplication JSON-LD so the SERP presentation cannot silently
-   drift again. Rating/review markup must NEVER appear: no real store-rating
-   data is wired, and fabricating it is forbidden. */
+   drift again. Rating markup IS allowed since bead 6dq — but only REAL
+   numbers: the rendered aggregateRating must equal the rating-count-weighted
+   mean recomputed here from the checked-in bootstrap snapshot. Any drift
+   between the emitted node and the store data fails this test. */
 
 const EXPECTED_TITLE = 'Classroom Quick Downloader — Google Classroom Files';
 const EXPECTED_DESCRIPTION =
@@ -84,7 +88,7 @@ describe('homepage SERP head guard', () => {
     expect(head).not.toContain('noindex, nofollow');
   });
 
-  it('SoftwareApplication JSON-LD is spec-complete and rating-free', () => {
+  it('SoftwareApplication JSON-LD is spec-complete with a real aggregateRating', () => {
     const { head } = render(RootRedirectPage);
     const app = jsonLdItems(head).find((item) => item['@type'] === 'SoftwareApplication');
     expect(app).toBeDefined();
@@ -97,8 +101,34 @@ describe('homepage SERP head guard', () => {
     expect(offers?.['price']).toBe('0');
     expect(offers?.['priceCurrency']).toBe('USD');
 
-    // No rating or review markup anywhere in the head: the extension's store
-    // ratings are not wired to this site, so none may be fabricated.
-    expect(head).not.toMatch(/aggregateRating|ratingValue|reviewCount|bestRating/i);
+    // The aggregateRating must be real: recompute the rating-count-weighted
+    // mean from the checked-in bootstrap snapshot (independent of the seo
+    // module under test) and require equality. A fabricated, hardcoded, or
+    // drifted number fails here.
+    const aggregate = app?.['aggregateRating'] as Record<string, unknown> | undefined;
+    expect(aggregate?.['@type']).toBe('AggregateRating');
+
+    const bootstrap = JSON.parse(
+      readFileSync(
+        join(process.cwd(), 'static', 'data', 'bootstrap-snapshot.json'),
+        'utf8',
+      ),
+    ) as { overview?: { installs?: { browsers?: Array<{ rating?: unknown; ratingCount?: unknown }> } } };
+    const browsers = bootstrap.overview?.installs?.browsers ?? [];
+    let weightedSum = 0;
+    let totalCount = 0;
+    for (const browser of browsers) {
+      const rating = Number(String(browser.rating ?? '').trim());
+      const count = Number(browser.ratingCount);
+      if (!Number.isFinite(rating) || rating < 1 || rating > 5) continue;
+      if (!Number.isInteger(count) || count <= 0) continue;
+      weightedSum += rating * count;
+      totalCount += count;
+    }
+    expect(totalCount).toBeGreaterThan(0);
+    expect(aggregate?.['ratingValue']).toBe((weightedSum / totalCount).toFixed(1));
+    expect(aggregate?.['ratingCount']).toBe(totalCount);
+    expect(aggregate?.['bestRating']).toBe('5');
+    expect(aggregate?.['worstRating']).toBe('1');
   });
 });
