@@ -76,6 +76,100 @@ export function createEmptyStats(): DownloadStats {
   };
 }
 
+/**
+ * Owner-reported bug (2026-10-21): the counter behind levels and confetti
+ * used to START AT ZERO for every install updating from a pre-1.9.0
+ * version — the record did not exist, so a veteran with hundreds of
+ * downloads saw level 0 and got "first file!" confetti. A fresh record is
+ * now seeded from the legacy analytics counter (LocalStats.success —
+ * successful downloads since install) so levels and the ladder begin from
+ * the real history.
+ *
+ * Seeding semantics: history is ACKNOWLEDGED, not re-celebrated. The count
+ * starts at the legacy total, lastMilestoneReached marks the highest rung
+ * already passed, and milestonePending stays null — the next celebration is
+ * the NEXT rung the user actually crosses.
+ *
+ * Layering: the legacy counter lives in the entrypoints' analytics storage,
+ * which pure src/ must not import, so the background registers a provider
+ * (setLegacyLifetimeCountProvider) and every chain operation seeds through
+ * ensureDownloadStatsSeeded when the record is missing or unusable.
+ */
+export function seedStatsFromLegacyCount(legacyCount: number): DownloadStats {
+  const safeCount =
+    Number.isFinite(legacyCount) && legacyCount > 0 ? Math.floor(legacyCount) : 0;
+  const stats = createEmptyStats();
+  stats.lifetimeCount = safeCount;
+  stats.lastMilestoneReached = highestRungAtOrBelow(safeCount);
+  return stats;
+}
+
+/** Highest ladder value at or below count; null when count is below rung 1. */
+function highestRungAtOrBelow(count: number): number | null {
+  let highest: number | null = null;
+  for (const rung of MILESTONE_LADDER) {
+    if (rung > count) break;
+    highest = rung;
+  }
+  return highest;
+}
+
+let legacyLifetimeCountProvider: (() => Promise<number>) | null = null;
+
+/**
+ * Register the legacy lifetime-count reader. The background service worker
+ * calls this once at startup with the analytics storage reader; tests pass
+ * their own (or null to fall back to zero).
+ */
+export function setLegacyLifetimeCountProvider(
+  provider: (() => Promise<number>) | null,
+): void {
+  legacyLifetimeCountProvider = provider;
+}
+
+async function readLegacyLifetimeCount(): Promise<number> {
+  if (!legacyLifetimeCountProvider) return 0;
+  try {
+    return await legacyLifetimeCountProvider();
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Load the stats record, seeding it from the legacy counter when it is
+ * missing or unusable (first run after the update, storage corruption). A
+ * seed with real history is persisted immediately so the popup and every
+ * later read — through any context — see the same acknowledged count; a
+ * zero legacy count keeps the fresh-install contract (no startup write). Runs on the
+ * serialized chain via the chain operations; call it once at service-worker
+ * startup too (ensureDownloadStatsSeeded from the background) so the popup
+ * sees the real count before the first download settles.
+ */
+export async function ensureDownloadStatsSeeded(): Promise<DownloadStats> {
+  const run = countChain.then(() => loadOrSeedDownloadStats());
+  countChain = run.catch(() => undefined);
+  return run;
+}
+
+/**
+ * The unchained load-or-seed. ONLY for callers that already hold a turn of
+ * the serialized chain (the chain operations below) — queueing a second
+ * turn from inside one deadlocks, since the inner turn waits for the outer.
+ */
+async function loadOrSeedDownloadStats(): Promise<DownloadStats> {
+  const { stats, valid } = await loadDownloadStats();
+  if (valid) return stats;
+  const legacyCount = await readLegacyLifetimeCount();
+  // Nothing to acknowledge: a fresh install keeps the pre-seeding contract
+  // (in-memory zero record, first write on the first settle) — no extra
+  // storage write for the common case.
+  if (!(legacyCount > 0)) return stats;
+  const seeded = seedStatsFromLegacyCount(legacyCount);
+  await saveDownloadStats(seeded);
+  return seeded;
+}
+
 function makeInstallId(): string {
   try {
     const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
@@ -242,7 +336,7 @@ export async function countCompletedDownload(
   downloadId: string,
 ): Promise<SettleResult & { stats: DownloadStats }> {
   const run = countChain.then(async (): Promise<SettleResult & { stats: DownloadStats }> => {
-    const { stats } = await loadDownloadStats();
+    const stats = await loadOrSeedDownloadStats();
     const result = applyDownloadSettle(stats, downloadId);
     if (result.changed) await saveDownloadStats(result.stats);
     return { ...result, stats: result.stats };
@@ -255,7 +349,7 @@ export async function countCompletedDownload(
 
 export async function clearMilestonePending(): Promise<DownloadStats> {
   const run = countChain.then(async (): Promise<DownloadStats> => {
-    const { stats } = await loadDownloadStats();
+    const stats = await loadOrSeedDownloadStats();
     if (stats.milestonePending === null) return stats;
     const next = { ...stats, milestonePending: null };
     await saveDownloadStats(next);
@@ -277,7 +371,7 @@ export async function clearMilestonePending(): Promise<DownloadStats> {
  */
 export async function claimMilestonePending(): Promise<number | null> {
   const run = countChain.then(async (): Promise<number | null> => {
-    const { stats } = await loadDownloadStats();
+    const stats = await loadOrSeedDownloadStats();
     if (stats.milestonePending === null) return null;
     const claimed = stats.milestonePending;
     const next = { ...stats, milestonePending: null };
