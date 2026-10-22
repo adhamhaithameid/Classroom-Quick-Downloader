@@ -12,12 +12,17 @@ import {
   corruptStatsStorage,
   firstRunFixture,
   historyRowsFixtureHelpers,
+  legacyStatsStorage,
   localStatsStorage,
   preSchemaSettingsStorage,
   settingsStorage,
   statsStorage,
   type FixtureState,
 } from '../src/fixtures/fixture-state';
+import {
+  ensureDownloadStatsSeeded,
+  setLegacyLifetimeCountProvider,
+} from '../../extension/src/history/download-stats';
 import {
   confettiBurstCount,
   resetConfettiBursts,
@@ -152,6 +157,34 @@ describe('simulator route A — real popup App', () => {
     // The stored record claims 137; the failed integrity check resets it.
     expect(el.querySelector('.cqd-lifetime-count')?.textContent).toBe('0');
     expect(el.textContent).toContain('Level 0 — download your first file');
+  });
+
+  it('veteran update: a missing stats record seeds from the legacy analytics history (bead 9gam)', async () => {
+    // The update path (sxtf): local_stats carries the install's real
+    // history, the checksummed stats record does not exist yet (new in
+    // 1.9.0). The background's startup seeding runs the real function
+    // against the real storage surface, then the popup renders the
+    // acknowledged level — with NO retroactive celebration.
+    const veteran: FixtureState = {
+      ...firstRunFixture(),
+      storage: {
+        ...settingsStorage(),
+        ...legacyStatsStorage(523),
+      },
+    };
+    installFixtureChrome(veteran);
+    setLegacyLifetimeCountProvider(async () => {
+      const ls = fixture().storage['local_stats'] as { success?: number } | undefined;
+      return ls?.success ?? 0;
+    });
+    await ensureDownloadStatsSeeded();
+
+    const el = await renderApp(veteran);
+    expect(el.querySelector('.cqd-lifetime-count')?.textContent).toBe('523');
+    expect(el.textContent).toContain('Level 5');
+    // Acknowledged history never re-celebrates: no toast on the update path.
+    expect(el.querySelector('.cqd-milestone-toast')).toBeNull();
+    setLegacyLifetimeCountProvider(null);
   });
 
   it('upgraded install: pre-schema storage migrates and stamps v2 on load', async () => {
