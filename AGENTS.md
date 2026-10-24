@@ -119,6 +119,13 @@ Workflow facts:
   the type, body lines ≤ 100 chars.
 - Escalating retries on a blocked action (Mimosa hook, commitlint) are a
   signal to change approach, not to retry the same call.
+- NEVER run `git clean -fdX` or `git clean -X` here — its `-e` excludes did
+  NOT protect `.beads/`, `.env`, or `extension/.output/signed.xpi` (2026-10-24
+  incident; `bd bootstrap` restored the tracker, but `.env` values and design
+  prototypes were lost with no backup). Remove generated files only with
+  `scripts/safe-clean` (dry-run by default). Protected paths:
+  `.beads/`, `*.env`, `.dev.vars`, `signed.xpi`, `tools/commit-planner/data.*`
+  (regenerate via `scan.mjs`), `website/prototype-*.html`. See GLOSSARY.md.
 
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:970c3bf2 -->

@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+# safe-clean — the ONLY approved way to remove generated files in this repo.
+#
+# Why this exists (2026-10-24 incident): `git clean -fdX` ignored its -e
+# excludes and deleted .beads/ (the Dolt issue tracker), .env files,
+# .dev.vars, the staged signed xpi, design prototypes, and planner data.
+# None had backups. Never run `git clean -fdX` / `git clean -X` here.
+#
+# Usage:
+#   scripts/safe-clean            # dry-run: prints what it would remove
+#   scripts/safe-clean --yes      # actually remove
+#   scripts/safe-clean --yes --deep   # also node_modules + pnpm store prune
+
+set -euo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+APPLY=no
+DEEP=no
+for arg in "$@"; do
+  case "$arg" in
+    --yes) APPLY=yes ;;
+    --deep) DEEP=yes ;;
+    *) echo "unknown arg: $arg"; exit 2 ;;
+  esac
+done
+
+# Generated, regenerable paths. Explicit list — no globs that can widen.
+TARGETS=(
+  extension/.output
+  extension/.wxt
+  extension/.stryker-tmp
+  extension/coverage
+  extension/reports
+  website/.svelte-kit
+  website/build
+  website/.wrangler
+  website/test-results
+  website/qa-artifacts
+  cloudflare-worker/.wrangler
+  cloudflare-worker/coverage
+  test-results
+  playwright-report
+  qa-artifacts
+  graphify-out
+  gui-test-screenshots
+  .wrangler
+  .scratch
+  # macOS noise
+  .DS_Store
+)
+
+# Guard: these must NEVER be touched. Abort if a target resolves into them.
+PROTECTED=(
+  .beads
+  .env
+  extension/.env
+  oracle-backend/.env
+  cloudflare-worker/.dev.vars
+  extension/.output/signed.xpi
+)
+
+for p in "${PROTECTED[@]}"; do
+  for t in "${TARGETS[@]}"; do
+    case "$t" in
+      "$p"|"$p"/*) echo "ABORT: target $t is protected ($p)"; exit 1 ;;
+    esac
+  done
+done
+
+removed=0
+for t in "${TARGETS[@]}"; do
+  [ -e "$t" ] || continue
+  # Keep protected files that live INSIDE a target (e.g. signed.xpi in .output).
+  keep=()
+  for p in "${PROTECTED[@]}"; do
+    case "$p" in
+      "$t"/*) keep+=("$p") ;;
+    esac
+  done
+  if [ "$APPLY" = yes ]; then
+    if [ ${#keep[@]} -gt 0 ]; then
+      for k in "${keep[@]}"; do
+        find "$t" -mindepth 1 -maxdepth 1 -not -path "${k#$t/}" -not -path "$t/$(basename "$k")" -exec rm -rf -- {} +
+      done
+      echo "removed contents of: $t (kept: ${keep[*]})"
+    else
+      rm -rf -- "$t"
+      echo "removed: $t"
+    fi
+  else
+    if [ ${#keep[@]} -gt 0 ]; then
+      echo "would remove contents of: $t (keeping: ${keep[*]})"
+    else
+      echo "would remove: $t"
+    fi
+  fi
+  removed=$((removed + 1))
+done
+
+if [ "$DEEP" = yes ]; then
+  for nm in node_modules extension/node_modules website/node_modules \
+            cloudflare-worker/node_modules oracle-backend/node_modules \
+            simulator/node_modules; do
+    [ -e "$nm" ] || continue
+    if [ "$APPLY" = yes ]; then rm -rf -- "$nm"; echo "removed: $nm"; else echo "would remove: $nm"; fi
+  done
+  if [ "$APPLY" = yes ]; then pnpm store prune || true; fi
+fi
+
+if [ "$removed" = 0 ]; then
+  echo "nothing to clean"
+fi
+[ "$APPLY" = yes ] || echo "dry-run only — pass --yes to apply, --deep for node_modules + store prune"
