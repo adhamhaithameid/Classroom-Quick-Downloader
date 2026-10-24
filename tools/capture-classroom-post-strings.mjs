@@ -233,7 +233,7 @@ async function editAnnouncementIfNeeded(page, log) {
     log('    no announcement options button');
     return false;
   }
-  const more = page.locator(`button[aria-label="${state.menuAria.replace(/"/g, '\\"')}"]`).first();
+  const more = page.locator(`button[aria-label="${state.menuAria.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"]`).first();
   await clickAt(page, more);
   await page.waitForTimeout(2_000);
   const edit = page.locator('[role="menu"] [role="menuitem"]:has-text("Edit"), [role="menu"] li:has-text("Edit")').first();
