@@ -551,7 +551,7 @@ function computeDownloadCountAggregates(
   return { total, installs, byBrowser, reportsProcessed, dropped };
 }
 
-const CONFIG_VERSION = 2;
+const CONFIG_VERSION = 3;
 // Flush just after the UTC daily reset (00:00): on the free plan the request
 // quota is typically exhausted by late evening, so a 23:00 flush always ran
 // into error 1027. 00:15 lands in a fresh quota window every day.
@@ -622,8 +622,12 @@ const HEALTH_WARN_PENDING_BATCHES = 10;
 const HEALTH_CRIT_PENDING_BATCHES = 25;
 const HEALTH_WARN_FAILURES = 3;
 const HEALTH_CRIT_FAILURES = 5;
-const HEALTH_WARN_STALE_MS = 6 * 60 * 60 * 1000;
-const HEALTH_CRIT_STALE_MS = 24 * 60 * 60 * 1000;
+// The archive flush is DAILY (alarm at 00:15 UTC), so sinceFlushMs
+// legitimately grows to ~24h between flushes. Warn only past one full
+// cycle + 2h of slack; critical past two missed cycles. (6h/24h fired a
+// false warn ~18h of every day — see bead ldlz.)
+const HEALTH_WARN_STALE_MS = 26 * 60 * 60 * 1000;
+const HEALTH_CRIT_STALE_MS = 48 * 60 * 60 * 1000;
 const HEALTH_WARN_BUFFER_UTIL = 0.8;
 const HEALTH_CRIT_BUFFER_UTIL = 0.95;
 const HEALTH_NOTIFY_WARN_INTERVAL_MS = 30 * 60 * 1000;
@@ -2823,6 +2827,15 @@ export class DownloadsDurable {
     let configDirty = false;
     if (!Number.isFinite(this.data.configVersion) || this.data.configVersion < CONFIG_VERSION) {
       this.data.configVersion = CONFIG_VERSION;
+      // ldlz retune (v3): the daily flush moved to a 00:15 UTC alarm, so the
+      // stale thresholds re-based to 26h/48h. Migrate ONLY values still equal
+      // to the OLD defaults — genuinely custom thresholds survive untouched.
+      if (this.data.configHealthWarnStaleMs === 6 * 60 * 60 * 1000) {
+        this.data.configHealthWarnStaleMs = HEALTH_WARN_STALE_MS;
+      }
+      if (this.data.configHealthCriticalStaleMs === 24 * 60 * 60 * 1000) {
+        this.data.configHealthCriticalStaleMs = HEALTH_CRIT_STALE_MS;
+      }
       configDirty = true;
     }
     this.data.configBatchSize = clampInt(this.data.configBatchSize, 1, 1000, base.configBatchSize);
@@ -3489,18 +3502,29 @@ export class DownloadsDurable {
 
     // Flush extension buffered events once daily at 00:15 UTC — shortly after
     // the free-plan request quota resets at midnight, so the flush does not
-    // run into error 1027 on heavy-traffic days.
+    // run into error 1027 on heavy-traffic days. CATCH-UP: a delayed alarm
+    // (Cloudflare may fire an alarm hours late after a DO eviction) must not
+    // skip the whole day, so any alarm on a day whose flush has not happened
+    // yet also flushes.
     const currentHour = new Date().getUTCHours();
-    if ((this.d.buffer.length > 0 || this.d.pendingBatches.length > 0) && currentHour === 0) {
+    const lastFlushDay =
+      this.d.lastFlushAt != null
+        ? new Date(this.d.lastFlushAt).toISOString().slice(0, 10)
+        : null;
+    const todayUtc = new Date(now).toISOString().slice(0, 10);
+    const dailyFlushDue =
+      currentHour === 0 || (lastFlushDay != null && lastFlushDay !== todayUtc);
+    if ((this.d.buffer.length > 0 || this.d.pendingBatches.length > 0) && dailyFlushDue) {
       logEvent("info", "alarm_daily_flush", {
         bufferedEvents: this.d.buffer.length,
         pendingBatches: this.d.pendingBatches.length,
+        catchUp: currentHour !== 0,
       });
       await this.flushBufferToArchive(true);
     }
 
-    // Flush website telemetry queue once daily at 00:15 UTC.
-    if (this.d.websiteTelemetryQueue.length > 0 && currentHour === 0) {
+    // Flush website telemetry queue once daily at 00:15 UTC (same catch-up).
+    if (this.d.websiteTelemetryQueue.length > 0 && dailyFlushDue) {
       await this.flushWebsiteTelemetryQueue({
         force: true,
         trigger: "daily_alarm",
@@ -3510,7 +3534,7 @@ export class DownloadsDurable {
 
     // Bound the archive: delete rows older than the retention window so D1
     // storage stays flat. Best-effort; shares the alarm's daily cadence.
-    if (this.env.SITE_CACHE_DB && currentHour === 0) {
+    if (this.env.SITE_CACHE_DB && dailyFlushDue) {
       this.state.waitUntil(
         pruneArchive(this.env.SITE_CACHE_DB, REQUEST_HISTORY_DAYS).catch(() => {}),
       );
@@ -7092,6 +7116,10 @@ export class DownloadsDurable {
       this.d.retryState.consecutiveFailures += 1;
       logEvent("error", "archive_flush_exception", { error: String(err) });
       this.recordFailure("archive_forward", "exception", msg, 1, now);
+      // Mirror the ok:false branch: an exception path must also dead-letter
+      // the head batch once its attempts are exhausted, or a poison batch
+      // whose failures throw (not return ok:false) retries forever.
+      this.deadLetterHeadBatchIfExhausted(null, msg);
       stashFailedBatch();
       await this.scheduleRetry();
       await this.persist();
