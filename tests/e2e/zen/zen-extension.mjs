@@ -377,7 +377,13 @@ async function main() {
     check(`content script injects on classroom fixture (${BUTTON_SELECTOR})`, injected === true);
 
     const url = await session.execute(`return location.href`);
-    check("fixture served on the real classroom origin", String(url).startsWith("https://classroom.google.com"), `url: ${String(url).slice(0, 80)}`);
+    let sameOrigin = false;
+    try {
+      sameOrigin = new URL(String(url)).origin === "https://classroom.google.com";
+    } catch {
+      sameOrigin = false;
+    }
+    check("fixture served on the real classroom origin", sameOrigin, `url: ${String(url).slice(0, 80)}`);
 
     const shot = await session.command("GET", `/session/${session.sessionId}/screenshot`);
     if (typeof shot === "string" && shot.length > 100) {

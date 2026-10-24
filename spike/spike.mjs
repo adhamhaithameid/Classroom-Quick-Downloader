@@ -265,8 +265,8 @@ try {
   // The bubble is a native widget: if no page target appeared, capture the
   // desktop so a human can verify what the bubble showed.
   if (!popupAppeared && process.platform === "darwin") {
-    const { execSync } = await import("node:child_process");
-    execSync(`screencapture -x ${JSON.stringify(path.join(SHOTS, "state-e-desktop.png"))}`);
+    const { execFileSync } = await import("node:child_process");
+    execFileSync("screencapture", ["-x", path.join(SHOTS, "state-e-desktop.png")]);
     console.log("5: desktop screenshot saved (bubble is a native widget, not a page target)");
   }
   await ctx.close();

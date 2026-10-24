@@ -576,8 +576,8 @@ export function coerceTestimonialsPayload(input: unknown): TestimonialsResponse 
     const store = typeof item.store === 'string' && TESTIMONIAL_STORE_KEYS.has(item.store)
       ? (item.store as StoreLiveReview['store'])
       : null;
-    const reviewer = typeof item.reviewer === 'string' ? item.reviewer.replace(/<[^>]*>/g, '').trim().slice(0, 80) : '';
-    const text = typeof item.text === 'string' ? item.text.replace(/<[^>]*>/g, '').trim().slice(0, 600) : '';
+    const reviewer = typeof item.reviewer === 'string' ? item.reviewer.replace(/[<>]/g, '').trim().slice(0, 80) : '';
+    const text = typeof item.text === 'string' ? item.text.replace(/[<>]/g, '').trim().slice(0, 600) : '';
     const rating = typeof item.rating === 'number' && Number.isInteger(item.rating) && item.rating >= 1 && item.rating <= 5
       ? item.rating
       : null;

@@ -119,14 +119,19 @@ const MAX_TEXTS = 500;
 const MAX_ARIA = 300;
 const MAX_LINE = 200;
 
+const ENTITIES = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&nbsp;': ' ' };
+
 function decodeEntities(text) {
-  return text
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ');
+  return text.replace(/&(?:amp|lt|gt|quot|#39|nbsp);/g, (m) => ENTITIES[m]);
+}
+
+/** Drop tags structurally: each '<...' run is cut at its '>' (or kept when
+ * unterminated), so tag names never leak into corpus text. */
+function stripTagsToNewlines(html) {
+  return html
+    .split('<')
+    .map((seg, i) => (i === 0 ? seg : seg.slice(seg.indexOf('>') + 1)))
+    .join('\n');
 }
 
 /** Visible-ish text lines from raw HTML (script/style stripped, deduped). */
@@ -135,7 +140,7 @@ export function textLinesFromHtml(raw) {
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<!--[\s\S]*?-->/g, ' ');
-  const lines = decodeEntities(withoutInvisible.replace(/<[^>]+>/g, '\n'))
+  const lines = decodeEntities(stripTagsToNewlines(withoutInvisible))
     .split('\n')
     .map((l) => l.replace(/\s+/g, ' ').trim())
     .filter((l) => l.length > 0 && l.length <= MAX_LINE);

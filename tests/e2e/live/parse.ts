@@ -223,11 +223,8 @@ export function parseAccountEmail(ariaLabel: string | null): string | null {
   return m ? m[1] : null;
 }
 
+const ENTITIES: Record<string, string> = { "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'" };
+
 function decodeEntities(text: string): string {
-  return text
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
+  return text.replace(/&(?:amp|lt|gt|quot|#39);/g, (m) => ENTITIES[m]);
 }
