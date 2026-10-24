@@ -5,7 +5,8 @@ name: Daily Data Backups
 #   backups/latest/backup-summary.csv        — per-kind totals
 #   backups/latest/do-storage.json           — full Durable Object state dump
 #   backups/latest/public-snapshot.json      — last public website snapshot
-# Git history keeps every day's copy. The Google Sheets push is ACTIVE
+# Git history keeps every day's copy on the `data-backups` branch (main's
+# ruleset blocks unattributed bot pushes). The Google Sheets push is ACTIVE
 # (GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON + GOOGLE_SHEETS_ID are configured as
 # Actions secrets; the sheet is shared with the service-account client_email).
 # Full details: docs/BACKUPS.md.
@@ -116,7 +117,9 @@ jobs:
             exit 0
           fi
           git commit -m "chore(backups): daily data backup $(date -u +%Y-%m-%d) [skip ci]"
-          git push
+          # main's ruleset rejects the bot's unattributed push (GH013), so the
+          # rolling history lands on a dedicated branch instead of main.
+          git push origin "HEAD:refs/heads/data-backups" --force
 
       - name: Push to Google Sheet (optional)
         env:
