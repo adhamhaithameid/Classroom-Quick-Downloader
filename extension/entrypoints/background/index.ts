@@ -60,6 +60,8 @@ import {
   countCompletedDownload,
   clearMilestonePending,
   claimMilestonePending,
+  ensureDownloadStatsSeeded,
+  setLegacyLifetimeCountProvider,
   CQD_STATS_CLAIM_CELEBRATION,
 } from '../../src/history/download-stats';
 import { reportDownloadCount } from '../utils/analytics/count-reporter';
@@ -143,6 +145,12 @@ function isStudentWorkResolvePublishMessage(value: unknown): value is StudentWor
 export default defineBackground(() => {
   // Initialize analytics alarms
   ensureAnalyticsAlarm();
+  // Levels + confetti must start from the real history, not from zero: a
+  // missing stats record (first wake after updating from pre-1.9.0) is
+  // seeded from the legacy analytics success counter. Runs on every wake;
+  // a valid record makes it a no-op read.
+  setLegacyLifetimeCountProvider(async () => (await loadStats()).success ?? 0);
+  void ensureDownloadStatsSeeded().catch(() => undefined);
   // Report unhandled background errors as runtime_error analytics events
   // (rate-capped, signature-only; see utils/analytics/runtime-errors.ts).
   installRuntimeErrorReporting();

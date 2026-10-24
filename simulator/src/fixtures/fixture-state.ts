@@ -102,6 +102,23 @@ export function corruptStatsStorage(): Record<string, unknown> {
   };
 }
 
+/**
+ * Build the pre-1.9.0 analytics stats record (local_stats) the way the
+ * analytics storage wrote it — the legacy lifetime counter the stats
+ * seeding reads on the update path (bead sxtf; E2E per bead 9gam).
+ */
+export function legacyStatsStorage(success: number): Record<string, unknown> {
+  return {
+    local_stats: {
+      total: success,
+      success,
+      fail: 0,
+      cancelled: 0,
+      attempts: success,
+    },
+  };
+}
+
 /** Build the popup's donut-chart record (local_stats). */
 export function localStatsStorage(byType: Record<string, number>): Record<string, unknown> {
   const total = Object.values(byType).reduce((sum, n) => sum + n, 0);

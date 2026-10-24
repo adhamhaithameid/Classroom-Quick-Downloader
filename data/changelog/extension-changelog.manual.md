@@ -6,6 +6,7 @@ A fixes release: downloaded files always keep their file extension, turned-off h
 ### Fixed
 - Downloaded files always get their file extension, even when the Classroom post title has none (a PowerPoint titled "Unit V" now saves as "Unit V.pptx").
 - Turning off the Comment or Edited highlights now stays off after you close and reopen Classroom.
+- Levels and milestones now start from your existing download history after updating, instead of counting from zero — no surprise "first file" confetti for long-time users.
 
 ## v1.9.1
 ### Summary
