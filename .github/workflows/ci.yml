@@ -221,7 +221,9 @@ jobs:
           # already-registered version is owner-invisible to some API
           # surfaces (version GET 404s) and the create flow 409s.
           AMO_ADDON_ID: classroom-quick-downloader-qa@adhamhaitham.dev
-          AMO_POLL_TIMEOUT_MS: "600000"
+          # 2026-10-24: review of a fresh unlisted QA version took ~12 min
+          # end to end; 10 min timed out before the signature landed.
+          AMO_POLL_TIMEOUT_MS: "1800000"
         run: |
           pnpm exec playwright install firefox
           # Build the Firefox zip with the QA companion guid and a unique
