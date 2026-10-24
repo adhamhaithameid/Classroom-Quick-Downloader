@@ -46,14 +46,14 @@
 	"devDependencies": {
 		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "^2.70.3",
-		"@sveltejs/vite-plugin-svelte": "^7.3.0",
+		"@sveltejs/vite-plugin-svelte": "^7.3.1",
 		"@types/d3-geo": "^3.1.1",
 		"@types/d3-scale": "^4.0.9",
 		"@types/topojson-client": "^3.1.5",
-		"svelte": "^5.57.0",
-		"svelte-check": "^4.7.6",
+		"svelte": "^5.57.2",
+		"svelte-check": "^4.7.7",
 		"typescript": "^6.0.3",
-		"vite": "^8.3.4",
+		"vite": "^8.3.5",
 		"vitest": "^4.1.12"
 	}
 }
