@@ -5,8 +5,10 @@ packages:
   - "website"
   - "simulator"
   - "tools/*"
-onlyBuiltDependencies:
-  - esbuild
+# pnpm 12 renamed onlyBuiltDependencies -> allowBuilds (map, true = allowed).
+allowBuilds:
+  esbuild: true
+  workerd: true
 
 # Migrated from package.json pnpm field 2026-10-24 — pnpm 11+ ignores
 # the pnpm key in package.json (pnpm/pnpm#11536).
