@@ -150,6 +150,10 @@ const TEACHER_SIGNALS: { label: string; pattern: RegExp }[] = [
     pattern: /أعلن\s+شيئً?ا?\s+لصفك/,
   },
   {
+    label: "stream collapsed composer (New announcement button)",
+    pattern: /new announcement/i,
+  },
+  {
     label: "classwork create button (aria-label)",
     pattern: /aria-label="(Create|إنشاء)"/i,
   },
