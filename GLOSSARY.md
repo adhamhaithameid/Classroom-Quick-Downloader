@@ -110,6 +110,15 @@ relying on them; docs can lag behind the code.
   `live-chromium`). Branded Chrome 137+ cannot load extensions (anti-abuse);
   Chrome for Testing (`extension-chromium`) and Edge still honor the flags.
 - **Nightly tests** — `nightly-tests.yml`, the long full-matrix run.
+- **Mega-E2E gate** — `scripts/mega-e2e` / `tools/mega-e2e/`, the pre-deploy
+  quality gate: build, unit, golden, both browser E2E legs, popup QA, live
+  suites, and DOM-drift probes. The stores workflow runs its CI side
+  automatically before any publish; a dispatch cannot skip it. See
+  docs/MEGA_E2E_GATE.md and the skill `.agents/skills/mega-e2e/SKILL.md`.
+- **Drift probes** — the mega gate's discovery layer: required selector
+  families are pinned against captured fixtures with a marker-ratio
+  snapshot, so silent Google markup changes (like the 2026-10 `data-drive-id`
+  removal, bead `bs7c`) fail the gate before they reach users.
 - **CodeQL / Dependabot alerts** — GitHub security findings. Fix in code
   when cheap; dismiss with a written reason only when the fix is a tracked
   major migration (bead `jmvc`).

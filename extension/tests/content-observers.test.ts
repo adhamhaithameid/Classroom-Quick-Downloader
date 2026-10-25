@@ -123,6 +123,50 @@ describe('content/observers', () => {
     );
   });
 
+  it('injects for the 2026-10 card markup: anchor is the card, aria-label Attachment:, unknown wrapper classes', async () => {
+    // Live capture 2026-10-25 (bead bs7c): Google dropped data-drive-id and
+    // the known container classes from details-view cards. The <a> itself is
+    // the card; only its aria-label and drive href identify it.
+    const { mod, injectButtonIntoAttachment } = await loadObserversModule();
+    const root = document.createElement('div');
+    root.innerHTML = `
+      <div class="riU7le FHXi2c">
+        <a
+          class="vwNuXe JkIgWb gmNu1d yixX5e"
+          target="_blank"
+          aria-label="Attachment: PDF: cqd-test-file-1.pdf"
+          jsname="HrdP0"
+          href="https://drive.google.com/file/d/1nYQPtJQJXW_LvVfo2jMLJmQlVC17zmRX/view?usp=classroom_web&amp;authuser=0"
+          title="cqd-test-file-1.pdf"
+        >
+          <div class="MM30Lb"><div class="mvRF3b">cqd-test-file-1.pdf</div></div>
+        </a>
+      </div>
+    `;
+    document.body.appendChild(root);
+
+    mod.injectSingleFileButtons(root);
+    expect(injectButtonIntoAttachment).toHaveBeenCalledTimes(1);
+    expect(injectButtonIntoAttachment).toHaveBeenCalledWith(
+      root.querySelector('a[aria-label^="Attachment:"]'),
+      'https://drive.google.com/file/d/1nYQPtJQJXW_LvVfo2jMLJmQlVC17zmRX/view?usp=classroom_web&authuser=0',
+    );
+  });
+
+  it('still ignores a loose drive link without the Attachment: aria-label', async () => {
+    const { mod, injectButtonIntoAttachment } = await loadObserversModule();
+    const root = document.createElement('div');
+    root.innerHTML = `
+      <div class="riU7le FHXi2c">
+        <a href="https://drive.google.com/file/d/1nYQPtJQJXW_LvVfo2jMLJmQlVC17zmRX/view">bare link in unknown wrapper</a>
+      </div>
+    `;
+    document.body.appendChild(root);
+
+    mod.injectSingleFileButtons(root);
+    expect(injectButtonIntoAttachment).not.toHaveBeenCalled();
+  });
+
   it('ignores bare post-body links that are not inside attachment containers', async () => {
     const { mod, injectButtonIntoAttachment } = await loadObserversModule();
     const root = document.createElement('div');
