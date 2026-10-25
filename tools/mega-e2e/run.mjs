@@ -63,6 +63,20 @@ function discover() {
   env.firefoxSignedXpi = fs.existsSync(path.join(REPO, 'extension/.output/signed.xpi'));
   env.liveProfile = fs.existsSync(path.join(REPO, 'tests/e2e/.live-profile/Default'));
   env.liveRequested = process.env.LIVE_CLASSROOM === '1';
+  // darwin-27's sandbox denies the bundled Firefox build (memory: darwin-27
+  // macOS sandbox denial; re-verified 2026-10-25 with firefox-1555). A
+  // one-second failed launch marks the leg OS-blocked so the report says so
+  // instead of a bare FAIL — the CI matrix owns Firefox coverage.
+  if (process.platform === 'darwin') {
+    const probe = spawnSync(
+      process.execPath,
+      ['-e', `import('@playwright/test').then(async ({firefox}) => { try { const c = await firefox.launchPersistentContext('/tmp/mega-ff-probe', { headless: true, timeout: 15000 }); await c.close(); process.exit(0); } catch { process.exit(1); } })`],
+      { cwd: REPO, encoding: 'utf8', timeout: 30000 },
+    );
+    env.firefoxSandboxBlocked = probe.status !== 0;
+  } else {
+    env.firefoxSandboxBlocked = false;
+  }
   return env;
 }
 
@@ -101,10 +115,15 @@ if (!QUICK) {
   stage('e2e-firefox', {
     required: REQUIRE_FIREFOX,
     skip: () => {
-      if (env.firefoxSignedXpi) return null;
-      return 'No signed xpi staged at extension/.output/signed.xpi. Mint one via the AMO QA companion (see docs/EXTENSION_TESTING_RUNBOOK.md), then re-run.';
+      if (!env.firefoxSignedXpi) {
+        return 'No signed xpi staged at extension/.output/signed.xpi. Mint one via the AMO QA companion (see docs/EXTENSION_TESTING_RUNBOOK.md), then re-run.';
+      }
+      if (env.firefoxSandboxBlocked) {
+        return 'darwin sandbox blocks the bundled Firefox on this Mac (verified 2026-10-25; memory: darwin-27 denies Nightly.app). The signed-Firefox matrix runs on CI — push an [amo-qa] commit and watch the extension-e2e job.';
+      }
+      return null;
     },
-    run: () => sh('pnpm -C extension test:qa:firefox-signed'),
+    run: () => sh('QA_SIGNED_XPI=$PWD/extension/.output/signed.xpi pnpm -C extension test:qa:firefox-signed'),
   });
   stage('popup-qa', {
     required: false,
