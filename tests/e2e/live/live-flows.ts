@@ -129,8 +129,54 @@ export async function findAssignmentWithAttachments(
   target: ResolvedClass,
 ): Promise<FoundAssignment | null> {
   const max = Number(process.env.LIVE_MAX_ASSIGNMENTS ?? "4");
-  await gotoLive(page, absoluteClassroomUrl(`${target.href}/w/all`));
-  const links = parseAssignmentLinks(await pageHtml(page)).slice(0, max);
+  // The /c/<id>/w/all deep link renders an empty shell (verified live
+  // 2026-10-25); reach classwork by clicking the tab on the class home.
+  await gotoLive(page, absoluteClassroomUrl(target.href));
+  await page
+    .locator('a:has-text("Classwork"), div[role="link"]:has-text("Classwork"), span:has-text("Classwork")')
+    .first()
+    .click();
+  await page.waitForTimeout(4000);
+  // Assignment rows are click-driven divs (no anchors until expanded, live
+  // 2026-10-25); expand all so the /details anchors render for the parser.
+  const expandAll = page.locator('span:text-is("Expand all"), div:text-is("Expand all")').first();
+  if (await expandAll.isVisible().catch(() => false)) {
+    await expandAll.click();
+    await page.waitForTimeout(3000);
+  }
+  let links = parseAssignmentLinks(await pageHtml(page)).slice(0, max);
+  if (links.length === 0) {
+    // Fallback: rows are click-driven divs whose titles live in generated
+    // classes (span.Vu2fZd inside div.lio3ib, observed live 2026-10-25), so
+    // pick clickable-looking title spans structurally: visible, inside the
+    // main content column, and not a known UI label. Click each candidate
+    // until expanding one reveals /details anchors.
+    const STOP = new Set([
+      "stream", "classwork", "people", "grades", "create", "collapse all",
+      "expand all", "no topic", "view instructions", "post", "assign",
+      "cancel", "due", "points", "help",
+    ]);
+    const candidates = await page.evaluate(() => {
+      const out: { x: number; y: number; text: string }[] = [];
+      for (const el of document.querySelectorAll("span")) {
+        if (!(el as HTMLElement).offsetParent) continue;
+        const t = (el.textContent ?? "").trim();
+        if (t.length < 4 || t.length > 120) continue;
+        const r = el.getBoundingClientRect();
+        if (r.x < 100 || r.width > 700) continue;
+        out.push({ x: r.x + r.width / 2, y: r.y + r.height / 2, text: t });
+      }
+      return out;
+    });
+    for (const c of candidates) {
+      if (STOP.has(c.text.toLowerCase())) continue;
+      if (/^(posted|assigned|turned in|draft)\b/i.test(c.text)) continue;
+      await page.mouse.click(c.x, c.y).catch(() => {});
+      await page.waitForTimeout(3000);
+      links = parseAssignmentLinks(await pageHtml(page)).slice(0, max);
+      if (links.length > 0) break;
+    }
+  }
   for (const link of links) {
     await gotoLive(page, absoluteClassroomUrl(link.href));
     const attachments = countDriveAttachments(await pageHtml(page));
