@@ -226,6 +226,22 @@ export async function launchQaContext(
       console.log(`[qa-console] page tapped: ${page.url().slice(0, 80)}`);
       page.on("console", tap("page"));
       page.on("pageerror", (e) => console.log(`[qa-console:page] pageerror: ${String(e).slice(0, 300)}`));
+      // DOM-level probe: console capture may be lossy on the bundled Firefox
+      // (juggler pipe), but DOM reads are not. After every load, dump the
+      // markers that answer "did the content script run?" directly.
+      page.on("load", () => {
+        void page
+          .evaluate(() => ({
+            url: location.href.slice(0, 90),
+            title: document.title.slice(0, 60),
+            cqdStyles: document.querySelectorAll("style[data-cqd-v2], style#cqd-v2-styles, style[data-cqd-injected]").length,
+            cqdButtons: document.querySelectorAll(".cqd-download-btn").length,
+            cqdAny: document.querySelectorAll("[class*='cqd']").length,
+            bodyChars: document.body?.innerText?.length ?? 0,
+          }))
+          .then((m) => console.log(`[qa-console:dom] ${JSON.stringify(m)}`))
+          .catch(() => {});
+      });
     };
     // launchPersistentContext hands us an initial page that predates this
     // listener — context.on("page") never fires for it, and the journeys

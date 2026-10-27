@@ -241,6 +241,16 @@ jobs:
           # w5r6: stream the extension's console into the run log so the
           # Firefox injection failure is diagnosable from CI artifacts.
           QA_CONSOLE_VERBOSE=1 pnpm -C extension test:qa:firefox-signed
+      - name: Upload firefox leg artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: firefox-qa-leg-artifacts
+          path: |
+            test-results/
+            qa-artifacts/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Signed Firefox QA leg skipped (no AMO credentials)
         if: ${{ env.AMO_JWT_ISSUER == '' || env.AMO_JWT_SECRET == '' }}
