@@ -144,4 +144,4 @@ jobs:
             - [ ] Edge — [upload here](https://partner.microsoft.com/en-us/dashboard/microsoftedge/overview) → upload `cqd-edge-*.zip`
 
             ## Artifacts
-            All three browser builds are attached. Firefox is already published. Chrome and Edge require manual upload to their respective stores.
+            All three browser builds are attached. Firefox publishing runs through the production pipeline (extension-stores.yml). Chrome and Edge require manual upload to their respective stores.

@@ -314,6 +314,7 @@ jobs:
     with:
       ref: production
       skip_gate: true
+      dry_run: ${{ inputs.dry_run || false }}
       publish_cws: ${{ needs.version-preflight.outputs.publish_cws == 'true' }}
       publish_edge: ${{ needs.version-preflight.outputs.publish_edge == 'true' }}
       publish_amo: ${{ needs.version-preflight.outputs.publish_amo == 'true' }}
