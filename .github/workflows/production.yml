@@ -83,7 +83,7 @@ jobs:
           for store in cws edge amo; do
             verdict="$(jq -r --arg s "$store" '.perStore[$s].verdict' /tmp/preflight.json)"
             publish="false"
-            if [ "$verdict" = "publish-needed" ] || [ "$verdict" = "unknown-allowed" ]; then publish="true"; fi
+            if [ "$verdict" = "publish-needed" ]; then publish="true"; fi
             echo "publish_${store}=${publish}" >> "$GITHUB_OUTPUT"
             echo "  ${store}: ${verdict} -> publish=${publish}"
           done
