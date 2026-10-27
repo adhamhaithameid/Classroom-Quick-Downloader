@@ -223,7 +223,9 @@ jobs:
           AMO_ADDON_ID: classroom-quick-downloader-qa@adhamhaitham.dev
           # 2026-10-25: GUID-form addon URLs 404 on AMO; version endpoints
           # go by slug.
-          AMO_ADDON_SLUG: classroom-quick-downloader-qa
+          # The QA companion's slug is its auto-generated id (status
+          # 'incomplete' add-ons never get a human slug; verified 2026-10-27).
+          AMO_ADDON_SLUG: bf0853ae322743548ea0
           # 2026-10-24: review of a fresh unlisted QA version took ~12 min
           # end to end; 10 min timed out before the signature landed.
           AMO_POLL_TIMEOUT_MS: "1800000"
