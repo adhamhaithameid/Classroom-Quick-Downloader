@@ -50,3 +50,7 @@ auditConfig:
     - GHSA-c6gr-qvv4-5v3f
     - GHSA-pfhg-q3qv-9q6r
     - GHSA-27mw-82g8-phjj
+    # 2026-10-28: deepmerge GHSA-gcqx-w48m-w2h4 (low, via @sveltejs/kit >
+    # @sveltejs/vite-plugin-svelte). No patched version exists yet; accepted
+    # per the audit-gate policy until upstream ships a fix.
+    - GHSA-gcqx-w48m-w2h4

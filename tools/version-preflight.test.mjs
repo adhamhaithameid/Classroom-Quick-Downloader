@@ -4,7 +4,7 @@
 // Network probes are injectable (fetchImpl) and NOT exercised here.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { semverGt, buildAmoJwt, classify, parseArgs, runProbes } from './version-preflight.mjs';
+import { semverGt, buildAmoJwt, classify, parseArgs, runProbes, probeAmo } from './version-preflight.mjs';
 
 test('semverGt: numeric segment compare, not string compare', () => {
   assert.equal(semverGt('1.9.3', '1.9.2'), true);
@@ -118,4 +118,29 @@ test('runProbes: a throwing probe becomes ok:false, never a fatal error', async 
   assert.equal(probes.cws.ok, false);
   assert.match(probes.cws.error, /socket hang up/);
   assert.equal(probes.edge.ok, true);
+});
+
+test('probeAmo: 404 on the JWT endpoint falls back to the public GET (known AMO owner-JWT quirk)', async () => {
+  const calls = [];
+  const fetchImpl = async (url, opts = {}) => {
+    calls.push({ authed: Boolean(opts.headers?.Authorization) });
+    if (opts.headers?.Authorization) {
+      return { ok: false, status: 404, json: async () => ({}) };
+    }
+    return { ok: true, status: 200, json: async () => ({ results: [{ version: '1.9.3' }, { version: '1.9.2' }] }) };
+  };
+  const r = await probeAmo({ issuer: 'i', secret: 's', addonSlug: 'slug', fetchImpl });
+  assert.equal(r.ok, true);
+  assert.equal(r.live, '1.9.3');
+  assert.match(r.note, /public versions only/);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].authed, true);
+  assert.equal(calls[1].authed, false);
+});
+
+test('probeAmo: non-404 auth failures stay failed (no silent downgrade)', async () => {
+  const fetchImpl = async () => ({ ok: false, status: 401, json: async () => ({}) });
+  const r = await probeAmo({ issuer: 'i', secret: 's', addonSlug: 'slug', fetchImpl });
+  assert.equal(r.ok, false);
+  assert.equal(r.error, 'http 401');
 });
