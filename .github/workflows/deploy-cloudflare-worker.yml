@@ -1,16 +1,36 @@
 name: Deploy Cloudflare Worker
 
+# CUTOVER NOTE (production pipeline, docs/RELEASE_PIPELINE.md): the
+# `push: main` trigger is removed in the Phase 4 cutover commit, after the
+# production branch, environment, and a dry-run rehearsal exist. Until then
+# main pushes keep deploying exactly as before.
 on:
   push:
     branches: [main]
+  workflow_call:
+    inputs:
+      dry_run:
+        type: boolean
+        default: false
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Rehearse without deploying'
+        type: boolean
+        default: false
+      allow_non_production:
+        description: 'Allow dispatch from a non-production ref (emergency only)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
+# Never cancel a live deploy: a half-finished submission is worse than a
+# queued one. Rehearsals and follow-up runs queue behind the active deploy.
 concurrency:
-  group: deploy-cloudflare-worker-main
-  cancel-in-progress: true
+  group: deploy-cloudflare-worker
+  cancel-in-progress: false
 
 jobs:
   preflight:
@@ -65,7 +85,8 @@ jobs:
     name: Deploy Worker to Cloudflare
     runs-on: ubuntu-latest
     needs: preflight
-
+    environment: production
+    if: inputs.dry_run != true
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -262,3 +283,13 @@ jobs:
           done
           echo "::error::Post-deploy production verification failed after retries"
           exit 1
+
+  deploy-dry-run:
+    name: Dry run — worker deploy skipped
+    runs-on: ubuntu-latest
+    needs: preflight
+    if: inputs.dry_run == true
+    steps:
+      - name: Report intended action
+        run: |
+          echo "::notice::DRY RUN: would deploy the worker to Cloudflare from ${{ github.sha }}. No effect applied."
