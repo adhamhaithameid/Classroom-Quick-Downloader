@@ -26,6 +26,7 @@ const BASELINE_PATH = resolve(
 /** Fixture filename -> the ViewKind that page would be classified as. */
 const VIEW_KIND_BY_FIXTURE: Record<string, ViewKind> = {
   'announcement-detail-en.html': ViewKind.ANNOUNCEMENT_DETAIL,
+  'details-aria-cards-2026-10.html': ViewKind.ASSIGNMENT_DETAILS,
   'assignment-details-en.html': ViewKind.ASSIGNMENT_DETAILS,
   'classwork-material-post-en.html': ViewKind.CLASSWORK_LIST,
   'material-details-en.html': ViewKind.MATERIAL_DETAILS,

@@ -144,6 +144,6 @@ describe('selector audit over the accuracy-corpus classroom fixtures', () => {
     // The documented corpus rate — see docs/engine/selector-audit-2026-09.md.
     // If this fails, a NEW fixture is synthesizing hash fallbacks: audit the
     // fixture's anchor markup before touching the pinned numbers.
-    expect({ totalFiles, hashIdCount }).toEqual({ totalFiles: 8, hashIdCount: 0 });
+    expect({ totalFiles, hashIdCount }).toEqual({ totalFiles: 10, hashIdCount: 0 });
   });
 });

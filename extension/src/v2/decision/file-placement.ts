@@ -195,11 +195,27 @@ export function computePlacement(
     const downloadAllId = `download-all:${post.id}`;
 
     if (!isAlreadyPlaced(downloadAllId, post.element)) {
-      const anchor = findAnchorForHeader(
-        post.element,
-        recipe.downloadAll.anchorStrategy,
-        viewKind,
-      );
+      // Synthetic details posts (bead bs7c): the post element IS
+      // document.body and carries no data-stream-item-id. A body-wide
+      // header query matches an arbitrary leftover subtree, where the
+      // group run's self-contained enumeration finds zero single buttons.
+      // Mount on the post root instead — the recipe's own fallback shape.
+      const isSyntheticDetailsPost =
+        post.id.startsWith('details:') || !post.element.hasAttribute?.('data-stream-item-id');
+      const anchor = isSyntheticDetailsPost
+        ? {
+            element: post.element,
+            strategy: 'post-root' as const,
+            confidence: FALLBACK_CONFIDENCE,
+            selectorUsed: 'post-root-fallback (synthetic details post)',
+            isFallback: true,
+            scorerTrace: null,
+          }
+        : findAnchorForHeader(
+            post.element,
+            recipe.downloadAll.anchorStrategy,
+            viewKind,
+          );
 
       decisions.push({
         fileId: downloadAllId,

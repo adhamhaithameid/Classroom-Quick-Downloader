@@ -136,7 +136,25 @@ if (!QUICK) {
       if (!env.liveProfile) return 'No signed-in profile at tests/e2e/.live-profile — run `pnpm test:live:login` once.';
       return null;
     },
-    run: () => sh('LIVE_CLASSROOM=1 pnpm exec playwright test --project=live-chromium tests/e2e/live/'),
+    run: () => {
+      // Discovery classifies roles into qa-artifacts/live/classes.json; pin
+      // the teacher/student suites to the sandbox classes when the owner
+      // configured them (see docs/LIVE_CLASSROOM_TESTING.md § seeding).
+      const extra = [];
+      for (const [role, envName] of [['teacher', 'LIVE_TEACHER_CLASS_ID'], ['student', 'LIVE_STUDENT_CLASS_ID']]) {
+        try {
+          const classes = JSON.parse(fs.readFileSync(path.join(REPO, 'qa-artifacts/live/classes.json'), 'utf8'));
+          // Only pin when the discovery artifact carries a real teacher match;
+          // otherwise the suites' own resolution applies.
+          if (role === 'teacher' && !process.env[envName] && !classes.some?.((c) => c.role === 'teacher')) {
+            const sandbox = process.env.CQD_SANDBOX_CLASS_ID;
+            if (sandbox) extra.push(`LIVE_${role.toUpperCase()}_CLASS_ID=${sandbox} LIVE_${role.toUpperCase()}_AUTHUSER=0`);
+          }
+        } catch { /* no artifact — suites resolve themselves */ }
+      }
+      const prefix = extra.length ? extra.join(' ') + ' ' : '';
+      return sh(`${prefix}LIVE_CLASSROOM=1 pnpm exec playwright test --project=live-chromium tests/e2e/live/`);
+    },
   });
 }
 stage('drift', {

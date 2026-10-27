@@ -167,6 +167,7 @@ export class EngineV2 implements CQDEngine {
   private lastRenderApplied: Array<{ postId: string; kind: 'button' | 'flag' | 'all' }> = [];
 
   // -- Performance tracking --
+  private prevDetailsFileCount = 0;
   private scanCount = 0;
   private totalScanMs = 0;
 
@@ -607,8 +608,72 @@ export class EngineV2 implements CQDEngine {
       seenPostIds.add(this.ingestPost(postEl));
     }
 
-    // 3. CLEANUP — Remove posts that are no longer in the DOM
+    // 2b. DETAILS-VIEW SYNTHESIS (bead bs7c, live 2026-10-25): assignment/
+    // material/announcement details pages render the body WITHOUT any
+    // data-stream-item-id wrapper, so the post loop above sees nothing and
+    // every card lost its button. Ingest one synthetic post for the page
+    // body whose files are the card anchors no real post already covers.
+    if (
+      this.currentView === 'assignment_details' ||
+      this.currentView === 'material_details' ||
+      this.currentView === 'announcement_detail'
+    ) {
+      const covered = new Set<string>();
+      for (const p of this.postMap.values()) {
+        for (const f of p.files) covered.add(f.canonicalId);
+      }
+      const bodyFiles = this.discoverFiles(document.body);
+      const uncovered = bodyFiles.filter((f) => !covered.has(f.canonicalId));
+      if (uncovered.length > 0) {
+        // The synthetic post OWNS the details page ("the post is the entire
+        // page content"). Drop the empty leftover SPA posts: their per-post
+        // stale-button cleanup runs AFTER render and would delete the
+        // download-all button wherever it landed inside their subtree
+        // (verified live 2026-10-25 — the group button vanished between
+        // render and cleanup while singles outside their subtrees lived).
+        for (const [pid, p] of this.postMap) {
+          if (p.files.length === 0 && !pid.startsWith('details:')) {
+            this.postMap.delete(pid);
+            this.flagDecisions.delete(pid);
+            this.decisionTraces.delete(pid);
+          }
+        }
+        const detailsId = `details:${location.pathname}`;
+        let post = this.postMap.get(detailsId);
+        if (!post) {
+          post = {
+            id: detailsId,
+            element: document.body,
+            viewKind: this.currentView,
+            files: [],
+            flags: null,
+            lastScannedAt: 0,
+          };
+          this.postMap.set(detailsId, post);
+          this.elementToPostId.set(document.body, detailsId);
+        }
+        post.element = document.body;
+        post.lastScannedAt = Date.now();
+        post.files = uncovered;
+        post.flags = this.detectFlags(document.body, detailsId);
+        seenPostIds.add(detailsId);
+      }
+    }
+
+    // 3. CLEANUP — Remove posts that are no longer in the DOM.
+    // DETAILS GUARD (bs7c, live 2026-10-25): Classroom's SPA transition
+    // transiently unmounts the whole card list; a scan landing in that
+    // window sees zero posts/files and would strip the synthetic details
+    // post mid-flight (download-all then fetches nothing). Within a
+    // details view, keep the synthetic post across empty scans — the view
+    // change destroys the engine wholesale, so nothing stale survives.
+    const detailsView =
+      this.currentView === 'assignment_details' ||
+      this.currentView === 'material_details' ||
+      this.currentView === 'announcement_detail';
+    const keepDetailsAcrossEmptyScan = detailsView && postElements.length === 0;
     for (const [postId, post] of this.postMap.entries()) {
+      if (keepDetailsAcrossEmptyScan && postId.startsWith('details:')) continue;
       if (!seenPostIds.has(postId) || !post.element.isConnected) {
         this.postMap.delete(postId);
         this.flagDecisions.delete(postId);
@@ -643,6 +708,30 @@ export class EngineV2 implements CQDEngine {
     this.performanceMonitor.stopTimer('fullScan');
     const budgetResult = this.budgetController.recordFastPass(elapsed);
     this.budgetController.updatePostCount(this.postMap.size);
+
+    // 5b. DETAILS-VIEW SELF-HEAL (bs7c, live 2026-10-25): Classroom
+    // re-renders the card list through a transiently-EMPTY DOM; a scan that
+    // lands in that window sees 0 files, tears the synthetic post down, and
+    // — if no further mutation fires — the buttons never come back. When a
+    // details scan drops from files>0 to 0, schedule one bounded rescan.
+    if (
+      fileCount === 0 &&
+      this.prevDetailsFileCount > 0 &&
+      (this.currentView === 'assignment_details' ||
+        this.currentView === 'material_details' ||
+        this.currentView === 'announcement_detail')
+    ) {
+      window.setTimeout(() => {
+        if (this.isActive) this.fullScan();
+      }, 500);
+    }
+    if (
+      this.currentView === 'assignment_details' ||
+      this.currentView === 'material_details' ||
+      this.currentView === 'announcement_detail'
+    ) {
+      this.prevDetailsFileCount = fileCount;
+    }
 
     // 6. SCHEDULE DEEP VALIDATION (idle time)
     this.scheduleDeepValidation();

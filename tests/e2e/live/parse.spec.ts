@@ -113,6 +113,15 @@ test.describe("attachment/button counters", () => {
     expect(countDriveAttachments("<div>none</div>")).toBe(0);
   });
 
+  test("counts 2026-10 detail cards (aria-label Attachment: + drive href, no data-drive-id)", () => {
+    const html = `
+      <div class="riU7le"><a aria-label="Attachment: PDF: a.pdf" href="https://drive.google.com/file/d/1/view">a</a></div>
+      <div class="riU7le"><a aria-label="Attachment: PDF: b.pdf" href="https://drive.google.com/file/d/2/view">b</a></div>
+      <div><a aria-label="Attachment: Google Form" href="https://docs.google.com/forms/d/x/viewform">f</a></div>`;
+    // Form attachments are not drive downloads; only the two drive cards count.
+    expect(countDriveAttachments(html)).toBe(2);
+  });
+
   test("counts submission attachment cards (.WkZsyc contract)", () => {
     const html = `<div class="WkZsyc" data-submission-attachment-id="s1"></div>
       <div class="WkZsyc" data-submission-attachment-id="s2"></div>`;

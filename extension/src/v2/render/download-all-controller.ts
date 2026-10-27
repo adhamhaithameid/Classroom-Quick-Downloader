@@ -208,10 +208,13 @@ export function runDownloadAllForActiveMode(): boolean | null {
 }
 
 function startRun(postId: string, groupButton: HTMLButtonElement): boolean {
+  // Details views (bead bs7c): the synthetic post is document.body and
+  // carries no data-stream-item-id, so closest() misses and the old
+  // parentElement fallback scoped the enumeration to the button's own
+  // wrapper — zero files, no run. Body is the correct scope there ("the
+  // post is the entire page content"); closest() still wins in post views.
   const root =
-    groupButton.closest<HTMLElement>('[data-stream-item-id]') ??
-    groupButton.parentElement ??
-    document.body;
+    groupButton.closest<HTMLElement>('[data-stream-item-id]') ?? document.body;
 
   // Enumerate the group's single-file buttons from the DOM (self-contained —
   // no engine coupling), deduped by canonical file id.
