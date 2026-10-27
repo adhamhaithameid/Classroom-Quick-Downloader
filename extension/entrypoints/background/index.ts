@@ -205,11 +205,20 @@ export default defineBackground(() => {
   const iconAnimation = createIconAnimationController();
   setQueueListener((qs) => iconAnimation.setActiveCount(qs.activeIds.length));
 
-  // Update-available dot (bead 08fg.3): live /changelog check, 12h-gated,
-  // alarm-driven; dismissal rides the changelog seen map.
+  // Update-available dot (bead 08fg.3): every update signal — live
+  // /changelog check (12h-gated), browser-applied updates, and browser-
+  // scheduled updates; dismissal rides the changelog seen map.
   const updateDot = createUpdateDotController();
   ensureUpdateCheckAlarm();
   chrome.alarms.onAlarm.addListener((alarm) => updateDot.onAlarm(alarm.name));
+  chrome.runtime.onInstalled.addListener((details) => {
+    void updateDot.onInstalled({ reason: details.reason, previousVersion: details.previousVersion });
+  });
+  if (chrome.runtime.onUpdateAvailable) {
+    chrome.runtime.onUpdateAvailable.addListener((details) => {
+      void updateDot.onRuntimeUpdateAvailable(details?.version);
+    });
+  }
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && changes.cqd_changelog_seen_v1) {
       updateDot.onStorageChanged('cqd_changelog_seen_v1');

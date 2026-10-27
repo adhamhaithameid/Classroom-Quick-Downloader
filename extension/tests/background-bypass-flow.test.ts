@@ -191,6 +191,10 @@ async function loadFlow(options: FlowOptions = {}) {
   chrome.runtime.onMessage.addListener = vi.fn((l: any) => {
     onMessageListeners.push(l);
   }) as never;
+  // Update-dot event registries (bead 08fg.3); the flow tests never fire them.
+  const runtimeWithEvents = chrome.runtime as any;
+  runtimeWithEvents.onInstalled = { addListener: vi.fn() };
+  runtimeWithEvents.onUpdateAvailable = { addListener: vi.fn() };
   chrome.downloads.onChanged.addListener = vi.fn((l: any) => {
     downloadChangedListeners.push(l);
   }) as never;

@@ -43,7 +43,8 @@ describe('background update dot (08fg.3)', () => {
     vi.restoreAllMocks();
     env = makeChrome();
     decorate = vi.spyOn(iconManager, 'setIconDecorationPaths');
-    iconManager.setIconDecorationPaths(null);
+    iconManager.setIconDecorationPaths(null); // clear leaked module state
+    decorate.mockClear(); // the reset call is not an assertion subject
   });
 
   it('fetches the live changelog and decorates the icon for a newer unseen version', async () => {
@@ -120,10 +121,104 @@ describe('background update dot (08fg.3)', () => {
   it('routes the update-check alarm to checkNow', async () => {
     const fetchImpl = vi.fn(async () => changelogResponse('1.9.4'));
     const c = createUpdateDotController({ fetchImpl, now: () => 1_000 * DAY_MS });
-    c.onAlarm(UPDATE_CHECK_ALARM);
-    await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
-    c.onAlarm('unrelated-alarm');
+    await c.onAlarm(UPDATE_CHECK_ALARM);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+    await c.onAlarm('unrelated-alarm');
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the dot when the browser just applied an update (onInstalled update)', async () => {
+    const c = createUpdateDotController({
+      fetchImpl: vi.fn(async () => changelogResponse('1.9.3')),
+      now: () => 1_000 * DAY_MS,
+    });
+    await c.onInstalled({ reason: 'update', previousVersion: '1.9.2' });
+    expect(decorate).toHaveBeenLastCalledWith(expect.objectContaining({ color: expect.anything() }));
+    expect(env.store[UPDATE_STATE_KEY]).toMatchObject({
+      pendingVersion: '1.9.3',
+      pendingReason: 'updated',
+    });
+  });
+
+  it('ignores a fresh install', async () => {
+    const c = createUpdateDotController({
+      fetchImpl: vi.fn(async () => changelogResponse('1.9.4')),
+      now: () => 1_000 * DAY_MS,
+    });
+    await c.onInstalled({ reason: 'install' });
+    expect(env.store[UPDATE_STATE_KEY]).toBeUndefined();
+    expect(decorate).not.toHaveBeenCalled();
+  });
+
+  it('shows the dot when the browser schedules an update (onUpdateAvailable)', async () => {
+    const c = createUpdateDotController({
+      fetchImpl: vi.fn(async () => changelogResponse('1.9.3')),
+      now: () => 1_000 * DAY_MS,
+    });
+    await c.onRuntimeUpdateAvailable('1.9.5');
+    expect(decorate).toHaveBeenLastCalledWith(expect.objectContaining({ color: expect.anything() }));
+    expect(env.store[UPDATE_STATE_KEY]).toMatchObject({
+      pendingVersion: '1.9.5',
+      pendingReason: 'scheduled',
+    });
+  });
+
+  it('keeps the live latest when a browser event fires without a version', async () => {
+    let t = 1_000 * DAY_MS;
+    const c = createUpdateDotController({
+      fetchImpl: vi.fn(async () => changelogResponse('1.9.4')),
+      now: () => t,
+    });
+    await c.checkNow();
+    expect(decorate).toHaveBeenLastCalledWith(expect.anything());
+    await c.onRuntimeUpdateAvailable(undefined);
+    expect(env.store[UPDATE_STATE_KEY]).toMatchObject({ latestVersion: '1.9.4' });
+    expect(decorate).toHaveBeenLastCalledWith(expect.anything());
+  });
+
+  it('a seen pending version falls through to a newer unseen live release', async () => {
+    let t = 1_000 * DAY_MS;
+    const c = createUpdateDotController({
+      fetchImpl: vi.fn(async () => changelogResponse('1.9.5')),
+      now: () => t,
+    });
+    await c.onRuntimeUpdateAvailable('1.9.4');
+    expect(env.store[UPDATE_STATE_KEY]).toMatchObject({ pendingVersion: '1.9.4' });
+    t += DAY_MS;
+    await c.checkNow(); // learns the live latest, keeps the pending version
+    expect(env.store[UPDATE_STATE_KEY]).toMatchObject({
+      pendingVersion: '1.9.4',
+      latestVersion: '1.9.5',
+    });
+    env.store[CHANGELOG_SEEN_KEY] = { '1.9.4': 'tok' };
+    await c.onStorageChanged(CHANGELOG_SEEN_KEY);
+    expect(decorate).toHaveBeenLastCalledWith(expect.objectContaining({ color: expect.anything() }));
+  });
+
+  it('checkNow preserves a pending version while updating the live latest', async () => {
+    let t = 1_000 * DAY_MS;
+    const c = createUpdateDotController({
+      fetchImpl: vi.fn(async () => changelogResponse('1.9.6')),
+      now: () => t,
+    });
+    await c.onInstalled({ reason: 'update', previousVersion: '1.9.2' });
+    t += DAY_MS;
+    await c.checkNow();
+    expect(env.store[UPDATE_STATE_KEY]).toMatchObject({
+      pendingVersion: '1.9.3',
+      pendingReason: 'updated',
+      latestVersion: '1.9.6',
+    });
+  });
+
+  it('accepts a v1 state without pending fields (migration on read)', async () => {
+    env.store[UPDATE_STATE_KEY] = { latestVersion: '1.9.4', checkedAt: 1_000 * DAY_MS };
+    const c = createUpdateDotController({
+      fetchImpl: vi.fn(async () => new Response('{}', { status: 500 })),
+      now: () => 1_000 * DAY_MS,
+    });
+    await c.evaluate();
+    expect(decorate).toHaveBeenLastCalledWith(expect.objectContaining({ color: expect.anything() }));
   });
 
   it('ensureUpdateCheckAlarm registers a 12h repeating alarm', () => {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isNewerVersion,
   latestVersionFrom,
-  shouldShowDot,
+  updateTarget,
 } from '../src/update/update-state';
 
 describe('update-state', () => {
@@ -22,34 +22,79 @@ describe('update-state', () => {
     expect(latestVersionFrom([])).toBeNull();
   });
 
-  it('shows the dot only for a newer, unseen latest version', () => {
+  it('targets a pending version (just updated) until it is seen', () => {
     expect(
-      shouldShowDot({ latestVersion: '1.9.4', installedVersion: '1.9.3', seenVersions: {} }),
-    ).toBe(true);
+      updateTarget({
+        pendingVersion: '1.9.4',
+        latestVersion: null,
+        installedVersion: '1.9.4',
+        seenVersions: {},
+      }),
+    ).toEqual({ version: '1.9.4', reason: 'updated' });
     expect(
-      shouldShowDot({ latestVersion: '1.9.3', installedVersion: '1.9.3', seenVersions: {} }),
-    ).toBe(false);
+      updateTarget({
+        pendingVersion: '1.9.4',
+        latestVersion: null,
+        installedVersion: '1.9.4',
+        seenVersions: { '1.9.4': 'tok' },
+      }),
+    ).toEqual({ version: null, reason: null });
+  });
+
+  it('targets a pending scheduled version that differs from the install', () => {
     expect(
-      shouldShowDot({ latestVersion: '1.9.2', installedVersion: '1.9.3', seenVersions: {} }),
-    ).toBe(false);
-    // The user opened the changelog for the latest version → dismissed.
+      updateTarget({
+        pendingVersion: '1.9.5',
+        latestVersion: '1.9.5',
+        installedVersion: '1.9.3',
+        seenVersions: {},
+      }),
+    ).toEqual({ version: '1.9.5', reason: 'scheduled' });
+  });
+
+  it('falls through a seen pending version to a newer unseen live latest', () => {
     expect(
-      shouldShowDot({
+      updateTarget({
+        pendingVersion: '1.9.4',
+        latestVersion: '1.9.5',
+        installedVersion: '1.9.3',
+        seenVersions: { '1.9.4': 'tok' },
+      }),
+    ).toEqual({ version: '1.9.5', reason: 'available' });
+  });
+
+  it('targets the live latest only when newer and unseen', () => {
+    expect(
+      updateTarget({
+        pendingVersion: null,
+        latestVersion: '1.9.4',
+        installedVersion: '1.9.3',
+        seenVersions: {},
+      }),
+    ).toEqual({ version: '1.9.4', reason: 'available' });
+    expect(
+      updateTarget({
+        pendingVersion: null,
+        latestVersion: '1.9.3',
+        installedVersion: '1.9.3',
+        seenVersions: {},
+      }),
+    ).toEqual({ version: null, reason: null });
+    expect(
+      updateTarget({
+        pendingVersion: null,
         latestVersion: '1.9.4',
         installedVersion: '1.9.3',
         seenVersions: { '1.9.4': 'tok' },
       }),
-    ).toBe(false);
-    // Seeing an OLDER version does not dismiss the latest.
+    ).toEqual({ version: null, reason: null });
     expect(
-      shouldShowDot({
-        latestVersion: '1.9.4',
+      updateTarget({
+        pendingVersion: null,
+        latestVersion: '1.9.2',
         installedVersion: '1.9.3',
-        seenVersions: { '1.9.3': 'tok' },
+        seenVersions: {},
       }),
-    ).toBe(true);
-    expect(
-      shouldShowDot({ latestVersion: null, installedVersion: '1.9.3', seenVersions: {} }),
-    ).toBe(false);
+    ).toEqual({ version: null, reason: null });
   });
 });

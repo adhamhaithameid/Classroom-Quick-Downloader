@@ -1,5 +1,4 @@
 import { EXTENSION_MANUAL_CHANGELOG } from './manual-changelog.generated';
-import { isNewerVersion } from '../../src/update/update-state';
 import { CHANGELOG_SEEN_KEY as SEEN_KEY } from './update-state';
 
 export { CHANGELOG_SEEN_KEY as SEEN_KEY } from './update-state';
@@ -280,25 +279,19 @@ export function getRuleClasses(rule: NotificationRule | null, isSeen: boolean): 
   return classes.join(' ');
 }
 
-export interface UpdatePillInput {
-  /** Newest live version from the worker changelog (update-state mirror). */
-  latestVersion: string | null;
-  installedVersion: string;
-  /** True once the user opened the changelog covering the latest version. */
-  latestSeen: boolean;
-  baseRule: NotificationRule | null;
-}
-
 /**
- * Pill rule for an available update (bead 08fg.3): a major pulse overrides
- * the manual rules while a newer, unseen version exists. Dismissal (opening
- * the changelog) falls back to the base rule.
+ * Pill rule for any active update signal (bead 08fg.3): a major pulse that
+ * overrides the manual rules while the dot has a target (newer unseen live
+ * release, just-updated, or scheduled). Dismissal (opening the changelog)
+ * falls back to the base rule. Apply as:
+ *   const pillRule = target.version ? UPDATE_PILL_RULE : baseRule;
  */
-export function resolveUpdatePill(input: UpdatePillInput): NotificationRule | null {
-  if (!input.latestVersion || input.latestSeen) return input.baseRule;
-  if (!isNewerVersion(input.latestVersion, input.installedVersion)) return input.baseRule;
-  return { id: 'update-available', target: 'all', priority: 'major', effect: 'pulse' };
-}
+export const UPDATE_PILL_RULE: NotificationRule = {
+  id: 'update-available',
+  target: 'all',
+  priority: 'major',
+  effect: 'pulse',
+};
 
 // LEGACY_CHANGELOG_DISABLED_START
 // Remote Oracle changelog fetch path intentionally disabled.

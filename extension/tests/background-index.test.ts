@@ -150,7 +150,9 @@ describe('background/index', () => {
     // W3: the URL is set once directly and once after the startup flush
     // resolves (post-flush stats refresh); the last setUninstallURL call wins.
     expect(setUninstallURL).toHaveBeenCalled();
-    expect(onInstalledAddListener).toHaveBeenCalledTimes(1);
+    // Two onInstalled listeners: the analytics uninstall flow plus the
+    // update-dot controller (bead 08fg.3).
+    expect(onInstalledAddListener).toHaveBeenCalledTimes(2);
     const lastCallIndex = setUninstallURL.mock.calls.length - 1;
     const uninstallUrl = String(setUninstallURL.mock.calls[lastCallIndex]?.[0] || '');
     expect(uninstallUrl).toContain('/uninstall?');

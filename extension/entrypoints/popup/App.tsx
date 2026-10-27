@@ -19,11 +19,16 @@ import {
   isVersionSeen,
   markAsSeen,
   getLatestChange,
-  resolveUpdatePill,
+  UPDATE_PILL_RULE,
   type ChangelogData,
   type ChangelogFetchResult
 } from '../utils/changelog';
-import { UPDATE_STATE_KEY, type UpdateState } from '../utils/update-state';
+import {
+  CHANGELOG_SEEN_KEY,
+  UPDATE_STATE_KEY,
+  type UpdateState,
+} from '../utils/update-state';
+import { updateTarget } from '../../src/update/update-state';
 import { popupMessage } from './i18n';
 import { CHANGELOG_SITE_URL, WEBSITE_BASE_URL } from '../utils/analytics/constants';
 import { isApiConfigured } from '../../src/engines/v3/api/config';
@@ -359,45 +364,45 @@ function App() {
   const [changelogStatusMessage, setChangelogStatusMessage] = useState<string | null>(null);
 
   // UPDATE-AVAILABLE STATE (bead 08fg.3) — the background owns the live
-  // /changelog check; the popup mirrors its storage key for the pill pulse.
-  const [latestVersion, setLatestVersion] = useState<string | null>(null);
-  const [latestSeen, setLatestSeen] = useState(false);
+  // /changelog check plus the browser update events (onInstalled /
+  // onUpdateAvailable); the popup mirrors its storage key and computes the
+  // same dot target for the pill pulse.
+  const [updateTargetVersion, setUpdateTargetVersion] = useState<string | null>(null);
   useEffect(() => {
     const browserApi = (globalThis as any).chrome;
     if (!browserApi?.storage?.local?.get) return;
     let alive = true;
-    browserApi.storage.local.get(UPDATE_STATE_KEY, (res: any) => {
-      const state = res?.[UPDATE_STATE_KEY] as UpdateState | undefined;
-      if (alive && state && typeof state.latestVersion === 'string') {
-        setLatestVersion(state.latestVersion);
+    const recompute = async () => {
+      try {
+        const [stateRes, seenRes] = await Promise.all([
+          browserApi.storage.local.get(UPDATE_STATE_KEY),
+          browserApi.storage.local.get(CHANGELOG_SEEN_KEY),
+        ]);
+        const state = stateRes?.[UPDATE_STATE_KEY] as UpdateState | undefined;
+        const seen =
+          (seenRes?.[CHANGELOG_SEEN_KEY] as Record<string, string | undefined> | undefined) ?? {};
+        const target = updateTarget({
+          pendingVersion: state?.pendingVersion ?? null,
+          latestVersion: state?.latestVersion ?? null,
+          installedVersion: version ?? '',
+          seenVersions: seen,
+        });
+        if (alive) setUpdateTargetVersion(target.version);
+      } catch {
+        if (alive) setUpdateTargetVersion(null);
       }
-    });
+    };
+    void recompute();
     const listener = (changes: any, area: string) => {
-      if (area !== 'local' || !changes[UPDATE_STATE_KEY]) return;
-      const next = changes[UPDATE_STATE_KEY].newValue as UpdateState | undefined;
-      setLatestVersion(
-        next && typeof next.latestVersion === 'string' ? next.latestVersion : null,
-      );
+      if (area !== 'local') return;
+      if (changes[UPDATE_STATE_KEY] || changes[CHANGELOG_SEEN_KEY]) void recompute();
     };
     browserApi.storage.onChanged.addListener(listener);
     return () => {
       alive = false;
       browserApi.storage.onChanged.removeListener(listener);
     };
-  }, []);
-  useEffect(() => {
-    if (!latestVersion) {
-      setLatestSeen(false);
-      return;
-    }
-    let alive = true;
-    void isVersionSeen(latestVersion, changelogData).then((value) => {
-      if (alive) setLatestSeen(value);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [latestVersion, changelogData]);
+  }, [version]);
 
   // ENGINE MODE STATE — the initial value mirrors the runtime default
   // (mode-controller.ts DEFAULT_MODE 'v2'): fresh installs run v2, so the
@@ -976,14 +981,10 @@ function App() {
       }
     : null;
   const effectiveRule = matchedRule ?? fallbackRule;
-  // A newer, unseen live version pulses the pill (08fg.3); dismissal falls
-  // back to the manual rules.
-  const pillRule = resolveUpdatePill({
-    latestVersion,
-    installedVersion: version ?? '',
-    latestSeen,
-    baseRule: effectiveRule,
-  });
+  // Any active update signal (newer unseen live release, just-updated, or
+  // scheduled) pulses the pill (08fg.3); dismissal falls back to the manual
+  // rules.
+  const pillRule = updateTargetVersion ? UPDATE_PILL_RULE : effectiveRule;
 
   const isLoadingSettings = loadingState || settings == null;
   const isEnabled = settings?.extensionEnabled ?? true;
@@ -1059,10 +1060,10 @@ function App() {
                          await markAsSeen(version, changelogData);
                          setSeen(true);
                        }
-                       if (latestVersion) {
-                         // Dismiss the update dot + pill for this version.
-                         await markAsSeen(latestVersion, changelogData);
-                         setLatestSeen(true);
+                       if (updateTargetVersion && updateTargetVersion !== version) {
+                         // Dismiss the update dot + pill for the target version.
+                         await markAsSeen(updateTargetVersion, changelogData);
+                         setUpdateTargetVersion(null);
                        }
                     }}
                   >

@@ -256,6 +256,11 @@ export async function loadFlowHarness(options: FlowHarnessOptions = {}) {
     cb({ extensionEnabled: true }),
   );
   (chrome.runtime as { lastError?: unknown }).lastError = undefined;
+  // Update-dot event registries (bead 08fg.3): registries only; the flow
+  // tests never fire the browser update events.
+  const runtimeWithEvents = chrome.runtime as any;
+  runtimeWithEvents.onInstalled = { addListener: vi.fn() };
+  runtimeWithEvents.onUpdateAvailable = { addListener: vi.fn() };
 
   const mod = await import('../../entrypoints/background/index');
   (mod.default as unknown as () => void)();

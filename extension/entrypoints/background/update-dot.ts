@@ -1,21 +1,25 @@
 // filepath: extension/entrypoints/background/update-dot.ts
 /**
- * Update-available dot (bead 08fg.3). The worker's live GET /changelog is
- * the only source that can know about a version newer than the installed
- * bundle — the bundled changelog ships with the release. Checks are
- * staleness-gated to at most one fetch per 12h and run on service-worker
- * start plus a 12h alarm. Dismissal rides the existing changelog seen map,
- * so opening the changelog for the latest version clears the dot.
+ * Update-available dot (bead 08fg.3). The dot covers every update signal:
+ * - "available": the worker's live GET /changelog knows a newer release
+ *   (checked at most once per 12h, on service-worker start plus an alarm).
+ * - "updated": the browser just applied an update (runtime.onInstalled,
+ *   reason "update").
+ * - "scheduled": the browser detected and scheduled an update
+ *   (runtime.onUpdateAvailable).
+ * Dismissal rides the existing changelog seen map, so opening the
+ * changelog for the target version clears the dot. Storage and network
+ * failures never reject — the dot keeps its previous state.
  */
 
 import {
   latestVersionFrom,
-  shouldShowDot,
+  updateTarget,
   type SeenVersions,
+  type UpdateReason,
 } from '../../src/update/update-state';
 import { repaintAllTabIcons, setIconDecorationPaths } from './icon-manager';
-import { CHANGELOG_SEEN_KEY } from '../utils/update-state';
-import { UPDATE_STATE_KEY, type UpdateState } from '../utils/update-state';
+import { CHANGELOG_SEEN_KEY, UPDATE_STATE_KEY, type UpdateState } from '../utils/update-state';
 import { CHANGELOG_URL } from '../utils/analytics/constants';
 
 export const UPDATE_CHECK_ALARM = 'cqd-update-check';
@@ -43,6 +47,8 @@ export interface UpdateDotController {
   evaluate(): Promise<void>;
   onAlarm(name: string): Promise<void>;
   onStorageChanged(key: string): Promise<void>;
+  onInstalled(details: { reason?: string; previousVersion?: string }): Promise<void>;
+  onRuntimeUpdateAvailable(version?: string): Promise<void>;
 }
 
 function storageAvailable(): boolean {
@@ -63,7 +69,12 @@ async function readState(): Promise<UpdateState | null> {
   const raw = got?.[UPDATE_STATE_KEY] as UpdateState | undefined;
   if (!raw || typeof raw.checkedAt !== 'number') return null;
   if (typeof raw.latestVersion !== 'string' && raw.latestVersion !== null) return null;
-  return raw;
+  // v1 states predate the pending fields; normalize on read.
+  return {
+    ...raw,
+    pendingVersion: typeof raw.pendingVersion === 'string' ? raw.pendingVersion : null,
+    pendingReason: (raw.pendingReason ?? null) as UpdateReason | null,
+  };
 }
 
 function installedVersion(): string {
@@ -81,16 +92,30 @@ export function createUpdateDotController(deps: UpdateDotDeps = {}): UpdateDotCo
   const evaluate = async (): Promise<void> => {
     try {
       const [state, seen] = await Promise.all([readState(), readSeen()]);
-      const show = shouldShowDot({
+      const target = updateTarget({
+        pendingVersion: state?.pendingVersion ?? null,
         latestVersion: state?.latestVersion ?? null,
         installedVersion: installedVersion(),
         seenVersions: seen,
       });
-      setIconDecorationPaths(show ? { color: DOT_COLOR_PATHS, gray: DOT_GRAY_PATHS } : null);
+      setIconDecorationPaths(target.version ? { color: DOT_COLOR_PATHS, gray: DOT_GRAY_PATHS } : null);
       repaintAllTabIcons();
     } catch {
       // Storage unavailable or failing — the dot keeps its previous state.
     }
+  };
+
+  /** Merges a pending version into the stored state and re-evaluates. */
+  const setPending = async (version: string, reason: UpdateReason): Promise<void> => {
+    const state = await readState();
+    const next: UpdateState = {
+      latestVersion: state?.latestVersion ?? null,
+      checkedAt: state?.checkedAt ?? 0,
+      pendingVersion: version,
+      pendingReason: reason,
+    };
+    await chrome.storage.local.set({ [UPDATE_STATE_KEY]: next });
+    await evaluate();
   };
 
   const checkNow = async (force = false): Promise<void> => {
@@ -111,7 +136,11 @@ export function createUpdateDotController(deps: UpdateDotDeps = {}): UpdateDotCo
       } catch {
         return; // keep the previous state; the next wake retries
       }
-      const next: UpdateState = { latestVersion: latest, checkedAt: now() };
+      const next: UpdateState = {
+        ...(state ?? { pendingVersion: null, pendingReason: null }),
+        latestVersion: latest,
+        checkedAt: now(),
+      };
       await chrome.storage.local.set({ [UPDATE_STATE_KEY]: next });
       await evaluate();
     } catch {
@@ -130,6 +159,16 @@ export function createUpdateDotController(deps: UpdateDotDeps = {}): UpdateDotCo
     onStorageChanged(key: string): Promise<void> {
       if (key !== CHANGELOG_SEEN_KEY) return Promise.resolve();
       return evaluate();
+    },
+    onInstalled(details): Promise<void> {
+      // "install" is a fresh start (no prior version to celebrate);
+      // "update" means the browser just moved us to a new version.
+      if (details?.reason !== 'update') return Promise.resolve();
+      return setPending(installedVersion(), 'updated').catch(() => undefined);
+    },
+    onRuntimeUpdateAvailable(version?: string): Promise<void> {
+      if (!version) return Promise.resolve();
+      return setPending(version, 'scheduled').catch(() => undefined);
     },
   };
 }
