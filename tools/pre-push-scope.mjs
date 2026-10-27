@@ -31,12 +31,13 @@ const isDocPath = (p) => p.startsWith('docs/') || p.endsWith('.md') || p.startsW
 
 /**
  * Pure decision core, unit-tested in tools/pre-push-scope.test.mjs.
- * @param {{changedFiles: string[], pushingToMain: boolean, fullGateEnv: boolean, hasBase: boolean}}
+ * @param {{changedFiles: string[], pushingToMain: boolean, pushingToProduction?: boolean, fullGateEnv: boolean, hasBase: boolean}}
  * @returns {{mode: 'full'|'scoped'|'skip', legs: string[]}}
  */
-export function buildPlan({ changedFiles, pushingToMain, fullGateEnv, hasBase }) {
+export function buildPlan({ changedFiles, pushingToMain, pushingToProduction = false, fullGateEnv, hasBase }) {
   if (fullGateEnv) return { mode: 'full', legs: [FULL_GATE] };
   if (pushingToMain) return { mode: 'full', legs: [FULL_GATE] };
+  if (pushingToProduction) return { mode: 'full', legs: [FULL_GATE] };
   if (!hasBase) return { mode: 'full', legs: [FULL_GATE] };
 
   const touched = changedFiles.filter((f) => !isDocPath(f));
@@ -69,19 +70,20 @@ function main() {
 
   // husky feeds one "<local ref> <local sha> <remote ref> <remote sha>" line per ref.
   const stdin = readFileSync(0, 'utf8').trim();
-  const pushingToMain = stdin
-    .split('\n')
-    .some((line) => line.trim().split(/\s+/)[2] === 'refs/heads/main');
+  const pushedRefs = stdin.split('\n').map((line) => line.trim().split(/\s+/)[2]);
+  const pushingToMain = pushedRefs.includes('refs/heads/main');
+  const pushingToProduction = pushedRefs.includes('refs/heads/production');
 
   const fullGateEnv = process.env.CQD_FULL_GATE === '1';
   const mergeBase = git(['merge-base', 'HEAD', 'origin/main'], { allowFail: true });
   const hasBase = mergeBase.ok && !!mergeBase.out;
   const changedFiles = hasBase ? git(['diff', '--name-only', `${mergeBase.out}`, 'HEAD']).out.split('\n').filter(Boolean) : [];
 
-  const plan = buildPlan({ changedFiles, pushingToMain, fullGateEnv, hasBase });
+  const plan = buildPlan({ changedFiles, pushingToMain, pushingToProduction, fullGateEnv, hasBase });
 
   if (plan.mode === 'full') {
-    console.log(`[pre-push-scope] FULL gate (${fullGateEnv ? 'CQD_FULL_GATE=1' : pushingToMain ? 'pushing to main' : hasBase ? 'non-workspace files touched' : 'no merge-base with origin/main'}).`);
+    const reason = fullGateEnv ? 'CQD_FULL_GATE=1' : pushingToMain ? 'pushing to main' : pushingToProduction ? 'pushing to production' : hasBase ? 'non-workspace files touched' : 'no merge-base with origin/main';
+    console.log(`[pre-push-scope] FULL gate (${reason}).`);
   } else if (plan.mode === 'skip') {
     console.log('[pre-push-scope] Docs-only push — workspace gates skipped. CI runs the full matrix on the PR.');
   } else {
