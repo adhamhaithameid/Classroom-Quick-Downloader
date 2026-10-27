@@ -4,10 +4,48 @@ This is the main engineering changelog for Classroom Quick Downloader.
 It focuses on meaningful product, reliability, security, and architecture changes instead of raw commit history.
 
 ## Versioning Notes
-- Current extension release line: `1.9.1`
+- Current extension release line: `1.9.3`
 - The `1.8.0`→`1.8.7` ladder below materializes the post-1.8.0 work as 0.0.1 steps anchored to commit dates; the `1.5.6`→`1.8.0` ladder remains the internal history of the 1.5→1.8 line: every point version is anchored to the commit record and file-change dates of its window; patches never reach `.10` — the next minor takes over (`1.6.9` → `1.7.0`, `1.7.9` → `1.8.0`, `1.8.9` → `1.9.0` when the Free-completion milestone ships)
 - Planned next engine milestone: post-1.6 acquisition strategy wiring (API download tier behind the consent gate)
 - Pre-`1.0.0` bootstrap work is intentionally omitted from the user-facing release ledger
+
+## [1.9.3] - 2026-10-25
+
+### Summary
+
+Live-Classroom HITL verification caught Google dropping `data-drive-id` from
+attachment cards on assignment details pages. The legacy engine keyed file
+detection on that attribute, so download buttons disappeared on details views
+(likely the root cause of survey #818, sev 5/5). This release restores
+injection for the new card markup and ships the live-harness fixes the
+verification exposed.
+
+### Added
+
+- Live harness: teacher detection recognizes the collapsed stream composer
+  ("New announcement" button); the assignment finder reaches classwork via the
+  tab (the `/w/all` deep link now renders an empty shell) and expands
+  click-driven rows before parsing `/details` anchors.
+- Mega-E2E pre-deploy gate (`tools/mega-e2e/` + `scripts/mega-e2e`): the full
+  browser matrix, live suites, popup QA, security suites, and a discovery
+  report — required before any store dispatch.
+
+### Fixed
+
+- Details-page attachment detection (bead bs7c): when no known container
+  matches, the anchor itself is treated as the card when its aria-label starts
+  with "Attachment:" — Google's own contract on the new markup. Loose body
+  links without that label stay button-free.
+- Store workflow AMO leg: the API 404s GUID-form addon URLs since 2026-10-24;
+  the publish flow now resolves the add-on by slug and uses the two-step
+  upload-then-version API.
+
+## [1.9.2] - 2026-10-24
+
+Survey-fixes release: download levels seeded from legacy stats, Chrome
+filename extensions preserved on save, flag-race fix on Classroom reopen,
+aggregate-rating schema from real store reviews, nightly test pin, backups
+D1-export fix, audit-gate dependency refresh under pnpm 12.
 
 ## [1.9.1] - 2026-10-04
 

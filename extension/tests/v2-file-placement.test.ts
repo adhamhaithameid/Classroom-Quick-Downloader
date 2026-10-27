@@ -824,3 +824,51 @@ describe('File Placement: collapsed classwork keeps Download All (bug 2.1)', () 
     expect(decisions.filter((d) => !d.fileId.startsWith('download-all:'))).toHaveLength(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 2026-10 details synthesis (bead bs7c): the synthetic details post's
+// element is document.body and carries no data-stream-item-id. The header
+// anchor strategy must NOT be used there — a body-wide header match lands
+// inside an arbitrary leftover SPA subtree, where the group run's
+// self-contained enumeration finds zero single buttons (verified live).
+// The group decision must target the post root (body) instead.
+// ---------------------------------------------------------------------------
+describe('File Placement: synthetic details post (body element)', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  function mockDetailsPost(postId: string, files: ScannedFile[]): ScannedPost {
+    const el = document.body;
+    for (const f of files) el.appendChild(f.element);
+    return {
+      id: postId,
+      element: el,
+      fingerprint: `${postId}-${files.length}`,
+      files,
+      isExpanded: true,
+      isConnected: true,
+    };
+  }
+
+  it('mounts download-all on the post root, never a body-wide header match', () => {
+    // A "header-like" element inside a leftover subtree would win a
+    // body-wide header query — the decision must not target it.
+    const leftover = document.createElement('div');
+    leftover.setAttribute('data-stream-item-id', 'leftover');
+    const headerLike = document.createElement('div');
+    headerLike.className = 'N5dSp';
+    leftover.appendChild(headerLike);
+    document.body.appendChild(leftover);
+
+    const post = mockDetailsPost('details:/u/0/c/x/a/y/details', [
+      mockFile('file-1'),
+      mockFile('file-2'),
+    ]);
+    const decisions = computePlacement(post, ViewKind.ASSIGNMENT_DETAILS);
+    const all = decisions.find((d) => d.fileId.startsWith('download-all:'));
+    expect(all).toBeTruthy();
+    expect(all!.targetElement).toBe(document.body);
+    expect(all!.insertionPoint).toBe('append');
+  });
+});

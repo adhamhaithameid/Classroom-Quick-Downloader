@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# mega-e2e — wrapper for the pre-deploy quality gate (tools/mega-e2e/run.mjs).
+# Usage: scripts/mega-e2e [--quick|--require-live|--require-firefox]
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export PATH="/opt/homebrew/opt/openssl/bin:$HOME/.local/bin:/usr/local/opt/go/bin:$PATH"
+exec node "$ROOT/tools/mega-e2e/run.mjs" "$@"

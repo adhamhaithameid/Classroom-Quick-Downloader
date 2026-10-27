@@ -32,7 +32,7 @@
  * @since v4.0.0
  */
 
-import type { ViewKind } from '../../engines/types';
+import { ViewKind } from '../../engines/types';
 import {
   createPostScorer,
   createFileAnchorScorer,
@@ -209,6 +209,40 @@ export class DOMScanner {
       };
 
       posts.set(postId, scannedPost);
+    }
+
+    // 3. Details views (assignment/material/announcement) render the body
+    // WITHOUT any data-stream-item-id wrapper — the 2026-10 markup carries
+    // only generated classes (bead bs7c). Synthesize one post for the whole
+    // scope so the placement recipes (which expect "the post is the entire
+    // page content") still receive the cards.
+    if (
+      (viewKind === ViewKind.ASSIGNMENT_DETAILS ||
+        viewKind === ViewKind.MATERIAL_DETAILS ||
+        viewKind === ViewKind.ANNOUNCEMENT_DETAIL) &&
+      typeof location !== 'undefined'
+    ) {
+      // scope may be the Document (default fullScan arg) — fingerprint and
+      // extract need an Element.
+      const scopeEl: HTMLElement = scope instanceof HTMLElement ? scope : document.body;
+      const files = this.extractFiles(scopeEl);
+      const covered = new Set<string>();
+      for (const p of posts.values()) {
+        for (const f of p.files) covered.add(f.canonicalId);
+      }
+      const uncovered = files.filter((f) => !covered.has(f.canonicalId));
+      if (uncovered.length > 0) {
+        const detailsId = `details:${location.pathname}`;
+        posts.set(detailsId, {
+          id: detailsId,
+          element: scopeEl,
+          fingerprint: computeFingerprint(scopeEl),
+          files: uncovered,
+          isExpanded: true,
+          isConnected: true,
+        });
+        totalFiles += uncovered.length;
+      }
     }
 
     const duration_ms = performance.now() - startTime;

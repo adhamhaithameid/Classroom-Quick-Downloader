@@ -105,10 +105,15 @@ export function parseAssignmentLinks(html: string): LiveAssignmentLink[] {
 
 /**
  * Count real attachment cards on an assignment/material details page.
- * Keys on CQD's structural contract: [data-drive-id] (details views).
+ * Keys on CQD's structural contracts: [data-drive-id] (pre-2026-10 details
+ * views) and the aria-label "Attachment:" drive-href anchor (2026-10+
+ * details views — Google dropped data-drive-id; bead bs7c).
  */
 export function countDriveAttachments(html: string): number {
-  return (html.match(/data-drive-id="/g) ?? []).length;
+  const legacy = (html.match(/data-drive-id="/g) ?? []).length;
+  const anchorTags = html.match(/<a\b[^>]*aria-label="Attachment:[^"]*"[^>]*>/gi) ?? [];
+  const ariaCards = anchorTags.filter((tag) => /drive\.google\.com\/file\/d\//.test(tag)).length;
+  return Math.max(legacy, ariaCards);
 }
 
 /**
@@ -148,10 +153,6 @@ const TEACHER_SIGNALS: { label: string; pattern: RegExp }[] = [
   {
     label: "stream compose box (Arabic: أعلن شيئًا لصفك)",
     pattern: /أعلن\s+شيئً?ا?\s+لصفك/,
-  },
-  {
-    label: "stream collapsed composer (New announcement button)",
-    pattern: /new announcement/i,
   },
   {
     label: "classwork create button (aria-label)",

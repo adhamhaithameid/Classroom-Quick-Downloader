@@ -414,3 +414,57 @@ describe('DOMScanner: getScorers', () => {
     expect(scorers.accordion).toBeTruthy();
   });
 });
+
+// ---------------------------------------------------------------------------
+// 2026-10 live capture: details-view cards lost data-drive-id and every
+// known container class; the anchor itself carries the contract via
+// aria-label="Attachment: …" + drive href (bead bs7c).
+// ---------------------------------------------------------------------------
+describe('v2 scanner on the 2026-10 details-view card markup', () => {
+  it('extracts both aria-label attachment files from a post with unknown container classes', () => {
+    const post = document.createElement('div');
+    post.setAttribute('data-stream-item-id', 'details-post-1');
+    for (const [name, id] of [['cqd-test-file-1.pdf', '1nYQPtJQJXW_LvVfo2jMLJmQlVC17zmRX'], ['cqd-test-file-2.pdf', '2nYQPtJQJXW_LvVfo2jMLJmQlVC17zmRY']] as const) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'riU7le FHXi2c'; // unknown to every selector family
+      const anchor = document.createElement('a');
+      anchor.className = 'vwNuXe JkIgWb gmNu1d yixX5e';
+      anchor.href = `https://drive.google.com/file/d/${id}/view?usp=classroom_web&authuser=0`;
+      anchor.setAttribute('aria-label', `Attachment: PDF: ${name}`);
+      anchor.setAttribute('target', '_blank');
+      wrapper.appendChild(anchor);
+      post.appendChild(wrapper);
+    }
+    document.body.appendChild(post);
+
+    const scanner = new DOMScanner();
+    const result = scanner.fullScan('stream' as any);
+    const files: string[] = [];
+    for (const p of result.posts.values()) files.push(...p.files.map((f) => f.canonicalId));
+    expect(files).toContain('drive:1nYQPtJQJXW_LvVfo2jMLJmQlVC17zmRX');
+    expect(files).toContain('drive:2nYQPtJQJXW_LvVfo2jMLJmQlVC17zmRY');
+    post.remove();
+  });
+
+  it("synthesizes a details post when cards live OUTSIDE any data-stream-item-id (2026-10 live capture)", () => {
+    // Live details pages render the assignment body with NO post wrapper —
+    // the cards' ancestors carry only generated classes (bead bs7c).
+    for (const [name, id] of [['cqd-test-file-1.pdf', '1nYQPtJQJXW_LvVfo2jMLJmQlVC17zmRX'], ['cqd-test-file-2.pdf', '2nYQPtJQJXW_LvVfo2jMLJmQlVC17zmRY']] as const) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'riU7le FHXi2c';
+      const anchor = document.createElement('a');
+      anchor.href = `https://drive.google.com/file/d/${id}/view?usp=classroom_web&authuser=0`;
+      anchor.setAttribute('aria-label', `Attachment: PDF: ${name}`);
+      wrapper.appendChild(anchor);
+      document.body.appendChild(wrapper);
+    }
+
+    const scanner = new DOMScanner();
+    const result = scanner.fullScan('assignment_details' as any);
+    const files: string[] = [];
+    for (const p of result.posts.values()) files.push(...p.files.map((f) => f.canonicalId));
+    expect(files).toContain('drive:1nYQPtJQJXW_LvVfo2jMLJmQlVC17zmRX');
+    expect(files).toContain('drive:2nYQPtJQJXW_LvVfo2jMLJmQlVC17zmRY');
+    document.body.innerHTML = '';
+  });
+});

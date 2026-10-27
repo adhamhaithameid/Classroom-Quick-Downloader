@@ -163,18 +163,30 @@ export async function findAssignmentWithAttachments(
         const t = (el.textContent ?? "").trim();
         if (t.length < 4 || t.length > 120) continue;
         const r = el.getBoundingClientRect();
-        if (r.x < 100 || r.width > 700) continue;
+        // Content column only: right of the navigation rail, below the
+        // tabs/header chrome — clicking the Classroom logo or header links
+        // navigates away and wedges the finder.
+        if (r.x < 240 || r.y < 140 || r.width > 700) continue;
         out.push({ x: r.x + r.width / 2, y: r.y + r.height / 2, text: t });
       }
       return out;
     });
     for (const c of candidates) {
-      if (STOP.has(c.text.toLowerCase())) continue;
+      const low = c.text.toLowerCase();
+      if (STOP.has(low) || low.includes("classroom")) continue;
       if (/^(posted|assigned|turned in|draft)\b/i.test(c.text)) continue;
+      // Skip chrome that opens dialogs/menus (help, create, kebab, topic
+      // toggles) — an open overlay swallows every later click.
+      if (/help|feedback|create|collapse|expand|more_vert|more options|topic|graded|points|due|assign|reuse|question|material|class settings|calendar|drive folder/i.test(low)) {
+        continue;
+      }
       await page.mouse.click(c.x, c.y).catch(() => {});
       await page.waitForTimeout(3000);
       links = parseAssignmentLinks(await pageHtml(page)).slice(0, max);
       if (links.length > 0) break;
+      // Close anything the misclick opened before the next candidate.
+      await page.keyboard.press("Escape").catch(() => {});
+      await page.waitForTimeout(500);
     }
   }
   for (const link of links) {
@@ -226,10 +238,16 @@ export async function exerciseDetailsDownloads(
   if (allButtons >= 1) {
     const before = verifiedDownloads(await getProbe()).length;
     await page.click("button.cqd-download-all-btn");
-    // Download-all re-fetches every attachment (attachments count includes
-    // the one already downloaded) — at least `attachments` total files.
-    const verified = await waitForVerifiedDownloads(getProbe, Math.max(before + attachments, 2));
+    // The V2 group machine skips buttons already in `success` state (no
+    // pointless re-download; the single click above downloaded exactly one),
+    // so the group must fetch the REMAINING attachments: attachments - 1
+    // new files, at least one to prove the run happened.
+    const mustFetch = Math.max(attachments - 1, 1);
+    const verified = await waitForVerifiedDownloads(getProbe, before + mustFetch);
     allCount = verified.length - before;
+    if (allCount < mustFetch) {
+      throw new Error(`PRODUCT: download-all fetched ${allCount} new file(s), expected ${mustFetch} (already-downloaded files are intentionally skipped by the V2 group machine)`);
+    }
   }
   return { assignments: { detailsHref, attachments }, single, allCount };
 }

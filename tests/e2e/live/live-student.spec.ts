@@ -78,10 +78,15 @@ test.describe("live student role (real downloads)", () => {
     expect(outcome.single.existsOnDisk ?? false, "downloaded file must exist on disk").toBe(true);
     expect(outcome.single.totalBytes ?? 0, "downloaded file must have bytes").toBeGreaterThan(0);
     if (outcome.assignments.attachments >= 2) {
+      // The V2 group machine skips buttons already in `success` state (the
+      // single click above downloaded one), so the group fetches the
+      // REMAINING attachments — >= 1 new file proves the run happened. The
+      // full remaining-count contract is enforced inside
+      // exerciseDetailsDownloads (live-flows.ts).
       expect(
         outcome.allCount,
-        "download-all must fetch every attachment",
-      ).toBeGreaterThanOrEqual(outcome.assignments.attachments);
+        "download-all must fetch the not-yet-downloaded attachments",
+      ).toBeGreaterThanOrEqual(1);
     }
     console.log(
       `[live-student] verified: ${outcome.single.filename} (${outcome.single.totalBytes} bytes, ${outcome.single.mime}); download-all fetched ${outcome.allCount}`,

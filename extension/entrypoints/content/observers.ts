@@ -85,6 +85,15 @@ function resolveAttachmentContainer(anchor: HTMLAnchorElement): HTMLElement | nu
     }
   }
 
+  // 2026-10 details-view markup (bead bs7c): Google dropped data-drive-id and
+  // every known container class; the <a> IS the card and its aria-label
+  // ("Attachment: …") is the strongest contract left. That label is Google's
+  // own and never appears on loose body links, so the random-button guard
+  // above keeps its meaning.
+  if (/^attachment:/i.test(anchor.getAttribute('aria-label') || '')) {
+    return anchor;
+  }
+
   return null;
 }
 

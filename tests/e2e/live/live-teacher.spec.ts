@@ -74,8 +74,18 @@ test.describe("live teacher role", () => {
     if (resolution.kind !== "ok") return;
     const target = resolution.target;
     await gotoLive(page, absoluteClassroomUrl(target.href));
+    // The stream composer is NOT teacher proof anymore: students can post
+    // when the teacher allows it, so the collapsed "New announcement"
+    // button and even an openable composer render for both roles (probed
+    // live 2026-10-25). The strictly teacher-only surface is the Classwork
+    // Create button, so role verification happens on the Classwork tab.
+    await page
+      .locator('a:has-text("Classwork"), div[role="link"]:has-text("Classwork"), span:has-text("Classwork")')
+      .first()
+      .click();
+    await page.waitForTimeout(4000);
     const detection = detectRole(await pageHtml(page));
-    await liveScreenshot(page, "teacher", "stream");
+    await liveScreenshot(page, "teacher", "classwork-role");
     await liveArtifact("teacher", "role.json", { target, detection });
     if (detection.role !== "teacher") {
       throw new Error(
@@ -83,6 +93,10 @@ test.describe("live teacher role", () => {
       );
     }
     expect(detection.role).toBe("teacher");
+    // Leave the shared tab off Classroom: with two live Classroom tabs the
+    // extension's per-tab engine on the newest tab under-performs (paired
+    // runs failed while isolated runs passed, 2026-10-25).
+    await page.goto("about:blank").catch(() => {});
   });
 
   test("injects and downloads assignment attachments as teacher", async () => {
@@ -90,8 +104,18 @@ test.describe("live teacher role", () => {
     if (resolution.kind !== "ok") return;
     const target = resolution.target;
 
-    const found = await findAssignmentWithAttachments(page, target);
+    // Fresh document per test: the role-verification test leaves SPA state
+    // that can starve the engine's initial scan timing on the next load
+    // (verified 2026-10-25 — the same test passes in isolation).
+    const dlPage = await context.newPage();
+    // Bring the working tab to the front: Chrome throttles background tabs'
+    // timers, and the engine's settle/scan loops must run like a real user
+    // session (paired-run failures without this, 2026-10-25).
+    await dlPage.bringToFront();
+
+    const found = await findAssignmentWithAttachments(dlPage, target);
     if (!found) {
+      await dlPage.close();
       test.skip(
         true,
         `no assignment with Drive attachments in ${target.name ?? target.classId} — seed one (docs/LIVE_CLASSROOM_TESTING.md § seeding)`,
@@ -99,8 +123,9 @@ test.describe("live teacher role", () => {
       return;
     }
     const getProbe = await instrumentLiveDownloads(context);
-    const outcome = await exerciseDetailsDownloads(page, getProbe, found.detailsHref, found.attachments);
-    await recordDetailsOutcome(page, "teacher", target, outcome);
+    const outcome = await exerciseDetailsDownloads(dlPage, getProbe, found.detailsHref, found.attachments);
+    await recordDetailsOutcome(dlPage, "teacher", target, outcome);
+    await dlPage.close();
 
     expect(outcome.single.totalBytes ?? 0).toBeGreaterThan(0);
     console.log(`[live-teacher] verified teacher download: ${outcome.single.filename}`);

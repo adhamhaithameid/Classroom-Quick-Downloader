@@ -78,10 +78,21 @@ function readEnv() {
     issuer: process.env.AMO_JWT_ISSUER,
     secret: process.env.AMO_JWT_SECRET,
     addonId: process.env.AMO_ADDON_ID || DEFAULT_ADDON_ID,
+    // 2026-10-25: AMO 404s GUID-form addon URLs (both /addons/addon/<guid>/ and
+    // /addons/<guid>/versions/) even for the rightful owner — Mozilla-side
+    // drift first seen 2026-10-24, tracked as web-ext#3913. Slug-form URLs
+    // still work, so version lookups go through the slug when provided.
+    addonSlug: process.env.AMO_ADDON_SLUG || null,
     channel,
     baseUrl: (process.env.AMO_BASE_URL || 'https://addons.mozilla.org').replace(/\/+$/, ''),
     pollTimeoutMs: Number(process.env.AMO_POLL_TIMEOUT_MS || 180_000),
   };
+}
+
+/** Base for the documented version endpoints (slug preferred over guid). */
+function versionBase(env) {
+  const id = env.addonSlug || env.addonId;
+  return `${env.baseUrl}/api/v5/addons/addon/${encodeURIComponent(id)}/versions`;
 }
 
 /** Newest *-firefox.zip in .output (what `pnpm -C extension firefox` produces). */
@@ -223,51 +234,91 @@ async function main() {
     );
   }
   const version = resolveVersion(xpiPath);
-  const versionUrl = `${env.baseUrl}/api/v5/addons/${encodeURIComponent(env.addonId)}/versions/${encodeURIComponent(version)}/`;
-  console.log(`✶ Signing ${path.basename(xpiPath)} (v${version}, channel=${env.channel}) for ${env.addonId}`);
+  const vBase = versionBase(env);
+  const versionUrl = `${vBase}/${encodeURIComponent(version)}/`;
+  console.log(`✶ Signing ${path.basename(xpiPath)} (v${version}, channel=${env.channel}) for ${env.addonSlug || env.addonId}`);
 
-  // 1. Upload: PUT the zip as the multipart `upload` field.
+  // 1. Upload via the two-step staging flow (proven 2026-10-25): the legacy
+  //    single-call version PUT (multipart to /addons/<id>/versions/<v>/)
+  //    stopped working when AMO began 404ing GUID-form URLs.
   const jwt = makeJwt(env.issuer, env.secret);
-  const form = new FormData();
-  form.append(
+  const stageForm = new FormData();
+  stageForm.append(
     'upload',
     new Blob([new Uint8Array(fs.readFileSync(xpiPath))], { type: 'application/octet-stream' }),
     path.basename(xpiPath),
   );
-  form.append('channel', env.channel);
-  const putRes = await fetch(versionUrl, {
-    method: 'PUT',
+  stageForm.append('channel', env.channel);
+  const stageRes = await fetch(`${env.baseUrl}/api/v5/addons/upload/`, {
+    method: 'POST',
     headers: { Authorization: `JWT ${jwt}` },
-    body: form,
+    body: stageForm,
   });
-  if (putRes.status === 404) {
-    // The version PUT 404s both when the add-on is genuinely new AND when
-    // the JWT account cannot see an existing listing (0h4d.12.9: 2026-10-16
-    // run created a DUPLICATE add-on that way). The public endpoint decides:
-    // a listed add-on is publicly readable regardless of JWT ownership.
+  let uploadUuid = null;
+  if (stageRes.ok) {
+    const staged = await stageRes.json().catch(() => null);
+    uploadUuid = staged?.uuid ?? null;
+  }
+  if (!uploadUuid) {
+    // Unknown add-on: fall back to the documented create flow (PUT the
+    // addon resource with the staged uuid). A 404 here for a KNOWN add-on
+    // means GUID-form lookup drift — retry the addon probe by slug first.
+    const probeId = env.addonSlug || env.addonId;
     const probe = await fetch(
-      `${env.baseUrl}/api/v5/addons/addon/${encodeURIComponent(env.addonId)}/`,
+      `${env.baseUrl}/api/v5/addons/addon/${encodeURIComponent(probeId)}/`,
     );
+    if (probe.ok && env.addonSlug) {
+      fail(
+        `add-on ${probeId} exists but staging rejected the upload — inspect the ` +
+          `response below and re-run (AMO-side transient states do occur).`,
+      );
+    }
     if (probe.ok) {
       fail(
-        `add-on ${env.addonId} exists publicly but the JWT account cannot see it ` +
-          `(version PUT 404, version list 404). The AMO API keys belong to a ` +
-          `different addons.mozilla.org account than the listing owner. ` +
-          `Create API keys while signed in as the listing owner ` +
-          `(https://addons.mozilla.org/developers/addon/api/key/) and update ` +
-          `AMO_JWT_ISSUER / AMO_JWT_SECRET. NOT running the create flow — ` +
+        `add-on ${env.addonId} exists publicly but the JWT account cannot see it. ` +
+          `The AMO API keys may belong to a different addons.mozilla.org account ` +
+          `than the listing owner — create keys while signed in as the listing ` +
+          `owner (https://addons.mozilla.org/developers/addon/api/key/) and ` +
+          `update AMO_JWT_ISSUER / AMO_JWT_SECRET. NOT running the create flow — ` +
           `it would create a duplicate add-on.`,
       );
     }
-    // Genuinely new add-on: the documented create flow — POST the file to
-    // /upload/, poll validation, then PUT the addon resource with the uuid.
-    console.log('ℹ Version endpoint 404 and add-on is publicly unknown; running the create flow…');
+    console.log('ℹ Add-on is publicly unknown; running the create flow…');
     const created = await createNewAddon(env, jwt, xpiPath, versionUrl, version);
     if (!created) {
-      fail((await apiError('upload', putRes.status, await putRes.text())).message);
+      fail((await apiError('upload', stageRes.status, await stageRes.text())).message);
     }
-  } else if (!putRes.ok) {
-    fail((await apiError('upload', putRes.status, await putRes.text())).message);
+  } else {
+    // Poll staging until validation finishes, then create the version.
+    let processed = false;
+    let staged = null;
+    const stageDeadline = Date.now() + env.pollTimeoutMs;
+    while (Date.now() < stageDeadline) {
+      const poll = await fetch(`${env.baseUrl}/api/v5/addons/upload/${uploadUuid}/`, {
+        headers: { Authorization: `JWT ${jwt}` },
+      });
+      staged = poll.ok ? await poll.json().catch(() => null) : null;
+      if (staged?.processed) break;
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+    }
+    if (!staged?.processed) {
+      fail(`upload ${uploadUuid} never finished validation within ${env.pollTimeoutMs} ms.`);
+    }
+    if (staged.valid === false) {
+      fail(`AMO rejected the upload:\n${JSON.stringify(staged.validation_results, null, 2)}`);
+    }
+    const createRes = await fetch(`${vBase}/`, {
+      method: 'POST',
+      headers: { Authorization: `JWT ${jwt}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ upload: uploadUuid }),
+    });
+    if (!createRes.ok) {
+      fail((await apiError('create-version', createRes.status, await createRes.text())).message);
+    }
+    const created = await createRes.json().catch(() => null);
+    if (created?.validation_errors) {
+      fail(`AMO rejected the version:\n${JSON.stringify(created.validation_errors, null, 2)}`);
+    }
   }
   console.log('✓ Uploaded — AMO is validating/signing the version…');
 
@@ -289,7 +340,7 @@ async function main() {
       // No `?filter=all`: AMO now rejects that param with 404 on this
       // endpoint (verified 2026-10-16 with owner JWT; the plain list
       // already includes unreviewed versions for the owner).
-      `${env.baseUrl}/api/v5/addons/${encodeURIComponent(env.addonId)}/versions/`,
+      `${vBase}/`,
       { headers: { Authorization: `JWT ${jwt}` } },
     );
     if (listRes.ok) {
@@ -309,7 +360,7 @@ async function main() {
       lastDiagAt = Date.now();
       const detail = await fetch(versionUrl, { headers: { Authorization: `JWT ${jwt}` } });
       const list = await fetch(
-        `${env.baseUrl}/api/v5/addons/${encodeURIComponent(env.addonId)}/versions/`,
+        `${vBase}/`,
         { headers: { Authorization: `JWT ${jwt}` } },
       );
       const listBody = list.ok ? await list.json().catch(() => null) : null;

@@ -27,7 +27,38 @@ permissions:
   contents: read
 
 jobs:
+  # MEGA-E2E GATE (2026-10-25): no store dispatch may skip the quality
+  # suite. CI-side scope is build+unit+golden+drift (the full browser matrix
+  # runs in the CI matrix on push; the local-only legs — edge/firefox/live —
+  # are recorded as skips in the report). A gate failure blocks every store.
+  mega-e2e-gate:
+    name: Mega-E2E quality gate (pre-deploy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 12.15.0
+      - uses: actions/setup-node@f4528c1b8f5b3b1fbd1b7d1c4ca7b4e19c4d1e6f
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run mega-e2e gate (quick scope)
+        run: node tools/mega-e2e/run.mjs --quick
+      - name: Upload gate report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mega-e2e-report
+          path: qa-artifacts/mega-e2e/
+
   build-chrome:
+    needs: mega-e2e-gate
     name: Build Chrome zip
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -100,7 +131,7 @@ jobs:
 
   publish-firefox-listed:
     name: Publish to AMO (listed)
-    needs: build-firefox
+    needs: [mega-e2e-gate, build-firefox]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -120,6 +151,9 @@ jobs:
           AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
           AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
           AMO_ADDON_ID: classroom-quick-downloader@adhamhaitham.dev
+          # 2026-10-25: AMO 404s GUID-form addon URLs; version endpoints are
+          # addressed by slug (the create flow still uses the guid).
+          AMO_ADDON_SLUG: classroom-quick-downloader
           AMO_CHANNEL: listed
           # The zip is packaged at the repo root above; the signer's default
           # search path (extension/.output) does not exist on the runner.
@@ -130,7 +164,7 @@ jobs:
 
   publish-edge:
     name: Publish to Edge Add-ons
-    needs: build-edge
+    needs: [mega-e2e-gate, build-edge]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -157,7 +191,7 @@ jobs:
 
   publish-chrome:
     name: Publish to Chrome Web Store
-    needs: build-chrome
+    needs: [mega-e2e-gate, build-chrome]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
