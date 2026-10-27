@@ -105,10 +105,21 @@ async function fetchJson(fetchImpl, url, opts = {}) {
 
 export async function probeAmo({ issuer, secret, addonSlug, fetchImpl = fetch }) {
   const token = buildAmoJwt(issuer, secret);
-  const r = await fetchJson(fetchImpl, `https://addons.mozilla.org/api/v5/addons/addon/${encodeURIComponent(addonSlug)}/versions/?filter=all_with_unlisted`, { headers: { Authorization: `JWT ${token}` } });
+  const url = `https://addons.mozilla.org/api/v5/addons/addon/${encodeURIComponent(addonSlug)}/versions/?filter=all_with_unlisted`;
+  const authed = await fetchJson(fetchImpl, url, { headers: { Authorization: `JWT ${token}` } });
+  // Known AMO behavior (2026-10-16+): version endpoints 404 for the owner
+  // JWT on some add-on states. The LISTED add-on's versions are public data
+  // — fall back to the unauthenticated GET, which cannot see in-review
+  // versions (the publish leg's 409 skip covers that residue).
+  let r = authed;
+  let scope = 'includes unlisted/in-review versions';
+  if (!authed.ok && authed.error === 'http 404') {
+    r = await fetchJson(fetchImpl, url);
+    scope = 'public versions only (JWT endpoint 404 — known AMO quirk); in-review versions unseen';
+  }
   if (!r.ok) return r;
   const live = (r.body?.results ?? []).map((v) => v.version).sort(semverCmpDesc)[0] ?? null;
-  return { ok: true, live, note: 'includes unlisted/in-review versions' };
+  return { ok: true, live, note: scope };
 }
 
 export async function probeCws({ clientId, clientSecret, refreshToken, itemId, fetchImpl = fetch }) {
@@ -216,8 +227,10 @@ async function main() {
       console.log(`[version-preflight]   ${store}: ${info.verdict}${live}${info.error ? ` — ${info.error}` : ''}`);
     }
     console.log(`[version-preflight] publish set: ${verdict.publishSet.length ? verdict.publishSet.join(', ') : '(none — versions current everywhere)'}`);
-    for (const f of verdict.failures) console.error(`[version-preflight] FAIL ${f.store}: ${f.reason}`);
   }
+  // Failures must reach the run log in BOTH modes: stdout may be redirected
+  // to a JSON file, so a silent exit(1) is undiagnosable from CI.
+  for (const f of verdict.failures) console.error(`[version-preflight] FAIL ${f.store}: ${f.reason}`);
 
   if (verdict.failures.length > 0 && !args.allowNoProbeFail) process.exit(1);
 }
