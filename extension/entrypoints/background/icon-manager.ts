@@ -24,6 +24,47 @@ export const GRAY_ICON_PATHS: Record<number, string> = {
   128: 'icon/128-gray.png',
 };
 
+// Download-animation overrides (icon-animation.ts). While set, every tab
+// icon renders the override; null restores the per-tab color/gray base
+// icons. The two channels are mutually exclusive; setting one clears the other.
+let overridePaths: Record<number, string> | null = null;
+let overrideImageData: Record<number, ImageData> | null = null;
+
+export function setIconOverridePaths(paths: Record<number, string> | null): void {
+  overridePaths = paths;
+  if (paths) overrideImageData = null;
+}
+
+export function setIconOverrideImageData(data: Record<number, ImageData> | null): void {
+  overrideImageData = data;
+  if (data) overridePaths = null;
+}
+
+// Update-available dot decoration (update-dot.ts). Sits below the download
+// animation overrides and above the per-tab base icons; the classroom flag
+// picks between the colored and gray dot variants.
+let decorationPaths: {
+  color: Record<number, string>;
+  gray: Record<number, string>;
+} | null = null;
+
+export function setIconDecorationPaths(paths: {
+  color: Record<number, string>;
+  gray: Record<number, string>;
+} | null): void {
+  decorationPaths = paths;
+}
+
+/** Re-applies base icons (+decoration) to every known tab. */
+export function repaintAllTabIcons(): void {
+  if (typeof chrome === 'undefined' || !chrome.tabs?.query) return;
+  chrome.tabs.query({}, (tabs) => {
+    for (const tab of tabs) {
+      if (tab.id !== undefined) updateIconForTab(tab.id, tab.url);
+    }
+  });
+}
+
 /**
  * Check if a URL is a Google Classroom page.
  */
@@ -39,12 +80,24 @@ export function isClassroomUrl(url?: string | null): boolean {
  */
 export function setActionIcon(tabId: number, classroom: boolean): void {
   if (typeof chrome === 'undefined') return;
-  const path = classroom ? COLOR_ICON_PATHS : GRAY_ICON_PATHS;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const actionApi = (chrome as any).action || (chrome as any).browserAction;
   if (!actionApi?.setIcon) return;
   try {
-    actionApi.setIcon({ tabId, path });
+    if (overrideImageData) {
+      actionApi.setIcon({ tabId, imageData: overrideImageData });
+    } else {
+      const path =
+        overridePaths ??
+        (decorationPaths
+          ? classroom
+            ? decorationPaths.color
+            : decorationPaths.gray
+          : classroom
+            ? COLOR_ICON_PATHS
+            : GRAY_ICON_PATHS);
+      actionApi.setIcon({ tabId, path });
+    }
   } catch {
     // Ignore errors for non-existent tabs
   }

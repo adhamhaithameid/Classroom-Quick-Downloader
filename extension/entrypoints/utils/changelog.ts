@@ -1,4 +1,7 @@
 import { EXTENSION_MANUAL_CHANGELOG } from './manual-changelog.generated';
+import { CHANGELOG_SEEN_KEY as SEEN_KEY } from './update-state';
+
+export { CHANGELOG_SEEN_KEY as SEEN_KEY } from './update-state';
 
 export interface ChangelogEntry {
   id: string;
@@ -50,7 +53,6 @@ export interface ChangelogFetchResult {
 }
 
 const STORAGE_KEY = 'cqd_changelog_v1';
-const SEEN_KEY = 'cqd_changelog_seen_v1';
 
 function normalizeVersion(value: string): string {
   return value.trim().replace(/^v/i, '');
@@ -276,6 +278,20 @@ export function getRuleClasses(rule: NotificationRule | null, isSeen: boolean): 
 
   return classes.join(' ');
 }
+
+/**
+ * Pill rule for any active update signal (bead 08fg.3): a major pulse that
+ * overrides the manual rules while the dot has a target (newer unseen live
+ * release, just-updated, or scheduled). Dismissal (opening the changelog)
+ * falls back to the base rule. Apply as:
+ *   const pillRule = target.version ? UPDATE_PILL_RULE : baseRule;
+ */
+export const UPDATE_PILL_RULE: NotificationRule = {
+  id: 'update-available',
+  target: 'all',
+  priority: 'major',
+  effect: 'pulse',
+};
 
 // LEGACY_CHANGELOG_DISABLED_START
 // Remote Oracle changelog fetch path intentionally disabled.

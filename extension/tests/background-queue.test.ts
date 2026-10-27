@@ -87,4 +87,29 @@ describe('background download queue (0h4d.1.2)', () => {
     queue.queueSettled('r-1');
     expect(started).toEqual(['n-0', 'n-1', 'n-2']);
   });
+
+  it('notifies the queue listener with the snapshot on every mutation (08fg.1 icon feed)', async () => {
+    vi.resetModules();
+    const queue = await import('../entrypoints/background/queue');
+    queue.resetQueueForTests();
+    const activeCounts: number[] = [];
+    queue.setQueueListener((s) => activeCounts.push(s.activeIds.length));
+
+    queue.queueRequest('a', () => {});
+    queue.queueRequest('b', () => {});
+    queue.queueRequest('c', () => {});
+    queue.queueRequest('d', () => {}); // waits beyond the concurrency cap
+    queue.queueSettled('a'); // frees a slot → d admits
+    expect(activeCounts).toEqual([1, 2, 3, 3, 3]);
+
+    queue.setQueueListener(null);
+    queue.queueSettled('b');
+    expect(activeCounts).toEqual([1, 2, 3, 3, 3]); // detached → silent
+
+    queue.resetQueueForTests();
+    activeCounts.length = 0;
+    queue.setQueueListener((s) => activeCounts.push(s.activeIds.length));
+    queue.queueRecoverActive('r-1');
+    expect(activeCounts).toEqual([1]);
+  });
 });

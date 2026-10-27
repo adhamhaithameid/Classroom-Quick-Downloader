@@ -21,6 +21,18 @@ export const QUEUE_CONCURRENCY = 3;
 let snapshot: QueueSnapshot = createEmptyQueue();
 const starters = new Map<string, () => void>();
 
+type QueueListener = (snapshot: QueueSnapshot) => void;
+let listener: QueueListener | null = null;
+
+/** Per-mutation snapshot feed (toolbar icon animation, bead 08fg.1). */
+export function setQueueListener(fn: QueueListener | null): void {
+  listener = fn;
+}
+
+function notifyListener(): void {
+  listener?.(snapshot);
+}
+
 /** A new download request: queue it and pump (admits immediately if capacity allows). */
 export function queueRequest(requestId: string, start: () => void, onQueued?: () => void): void {
   starters.set(requestId, start);
@@ -28,6 +40,7 @@ export function queueRequest(requestId: string, start: () => void, onQueued?: ()
   pump();
   // Still waiting after the pump? Tell the origin once (the pill shows it).
   if (onQueued && snapshot.entries.some((e) => e.requestId === requestId)) onQueued();
+  notifyListener();
 }
 
 /** A request reached a terminal state (success/fail/cancel/TTL) — free its slot. */
@@ -40,16 +53,19 @@ export function queueSettled(requestId: string): void {
   starters.delete(requestId);
   snapshot = remove(snapshot, requestId);
   pump();
+  notifyListener();
 }
 
 /** Restart recovery: a reconciled record was already downloading pre-restart. */
 export function queueRecoverActive(requestId: string): void {
   snapshot = markActive(snapshot, requestId);
+  notifyListener();
 }
 
 export function setQueuePaused(paused: boolean): void {
   snapshot = setPaused(snapshot, paused);
   pump();
+  notifyListener();
 }
 
 export function getQueueSnapshot(): QueueSnapshot {

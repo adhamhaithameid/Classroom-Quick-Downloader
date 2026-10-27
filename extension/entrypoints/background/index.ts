@@ -26,7 +26,15 @@ import {
   IS_FIREFOX,
 } from './state';
 import { createStoragePersistence, reconcilePersistedJobs } from './job-persistence';
-import { queueSettled, queueRecoverActive, getQueueSnapshot, setQueuePaused } from './queue';
+import {
+  queueSettled,
+  queueRecoverActive,
+  getQueueSnapshot,
+  setQueuePaused,
+  setQueueListener,
+} from './queue';
+import { createIconAnimationController } from './icon-animation';
+import { createUpdateDotController, ensureUpdateCheckAlarm } from './update-dot';
 import { createIconUpdaters, isClassroomUrl, setActionIcon, GRAY_ICON_PATHS } from './icon-manager';
 import { extractDriveFileId } from './auth-utils';
 import { composeSuggestedFilename, getFilenameExt, buildUrlWithAuthUser } from './url-helpers';
@@ -191,16 +199,46 @@ export default defineBackground(() => {
   // Create icon update closures
   const { updateTabIcon, updateGlobalIcon } = createIconUpdaters();
 
+  // Toolbar download animation (bead 08fg.1): spinner while the queue holds
+  // active items, success/error flash on drain, fed by queue mutations,
+  // terminal outcomes, and the global enable toggle.
+  const iconAnimation = createIconAnimationController();
+  setQueueListener((qs) => iconAnimation.setActiveCount(qs.activeIds.length));
+
+  // Update-available dot (bead 08fg.3): every update signal — live
+  // /changelog check (12h-gated), browser-applied updates, and browser-
+  // scheduled updates; dismissal rides the changelog seen map.
+  const updateDot = createUpdateDotController();
+  ensureUpdateCheckAlarm();
+  chrome.alarms.onAlarm.addListener((alarm) => updateDot.onAlarm(alarm.name));
+  chrome.runtime.onInstalled.addListener((details) => {
+    void updateDot.onInstalled({ reason: details.reason, previousVersion: details.previousVersion });
+  });
+  if (chrome.runtime.onUpdateAvailable) {
+    chrome.runtime.onUpdateAvailable.addListener((details) => {
+      void updateDot.onRuntimeUpdateAvailable(details?.version);
+    });
+  }
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.cqd_changelog_seen_v1) {
+      updateDot.onStorageChanged('cqd_changelog_seen_v1');
+    }
+  });
+  void updateDot.checkNow();
+
   // Initial extension state check
   chrome.storage.local.get('extensionEnabled', (res) => {
     const enabled = res.extensionEnabled !== false;
-    updateGlobalIcon(enabled);
+    iconAnimation.setEnabled(enabled); // clears any frame override first
+    updateGlobalIcon(enabled); // then the gray walk repaints from a clean state
   });
 
   // Listen for global toggle changes
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && changes.extensionEnabled) {
-      updateGlobalIcon(changes.extensionEnabled.newValue !== false);
+      const enabled = changes.extensionEnabled.newValue !== false;
+      iconAnimation.setEnabled(enabled);
+      updateGlobalIcon(enabled);
     }
   });
 
@@ -343,6 +381,7 @@ export default defineBackground(() => {
       error_type: 'SIZE_MISMATCH',
     });
     void recordDownloadHistory(pending, 'failed', 'SIZE_MISMATCH');
+    iconAnimation.notifySettled('fail');
     sendStatusToTab(
       pending,
       'error',
@@ -563,6 +602,7 @@ export default defineBackground(() => {
         if (pending.fileMeta?.name) recentDownloads.set(pending.fileMeta.name, Date.now());
         // 0h4d.1.6: one history row per terminal settle.
         void recordDownloadHistory(pending, 'success');
+        iconAnimation.notifySettled('success');
         // 1.9.0 confetti: one lifetime increment per download id (idempotent,
         // restart-safe); milestone detection rides the same transaction.
         void countCompletedDownload(pending.requestId).then((settle) => {
@@ -689,6 +729,7 @@ export default defineBackground(() => {
       const guidance = composeFailureMessage(errorType);
       // 0h4d.1.6: one history row per terminal settle.
       void recordDownloadHistory(pending, 'failed', errorType);
+      iconAnimation.notifySettled('fail');
       sendStatusToTab(pending, 'error', guidance || t('downloadInterrupted'), errorType);
       cleanup(pending, delta.id);
     }
