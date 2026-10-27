@@ -1,5 +1,9 @@
 # CQD Deployment Runbook
 
+> 2026-10-28: deploys run from the `production` branch (production.yml) behind
+> the production-environment approval, not from main pushes. Lane model:
+> docs/RELEASE_PIPELINE.md.
+
 > ⚠️ **UPDATE (2026-09-21)** — the Oracle backend is retired from the live data
 > path; all Oracle VM deployment/SSH steps below are historical and only
 > needed if you deliberately restore that backend (see the "Restoring the
