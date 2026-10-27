@@ -34,6 +34,7 @@ import {
   setQueueListener,
 } from './queue';
 import { createIconAnimationController } from './icon-animation';
+import { createUpdateDotController, ensureUpdateCheckAlarm } from './update-dot';
 import { createIconUpdaters, isClassroomUrl, setActionIcon, GRAY_ICON_PATHS } from './icon-manager';
 import { extractDriveFileId } from './auth-utils';
 import { composeSuggestedFilename, getFilenameExt, buildUrlWithAuthUser } from './url-helpers';
@@ -203,6 +204,18 @@ export default defineBackground(() => {
   // terminal outcomes, and the global enable toggle.
   const iconAnimation = createIconAnimationController();
   setQueueListener((qs) => iconAnimation.setActiveCount(qs.activeIds.length));
+
+  // Update-available dot (bead 08fg.3): live /changelog check, 12h-gated,
+  // alarm-driven; dismissal rides the changelog seen map.
+  const updateDot = createUpdateDotController();
+  ensureUpdateCheckAlarm();
+  chrome.alarms.onAlarm.addListener((alarm) => updateDot.onAlarm(alarm.name));
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.cqd_changelog_seen_v1) {
+      updateDot.onStorageChanged('cqd_changelog_seen_v1');
+    }
+  });
+  void updateDot.checkNow();
 
   // Initial extension state check
   chrome.storage.local.get('extensionEnabled', (res) => {

@@ -19,9 +19,11 @@ import {
   isVersionSeen,
   markAsSeen,
   getLatestChange,
+  resolveUpdatePill,
   type ChangelogData,
   type ChangelogFetchResult
 } from '../utils/changelog';
+import { UPDATE_STATE_KEY, type UpdateState } from '../utils/update-state';
 import { popupMessage } from './i18n';
 import { CHANGELOG_SITE_URL, WEBSITE_BASE_URL } from '../utils/analytics/constants';
 import { isApiConfigured } from '../../src/engines/v3/api/config';
@@ -355,6 +357,47 @@ function App() {
   const [showChangelog, setShowChangelog] = useState(false);
   const [changelogStatus, setChangelogStatus] = useState<'loading' | 'ready' | 'offline' | 'error'>('loading');
   const [changelogStatusMessage, setChangelogStatusMessage] = useState<string | null>(null);
+
+  // UPDATE-AVAILABLE STATE (bead 08fg.3) — the background owns the live
+  // /changelog check; the popup mirrors its storage key for the pill pulse.
+  const [latestVersion, setLatestVersion] = useState<string | null>(null);
+  const [latestSeen, setLatestSeen] = useState(false);
+  useEffect(() => {
+    const browserApi = (globalThis as any).chrome;
+    if (!browserApi?.storage?.local?.get) return;
+    let alive = true;
+    browserApi.storage.local.get(UPDATE_STATE_KEY, (res: any) => {
+      const state = res?.[UPDATE_STATE_KEY] as UpdateState | undefined;
+      if (alive && state && typeof state.latestVersion === 'string') {
+        setLatestVersion(state.latestVersion);
+      }
+    });
+    const listener = (changes: any, area: string) => {
+      if (area !== 'local' || !changes[UPDATE_STATE_KEY]) return;
+      const next = changes[UPDATE_STATE_KEY].newValue as UpdateState | undefined;
+      setLatestVersion(
+        next && typeof next.latestVersion === 'string' ? next.latestVersion : null,
+      );
+    };
+    browserApi.storage.onChanged.addListener(listener);
+    return () => {
+      alive = false;
+      browserApi.storage.onChanged.removeListener(listener);
+    };
+  }, []);
+  useEffect(() => {
+    if (!latestVersion) {
+      setLatestSeen(false);
+      return;
+    }
+    let alive = true;
+    void isVersionSeen(latestVersion, changelogData).then((value) => {
+      if (alive) setLatestSeen(value);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [latestVersion, changelogData]);
 
   // ENGINE MODE STATE — the initial value mirrors the runtime default
   // (mode-controller.ts DEFAULT_MODE 'v2'): fresh installs run v2, so the
@@ -933,6 +976,14 @@ function App() {
       }
     : null;
   const effectiveRule = matchedRule ?? fallbackRule;
+  // A newer, unseen live version pulses the pill (08fg.3); dismissal falls
+  // back to the manual rules.
+  const pillRule = resolveUpdatePill({
+    latestVersion,
+    installedVersion: version ?? '',
+    latestSeen,
+    baseRule: effectiveRule,
+  });
 
   const isLoadingSettings = loadingState || settings == null;
   const isEnabled = settings?.extensionEnabled ?? true;
@@ -982,7 +1033,7 @@ function App() {
                 {version && (
                   <button
                     type="button"
-                    className={`cqd-brand-version ${getRuleClasses(effectiveRule, seen)}`}
+                    className={`cqd-brand-version ${getRuleClasses(pillRule, seen)}`}
                     aria-label={`Version ${version} - View changelog`}
                     title={getLatestChange(changelogData) ? `Latest: ${getLatestChange(changelogData)}` : "View changelog"}
                     onClick={async () => {
@@ -1007,6 +1058,11 @@ function App() {
                        if (version) {
                          await markAsSeen(version, changelogData);
                          setSeen(true);
+                       }
+                       if (latestVersion) {
+                         // Dismiss the update dot + pill for this version.
+                         await markAsSeen(latestVersion, changelogData);
+                         setLatestSeen(true);
                        }
                     }}
                   >

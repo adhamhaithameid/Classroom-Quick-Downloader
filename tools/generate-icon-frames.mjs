@@ -130,7 +130,51 @@ try {
       Buffer.from(await render(size, 'error', 0), 'base64'),
     );
   }
-  console.log(`generated ${(FRAMES + 2) * SIZES.length} frames in extension/src/icon/fx/`);
+
+  // Update-available dot variants (bead 08fg.3): base icon + red dot with a
+  // white rim at the top-right corner. Full size set — the decoration
+  // replaces the default icon everywhere, including chrome://extensions.
+  const dotDir = join(iconDir, 'dot');
+  const dotGrayDir = join(iconDir, 'dot-gray');
+  mkdirSync(dotDir, { recursive: true });
+  mkdirSync(dotGrayDir, { recursive: true });
+  for (const size of [...SIZES, 96, 128]) {
+    const base64Of = (name) => readFileSync(join(iconDir, name)).toString('base64');
+    for (const [dir, baseName] of [
+      [dotDir, `${size}.png`],
+      [dotGrayDir, `${size}-gray.png`],
+    ]) {
+      const b64 = await page.evaluate(
+        async ([size, baseB64]) => {
+          const base = new Image();
+          base.src = `data:image/png;base64,${baseB64}`;
+          await base.decode();
+          const canvas = document.getElementById('c');
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(base, 0, 0, size, size);
+          const cx = size * 0.76;
+          const cy = size * 0.24;
+          const r = size * 0.17;
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.fillStyle = '#ea4335';
+          ctx.fill();
+          ctx.lineWidth = Math.max(1, size * 0.05);
+          ctx.strokeStyle = '#ffffff';
+          ctx.stroke();
+          const dataUrl = canvas.toDataURL('image/png');
+          return dataUrl.slice(dataUrl.indexOf(',') + 1);
+        },
+        [size, base64Of(baseName)],
+      );
+      writeFileSync(join(dir, `${size}.png`), Buffer.from(b64, 'base64'));
+    }
+  }
+  console.log(
+    `generated ${(FRAMES + 2) * SIZES.length} frames + ${SIZES.length + 1} * 2 dot icons`,
+  );
 } finally {
   await browser.close();
 }

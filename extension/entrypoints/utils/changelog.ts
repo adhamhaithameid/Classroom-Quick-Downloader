@@ -1,4 +1,8 @@
 import { EXTENSION_MANUAL_CHANGELOG } from './manual-changelog.generated';
+import { isNewerVersion } from '../../src/update/update-state';
+import { CHANGELOG_SEEN_KEY as SEEN_KEY } from './update-state';
+
+export { CHANGELOG_SEEN_KEY as SEEN_KEY } from './update-state';
 
 export interface ChangelogEntry {
   id: string;
@@ -50,7 +54,6 @@ export interface ChangelogFetchResult {
 }
 
 const STORAGE_KEY = 'cqd_changelog_v1';
-const SEEN_KEY = 'cqd_changelog_seen_v1';
 
 function normalizeVersion(value: string): string {
   return value.trim().replace(/^v/i, '');
@@ -275,6 +278,26 @@ export function getRuleClasses(rule: NotificationRule | null, isSeen: boolean): 
   }
 
   return classes.join(' ');
+}
+
+export interface UpdatePillInput {
+  /** Newest live version from the worker changelog (update-state mirror). */
+  latestVersion: string | null;
+  installedVersion: string;
+  /** True once the user opened the changelog covering the latest version. */
+  latestSeen: boolean;
+  baseRule: NotificationRule | null;
+}
+
+/**
+ * Pill rule for an available update (bead 08fg.3): a major pulse overrides
+ * the manual rules while a newer, unseen version exists. Dismissal (opening
+ * the changelog) falls back to the base rule.
+ */
+export function resolveUpdatePill(input: UpdatePillInput): NotificationRule | null {
+  if (!input.latestVersion || input.latestSeen) return input.baseRule;
+  if (!isNewerVersion(input.latestVersion, input.installedVersion)) return input.baseRule;
+  return { id: 'update-available', target: 'all', priority: 'major', effect: 'pulse' };
 }
 
 // LEGACY_CHANGELOG_DISABLED_START

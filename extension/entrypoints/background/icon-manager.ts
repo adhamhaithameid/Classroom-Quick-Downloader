@@ -40,6 +40,31 @@ export function setIconOverrideImageData(data: Record<number, ImageData> | null)
   if (data) overridePaths = null;
 }
 
+// Update-available dot decoration (update-dot.ts). Sits below the download
+// animation overrides and above the per-tab base icons; the classroom flag
+// picks between the colored and gray dot variants.
+let decorationPaths: {
+  color: Record<number, string>;
+  gray: Record<number, string>;
+} | null = null;
+
+export function setIconDecorationPaths(paths: {
+  color: Record<number, string>;
+  gray: Record<number, string>;
+} | null): void {
+  decorationPaths = paths;
+}
+
+/** Re-applies base icons (+decoration) to every known tab. */
+export function repaintAllTabIcons(): void {
+  if (typeof chrome === 'undefined' || !chrome.tabs?.query) return;
+  chrome.tabs.query({}, (tabs) => {
+    for (const tab of tabs) {
+      if (tab.id !== undefined) updateIconForTab(tab.id, tab.url);
+    }
+  });
+}
+
 /**
  * Check if a URL is a Google Classroom page.
  */
@@ -62,7 +87,15 @@ export function setActionIcon(tabId: number, classroom: boolean): void {
     if (overrideImageData) {
       actionApi.setIcon({ tabId, imageData: overrideImageData });
     } else {
-      const path = overridePaths ?? (classroom ? COLOR_ICON_PATHS : GRAY_ICON_PATHS);
+      const path =
+        overridePaths ??
+        (decorationPaths
+          ? classroom
+            ? decorationPaths.color
+            : decorationPaths.gray
+          : classroom
+            ? COLOR_ICON_PATHS
+            : GRAY_ICON_PATHS);
       actionApi.setIcon({ tabId, path });
     }
   } catch {
