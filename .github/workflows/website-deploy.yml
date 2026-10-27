@@ -1,13 +1,12 @@
 name: Deploy Website (Cloudflare Pages)
 
-# CUTOVER NOTE (production pipeline, docs/RELEASE_PIPELINE.md): the
-# `push: main` trigger is removed in the Phase 4 cutover commit. The Pages
-# branch is pinned to `production` below — after the owner flips the Pages
-# project's production branch (cutover step 6), every deploy from this
-# workflow is a production deployment.
+# CUTOVER COMPLETE (2026-10-28): main pushes no longer deploy. The only
+# paths to production are the production.yml release train (after the
+# production-environment approval) and the gated manual dispatches below.
+# Pages deploys always target the `production` branch (pinned below); after
+# the owner flips the Pages project's production branch, every deploy from
+# this workflow is a production deployment. Lane model: docs/RELEASE_PIPELINE.md.
 on:
-  push:
-    branches: [main]
   workflow_call:
     inputs:
       dry_run:
