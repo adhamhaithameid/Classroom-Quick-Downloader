@@ -508,6 +508,112 @@ jobs:
           go test ./... -count=1
 
   # ──────────────────────────────────────────────
+  # Scoped additions (production-pipeline design, 2026-10-28):
+  # a git-diff changes job gates three suite classes so docs-only PRs stay
+  # fast while every required context still reports (ci-passed treats
+  # `skipped` as non-failure for these jobs).
+  # ──────────────────────────────────────────────
+  changes:
+    name: Detect changed scopes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      integration: ${{ steps.diff.outputs.integration }}
+      core: ${{ steps.diff.outputs.core }}
+      e2e: ${{ steps.diff.outputs.e2e }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - id: diff
+        run: |
+          if [ -n "${{ github.event.pull_request.base.sha }}" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          elif [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            BASE="${{ github.event.before }}"
+          else
+            BASE="HEAD~1"
+          fi
+          git diff --name-only "$BASE" HEAD > /tmp/changed.txt 2>/dev/null || true
+          integration=false; core=false; e2e=false
+          if grep -qE '(^extension/|^cloudflare-worker/|^website/src/.*integration)' /tmp/changed.txt; then integration=true; fi
+          if grep -qE '^extension/src/core/' /tmp/changed.txt; then core=true; fi
+          if grep -qE '(^extension/src/|^extension/entrypoints/|^tests/e2e/|^tests/simulator/|^extension/wxt.config.ts|^extension/package.json)' /tmp/changed.txt; then e2e=true; fi
+          echo "integration=$integration" >> "$GITHUB_OUTPUT"
+          echo "core=$core" >> "$GITHUB_OUTPUT"
+          echo "e2e=$e2e" >> "$GITHUB_OUTPUT"
+
+  integration-tests:
+    name: Integration (extension ↔ worker ↔ website)
+    needs: changes
+    if: needs.changes.outputs.integration == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 12.15.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Extension ↔ Worker Durable Object contract
+        run: pnpm -C extension exec vitest run tests/integration-extension-cloudflare.test.ts
+      - name: Website integration layer
+        run: pnpm -C website run test:integration
+
+  mutation-pr:
+    name: Mutation (src/core, incremental)
+    needs: changes
+    if: needs.changes.outputs.core == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 12.15.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Stryker (incremental)
+        run: pnpm -C extension exec stryker run --incremental
+      - name: Enforce 80% mutation score floor
+        run: node extension/tools/mutation-score-check.mjs 80
+
+  qa-replay:
+    name: Manual-QA replay (chromium + edge)
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 12.15.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium msedge
+      - name: QA replay — chromium
+        run: pnpm exec playwright test --project=qa-chromium
+      - name: QA replay — edge
+        run: pnpm exec playwright test --project=qa-edge
+      - name: Upload QA evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: qa-replay-report
+          path: qa-artifacts/
+
+  # ──────────────────────────────────────────────
   # Summary Gate (for branch protection)
   # ──────────────────────────────────────────────
   ci-passed:
@@ -524,6 +630,10 @@ jobs:
       - gosec
       - oracle-tests
       - oracle-migration-smoke
+      - changes
+      - integration-tests
+      - mutation-pr
+      - qa-replay
     runs-on: ubuntu-latest
     steps:
       - name: Check all jobs
@@ -538,6 +648,10 @@ jobs:
           echo "gosec:                  ${{ needs.gosec.result }}"
           echo "Oracle Tests:           ${{ needs.oracle-tests.result }}"
           echo "Oracle Migration Smoke: ${{ needs.oracle-migration-smoke.result }}"
+          echo "Changed Scopes:         ${{ needs.changes.result }}"
+          echo "Integration:            ${{ needs.integration-tests.result }} (scope-gated)"
+          echo "Mutation (per-PR):      ${{ needs.mutation-pr.result }} (scope-gated)"
+          echo "QA Replay:              ${{ needs.qa-replay.result }} (scope-gated)"
 
           if [[ "${{ needs.attribution-guard.result }}" != "success" ]] ||
              [[ "${{ needs.extension-tests.result }}" != "success" ]] ||
@@ -548,9 +662,19 @@ jobs:
              [[ "${{ needs.cloudflare-smoke.result }}" != "success" ]] ||
              [[ "${{ needs.gosec.result }}" != "success" ]] ||
              [[ "${{ needs.oracle-tests.result }}" != "success" ]] ||
-             [[ "${{ needs.oracle-migration-smoke.result }}" != "success" ]]; then
+             [[ "${{ needs.oracle-migration-smoke.result }}" != "success" ]] ||
+             [[ "${{ needs.changes.result }}" != "success" ]]; then
             echo "::error::One or more CI jobs failed."
             exit 1
           fi
+
+          # Scope-gated jobs: success OR skipped is fine; anything else fails.
+          for job in integration-tests mutation-pr qa-replay; do
+            result="$(echo '${{ toJSON(needs) }}' | jq -r --arg job "$job" '.[$job].result')"
+            if [[ "$result" != "success" && "$result" != "skipped" ]]; then
+              echo "::error::$job finished with '$result'."
+              exit 1
+            fi
+          done
 
           echo "All CI checks passed!"

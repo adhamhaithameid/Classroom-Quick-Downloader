@@ -1,16 +1,36 @@
 name: Deploy Website (Cloudflare Pages)
 
+# CUTOVER NOTE (production pipeline, docs/RELEASE_PIPELINE.md): the
+# `push: main` trigger is removed in the Phase 4 cutover commit. The Pages
+# branch is pinned to `production` below — after the owner flips the Pages
+# project's production branch (cutover step 6), every deploy from this
+# workflow is a production deployment.
 on:
   push:
     branches: [main]
+  workflow_call:
+    inputs:
+      dry_run:
+        type: boolean
+        default: false
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Rehearse without deploying'
+        type: boolean
+        default: false
+      allow_non_production:
+        description: 'Allow dispatch from a non-production ref (emergency only)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
+# Never cancel a live deploy (see deploy-cloudflare-worker.yml).
 concurrency:
   group: website-cloudflare-pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   preflight:
@@ -67,7 +87,8 @@ jobs:
     name: Build and Deploy to Cloudflare Pages
     runs-on: ubuntu-latest
     needs: preflight
-
+    environment: production
+    if: inputs.dry_run != true
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -115,12 +136,12 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_PAGES_PROJECT_NAME: ${{ vars.CLOUDFLARE_PAGES_PROJECT_NAME }}
-          GITHUB_REF_NAME: ${{ github.ref_name }}
+          PAGES_DEPLOY_BRANCH: production
         run: |
           set -euo pipefail
           pnpm -C cloudflare-worker exec wrangler pages deploy ../website/build \
             --project-name="${CLOUDFLARE_PAGES_PROJECT_NAME}" \
-            --branch="${GITHUB_REF_NAME}"
+            --branch="${PAGES_DEPLOY_BRANCH}"
 
       - name: Post-deploy smoke checks
         env:
@@ -269,3 +290,13 @@ jobs:
           GOOGLE_SEARCH_CONSOLE_SITE_URL: ${{ vars.GOOGLE_SEARCH_CONSOLE_SITE_URL }}
           INDEXING_STRICT: "0"
         run: node tools/submit-search-indexing.mjs
+
+  deploy-dry-run:
+    name: Dry run — website deploy skipped
+    runs-on: ubuntu-latest
+    needs: preflight
+    if: inputs.dry_run == true
+    steps:
+      - name: Report intended action
+        run: |
+          echo "::notice::DRY RUN: would build + deploy the website to Cloudflare Pages (branch=production) from ${{ github.sha }}. No effect applied."

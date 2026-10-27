@@ -1,0 +1,357 @@
+name: Production Release Pipeline
+
+# Two-lane model (docs/RELEASE_PIPELINE.md, spec:
+# docs/superpowers/specs/2026-10-28--production-pipeline-design.md).
+#
+#   main       = development lane. Fast CI, scoped pre-push gate, no deploys.
+#   production = release lane. This workflow.
+#
+# Stage 1 (PR + push): full strict tests, full e2e, manual-QA replay,
+#   mutation gate, integration, version preflight, summary.
+# Stage 2 (push + dispatch): one `production` environment approval releases
+#   the train — worker deploy → website deploy → store publication →
+#   post-publish verification. Approval is required from a human and applies
+#   to admins; no path reaches users without it.
+#
+# Rehearsals: `gh workflow run production.yml` (dry_run defaults to true) —
+# gates run, the approval click is exercised, deploy/publish jobs no-op with
+# a notice of what they would have done. Push events are real by definition
+# (dry_run input absent).
+#
+# Gate ledger and incident mapping live in docs/RELEASE_PIPELINE.md.
+
+on:
+  push:
+    branches: [production]
+  pull_request:
+    branches: [production]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Rehearse: no deploy/publish effects (default true)'
+        type: boolean
+        default: true
+      publish_set:
+        description: 'Stores considered for publishing (cws,edge,amo)'
+        required: false
+        default: 'cws,edge,amo'
+
+# The caller permissions flow into called reusable workflows.
+permissions:
+  contents: read
+
+# PR runs cancel on new commits (pure gates, no effects). Push/dispatch runs
+# never cancel: the deploy/publish legs carry their own non-cancelling groups.
+concurrency:
+  group: production-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # ─────────────────────────────────────────────
+  # Stage 1 — strict gates
+  # ─────────────────────────────────────────────
+
+  version-preflight:
+    name: Version preflight (monotonicity + store tokens)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      publish_cws: ${{ steps.preflight.outputs.publish_cws }}
+      publish_edge: ${{ steps.preflight.outputs.publish_edge }}
+      publish_amo: ${{ steps.preflight.outputs.publish_amo }}
+      anything_to_publish: ${{ steps.preflight.outputs.anything_to_publish }}
+    env:
+      CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+      CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+      CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+      EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
+      EDGE_PRODUCT_ID: ${{ secrets.EDGE_PRODUCT_ID }}
+      AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+      AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Probe stores and classify
+        id: preflight
+        env:
+          RELEASE_SET: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_set || 'cws,edge,amo' }}
+        run: |
+          SET="${RELEASE_SET:-cws,edge,amo}"
+          node tools/version-preflight.mjs --json --release-set "$SET" > /tmp/preflight.json
+          for store in cws edge amo; do
+            verdict="$(jq -r --arg s "$store" '.perStore[$s].verdict' /tmp/preflight.json)"
+            publish="false"
+            if [ "$verdict" = "publish-needed" ]; then publish="true"; fi
+            echo "publish_${store}=${publish}" >> "$GITHUB_OUTPUT"
+            echo "  ${store}: ${verdict} -> publish=${publish}"
+          done
+          if jq -e '.publishSet | length > 0' /tmp/preflight.json > /dev/null; then
+            echo "anything_to_publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "anything_to_publish=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::All store versions current — this promote deploys infra only and skips publication."
+          fi
+
+  strict-tests:
+    name: Strict tests (${{ matrix.workspace }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - workspace: extension
+            run: pnpm -C extension run compile && pnpm -C extension run test && pnpm -C extension run test:coverage:all
+          - workspace: website
+            run: pnpm -C website run test:strict
+          - workspace: cloudflare-worker
+            run: pnpm -C cloudflare-worker run test:strict && pnpm -C cloudflare-worker run validate
+          - workspace: oracle-backend
+            run: pnpm -C oracle-backend run test:strict
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 12.15.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: ${{ matrix.run }}
+
+  full-e2e:
+    name: Full E2E (chromium + edge + headed + signed-firefox)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+      AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 12.15.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium msedge
+      - run: pnpm -C extension build
+      - name: E2E — chromium
+        run: pnpm run test:e2e
+      - name: E2E — edge
+        run: pnpm run test:e2e:edge
+      - name: E2E — headed security (xvfb)
+        run: xvfb-run --auto-servernum pnpm run test:e2e:headed-security
+      # Best-effort evidence only (AMO review latency + quota): signs the QA
+      # companion add-on; never blocks the train. Quota gate matches ci.yml
+      # (workflow_dispatch or an [amo-qa] commit marker).
+      - name: Sign extension (AMO) + signed Firefox QA leg
+        continue-on-error: true
+        if: >-
+          env.AMO_JWT_ISSUER != '' &&
+          env.AMO_JWT_SECRET != '' &&
+          (github.event_name == 'workflow_dispatch' ||
+           contains(github.event.head_commit.message, '[amo-qa]'))
+        env:
+          QA_SIGNED_XPI: ${{ github.workspace }}/extension/.output/signed.xpi
+          # CI signs the self-distribution QA companion add-on, never the
+          # store listing (its guid/slug quirks are documented in ci.yml).
+          AMO_ADDON_ID: classroom-quick-downloader-qa@adhamhaitham.dev
+          AMO_ADDON_SLUG: bf0853ae322743548ea0
+          AMO_POLL_TIMEOUT_MS: "1800000"
+        run: |
+          pnpm exec playwright install firefox
+          FIREFOX_GECKO_ID=$AMO_ADDON_ID FIREFOX_VERSION="1.8.0qa$GITHUB_RUN_NUMBER" pnpm -C extension firefox
+          pnpm -C extension sign:extension
+          QA_CONSOLE_VERBOSE=1 pnpm -C extension test:qa:firefox-signed
+
+  qa-replay:
+    name: Manual-QA replay (chromium + edge)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 12.15.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium msedge
+      - name: QA replay — chromium
+        run: pnpm exec playwright test --project=qa-chromium
+      - name: QA replay — edge
+        run: pnpm exec playwright test --project=qa-edge
+      - name: Upload QA evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: production-qa-replay-report
+          path: qa-artifacts/
+
+  integration-gate:
+    name: Integration (extension ↔ worker ↔ website)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 12.15.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -C extension exec vitest run tests/integration-extension-cloudflare.test.ts
+      - run: pnpm -C website run test:integration
+
+  # Full mutation score runs ONCE per release SHA — on the promote PR (the
+  # push re-runs the identical, already-proven tree). Nightly keeps its own
+  # cadence on main.
+  mutation-gate:
+    name: Mutation gate (src/core ≥ 80%)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 12.15.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -C extension run test:mutation
+      - run: node extension/tools/mutation-score-check.mjs 80
+
+  release-summary:
+    name: Release ✅
+    if: always()
+    needs:
+      - version-preflight
+      - strict-tests
+      - full-e2e
+      - qa-replay
+      - integration-gate
+      - mutation-gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check all gates
+        run: |
+          echo "Version Preflight: ${{ needs.version-preflight.result }}"
+          echo "Strict Tests:      ${{ needs.strict-tests.result }}"
+          echo "Full E2E:          ${{ needs.full-e2e.result }}"
+          echo "QA Replay:         ${{ needs.qa-replay.result }}"
+          echo "Integration:       ${{ needs.integration-gate.result }}"
+          echo "Mutation Gate:     ${{ needs.mutation-gate.result }} (PR events only)"
+
+          if [[ "${{ needs.version-preflight.result }}" != "success" ]] ||
+             [[ "${{ needs.strict-tests.result }}" != "success" ]] ||
+             [[ "${{ needs.full-e2e.result }}" != "success" ]] ||
+             [[ "${{ needs.qa-replay.result }}" != "success" ]] ||
+             [[ "${{ needs.integration-gate.result }}" != "success" ]]; then
+            echo "::error::One or more release gates failed."
+            exit 1
+          fi
+          mutation="${{ needs.mutation-gate.result }}"
+          if [[ "$mutation" != "success" && "$mutation" != "skipped" ]]; then
+            echo "::error::Mutation gate finished with '$mutation'."
+            exit 1
+          fi
+          echo "All release gates passed."
+
+  # ─────────────────────────────────────────────
+  # Stage 2 — approval-gated release train (push + dispatch; never PRs)
+  # ─────────────────────────────────────────────
+
+  release-approval:
+    name: Release approval (production environment)
+    if: github.event_name != 'pull_request'
+    needs: release-summary
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 60
+    steps:
+      - name: Human gate
+        run: |
+          echo "Approved by a required reviewer of the production environment."
+          echo "Dry run: ${{ inputs.dry_run == true }}"
+          echo "Publish set verdicts: cws=${{ needs.version-preflight.outputs.publish_cws }} edge=${{ needs.version-preflight.outputs.publish_edge }} amo=${{ needs.version-preflight.outputs.publish_amo }}"
+
+  deploy-worker:
+    name: Deploy worker
+    if: github.event_name != 'pull_request'
+    needs: [release-approval, version-preflight]
+    uses: ./.github/workflows/deploy-cloudflare-worker.yml
+    with:
+      dry_run: ${{ inputs.dry_run || false }}
+    secrets: inherit
+
+  deploy-website:
+    name: Deploy website
+    if: github.event_name != 'pull_request'
+    needs: [deploy-worker, version-preflight]
+    uses: ./.github/workflows/website-deploy.yml
+    with:
+      dry_run: ${{ inputs.dry_run || false }}
+    secrets: inherit
+
+  publish-stores:
+    name: Publish stores
+    if: github.event_name != 'pull_request'
+    needs: [deploy-website, version-preflight]
+    uses: ./.github/workflows/extension-stores.yml
+    with:
+      ref: production
+      skip_gate: true
+      dry_run: ${{ inputs.dry_run || false }}
+      publish_cws: ${{ needs.version-preflight.outputs.publish_cws == 'true' }}
+      publish_edge: ${{ needs.version-preflight.outputs.publish_edge == 'true' }}
+      publish_amo: ${{ needs.version-preflight.outputs.publish_amo == 'true' }}
+    secrets: inherit
+
+  post-publish-verify:
+    name: Post-publish verification
+    if: github.event_name != 'pull_request'
+    needs: [deploy-website, publish-stores]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PUBLIC_WORKER_BASE_URL: ${{ vars.PUBLIC_WORKER_BASE_URL }}
+      PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Worker + site production verification
+        run: SKIP_ORACLE_CHECK=1 node tools/verify-production.mjs
+      - name: Store listing spot check (best-effort; review queues lag listing)
+        continue-on-error: true
+        run: |
+          for url in \
+            "https://addons.mozilla.org/firefox/addon/classroom-quick-downloader/" \
+            "https://chromewebstore.google.com/detail/oemoongiefmpmomjikcjmkkkhffcbdid"; do
+            code="$(curl -s -o /dev/null -w '%{http_code}' -L --max-time 30 "$url" || echo 000)"
+            echo "listing ${code} ${url}"
+            if [ "$code" != "200" ]; then
+              echo "::warning::Listing not 200 yet (review queue may still be processing): ${url}"
+            fi
+          done
+      - name: Release summary links
+        run: |
+          echo "## Release train complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Worker: ${{ vars.PUBLIC_WORKER_BASE_URL }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Website: ${{ vars.PUBLIC_SITE_URL }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- AMO: https://addons.mozilla.org/firefox/addon/classroom-quick-downloader/" >> "$GITHUB_STEP_SUMMARY"
+          echo "- CWS: https://chromewebstore.google.com/detail/oemoongiefmpmomjikcjmkkkhffcbdid" >> "$GITHUB_STEP_SUMMARY"

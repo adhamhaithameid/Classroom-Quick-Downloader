@@ -1,5 +1,10 @@
 # Three-Store Publish Runbook
 
+> 2026-10-28: publishing is now exclusive to the production pipeline
+> (production.yml -> extension-stores.yml) behind the production-environment
+> approval. This document stays the reference for store mechanics and error
+> classes. Lane model: docs/RELEASE_PIPELINE.md.
+
 Current-state runbook for publishing the extension to Chrome Web Store,
 Firefox Add-ons (AMO), and Microsoft Partner Center. The 2026-10-03 sessions
 retro found store-publish friction in 29 of 44 interactive sessions (67 tool
