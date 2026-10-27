@@ -64,6 +64,17 @@ test.describe("corpus building from real fixture HTML", () => {
     const texts = textLinesFromHtml(raw);
     expect(texts).toEqual(["3 class comments"]);
   });
+
+  test("stripping tolerates end-tag whitespace and unterminated tags", () => {
+    // "</script >" (whitespace before '>') is valid HTML; a stripper that
+    // misses it leaks script bodies into the corpus (CodeQL js/bad-tag-filter).
+    expect(textLinesFromHtml(`<p>visible</p><script>var leak = 1;</script >`)).toEqual(["visible"]);
+    expect(textLinesFromHtml(`<p>visible</p><SCRIPT>var leak = 1;</SCRIPT\n>`)).toEqual(["visible"]);
+    expect(textLinesFromHtml(`<p>visible</p><style>.leak{}</style >`)).toEqual(["visible"]);
+    // An unterminated <script>/<style> swallows the rest, like a browser.
+    expect(textLinesFromHtml(`<p>visible</p><script>var leak = 1;`)).toEqual(["visible"]);
+    expect(textLinesFromHtml(`<p>visible</p><style>.leak{`)).toEqual(["visible"]);
+  });
 });
 
 test.describe("keyword audit against real strings", () => {
