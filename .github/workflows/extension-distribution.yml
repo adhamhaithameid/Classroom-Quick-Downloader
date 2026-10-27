@@ -139,7 +139,7 @@ jobs:
           body: |
             ## Distribution Checklist
 
-            - [x] Firefox — auto-published to AMO ✅
+            - [ ] Firefox — publish via the production pipeline (extension-stores.yml, ref=production); AMO publishing no longer happens on tag push
             - [ ] Chrome — [upload here](https://chrome.google.com/webstore/devconsole) → upload `cqd-chrome-*.zip`
             - [ ] Edge — [upload here](https://partner.microsoft.com/en-us/dashboard/microsoftedge/overview) → upload `cqd-edge-*.zip`
 

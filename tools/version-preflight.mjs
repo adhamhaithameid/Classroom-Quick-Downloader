@@ -132,6 +132,24 @@ export async function probeEdge({ apiKey, productId, fetchImpl = fetch }) {
   return live ? { ok: true, live } : { ok: false, error: 'product response had no versions' };
 }
 
+/**
+ * Probe exactly the release-set stores that have credentials. A probe that
+ * throws is classified `unknown` (ok:false) — a network blip on one store
+ * must never crash the CLI or leak into an unrelated release set.
+ */
+export async function runProbes({ releaseSet, credentials, impls }) {
+  const probes = {};
+  for (const store of ALL_STORES) {
+    if (!releaseSet.includes(store) || !credentials[store]) continue;
+    try {
+      probes[store] = await impls[store](credentials[store]);
+    } catch (err) {
+      probes[store] = { ok: false, error: err?.message ?? 'probe threw' };
+    }
+  }
+  return probes;
+}
+
 function semverCmpDesc(a, b) {
   const pa = String(a).split('.').map((n) => parseInt(n, 10) || 0);
   const pb = String(b).split('.').map((n) => parseInt(n, 10) || 0);
@@ -181,10 +199,11 @@ async function main() {
   const extensionVersion = args.extensionVersion ?? JSON.parse(readFileSync(resolve('extension/package.json'), 'utf8')).version;
   const credentials = collectCredentials();
 
-  const probes = {};
-  if (credentials.cws) probes.cws = await probeCws(credentials.cws);
-  if (credentials.edge) probes.edge = await probeEdge(credentials.edge);
-  if (credentials.amo) probes.amo = await probeAmo(credentials.amo);
+  const probes = await runProbes({
+    releaseSet: args.releaseSet,
+    credentials,
+    impls: { cws: probeCws, edge: probeEdge, amo: probeAmo },
+  });
 
   const verdict = classify({ extensionVersion, releaseSet: args.releaseSet, credentials, probes, allowUnknown: args.allowUnknown });
 

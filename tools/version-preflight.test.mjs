@@ -4,7 +4,7 @@
 // Network probes are injectable (fetchImpl) and NOT exercised here.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { semverGt, buildAmoJwt, classify, parseArgs } from './version-preflight.mjs';
+import { semverGt, buildAmoJwt, classify, parseArgs, runProbes } from './version-preflight.mjs';
 
 test('semverGt: numeric segment compare, not string compare', () => {
   assert.equal(semverGt('1.9.3', '1.9.2'), true);
@@ -93,4 +93,29 @@ test('parseArgs: defaults are all stores, no allowlist', () => {
   assert.deepEqual(a.releaseSet, ['cws', 'edge', 'amo']);
   assert.deepEqual(a.allowUnknown, []);
   assert.equal(a.extensionVersion, null);
+});
+
+test('runProbes: probes only release-set stores with credentials', async () => {
+  const probed = [];
+  const impls = {
+    cws: async () => { probed.push('cws'); return { ok: true, live: '1.0.0' }; },
+    edge: async () => { probed.push('edge'); return { ok: true, live: '1.0.0' }; },
+    amo: async () => { probed.push('amo'); return { ok: true, live: '1.0.0' }; },
+  };
+  const probes = await runProbes({ releaseSet: ['amo'], credentials: { amo: {}, cws: {} }, impls });
+  assert.deepEqual(probed, ['amo']);
+  assert.equal(probes.amo.ok, true);
+  assert.equal(probes.cws, undefined);
+});
+
+test('runProbes: a throwing probe becomes ok:false, never a fatal error', async () => {
+  const impls = {
+    cws: async () => { throw new Error('socket hang up'); },
+    edge: async () => ({ ok: true, live: '1.0.0' }),
+    amo: async () => ({ ok: true, live: '1.0.0' }),
+  };
+  const probes = await runProbes({ releaseSet: ['cws', 'edge', 'amo'], credentials: { cws: {}, edge: {}, amo: {} }, impls });
+  assert.equal(probes.cws.ok, false);
+  assert.match(probes.cws.error, /socket hang up/);
+  assert.equal(probes.edge.ok, true);
 });

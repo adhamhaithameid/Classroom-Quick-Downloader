@@ -75,8 +75,10 @@ jobs:
           node-version: 24
       - name: Probe stores and classify
         id: preflight
+        env:
+          RELEASE_SET: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_set || 'cws,edge,amo' }}
         run: |
-          SET="${{ github.event_name == 'workflow_dispatch' && inputs.publish_set || 'cws,edge,amo' }}"
+          SET="${RELEASE_SET:-cws,edge,amo}"
           node tools/version-preflight.mjs --json --release-set "$SET" > /tmp/preflight.json
           for store in cws edge amo; do
             verdict="$(jq -r --arg s "$store" '.perStore[$s].verdict' /tmp/preflight.json)"

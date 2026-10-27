@@ -52,6 +52,10 @@ on:
         description: 'Skip the mega-e2e gate (only when production.yml already ran the full matrix)'
         type: boolean
         default: false
+      dry_run:
+        description: 'Rehearse: build + gate only, no store submission'
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       ref:
@@ -70,6 +74,9 @@ on:
         type: boolean
         default: true
       skip_gate:
+        type: boolean
+        default: false
+      dry_run:
         type: boolean
         default: false
 
@@ -218,7 +225,7 @@ jobs:
     name: Publish to AMO (listed)
     environment: production
     needs: [mega-e2e-gate, build-firefox]
-    if: always() && needs.build-firefox.result == 'success' && (needs.mega-e2e-gate.result == 'success' || needs.mega-e2e-gate.result == 'skipped') && inputs.publish_amo == true
+    if: always() && needs.build-firefox.result == 'success' && (needs.mega-e2e-gate.result == 'success' || needs.mega-e2e-gate.result == 'skipped') && inputs.publish_amo == true && inputs.dry_run != true
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -253,7 +260,7 @@ jobs:
     name: Publish to Edge Add-ons
     environment: production
     needs: [mega-e2e-gate, build-edge]
-    if: always() && needs.build-edge.result == 'success' && (needs.mega-e2e-gate.result == 'success' || needs.mega-e2e-gate.result == 'skipped') && inputs.publish_edge == true
+    if: always() && needs.build-edge.result == 'success' && (needs.mega-e2e-gate.result == 'success' || needs.mega-e2e-gate.result == 'skipped') && inputs.publish_edge == true && inputs.dry_run != true
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -285,7 +292,7 @@ jobs:
     name: Publish to Chrome Web Store
     environment: production
     needs: [mega-e2e-gate, build-chrome]
-    if: always() && needs.build-chrome.result == 'success' && (needs.mega-e2e-gate.result == 'success' || needs.mega-e2e-gate.result == 'skipped') && inputs.publish_cws == true
+    if: always() && needs.build-chrome.result == 'success' && (needs.mega-e2e-gate.result == 'success' || needs.mega-e2e-gate.result == 'skipped') && inputs.publish_cws == true && inputs.dry_run != true
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -342,3 +349,14 @@ jobs:
       - name: CWS publish skipped (secrets not set yet)
         if: env.CWS_REFRESH_TOKEN_S == ''
         run: echo "::notice::CWS secrets not configured — add CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN to enable automated Chrome publishing."
+
+  publish-dry-run:
+    name: Dry run — store submission skipped
+    needs: [dispatch-preflight, build-chrome, build-edge, build-firefox]
+    if: always() && inputs.dry_run == true && needs.dispatch-preflight.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Report intended submissions
+        run: |
+          echo "::notice::DRY RUN: would submit stores (cws=${{ inputs.publish_cws }}, edge=${{ inputs.publish_edge }}, amo=${{ inputs.publish_amo }}) from ref ${{ inputs.ref || github.event.inputs.ref }}. No store was contacted."

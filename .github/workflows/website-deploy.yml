@@ -87,6 +87,18 @@ jobs:
     name: Build and Deploy to Cloudflare Pages
     runs-on: ubuntu-latest
     needs: preflight
+    environment: production
+    if: inputs.dry_run != true
+
+  deploy-dry-run:
+    name: Dry run — website deploy skipped
+    runs-on: ubuntu-latest
+    needs: preflight
+    if: inputs.dry_run == true
+    steps:
+      - name: Report intended action
+        run: |
+          echo "::notice::DRY RUN: would build + deploy the website to Cloudflare Pages (branch=production) from ${{ github.sha }}. No effect applied."
 
     steps:
       - name: Checkout
