@@ -111,6 +111,21 @@ export default defineContentScript({
       const { wireDownloadPath } = await import('../src/v2/render/download-controller');
       wireDownloadPath(orchestrator.getBus());
 
+      // 3e. Shadow engine router (beads hhpa.1/hhpa.2): records download
+      //     outcomes per engine mode × page view into local stats and logs
+      //     advisory routing decisions. HARD GATE: it never changes the
+      //     engine mode — activation is the opt-in 'auto' mode (hhpa.3),
+      //     and the factory default stays 'v2' pending owner review.
+      void import('../src/engines/router/router-shadow').then(({ createShadowRouter }) => {
+        void import('../entrypoints/utils/analytics').then(({ Analytics }) => {
+          createShadowRouter({
+            bus: orchestrator.getBus(),
+            getMode: () => engineRegistry.getMode(),
+            track: (event) => Analytics.track({ ...event, bypass_used: false }),
+          });
+        });
+      });
+
       // 3d. Download All group machine (z57 S3): the Download All run state
       //     machine driving staggered per-file requests through the same bus
       //     path, with cancel over the existing CQD_CANCEL_DOWNLOAD message.
