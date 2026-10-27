@@ -151,6 +151,8 @@ export async function loadFlowHarness(options: FlowHarnessOptions = {}) {
     // Faithful to the real classifier (icon-manager.ts CLASSROOM_URL_PATTERN).
     isClassroomUrl: (url?: string | null) => !!url && /classroom\.google\.com/.test(url),
     setActionIcon: vi.fn(),
+    setIconOverridePaths: vi.fn(),
+    setIconOverrideImageData: vi.fn(),
     GRAY_ICON_PATHS: {},
   }));
   vi.doMock('../../entrypoints/background/auth-utils', () => ({

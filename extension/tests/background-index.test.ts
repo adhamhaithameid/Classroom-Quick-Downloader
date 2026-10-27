@@ -88,6 +88,8 @@ describe('background/index', () => {
       createIconUpdaters: () => ({ updateTabIcon, updateGlobalIcon }),
       isClassroomUrl: () => true,
       setActionIcon: vi.fn(),
+      setIconOverridePaths: vi.fn(),
+      setIconOverrideImageData: vi.fn(),
       GRAY_ICON_PATHS: {},
     }));
     vi.doMock('../entrypoints/background/auth-utils', () => ({
@@ -188,6 +190,8 @@ describe('background/index', () => {
       createIconUpdaters: () => ({ updateTabIcon: vi.fn(), updateGlobalIcon: vi.fn() }),
       isClassroomUrl: () => true,
       setActionIcon: vi.fn(),
+      setIconOverridePaths: vi.fn(),
+      setIconOverrideImageData: vi.fn(),
       GRAY_ICON_PATHS: {},
     }));
     vi.doMock('../entrypoints/background/auth-utils', () => ({
@@ -261,6 +265,8 @@ describe('background/index', () => {
       createIconUpdaters: () => ({ updateTabIcon: vi.fn(), updateGlobalIcon: vi.fn() }),
       isClassroomUrl: () => true,
       setActionIcon: vi.fn(),
+      setIconOverridePaths: vi.fn(),
+      setIconOverrideImageData: vi.fn(),
       GRAY_ICON_PATHS: {},
     }));
     vi.doMock('../entrypoints/background/auth-utils', () => ({
@@ -326,6 +332,8 @@ describe('background/index', () => {
       createIconUpdaters: () => ({ updateTabIcon: vi.fn(), updateGlobalIcon: vi.fn() }),
       isClassroomUrl: () => true,
       setActionIcon: vi.fn(),
+      setIconOverridePaths: vi.fn(),
+      setIconOverrideImageData: vi.fn(),
       GRAY_ICON_PATHS: {},
     }));
     vi.doMock('../entrypoints/background/auth-utils', () => ({
@@ -488,6 +496,8 @@ describe('background/index', () => {
       createIconUpdaters: () => ({ updateTabIcon: vi.fn(), updateGlobalIcon: vi.fn() }),
       isClassroomUrl: () => false,
       setActionIcon: vi.fn(),
+      setIconOverridePaths: vi.fn(),
+      setIconOverrideImageData: vi.fn(),
       GRAY_ICON_PATHS: {},
     }));
     vi.doMock('../entrypoints/background/auth-utils', () => ({ extractDriveFileId }));
