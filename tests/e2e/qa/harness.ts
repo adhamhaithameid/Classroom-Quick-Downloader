@@ -222,11 +222,16 @@ export async function launchQaContext(
         console.log(`[qa-console:${label}] ${message.type?.() ?? "log"}: ${text.slice(0, 400)}`);
       }
     };
-    context.on("page", (page) => {
-      console.log(`[qa-console] page opened: ${page.url().slice(0, 80)}`);
+    const attachPage = (page: Page) => {
+      console.log(`[qa-console] page tapped: ${page.url().slice(0, 80)}`);
       page.on("console", tap("page"));
       page.on("pageerror", (e) => console.log(`[qa-console:page] pageerror: ${String(e).slice(0, 300)}`));
-    });
+    };
+    // launchPersistentContext hands us an initial page that predates this
+    // listener — context.on("page") never fires for it, and the journeys
+    // reuse it. Tap existing pages too.
+    for (const page of context.pages()) attachPage(page);
+    context.on("page", attachPage);
     context.on("backgroundpage", (page) => {
       console.log("[qa-console] background page attached");
       page.on("console", tap("bg"));
