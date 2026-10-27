@@ -208,6 +208,35 @@ export async function launchQaContext(
   // AMO-signed xpi, which Firefox accepts — the skip downgrade does not
   // apply. A missing background page then fails hard downstream
   // (getExtensionBase), which is the correct signal for a signed build.
+  // w5r6 diagnosis tap: stream extension-relevant console output to stdout so
+  // CI logs carry the extension's own view (background bootstrap, engine
+  // scans, injection decisions) even when journeys fail. Off by default.
+  const verbose = process.env.QA_CONSOLE_VERBOSE === "1";
+  if (verbose) {
+    const tap = (label: string) => (message: {
+      type?: () => string;
+      text: () => string;
+    }) => {
+      const text = message.text();
+      if (message.type?.() === "error" || message.type?.() === "warning" || /[Cc]QD|Uncaught|ReferenceError|TypeError/.test(text)) {
+        console.log(`[qa-console:${label}] ${message.type?.() ?? "log"}: ${text.slice(0, 400)}`);
+      }
+    };
+    context.on("page", (page) => {
+      console.log(`[qa-console] page opened: ${page.url().slice(0, 80)}`);
+      page.on("console", tap("page"));
+      page.on("pageerror", (e) => console.log(`[qa-console:page] pageerror: ${String(e).slice(0, 300)}`));
+    });
+    context.on("backgroundpage", (page) => {
+      console.log("[qa-console] background page attached");
+      page.on("console", tap("bg"));
+      page.on("pageerror", (e) => console.log(`[qa-console:bg] pageerror: ${String(e).slice(0, 300)}`));
+    });
+    context.on("serviceworker", (worker) => {
+      console.log(`[qa-console] service worker started: ${worker.url().slice(0, 80)}`);
+    });
+  }
+
   let extensionAvailable = true;
   const signedXpiMode = Boolean(process.env.QA_SIGNED_XPI);
   if (browser === "firefox" && !signedXpiMode && opts.skipIfExtensionUnavailable !== false) {
@@ -223,6 +252,11 @@ export async function launchQaContext(
       EXTENSION_UNAVAILABLE_REASON =
         "ENVIRONMENT: Playwright's bundled Firefox deletes the unsigned sideloaded xpi at startup (signing pref ignored) — no extension background page; see RUNBOOK firefox section";
     }
+  }
+  if (verbose) {
+    console.log(
+      `[qa-console] launch verdict: browser=${browser} signedXpi=${signedXpiMode} extensionAvailable=${extensionAvailable}`,
+    );
   }
 
   return {
