@@ -238,7 +238,9 @@ jobs:
           # version = the create flow always completes fresh.
           FIREFOX_GECKO_ID=$AMO_ADDON_ID FIREFOX_VERSION="1.8.0qa$GITHUB_RUN_NUMBER" pnpm -C extension firefox
           pnpm -C extension sign:extension
-          pnpm -C extension test:qa:firefox-signed
+          # w5r6: stream the extension's console into the run log so the
+          # Firefox injection failure is diagnosable from CI artifacts.
+          QA_CONSOLE_VERBOSE=1 pnpm -C extension test:qa:firefox-signed
 
       - name: Signed Firefox QA leg skipped (no AMO credentials)
         if: ${{ env.AMO_JWT_ISSUER == '' || env.AMO_JWT_SECRET == '' }}
