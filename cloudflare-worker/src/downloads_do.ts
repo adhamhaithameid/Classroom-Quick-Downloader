@@ -25,7 +25,12 @@ import type { D1Database, DurableObjectState } from "@cloudflare/workers-types";
 // workers-types WebSocket (the lib "WebWorker" global with the same name
 // shadows it inside this file).
 import type { WebSocket as DOWebSocket } from "@cloudflare/workers-types";
-import { archiveBatch, pruneArchive, readArchiveStats } from "./event-archive";
+import {
+  archiveBatch,
+  PAYLOAD_TOO_LARGE_ERROR,
+  pruneArchive,
+  readArchiveStats,
+} from "./event-archive";
 import { generateSecureRandomString, secureRandom } from "./downloads_do/helpers";
 import { timingSafeStringEqual } from "./timing";
 
@@ -6198,6 +6203,18 @@ export class DownloadsDurable {
   ): boolean {
     const head = this.d.pendingBatches[0];
     if (!head || head.attempts < MAX_BATCH_ATTEMPTS) return false;
+    return this.deadLetterHeadBatch(lastStatus, lastError);
+  }
+
+  /** Unconditional head-batch dead-letter — for errors that classify as
+   * guaranteed-to-fail-on-every-retry (payload size), where burning the
+   * attempts ladder adds nothing. */
+  private deadLetterHeadBatch(
+    lastStatus: number | null,
+    lastError: string,
+  ): boolean {
+    const head = this.d.pendingBatches[0];
+    if (!head) return false;
 
     this.d.pendingBatches.shift();
     this.d.pendingEvents = Math.max(0, this.d.pendingEvents - (head.weightedCount || 0));
@@ -7050,7 +7067,13 @@ export class DownloadsDurable {
         this.d.retryState.consecutiveFailures += 1;
         logEvent("warn", "archive_flush_failed", { error: msg });
         this.recordFailure("archive_forward", "write_error", msg, 1, now);
-        this.deadLetterHeadBatchIfExhausted(null, msg);
+        // 0k86: a size-classified failure fails EVERY retry identically —
+        // dead-letter the queued batch now instead of exhausting the ladder.
+        if (msg === PAYLOAD_TOO_LARGE_ERROR && pendingMeta) {
+          this.deadLetterHeadBatch(null, msg);
+        } else {
+          this.deadLetterHeadBatchIfExhausted(null, msg);
+        }
         stashFailedBatch();
         await this.scheduleRetry();
         await this.persist();
