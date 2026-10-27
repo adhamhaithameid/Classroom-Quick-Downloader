@@ -387,6 +387,7 @@ async function main() {
   if (!xpiRes.ok) fail((await apiError('download', xpiRes.status, await xpiRes.text())).message);
   const bytes = Buffer.from(await xpiRes.arrayBuffer());
   if (bytes.length === 0) fail('downloaded signed xpi is empty — refusing to write it.');
+  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   fs.writeFileSync(SIGNED_XPI_PATH, bytes);
 
   const metadata = {
