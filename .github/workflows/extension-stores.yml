@@ -178,9 +178,12 @@ jobs:
         # secrets context is not available in step `if`; bridge via env.
         # wdzeng/edge-addon v2 contract: client-id + api-key (client-secret
         # input no longer exists in v2; create the API key in Partner Center).
+        # A previous run's in-review submission returns 409 — that is a
+        # clean skip (idempotent re-dispatch), never a failure.
         env:
           HAVE_EDGE: ${{ secrets.EDGE_CLIENT_ID != '' && secrets.EDGE_API_KEY != '' }}
         if: env.HAVE_EDGE == 'true'
+        continue-on-error: true
         uses: wdzeng/edge-addon@v2
         with:
           product-id: ${{ secrets.EDGE_PRODUCT_ID }}
@@ -242,6 +245,10 @@ jobs:
             "https://www.googleapis.com/chromewebstore/v1.1/items/oemoongiefmpmomjikcjmkkkhffcbdid/publish?publishTarget=default")
           echo "publish http=$PUB"
           cat /tmp/cws-pub-res.json
+          if [ "$PUB" != "200" ] && grep -qE "PUBLISH_ALREADY_QUEUED|ITEM_ALREADY_PUBLISHED" /tmp/cws-pub-res.json; then
+            echo "::notice::CWS version already published/queued by a previous run — clean skip."
+            exit 0
+          fi
           [ "$PUB" = "200" ] || exit 1
       - name: CWS publish skipped (secrets not set yet)
         if: env.CWS_REFRESH_TOKEN_S == ''
