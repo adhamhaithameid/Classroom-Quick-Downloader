@@ -104,3 +104,24 @@ never to an error surface or worse detection:
 - `engine-v3`'s `4.2.1-stub` version string understates reality: the
   corroboration pipeline is real end-to-end; only its effect on rendered
   flags is pending.
+
+## Auto mode + shadow router (beads hhpa.1–.3, 2026-10-28)
+
+The popup engine selector offers **Auto**. Auto is a per-device opt-in
+stored as `cqdV2Mode='auto'`; the mode controller resolves it to a concrete
+mode from local outcome stats before the registry sees it. With no data,
+Auto resolves to the factory default `v2`. `v2` remains the shipped
+default for everyone; default-on Auto awaits owner review of shadow data.
+
+Plumbing (all under `extension/src/engines/router/`):
+
+- `router-stats.ts` — rolling per-mode × page-view outcome store
+  (`cqd_engine_router_stats_v1` in chrome.storage.local; ring cap 50 per
+  mode, total cap 400; cancelled settles excluded; burst-safe op chain).
+- `router-policy.ts` — pure scoring: success rate + sample confidence −
+  failure-streak penalty + stickiness bonus, a 10-minute switch cooldown,
+  and hysteresis (a healthy current mode is never demoted on a marginal
+  score). v3 is a candidate only when `isApiConfigured()`.
+- `router-shadow.ts` — page-bus wiring. HARD GATE: it logs decisions and
+  never calls `setMode`; decision records ride `/track` on signature
+  changes only (`file_type: engine_router_decision`).

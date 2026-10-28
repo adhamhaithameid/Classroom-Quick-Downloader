@@ -97,7 +97,7 @@ describe('EngineModeRow renders through chrome.i18n', () => {
     container.remove();
   });
 
-  function renderRow(props: { mode?: string; loading?: boolean; apiConfigured?: boolean; onSelect?: (mode: 'legacy' | 'v2' | 'v3') => void } = {}) {
+  function renderRow(props: { mode?: string; loading?: boolean; apiConfigured?: boolean; onSelect?: (mode: 'legacy' | 'v2' | 'v3' | 'auto') => void } = {}) {
     const onSelect = props.onSelect ?? vi.fn();
     flushSync(() => {
       root.render(
@@ -119,7 +119,7 @@ describe('EngineModeRow renders through chrome.i18n', () => {
     renderRow();
     const buttons = [...container.querySelectorAll<HTMLButtonElement>('.cqd-engine-mode-option')];
     // The API label has no catalog entry in this stub — the en fallback shows.
-    expect(buttons.map((b) => b.textContent)).toEqual(['Klassisch', 'Neu', 'API (beta)']);
+    expect(buttons.map((b) => b.textContent)).toEqual(['Klassisch', 'Neu', 'API (beta)', 'Auto']);
   });
 
   it('marks the group with the translated aria-label', () => {
@@ -133,7 +133,7 @@ describe('EngineModeRow renders through chrome.i18n', () => {
     stubGetMessage(() => '');
     renderRow();
     const buttons = [...container.querySelectorAll<HTMLButtonElement>('.cqd-engine-mode-option')];
-    expect(buttons.map((b) => b.textContent)).toEqual(['Legacy', 'New', 'API (beta)']);
+    expect(buttons.map((b) => b.textContent)).toEqual(['Legacy', 'New', 'API (beta)', 'Auto']);
     expect(container.querySelector('.cqd-engine-mode')?.getAttribute('aria-label')).toBe('Engine Mode');
   });
 
@@ -141,6 +141,6 @@ describe('EngineModeRow renders through chrome.i18n', () => {
     stubGetMessage((name) => (name === 'popup_engine_mode_api' ? 'API (Beta)' : ''));
     renderRow();
     const buttons = [...container.querySelectorAll<HTMLButtonElement>('.cqd-engine-mode-option')];
-    expect(buttons.map((b) => b.textContent)).toEqual(['Legacy', 'New', 'API (Beta)']);
+    expect(buttons.map((b) => b.textContent)).toEqual(['Legacy', 'New', 'API (Beta)', 'Auto']);
   });
 });

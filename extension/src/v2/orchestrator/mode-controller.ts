@@ -39,6 +39,16 @@
 
 import type { EngineMode } from '../../engines/types';
 import { engineRegistry } from '../../engines/engine-registry';
+import { isApiConfigured } from '../../engines/v3/api/config';
+import { decideRoute, type CandidateInput } from '../../engines/router/router-policy';
+import { ROUTER_STATS_STORAGE_KEY, type RouterStatsState } from '../../engines/router/router-stats';
+
+/**
+ * A stored mode may be 'auto' (bead hhpa.3): the router resolves it to a
+ * concrete EngineMode from the local outcome stats before the registry
+ * sees it. The registry API stays concrete-only by design.
+ */
+export type StoredEngineMode = EngineMode | 'auto';
 
 // ============================================================================
 // CONSTANTS
@@ -112,6 +122,10 @@ export async function readMode(): Promise<EngineMode> {
     const result = await chrome.storage.local.get(STORAGE_KEY);
     const stored = result[STORAGE_KEY];
 
+    if (stored === 'auto') {
+      return resolveAutoMode();
+    }
+
     if (isValidMode(stored)) {
       return stored;
     }
@@ -119,6 +133,64 @@ export async function readMode(): Promise<EngineMode> {
     return DEFAULT_MODE;
   } catch (e) {
     console.warn(`[CQD Mode] Failed to read mode from storage:`, e);
+    return DEFAULT_MODE;
+  }
+}
+
+/**
+ * Resolve the stored 'auto' mode (bead hhpa.3) into a concrete EngineMode
+ * from the router's local outcome stats. Availability: legacy and v2 are
+ * always candidates; v3 only when the API is configured. Any failure —
+ * storage, junk state, policy surprise — falls back to DEFAULT_MODE, so
+ * selecting Auto can never leave a tab without an engine.
+ *
+ * The factory default stays 'v2'; 'auto' is a per-device opt-in the user
+ * picks in the popup. Default-on awaits the owner's review of shadow data.
+ */
+export async function resolveAutoMode(): Promise<EngineMode> {
+  try {
+    if (typeof chrome === 'undefined' || !chrome?.storage?.local) return DEFAULT_MODE;
+    const got = await chrome.storage.local.get(ROUTER_STATS_STORAGE_KEY);
+    const state = got?.[ROUTER_STATS_STORAGE_KEY] as RouterStatsState | undefined;
+    const modes: Array<'legacy' | 'v2' | 'v3'> = ['legacy', 'v2', 'v3'];
+    const candidates: CandidateInput[] = modes.map((mode) => {
+      const modeStats = state?.ring?.[mode];
+      let attempts = 0;
+      let saved = 0;
+      let failureStreak = 0;
+      if (Array.isArray(modeStats)) {
+        for (let i = modeStats.length - 1; i >= 0; i -= 1) {
+          const status = modeStats[i]?.status;
+          if (status === 'cancelled') continue;
+          attempts += 1;
+          if (status === 'saved') saved += 1;
+        }
+        // Streak: trailing consecutive non-saved counted outcomes.
+        for (let i = modeStats.length - 1; i >= 0; i -= 1) {
+          const status = modeStats[i]?.status;
+          if (status === 'cancelled') continue;
+          if (status === 'saved') break;
+          failureStreak += 1;
+        }
+      }
+      return {
+        mode,
+        available: mode === 'v3' ? isApiConfigured() : true,
+        attempts,
+        saved,
+        failureStreak,
+      };
+    });
+    const totalAttempts = candidates.reduce((sum, candidate) => sum + candidate.attempts, 0);
+    if (totalAttempts === 0) {
+      // No data yet (fresh Auto opt-in): keep the factory default instead
+      // of the policy's arbitrary first pick among unproven candidates.
+      return DEFAULT_MODE;
+    }
+    const decision = decideRoute({ candidates, currentMode: null, lastSwitchAt: null, now: Date.now() });
+    return decision.chosen ?? DEFAULT_MODE;
+  } catch (e) {
+    console.warn('[CQD Mode] auto resolution failed, using default:', e);
     return DEFAULT_MODE;
   }
 }
@@ -177,10 +249,16 @@ export async function initModeController(): Promise<void> {
   // 2. Listen for mode change messages from popup/background
   if (typeof chrome !== 'undefined' && chrome?.runtime?.onMessage) {
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-      if (message?.type === 'cqd-set-mode' && isValidMode(message.mode)) {
-        setMode(message.mode).then(() => {
-          sendResponse({ success: true, mode: message.mode });
-        });
+      if (message?.type === 'cqd-set-mode' && isValidStoredMode(message.mode)) {
+        const apply = async (): Promise<EngineMode> => {
+          if (message.mode === 'auto') return resolveAutoMode();
+          return message.mode;
+        };
+        void apply()
+          .then((resolved) => setMode(resolved).then(() => resolved))
+          .then((resolved) => {
+            sendResponse({ success: true, mode: resolved });
+          });
         return true; // Keep the message channel open for async response
       }
     });
@@ -191,7 +269,12 @@ export async function initModeController(): Promise<void> {
     chrome.storage.onChanged.addListener((changes, areaName) => {
       if (areaName === 'local' && changes[STORAGE_KEY]) {
         const newMode = changes[STORAGE_KEY].newValue;
-        if (isValidMode(newMode)) {
+        if (newMode === 'auto') {
+          void resolveAutoMode().then((resolved) => {
+            engineRegistry.setMode(resolved);
+            console.log(`[CQD Mode] Auto resolved to: ${resolved}`);
+          });
+        } else if (isValidMode(newMode)) {
           engineRegistry.setMode(newMode);
           console.log(`[CQD Mode] Mode updated from storage change: ${newMode}`);
         }
@@ -212,4 +295,9 @@ function isValidMode(value: unknown): value is EngineMode {
     typeof value === 'string' &&
     ['legacy', 'shadow', 'v2', 'v3'].includes(value)
   );
+}
+
+/** Storage validity: concrete modes plus the router's 'auto' opt-in. */
+function isValidStoredMode(value: unknown): value is StoredEngineMode {
+  return value === 'auto' || isValidMode(value);
 }
