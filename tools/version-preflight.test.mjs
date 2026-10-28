@@ -145,19 +145,22 @@ test('probeAmo: non-404 auth failures stay failed (no silent downgrade)', async 
   assert.equal(r.error, 'http 401');
 });
 
-test('probeEdge: valid credentials (404 on dummy operation) pass with no live version', async () => {
+test('probeEdge: valid Publish API credentials + public version read', async () => {
   const calls = [];
   const fetchImpl = async (url, opts = {}) => {
     calls.push({ url, headers: opts.headers });
-    return { ok: false, status: 404, json: async () => ({}) };
+    if (url.includes('api.addons.microsoftedge.microsoft.com')) {
+      return { ok: false, status: 404, json: async () => ({}) };
+    }
+    return { ok: true, status: 200, json: async () => ({ version: '1.9.3' }) };
   };
   const r = await probeEdge({ apiKey: 'k', productId: 'p', clientId: 'c', fetchImpl });
   assert.equal(r.ok, true);
-  assert.equal(r.live, null);
-  assert.match(r.note, /no version read/);
+  assert.equal(r.live, '1.9.3');
+  assert.match(r.note, /Publish API credentials valid/);
   assert.equal(calls[0].headers['X-ClientID'], 'c');
-  assert.match(calls[0].headers.Authorization, /^ApiKey /);
   assert.match(calls[0].url, /api\.addons\.microsoftedge\.microsoft\.com/);
+  assert.match(calls[1].url, /getproductdetailsbycrxid/);
 });
 
 test('probeEdge: 401/403 stays failed (bad credentials)', async () => {
@@ -173,43 +176,32 @@ test('classify: Edge with no live version (edge-only set) is publish-needed, not
   assert.deepEqual(r.failures, []);
 });
 
-test('probeCws: v2 fetchStatus live version comes from published distributionChannels', async () => {
+test('probeCws: version read from the public listing page, token exchange proves credentials', async () => {
   const calls = [];
-  const fetchImpl = async (url, opts = {}) => {
+  const fetchImpl = async (url) => {
     calls.push(url);
     if (url.includes('oauth2.googleapis.com/token')) {
       return { ok: true, status: 200, json: async () => ({ access_token: 'tok' }) };
     }
-    return {
-      ok: true,
-      status: 200,
-      json: async () => ({
-        publishedItemRevisionStatus: { distributionChannels: [{ crxVersion: '1.9.3' }] },
-        submittedItemRevisionStatus: { state: 'PUBLISHED' },
-      }),
-    };
+    return { ok: true, status: 200, text: async () => '<div>Version</div><div class="nBZElf">1.9.3</div>' };
   };
   const r = await probeCws({ clientId: 'i', clientSecret: 's', refreshToken: 'r', itemId: 'item', fetchImpl });
   assert.equal(r.ok, true);
   assert.equal(r.live, '1.9.3');
-  assert.equal(r.note, undefined);
-  assert.match(calls[1], /chromewebstore\.googleapis\.com\/v2\/publishers\/-\/items\/item:fetchStatus/);
+  assert.match(r.note, /public listing/);
+  assert.match(calls[1], /chromewebstore\.google\.com\/detail\/classroom-quick-downloade\/item\?hl=en/);
 });
 
-test('probeCws: pending-review submission is surfaced in the note', async () => {
-  const fetchImpl = async (url) => {
-    if (url.includes('oauth2.googleapis.com/token')) return { ok: true, status: 200, json: async () => ({ access_token: 'tok' }) };
-    return {
-      ok: true,
-      status: 200,
-      json: async () => ({
-        publishedItemRevisionStatus: { distributionChannels: [{ crxVersion: '1.9.2' }] },
-        submittedItemRevisionStatus: { state: 'PENDING_REVIEW' },
-      }),
-    };
-  };
+test('probeCws: dead refresh token fails closed before any version read', async () => {
+  const fetchImpl = async () => ({ ok: false, status: 400, json: async () => ({ error: 'invalid_grant' }) });
   const r = await probeCws({ clientId: 'i', clientSecret: 's', refreshToken: 'r', itemId: 'item', fetchImpl });
-  assert.equal(r.ok, true);
-  assert.equal(r.live, '1.9.2');
-  assert.match(r.note, /pending review/);
+  assert.equal(r.ok, false);
+  assert.match(r.error, /token http 400: invalid_grant/);
+});
+
+test('probeCws: unreachable listing fails closed even with valid token', async () => {
+  const fetchImpl = async (url) => (url.includes('oauth2') ? { ok: true, status: 200, json: async () => ({ access_token: 't' }) } : { ok: false, status: 503, text: async () => '' });
+  const r = await probeCws({ clientId: 'i', clientSecret: 's', refreshToken: 'r', itemId: 'item', fetchImpl });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /listing page read failed/);
 });

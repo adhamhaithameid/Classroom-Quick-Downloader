@@ -122,14 +122,23 @@ export async function probeAmo({ issuer, secret, addonSlug, fetchImpl = fetch })
   return { ok: true, live, note: scope };
 }
 
-/**
- * CWS status read via the v2 API (chromewebstore.googleapis.com). The legacy
- * v1.1 items GET 400s (verified 2026-10-28, run 40606642538); the v2
- * fetchStatus method returns publishedItemRevisionStatus.distributionChannels
- * ([].crxVersion = the live version) plus submittedItemRevisionStatus.state
- * (PENDING_REVIEW = in-review). Publisher segment uses "-" (any publisher).
- */
-export async function probeCws({ clientId, clientSecret, refreshToken, itemId, fetchImpl = fetch }) {
+// Live versions come from the PUBLIC listing pages — the same sources the
+// worker's store-stats.ts scrapes — because the vendor APIs either rot
+// (CWS v1.1 items GET 400s, run 40606642538; v2 fetchStatus 403s on the
+// wildcard publisher, run 40608066367) or expose no read at all (Edge
+// Update API is upload/publish only). The authenticated probes stay as the
+// fail-closed credential checks: a valid version read with dead publish
+// credentials must still block the release.
+
+function extractCwsVersion(html) {
+  return (
+    html.match(/Version<\/div><div[^>]*>([\d.]+)</)?.[1] ??
+    html.match(/\\"version\\":\\"([\d.]+)\\"/)?.[1] ??
+    null
+  );
+}
+
+export async function probeCws({ clientId, clientSecret, refreshToken, itemId, listingSlug = 'classroom-quick-downloade', fetchImpl = fetch }) {
   const tokenRes = await fetchImpl('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -137,32 +146,28 @@ export async function probeCws({ clientId, clientSecret, refreshToken, itemId, f
   });
   const tokenBody = await tokenRes.json().catch(() => ({}));
   if (!tokenRes.ok) return { ok: false, error: `token http ${tokenRes.status}${tokenBody.error ? `: ${tokenBody.error}` : ''}` };
-  const r = await fetchJson(fetchImpl, `https://chromewebstore.googleapis.com/v2/publishers/-/items/${encodeURIComponent(itemId)}:fetchStatus`, { headers: { Authorization: `Bearer ${tokenBody.access_token}` } });
-  if (!r.ok) return r;
-  const channels = r.body?.publishedItemRevisionStatus?.distributionChannels ?? [];
-  const live = channels.map((c) => c.crxVersion).find(Boolean) ?? null;
-  const submittedState = r.body?.submittedItemRevisionStatus?.state ?? null;
-  const note = submittedState === 'PENDING_REVIEW' ? 'submitted revision pending review' : undefined;
-  return live ? { ok: true, live, note } : { ok: false, error: 'fetchStatus response had no published crxVersion', body: r.body };
+  const pageRes = await fetchImpl(`https://chromewebstore.google.com/detail/${listingSlug}/${encodeURIComponent(itemId)}?hl=en`);
+  const html = await pageRes.text().catch(() => '');
+  const live = extractCwsVersion(html ?? '');
+  return live ? { ok: true, live, note: 'version from public listing; OAuth token exchange verified' } : { ok: false, error: `listing page read failed (http ${pageRes.status})` };
 }
 
 /**
- * Edge has NO product-read endpoint: the Update API
- * (https://api.addons.microsoftedge.microsoft.com) only exposes submission
- * upload/publish/operations (learn.microsoft.com, "Use the REST API to
- * update an extension", v1.1). So this probe validates credentials only:
- * a GET on a nonexistent operation id returns 404/400 with valid key+client
- * and 401/403 with invalid ones, touching no state. The live version is
- * derived from the CWS probe in main() (single-version repo: all stores
- * ship the same version; an Edge instance left behind self-heals on the
- * next bump — the 2026-10-20 lesson).
+ * Edge has NO product-read endpoint in the Update API
+ * (https://api.addons.microsoftedge.microsoft.com — upload/publish only,
+ * learn.microsoft.com). The live version comes from the public
+ * getproductdetailsbycrxid endpoint (same source as the worker's
+ * store-stats.ts); the Publish API credentials are validated statelessly
+ * (GET on a nonexistent operation id: 404/400 valid vs 401/403 invalid).
  */
-export async function probeEdge({ apiKey, productId, clientId, fetchImpl = fetch }) {
+export async function probeEdge({ apiKey, productId, clientId, storeItemId = 'ecojbijjkcjdolpeoiemnccgmaeomcmn', fetchImpl = fetch }) {
   const r = await fetchJson(fetchImpl, `https://api.addons.microsoftedge.microsoft.com/v1/products/${encodeURIComponent(productId)}/submissions/draft/package/operations/00000000-0000-0000-0000-000000000000`, { headers: { Authorization: `ApiKey ${apiKey}`, 'X-ClientID': clientId } });
-  if (r.ok || r.error === 'http 404' || r.error === 'http 400' || r.error === 'http 405') {
-    return { ok: true, live: null, note: 'credentials valid; Edge API exposes no version read (derived from CWS)' };
-  }
-  return r;
+  if (!(r.ok || r.error === 'http 404' || r.error === 'http 400' || r.error === 'http 405')) return r;
+  const det = await fetchJson(fetchImpl, `https://microsoftedge.microsoft.com/addons/getproductdetailsbycrxid/${encodeURIComponent(storeItemId)}?hl=en-US&gl=US`);
+  const live = det.ok ? det.body?.version ?? null : null;
+  return live
+    ? { ok: true, live, note: 'version from public listing; Publish API credentials valid' }
+    : { ok: false, error: det.ok ? 'details response had no version' : det.error };
 }
 
 /**
@@ -237,11 +242,6 @@ async function main() {
     credentials,
     impls: { cws: probeCws, edge: probeEdge, amo: probeAmo },
   });
-  // Derive the Edge live version from the CWS probe: the Edge Update API
-  // exposes no version read, and this repo ships one version to all stores.
-  if (probes.edge?.ok && probes.edge.live == null && probes.cws?.ok) {
-    probes.edge.live = probes.cws.live;
-  }
 
   const verdict = classify({ extensionVersion, releaseSet: args.releaseSet, credentials, probes, allowUnknown: args.allowUnknown });
 
