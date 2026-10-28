@@ -194,12 +194,16 @@ function failureResponse(id: string): SimulatedResponse | null {
     };
   }
   if (id.startsWith("zerobyte")) {
-    // Completes successfully with an EMPTY file — a silent-corruption shape.
+    // Completes successfully with a corrupt, 1-byte file — the silent-
+    // corruption shape. A true 0-byte body never emits a terminal onChanged
+    // event on CI's Linux Chrome (no download entry is created at all,
+    // runs 40608948103/40747716940), so the case uses 1 byte: same
+    // corrupt-file intent, observable download lifecycle everywhere.
     return {
       status: 200,
       contentType: "application/pdf",
       headers: { "content-disposition": `attachment; filename="${id}.pdf"` },
-      body: Buffer.alloc(0),
+      body: Buffer.from("%"),
     };
   }
   if (id.startsWith("quota")) {
