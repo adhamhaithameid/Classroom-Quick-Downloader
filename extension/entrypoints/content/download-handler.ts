@@ -15,6 +15,7 @@ import {
   MAX_TERMINAL_STATE_MS,
 } from './state';
 import { toDownloadUrl } from './url-utils';
+import { classifyRoute } from '../../src/v2/context/route-classifier';
 import { getButtonState, setButtonState, setPillProgress } from './button-state';
 import { t } from './i18n';
 
@@ -95,29 +96,45 @@ export function startBackgroundDownload(
   fileMeta: FileMeta
 ): Promise<{ ok: boolean; userMessage?: string }> {
   const finalUrl = toDownloadUrl(url);
-  return new Promise((resolve) => {
-    if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
-      resolve({ ok: false, userMessage: t('runtimeError') || 'Runtime not available.' });
-      return;
-    }
-    try {
-      chrome.runtime.sendMessage(
-        { type: 'CQD_DOWNLOAD', url: finalUrl, requestId, fileMeta },
-        (response: any) => {
-          if (chrome.runtime.lastError || !response || response.started === false) {
-            resolve({
-              ok: false,
-              userMessage: response?.userMessage || t('startError') || 'Could not start.',
-            });
-          } else {
-            resolve({ ok: true });
-          }
+  // Use-case context (1ef6.1): the view the download was requested from and
+  // the engine mode this tab runs — the background attaches them to the
+  // terminal analytics events. Both are best-effort.
+  const pageType = classifyRoute(window.location.href);
+  const engineModePromise: Promise<string | undefined> =
+    typeof chrome !== 'undefined' && chrome.storage?.local
+      ? chrome.storage.local
+          .get('cqdV2Mode')
+          .then((res: Record<string, unknown>) =>
+            typeof res?.cqdV2Mode === 'string' ? res.cqdV2Mode : undefined,
+          )
+          .catch(() => undefined)
+      : Promise.resolve(undefined);
+  return engineModePromise.then(
+    (engineMode) =>
+      new Promise<{ ok: boolean; userMessage?: string }>((resolve) => {
+        if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
+          resolve({ ok: false, userMessage: t('runtimeError') || 'Runtime not available.' });
+          return;
         }
-      );
-    } catch {
-      resolve({ ok: false, userMessage: t('commError') || 'Comm error.' });
-    }
-  });
+        try {
+          chrome.runtime.sendMessage(
+            { type: 'CQD_DOWNLOAD', url: finalUrl, requestId, fileMeta, pageType, engineMode },
+            (response: any) => {
+              if (chrome.runtime.lastError || !response || response.started === false) {
+                resolve({
+                  ok: false,
+                  userMessage: response?.userMessage || t('startError') || 'Could not start.',
+                });
+              } else {
+                resolve({ ok: true });
+              }
+            },
+          );
+        } catch {
+          resolve({ ok: false, userMessage: t('commError') || 'Comm error.' });
+        }
+      }),
+  );
 }
 
 /**

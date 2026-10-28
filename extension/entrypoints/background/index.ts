@@ -39,6 +39,7 @@ import {
   startNextDriveAttempt,
   startSingleAttempt,
   startDownloadWithTimeout,
+  eventContextFor,
 } from './download-handler';
 import { Analytics, recordDownloadEvent } from '../utils/analytics';
 import { installRuntimeErrorReporting } from '../utils/analytics/runtime-errors';
@@ -335,6 +336,7 @@ export default defineBackground(() => {
       return;
     }
     recordDownloadEvent({
+      ...eventContextFor(pending),
       type: pending.finalExtension || pending.fileMeta?.ext || 'unknown',
       status: 'fail',
       duration_ms: Date.now() - pending.startTime,
@@ -554,6 +556,7 @@ export default defineBackground(() => {
           'unknown';
         sendStatusToTab(pending, 'success');
         recordDownloadEvent({
+          ...eventContextFor(pending),
           type: ext,
           status: 'success',
           duration_ms: duration,
@@ -676,6 +679,7 @@ export default defineBackground(() => {
       const duration = Date.now() - pending.startTime;
       const ext = pending.finalExtension || pending.fileMeta?.ext || 'unknown';
       recordDownloadEvent({
+        ...eventContextFor(pending),
         type: ext,
         status: 'fail',
         duration_ms: duration,
@@ -727,6 +731,7 @@ export default defineBackground(() => {
     }
 
     recordDownloadEvent({
+      ...eventContextFor(pending),
       type: pending.fileMeta?.ext || 'unknown',
       status: 'cancelled',
       duration_ms: Date.now() - pending.startTime,

@@ -94,6 +94,11 @@ function sanitizeEvent(raw: unknown, fallbackNow: number): AnalyticsEvent | null
     duration_ms: duration,
     bypass_used: ev.bypass_used === true,
     error_type: typeof ev.error_type === 'string' && ev.error_type.trim() ? ev.error_type.trim().slice(0, 128) : undefined,
+    // Use-case context (1ef6.1): length-capped passthrough of the already-
+    // sanitized track-time values; unknown characters are dropped here too.
+    pageType: normalizeContextField(ev.pageType, 20),
+    engineMode: normalizeContextField(ev.engineMode, 12),
+    strategy: normalizeContextField(ev.strategy, 16),
     language: normalizeString(ev.language, 'unknown', 12),
     timestamp: normalizeTimestamp(ev.timestamp, fallbackNow),
     id,
@@ -103,6 +108,13 @@ function sanitizeEvent(raw: unknown, fallbackNow: number): AnalyticsEvent | null
     count,
     rollup: ev.rollup === true,
   };
+}
+
+/** Context fields (1ef6.1): keep [a-z0-9_-] runs only, cap length. */
+function normalizeContextField(value: unknown, maxLen: number): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const cleaned = value.toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, maxLen);
+  return cleaned || undefined;
 }
 
 function sanitizeQueue(rawQueue: unknown): { queue: AnalyticsEvent[]; changed: boolean } {

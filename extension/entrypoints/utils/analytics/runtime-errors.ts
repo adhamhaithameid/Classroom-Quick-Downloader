@@ -96,12 +96,24 @@ export function installRuntimeErrorReporting(): void {
           hour: bucket,
           count: (state.hour === bucket ? state.count : 0) + 1,
         });
+        // Use-case context (1ef6.1): the stored engine mode at error time.
+        let engineMode: string | undefined;
+        try {
+          const chromeApi = (self as unknown as { chrome?: { storage?: { local?: { get: (k: string) => Promise<Record<string, unknown>> } } } }).chrome;
+          if (chromeApi?.storage?.local) {
+            const res = await chromeApi.storage.local.get('cqdV2Mode');
+            engineMode = typeof res?.cqdV2Mode === 'string' ? res.cqdV2Mode : undefined;
+          }
+        } catch {
+          engineMode = undefined;
+        }
         Analytics.track({
           status: 'fail',
           file_type: RUNTIME_ERROR_FILE_TYPE,
           duration_ms: 0,
           bypass_used: false,
           error_type: errorSignature(error, context),
+          engineMode,
           source: 'background',
         });
       } catch {
