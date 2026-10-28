@@ -34,6 +34,22 @@ export const DOWNLOAD_START_TIMEOUT_MS = 15_000;
 
 type StartHandler = (downloadId: number | undefined, hadError: boolean) => void;
 
+/**
+ * Use-case context for terminal analytics events (1ef6.1): the requester's
+ * view + engine mode plus the acquisition strategy the flow actually used.
+ */
+export function eventContextFor(pending: {
+  pageType?: string;
+  engineMode?: string;
+  isDrive: boolean;
+}): { pageType?: string; engineMode?: string; strategy: 'drive-auth' | 'direct' } {
+  return {
+    pageType: pending.pageType,
+    engineMode: pending.engineMode,
+    strategy: pending.isDrive ? 'drive-auth' : 'direct',
+  };
+}
+
 export const DOWNLOAD_START_TIMEOUT_MESSAGE =
   'The download could not be started — the source never responded. Try again.';
 
@@ -62,6 +78,7 @@ export function handleStartTimeout(
   respondOnce?: (payload: any) => void,
 ): void {
   recordDownloadEvent({
+    ...eventContextFor(pending),
     type: pending.fileMeta?.ext || 'unknown',
     status: 'fail',
     duration_ms: Date.now() - pending.startTime,
@@ -146,6 +163,7 @@ export function startSingleAttempt(
     (downloadId, hadError) => {
       if (hadError) {
         recordDownloadEvent({
+          ...eventContextFor(pending),
           type: pending.fileMeta?.ext || 'unknown',
           status: 'fail',
           duration_ms: Date.now() - pending.startTime,
@@ -187,6 +205,7 @@ export function startNextDriveAttempt(pending: PendingDownload): void {
       'AUTH_ALL_FAILED',
     );
     recordDownloadEvent({
+      ...eventContextFor(pending),
       type: pending.fileMeta?.ext || 'unknown',
       status: 'fail',
       duration_ms: Date.now() - pending.startTime,
@@ -277,6 +296,10 @@ export function handleDownloadRequest(
     tabId: sender.tab?.id,
     attemptedAuthUsers: [],
     isCancelled: false,
+    // Use-case context (1ef6.1): carried from the requester for the
+    // terminal analytics events. Sanitized again at record time.
+    pageType: typeof message.pageType === 'string' ? message.pageType : undefined,
+    engineMode: typeof message.engineMode === 'string' ? message.engineMode : undefined,
   };
 
   if (typeof initialAuthUser === 'number') {
@@ -341,6 +364,7 @@ export function handleDownloadRequest(
                 return;
               }
               recordDownloadEvent({
+                ...eventContextFor(pending),
                 type: pending.fileMeta?.ext || 'unknown',
                 status: 'fail',
                 duration_ms: Date.now() - pending.startTime,
