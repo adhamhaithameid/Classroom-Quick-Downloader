@@ -1,0 +1,27 @@
+name: Env Skip Probe
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  if-only:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "if-only ran, event=${{ github.event_name }}"
+  env-only:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - run: echo "env-only ran"
+  if-plus-env:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - run: echo "if-plus-env ran"
+  needs-chain:
+    needs: [if-only, env-only, if-plus-env]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "chain done"
