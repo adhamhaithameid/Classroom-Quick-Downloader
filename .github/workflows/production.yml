@@ -281,10 +281,12 @@ jobs:
 
   release-approval:
     name: Release approval (production environment)
-    # version-preflight MUST be listed: the step reads its outputs, and an
-    # unlisted needs reference is an expression failure that GitHub surfaces
-    # as a silent job skip (diagnosed 2026-10-28 via the zz-env-skip probe).
-    if: github.event_name != 'pull_request'
+    # always() overrides GitHub's transitive skipped-need propagation: the
+    # mutation-gate job is skipped on push events (PR-only by design), and
+    # without always() that skip cascades through release-summary and
+    # silently skips the whole release train (trains 6-10). The real gates
+    # stay explicit in the expression (probed 2026-10-28, zz-probe9b).
+    if: always() && github.event_name != 'pull_request' && needs.release-summary.result == 'success' && needs.version-preflight.result == 'success'
     needs: [release-summary, version-preflight]
     runs-on: ubuntu-latest
     environment: production
