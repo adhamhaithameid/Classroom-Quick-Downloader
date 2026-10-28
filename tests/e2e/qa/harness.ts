@@ -277,6 +277,52 @@ export async function launchQaContext(
         "ENVIRONMENT: Playwright's bundled Firefox deletes the unsigned sideloaded xpi at startup (signing pref ignored) — no extension background page; see RUNBOOK firefox section";
     }
   }
+  if (verbose && browser === "firefox" && signedXpiMode) {
+    // w5r6 round 5: probe from the BACKGROUND side — the page side proved
+    // content scripts never execute; this reads the add-on's own view
+    // (manifest, enabled state, tabs) and attempts a direct injection so
+    // the exact failure reason lands in the log.
+    void (async () => {
+      try {
+        const bg = context.backgroundPages()[0] ??
+          await context.waitForEvent("backgroundpage", { timeout: 5_000 }).catch(() => null);
+        if (!bg) {
+          console.log("[qa-console:bg-probe] no background page to probe");
+          return;
+        }
+        const view = await bg.evaluate(async () => {
+          const manifestCs = (browser.runtime.getManifest() as { content_scripts?: unknown[] }).content_scripts;
+          let self: { enabled?: boolean; type?: string } | null = null;
+          try {
+            const api = (globalThis as { browser?: { management?: { getSelf: () => Promise<{ enabled: boolean; type: string }> } } }).browser;
+            if (api?.management?.getSelf) self = await api.management.getSelf();
+          } catch (e) { self = { enabled: false, type: `management-error: ${String(e).slice(0, 80)}` }; }
+          const tabs = await browser.tabs.query({});
+          return {
+            csCount: manifestCs?.length ?? 0,
+            self,
+            tabs: tabs.map((t) => ({ url: (t.url ?? "").slice(0, 70), status: t.status })),
+          };
+        });
+        console.log(`[qa-console:bg-probe] view: ${JSON.stringify(view)}`);
+        // Direct injection attempt on the classroom tab.
+        const inject = await bg.evaluate(async () => {
+          const tabs = await browser.tabs.query({ url: "https://classroom.google.com/*" });
+          if (tabs.length === 0) return { error: "no classroom tab visible to the api" };
+          const api = (globalThis as { browser?: { tabs: { executeScript: (id: number, details: { code: string }) => Promise<unknown[]> } } }).browser;
+          try {
+            await api.tabs.executeScript(tabs[0].id, { code: "document.documentElement.dataset.cqdFxInjected = 'yes'" });
+            return { ok: true, tabUrl: tabs[0].url?.slice(0, 70) };
+          } catch (e) {
+            return { error: String(e).slice(0, 300), tabUrl: tabs[0].url?.slice(0, 70) };
+          }
+        });
+        console.log(`[qa-console:bg-probe] inject: ${JSON.stringify(inject)}`);
+      } catch (e) {
+        console.log(`[qa-console:bg-probe] crashed: ${String(e).slice(0, 200)}`);
+      }
+    })();
+  }
   if (verbose) {
     console.log(
       `[qa-console] launch verdict: browser=${browser} signedXpi=${signedXpiMode} extensionAvailable=${extensionAvailable}`,
