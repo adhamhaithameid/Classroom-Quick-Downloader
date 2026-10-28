@@ -281,8 +281,11 @@ jobs:
 
   release-approval:
     name: Release approval (production environment)
+    # version-preflight MUST be listed: the step reads its outputs, and an
+    # unlisted needs reference is an expression failure that GitHub surfaces
+    # as a silent job skip (diagnosed 2026-10-28 via the zz-env-skip probe).
     if: github.event_name != 'pull_request'
-    needs: release-summary
+    needs: [release-summary, version-preflight]
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 60
