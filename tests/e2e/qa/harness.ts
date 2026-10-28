@@ -237,6 +237,9 @@ export async function launchQaContext(
             cqdStyles: document.querySelectorAll("style[data-cqd-v2], style#cqd-v2-styles, style[data-cqd-injected]").length,
             cqdButtons: document.querySelectorAll(".cqd-download-btn").length,
             cqdAny: document.querySelectorAll("[class*='cqd']").length,
+            cqdAnyIdentity: [...document.querySelectorAll("[class*='cqd']")].slice(0, 3).map((e) => e.tagName + "." + String(e.className).slice(0, 40)),
+            bootstrapEntered: document.documentElement.getAttribute("data-cqd-bootstrap"),
+            v1Entered: document.documentElement.getAttribute("data-cqd-v1"),
             bodyChars: document.body?.innerText?.length ?? 0,
           }))
           .then((m) => console.log(`[qa-console:dom] ${JSON.stringify(m)}`))

@@ -38,6 +38,11 @@ export default defineContentScript({
   matches: ['https://classroom.google.com/*'],
   runAt: 'document_idle',
   async main() {
+    // w5r6 probe: the earliest possible footprint marker. If this attribute
+    // is absent on a loaded page, THIS content script never executed.
+    try {
+      document.documentElement.dataset.cqdBootstrap = "entered";
+    } catch { /* pre-document edge */ }
     try {
       // Dynamic imports to prevent module-level errors from
       // breaking other content scripts (legacy downloads, flags, etc.)
