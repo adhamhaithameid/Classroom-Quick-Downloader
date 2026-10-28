@@ -122,6 +122,13 @@ export async function probeAmo({ issuer, secret, addonSlug, fetchImpl = fetch })
   return { ok: true, live, note: scope };
 }
 
+/**
+ * CWS status read via the v2 API (chromewebstore.googleapis.com). The legacy
+ * v1.1 items GET 400s (verified 2026-10-28, run 40606642538); the v2
+ * fetchStatus method returns publishedItemRevisionStatus.distributionChannels
+ * ([].crxVersion = the live version) plus submittedItemRevisionStatus.state
+ * (PENDING_REVIEW = in-review). Publisher segment uses "-" (any publisher).
+ */
 export async function probeCws({ clientId, clientSecret, refreshToken, itemId, fetchImpl = fetch }) {
   const tokenRes = await fetchImpl('https://oauth2.googleapis.com/token', {
     method: 'POST',
@@ -130,10 +137,13 @@ export async function probeCws({ clientId, clientSecret, refreshToken, itemId, f
   });
   const tokenBody = await tokenRes.json().catch(() => ({}));
   if (!tokenRes.ok) return { ok: false, error: `token http ${tokenRes.status}${tokenBody.error ? `: ${tokenBody.error}` : ''}` };
-  const r = await fetchJson(fetchImpl, `https://www.googleapis.com/chromewebstore/v1.1/items/${encodeURIComponent(itemId)}`, { headers: { Authorization: `Bearer ${tokenBody.access_token}`, 'x-goog-api-version': '2' } });
+  const r = await fetchJson(fetchImpl, `https://chromewebstore.googleapis.com/v2/publishers/-/items/${encodeURIComponent(itemId)}:fetchStatus`, { headers: { Authorization: `Bearer ${tokenBody.access_token}` } });
   if (!r.ok) return r;
-  const live = r.body?.version ?? null;
-  return live ? { ok: true, live } : { ok: false, error: 'item response had no version' };
+  const channels = r.body?.publishedItemRevisionStatus?.distributionChannels ?? [];
+  const live = channels.map((c) => c.crxVersion).find(Boolean) ?? null;
+  const submittedState = r.body?.submittedItemRevisionStatus?.state ?? null;
+  const note = submittedState === 'PENDING_REVIEW' ? 'submitted revision pending review' : undefined;
+  return live ? { ok: true, live, note } : { ok: false, error: 'fetchStatus response had no published crxVersion', body: r.body };
 }
 
 /**
@@ -248,8 +258,10 @@ async function main() {
   // Failures must reach the run log in BOTH modes: stdout may be redirected
   // to a JSON file, so a silent exit(1) is undiagnosable from CI.
   for (const f of verdict.failures) {
-    const detail = verdict.perStore[f.store]?.error ? ` — ${verdict.perStore[f.store].error}` : '';
-    console.error(`[version-preflight] FAIL ${f.store}: ${f.reason}${detail}`);
+    const info = verdict.perStore[f.store] ?? {};
+    const detail = info.error ? ` — ${info.error}` : '';
+    const body = info.body ? ` :: ${JSON.stringify(info.body).slice(0, 300)}` : '';
+    console.error(`[version-preflight] FAIL ${f.store}: ${f.reason}${detail}${body}`);
   }
 
   if (verdict.failures.length > 0 && !args.allowNoProbeFail) process.exit(1);

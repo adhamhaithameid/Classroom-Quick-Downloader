@@ -4,7 +4,7 @@
 // Network probes are injectable (fetchImpl) and NOT exercised here.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { semverGt, buildAmoJwt, classify, parseArgs, runProbes, probeAmo, probeEdge } from './version-preflight.mjs';
+import { semverGt, buildAmoJwt, classify, parseArgs, runProbes, probeAmo, probeEdge, probeCws } from './version-preflight.mjs';
 
 test('semverGt: numeric segment compare, not string compare', () => {
   assert.equal(semverGt('1.9.3', '1.9.2'), true);
@@ -171,4 +171,45 @@ test('classify: Edge with no live version (edge-only set) is publish-needed, not
   const r = classify({ extensionVersion: '1.9.4', releaseSet: ['edge'], credentials: CREDS.edge, probes: { edge: { ok: true, live: null, note: 'credentials valid' } } });
   assert.deepEqual(r.publishSet, ['edge']);
   assert.deepEqual(r.failures, []);
+});
+
+test('probeCws: v2 fetchStatus live version comes from published distributionChannels', async () => {
+  const calls = [];
+  const fetchImpl = async (url, opts = {}) => {
+    calls.push(url);
+    if (url.includes('oauth2.googleapis.com/token')) {
+      return { ok: true, status: 200, json: async () => ({ access_token: 'tok' }) };
+    }
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        publishedItemRevisionStatus: { distributionChannels: [{ crxVersion: '1.9.3' }] },
+        submittedItemRevisionStatus: { state: 'PUBLISHED' },
+      }),
+    };
+  };
+  const r = await probeCws({ clientId: 'i', clientSecret: 's', refreshToken: 'r', itemId: 'item', fetchImpl });
+  assert.equal(r.ok, true);
+  assert.equal(r.live, '1.9.3');
+  assert.equal(r.note, undefined);
+  assert.match(calls[1], /chromewebstore\.googleapis\.com\/v2\/publishers\/-\/items\/item:fetchStatus/);
+});
+
+test('probeCws: pending-review submission is surfaced in the note', async () => {
+  const fetchImpl = async (url) => {
+    if (url.includes('oauth2.googleapis.com/token')) return { ok: true, status: 200, json: async () => ({ access_token: 'tok' }) };
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        publishedItemRevisionStatus: { distributionChannels: [{ crxVersion: '1.9.2' }] },
+        submittedItemRevisionStatus: { state: 'PENDING_REVIEW' },
+      }),
+    };
+  };
+  const r = await probeCws({ clientId: 'i', clientSecret: 's', refreshToken: 'r', itemId: 'item', fetchImpl });
+  assert.equal(r.ok, true);
+  assert.equal(r.live, '1.9.2');
+  assert.match(r.note, /pending review/);
 });
