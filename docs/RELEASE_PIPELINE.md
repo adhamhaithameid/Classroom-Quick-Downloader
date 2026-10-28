@@ -54,13 +54,14 @@ notice of what they would have done.
 
 - Per store: `publish-needed` (version > live), `current` (live ≥ version —
   covers in-review and already-submitted), `missing-secrets`, `unknown`.
-- Edge special case: the Edge Update API exposes no version read
-  (submission upload/publish only). The probe validates credentials
-  statelessly (404/400 on a dummy operation id vs 401/403) and the live
-  version derives from the CWS probe — one version ships to all stores.
-  An Edge instance left behind (partial past release) self-heals on the
-  next bump; the publish leg's continue-on-error + Partner Center's own
-  version check cover the residue.
+- Version reads use the PUBLIC listing pages (CWS detail page,
+  Edge getproductdetailsbycrxid) — the same sources the worker's
+  store-stats.ts scrapes — because the vendor APIs rot or lack reads:
+  CWS v1.1 items GET 400s (2026-10-28), the v2 fetchStatus 403s without a
+  publisher id secret, and the Edge Update API is upload/publish only.
+- Credential checks stay authenticated and fail-closed: CWS refresh-token
+  exchange, Edge Publish API dummy-operation GET (404/400 vs 401/403),
+  AMO JWT probe with a public fallback on the known owner-JWT 404.
 - Fail-closed exactly for release-set stores: a missing secret or a failing
   probe blocks the release. Stores outside the set are never probed.
 - No store in the set needs publishing → the promote deploys infra only and
