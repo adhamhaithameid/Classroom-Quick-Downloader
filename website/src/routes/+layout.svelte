@@ -3,6 +3,7 @@
   import { browser } from '$app/environment';
   import { base } from '$app/paths';
   import { navigating, page } from '$app/stores';
+  import { resolveFooterVariant, type FooterVariant } from '$lib/footer/prototype-variant';
   import logo from '$lib/assets/cqd-logo.svg';
   import { APP_VERSION, BING_SITE_VERIFICATION, GOOGLE_SITE_VERIFICATION, STORE_LINKS } from '$lib/config';
   import { browserDisplayName, detectBrowserFromNavigator, type BrowserKey } from '$lib/browser/detect';
@@ -195,6 +196,11 @@
   let route = '/';
   let isOverviewStyleRoute = false;
   let hideChrome = false;
+  /* w403: footer prototypes — the real footer under three surround modes.
+     'reveal' is the shipped sheet; 'static' renders it as a plain section;
+     'curtain' pins it behind an opaque sheet with pure CSS (zero JS scroll
+     work). Only the two /prototype-footer-* routes opt in. */
+  $: footerVariant = resolveFooterVariant($page.url.pathname) as FooterVariant;
   let snapshotLinks: { chrome: string; firefox: string; edge: string; github: string } | null = null;
   $: snapshotLinks = $websiteSnapshotStore.snapshot?.overview.links ?? null;
   $: githubHref = snapshotLinks?.github || STORE_LINKS.github;
@@ -780,8 +786,8 @@
     window.addEventListener('keydown', handleWindowKeydown);
     window.addEventListener('scroll', handleWindowScroll, { passive: true });
     window.addEventListener('resize', handleWindowResize);
-    if (!hideChrome) initThemeObserver();
-    if (!hideChrome) initSheetReveal();
+    if (!hideChrome && footerVariant === 'reveal') initThemeObserver();
+    if (!hideChrome && footerVariant === 'reveal') initSheetReveal();
     if (!hideChrome) {
       /* The pre-footer magnetic stop: catches a scroll gesture that comes
          to rest just before the sheet pins, holds it exactly at the page's
@@ -854,7 +860,7 @@
 <BrowserIconSprite />
 <CursorLayer />
 
-<div class="site-shell" class:o2-fullscreen={hideChrome}>
+<div class="site-shell" class:reveal-off={footerVariant !== "reveal"} class:prototype-static={footerVariant === "static"} class:prototype-curtain={footerVariant === "curtain"} class:o2-fullscreen={hideChrome}>
   <a class="skip-link" href="#main-content">Skip to content</a>
   {#if !hideChrome}
   <header class="l2-nav-shell" class:is-scrolled={scrolled} class:menu-open={openMenu !== null} class:nav-dark={navDark}>
@@ -3003,5 +3009,47 @@
       transition: none !important;
       animation: none !important;
     }
+  }
+
+  /* =========================================================================
+     w403 footer prototypes — the real footer under two alternative surrounds.
+     Both opt in per-route (see $lib/footer/prototype-variant.ts); every other
+     route keeps the shipped JS sheet reveal untouched.
+     ========================================================================= */
+
+  /* Variant A — static: the footer is a normal section. No reveal classes,
+     no runway, no transforms; the plain in-flow footer the reveal-off path
+     already renders. Nothing to style — the absence of .reveal-live is the
+     feature. Kept here as documentation of the contract. */
+
+  /* Variant B — native sticky curtain: the footer sticks to the viewport
+     bottom with position: sticky and the sheet simply scrolls over it.
+     Zero JS scroll work: no per-frame writes, no scroll listener, and no
+     fixed-position containing block (the overlay portal trap dies with it). */
+  :global(.site-shell.prototype-curtain) .reveal-runway {
+    height: 0 !important;
+  }
+  :global(.site-shell.prototype-curtain) main {
+    position: relative;
+    z-index: 1;
+    background: var(--bg);
+    border-radius: 0 0 22px 22px;
+    box-shadow: 0 24px 48px rgba(15, 40, 25, 0.14);
+  }
+  :global(.site-shell.prototype-curtain) :global(.reveal-footer) {
+    position: sticky;
+    bottom: 0;
+    z-index: 0;
+    height: auto;
+    overflow: visible;
+    background: var(--bg-deep);
+  }
+  :global(html.js) :global(.site-shell.prototype-curtain) :global(.reveal-footer) {
+    /* The first-paint guard hides the footer until initSheetReveal runs;
+       prototype routes never run it, so surface the footer here. */
+    visibility: visible;
+  }
+  :global(.site-shell.prototype-curtain) :global(.reveal-footer-content) {
+    translate: none;
   }
 </style>
