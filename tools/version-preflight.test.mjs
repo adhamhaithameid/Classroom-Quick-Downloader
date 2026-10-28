@@ -4,7 +4,7 @@
 // Network probes are injectable (fetchImpl) and NOT exercised here.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { semverGt, buildAmoJwt, classify, parseArgs, runProbes, probeAmo } from './version-preflight.mjs';
+import { semverGt, buildAmoJwt, classify, parseArgs, runProbes, probeAmo, probeEdge } from './version-preflight.mjs';
 
 test('semverGt: numeric segment compare, not string compare', () => {
   assert.equal(semverGt('1.9.3', '1.9.2'), true);
@@ -29,7 +29,7 @@ test('buildAmoJwt: three base64url segments decoding to alg HS256 + issuer', () 
 
 const CREDS = {
   cws: { clientId: 'id', clientSecret: 'sec', refreshToken: 'rt', itemId: 'item' },
-  edge: { apiKey: 'key', productId: 'prod' },
+  edge: { apiKey: 'key', productId: 'prod', clientId: 'edge-client' },
   amo: { issuer: 'iss', secret: 'secret', addonSlug: 'slug' },
 };
 
@@ -143,4 +143,32 @@ test('probeAmo: non-404 auth failures stay failed (no silent downgrade)', async 
   const r = await probeAmo({ issuer: 'i', secret: 's', addonSlug: 'slug', fetchImpl });
   assert.equal(r.ok, false);
   assert.equal(r.error, 'http 401');
+});
+
+test('probeEdge: valid credentials (404 on dummy operation) pass with no live version', async () => {
+  const calls = [];
+  const fetchImpl = async (url, opts = {}) => {
+    calls.push({ url, headers: opts.headers });
+    return { ok: false, status: 404, json: async () => ({}) };
+  };
+  const r = await probeEdge({ apiKey: 'k', productId: 'p', clientId: 'c', fetchImpl });
+  assert.equal(r.ok, true);
+  assert.equal(r.live, null);
+  assert.match(r.note, /no version read/);
+  assert.equal(calls[0].headers['X-ClientID'], 'c');
+  assert.match(calls[0].headers.Authorization, /^ApiKey /);
+  assert.match(calls[0].url, /api\.addons\.microsoftedge\.microsoft\.com/);
+});
+
+test('probeEdge: 401/403 stays failed (bad credentials)', async () => {
+  const fetchImpl = async () => ({ ok: false, status: 401, json: async () => ({}) });
+  const r = await probeEdge({ apiKey: 'k', productId: 'p', clientId: 'c', fetchImpl });
+  assert.equal(r.ok, false);
+  assert.equal(r.error, 'http 401');
+});
+
+test('classify: Edge with no live version (edge-only set) is publish-needed, not a crash', () => {
+  const r = classify({ extensionVersion: '1.9.4', releaseSet: ['edge'], credentials: CREDS.edge, probes: { edge: { ok: true, live: null, note: 'credentials valid' } } });
+  assert.deepEqual(r.publishSet, ['edge']);
+  assert.deepEqual(r.failures, []);
 });

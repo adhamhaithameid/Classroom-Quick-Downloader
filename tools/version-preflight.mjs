@@ -136,11 +136,23 @@ export async function probeCws({ clientId, clientSecret, refreshToken, itemId, f
   return live ? { ok: true, live } : { ok: false, error: 'item response had no version' };
 }
 
-export async function probeEdge({ apiKey, productId, fetchImpl = fetch }) {
-  const r = await fetchJson(fetchImpl, `https://api.addons.microsoft.com/submission/v1/products/${encodeURIComponent(productId)}`, { headers: { Authorization: `ApiKey ${apiKey}` } });
-  if (!r.ok) return r;
-  const live = r.body?.versions?.[0]?.version ?? null;
-  return live ? { ok: true, live } : { ok: false, error: 'product response had no versions' };
+/**
+ * Edge has NO product-read endpoint: the Update API
+ * (https://api.addons.microsoftedge.microsoft.com) only exposes submission
+ * upload/publish/operations (learn.microsoft.com, "Use the REST API to
+ * update an extension", v1.1). So this probe validates credentials only:
+ * a GET on a nonexistent operation id returns 404/400 with valid key+client
+ * and 401/403 with invalid ones, touching no state. The live version is
+ * derived from the CWS probe in main() (single-version repo: all stores
+ * ship the same version; an Edge instance left behind self-heals on the
+ * next bump — the 2026-10-20 lesson).
+ */
+export async function probeEdge({ apiKey, productId, clientId, fetchImpl = fetch }) {
+  const r = await fetchJson(fetchImpl, `https://api.addons.microsoftedge.microsoft.com/v1/products/${encodeURIComponent(productId)}/submissions/draft/package/operations/00000000-0000-0000-0000-000000000000`, { headers: { Authorization: `ApiKey ${apiKey}`, 'X-ClientID': clientId } });
+  if (r.ok || r.error === 'http 404' || r.error === 'http 400' || r.error === 'http 405') {
+    return { ok: true, live: null, note: 'credentials valid; Edge API exposes no version read (derived from CWS)' };
+  }
+  return r;
 }
 
 /**
@@ -179,8 +191,8 @@ export function collectCredentials(env = process.env) {
   if (env.CWS_CLIENT_ID && env.CWS_CLIENT_SECRET && env.CWS_REFRESH_TOKEN) {
     out.cws = { clientId: env.CWS_CLIENT_ID, clientSecret: env.CWS_CLIENT_SECRET, refreshToken: env.CWS_REFRESH_TOKEN, itemId: env.CWS_ITEM_ID || env.CWS_ITEM || 'oemoongiefmpmomjikcjmkkkhffcbdid' };
   }
-  if (env.EDGE_API_KEY && env.EDGE_PRODUCT_ID) {
-    out.edge = { apiKey: env.EDGE_API_KEY, productId: env.EDGE_PRODUCT_ID };
+  if (env.EDGE_API_KEY && env.EDGE_PRODUCT_ID && env.EDGE_CLIENT_ID) {
+    out.edge = { apiKey: env.EDGE_API_KEY, productId: env.EDGE_PRODUCT_ID, clientId: env.EDGE_CLIENT_ID };
   }
   if (env.AMO_JWT_ISSUER && env.AMO_JWT_SECRET) {
     out.amo = { issuer: env.AMO_JWT_ISSUER, secret: env.AMO_JWT_SECRET, addonSlug: env.AMO_ADDON_SLUG || 'classroom-quick-downloader' };
@@ -215,6 +227,11 @@ async function main() {
     credentials,
     impls: { cws: probeCws, edge: probeEdge, amo: probeAmo },
   });
+  // Derive the Edge live version from the CWS probe: the Edge Update API
+  // exposes no version read, and this repo ships one version to all stores.
+  if (probes.edge?.ok && probes.edge.live == null && probes.cws?.ok) {
+    probes.edge.live = probes.cws.live;
+  }
 
   const verdict = classify({ extensionVersion, releaseSet: args.releaseSet, credentials, probes, allowUnknown: args.allowUnknown });
 
@@ -230,7 +247,10 @@ async function main() {
   }
   // Failures must reach the run log in BOTH modes: stdout may be redirected
   // to a JSON file, so a silent exit(1) is undiagnosable from CI.
-  for (const f of verdict.failures) console.error(`[version-preflight] FAIL ${f.store}: ${f.reason}`);
+  for (const f of verdict.failures) {
+    const detail = verdict.perStore[f.store]?.error ? ` — ${verdict.perStore[f.store].error}` : '';
+    console.error(`[version-preflight] FAIL ${f.store}: ${f.reason}${detail}`);
+  }
 
   if (verdict.failures.length > 0 && !args.allowNoProbeFail) process.exit(1);
 }

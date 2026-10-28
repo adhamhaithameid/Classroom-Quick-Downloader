@@ -54,6 +54,13 @@ notice of what they would have done.
 
 - Per store: `publish-needed` (version > live), `current` (live ≥ version —
   covers in-review and already-submitted), `missing-secrets`, `unknown`.
+- Edge special case: the Edge Update API exposes no version read
+  (submission upload/publish only). The probe validates credentials
+  statelessly (404/400 on a dummy operation id vs 401/403) and the live
+  version derives from the CWS probe — one version ships to all stores.
+  An Edge instance left behind (partial past release) self-heals on the
+  next bump; the publish leg's continue-on-error + Partner Center's own
+  version check cover the residue.
 - Fail-closed exactly for release-set stores: a missing secret or a failing
   probe blocks the release. Stores outside the set are never probed.
 - No store in the set needs publishing → the promote deploys infra only and
