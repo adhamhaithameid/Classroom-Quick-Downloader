@@ -3484,6 +3484,7 @@ export default {
       pathname === "/admin/notifications/dismiss" ||
       pathname === "/admin/notifications/reset" ||
       pathname === "/admin/website/status" ||
+      pathname === "/admin/website/error-rollup" ||
       pathname === "/admin/website/flush-now" ||
       pathname === "/admin/website/replay-dlq" ||
       pathname === "/admin/website/override" ||
