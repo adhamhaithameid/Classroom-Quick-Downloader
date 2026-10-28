@@ -1,0 +1,39 @@
+name: Probe Round 4
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  preflight-like:
+    runs-on: ubuntu-latest
+    outputs:
+      publish_cws: ${{ steps.p.outputs.v }}
+    steps:
+      - id: p
+        run: echo "v=true" >> "$GITHUB_OUTPUT"
+  summary-like:
+    if: always()
+    needs: [preflight-like]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "summary ok"
+  replica-full:
+    if: github.event_name != 'pull_request'
+    needs: [summary-like, preflight-like]
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 60
+    steps:
+      - name: Human gate
+        run: |
+          echo "Approved."
+          echo "Dry run: ${{ inputs.dry_run == true }}"
+          echo "verdict: ${{ needs.preflight-like.outputs.publish_cws }}"
+  replica-noexpr:
+    if: github.event_name != 'pull_request'
+    needs: [summary-like, preflight-like]
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 60
+    steps:
+      - run: echo "no expressions"
