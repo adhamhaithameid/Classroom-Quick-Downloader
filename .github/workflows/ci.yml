@@ -602,10 +602,14 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium msedge
+      # --retries=1: the simulator proxy dropped connections on its first
+      # CI run (ERR_CONNECTION_CLOSED, run 40608948103) while locally green;
+      # one fresh-worker retry tolerates that flake, real regressions fail
+      # twice and still block.
       - name: QA replay — chromium
-        run: pnpm exec playwright test --project=qa-chromium
+        run: pnpm exec playwright test --project=qa-chromium --retries=1
       - name: QA replay — edge
-        run: pnpm exec playwright test --project=qa-edge
+        run: pnpm exec playwright test --project=qa-edge --retries=1
       - name: Upload QA evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
