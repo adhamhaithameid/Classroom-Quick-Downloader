@@ -77,7 +77,7 @@ jobs:
       - name: Probe stores and classify
         id: preflight
         env:
-          RELEASE_SET: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_set || 'cws,edge,amo' }}
+          RELEASE_SET: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.publish_set || 'cws,edge,amo' }}
         run: |
           SET="${RELEASE_SET:-cws,edge,amo}"
           node tools/version-preflight.mjs --json --release-set "$SET" > /tmp/preflight.json
@@ -293,7 +293,7 @@ jobs:
       - name: Human gate
         run: |
           echo "Approved by a required reviewer of the production environment."
-          echo "Dry run: ${{ inputs.dry_run == true }}"
+          echo "Dry run: ${{ github.event.inputs.dry_run == true }}"
           echo "Publish set verdicts: cws=${{ needs.version-preflight.outputs.publish_cws }} edge=${{ needs.version-preflight.outputs.publish_edge }} amo=${{ needs.version-preflight.outputs.publish_amo }}"
 
   deploy-worker:
@@ -302,7 +302,7 @@ jobs:
     needs: [release-approval, version-preflight]
     uses: ./.github/workflows/deploy-cloudflare-worker.yml
     with:
-      dry_run: ${{ inputs.dry_run || false }}
+      dry_run: ${{ github.event.inputs.dry_run || false }}
     secrets: inherit
 
   deploy-website:
@@ -311,7 +311,7 @@ jobs:
     needs: [deploy-worker, version-preflight]
     uses: ./.github/workflows/website-deploy.yml
     with:
-      dry_run: ${{ inputs.dry_run || false }}
+      dry_run: ${{ github.event.inputs.dry_run || false }}
     secrets: inherit
 
   publish-stores:
@@ -322,7 +322,7 @@ jobs:
     with:
       ref: production
       skip_gate: true
-      dry_run: ${{ inputs.dry_run || false }}
+      dry_run: ${{ github.event.inputs.dry_run || false }}
       publish_cws: ${{ needs.version-preflight.outputs.publish_cws == 'true' }}
       publish_edge: ${{ needs.version-preflight.outputs.publish_edge == 'true' }}
       publish_amo: ${{ needs.version-preflight.outputs.publish_amo == 'true' }}
