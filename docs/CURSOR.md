@@ -26,10 +26,11 @@ locked decisions from that review are baked in as constants and guard tests.
   `[data-cursor-ring]` opt-in) — collapses the cursor to the bare ring:
   no arrow, no glass. The full glass + seeking arrow cursor is the
   empty-space cursor.
-- **80ms follow lag** (`CURSOR_LAG_MS`): the whole cursor (ring and icon
-  together — the trailing-layer experiment was cut on review) eases to the
-  pointer with frame-rate-independent exponential easing, clamped at 250ms
-  per frame so a tab-switch wake never teleports.
+- **Native tracking** (`CURSOR_LAG_MS = 0`): the whole cursor (ring and icon
+  together) sits on the pointer with no follow lag — retuned from the
+  100ms design / 80ms constant after user feedback that it read as slow
+  (bead o3ui, 2026-10-28). The easing machinery stays for reduced-motion
+  and any future tau > 0 tuning; tau <= 0 snaps.
 - **Buttery transitions.** The layer renders every state's glyphs statically;
   state changes flip `data-state` and CSS transitions morph between states
   (glass dissipates, the badge cuts into the ring via `stroke-dasharray`,
