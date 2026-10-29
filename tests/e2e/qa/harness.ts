@@ -161,9 +161,16 @@ export async function launchQaContext(
 ): Promise<QaSession> {
   const sim = await startSimulatorProxy(scenario);
 
-  const context =
-    browser === "chromium"
-      ? await chromium.launchPersistentContext("", {
+  /* A failed browser launch (e.g. the darwin sandbox denying the bundled
+     Firefox build) must still yield a usable session: callers destructure
+     close() in afterAll unconditionally, and an unassigned closeQa turned
+     the launch failure into a confusing TypeError. Wrap the launch so a
+     dead browser degrades to the standard ENVIRONMENT skip path. */
+  let context: BrowserContext;
+  try {
+    context =
+      browser === "chromium"
+        ? await chromium.launchPersistentContext("", {
           // New headless (channel 'chromium') supports extensions; the bundled
           // old-headless build does not.
           channel: "chromium",
@@ -183,17 +190,31 @@ export async function launchQaContext(
             "--ignore-certificate-errors",
           ],
         })
-      : await firefox.launchPersistentContext(FIREFOX_PROFILE_DIR, {
-          headless: true,
-          acceptDownloads: true,
-          ignoreHTTPSErrors: true,
-          proxy: { server: sim.url },
-          firefoxUserPrefs: {
-            "xpinstall.signatures.required": false,
-            "extensions.autoDisableScopes": 0,
-            "extensions.enabledScopes": 15,
-          },
-        });
+        : await firefox.launchPersistentContext(FIREFOX_PROFILE_DIR, {
+            headless: true,
+            acceptDownloads: true,
+            ignoreHTTPSErrors: true,
+            proxy: { server: sim.url },
+            firefoxUserPrefs: {
+              "xpinstall.signatures.required": false,
+              "extensions.autoDisableScopes": 0,
+              "extensions.enabledScopes": 15,
+            },
+          });
+  } catch (error) {
+    EXTENSION_UNAVAILABLE_REASON =
+      "ENVIRONMENT: browser launch failed (" +
+      String((error as Error).message ?? error).slice(0, 200) +
+      ")";
+    return {
+      context: undefined as unknown as BrowserContext,
+      extensionAvailable: false,
+      servedDownloads: () => [],
+      close: async () => {
+        await sim.close();
+      },
+    };
+  }
 
   // Firefox ENVIRONMENT limitation (verified by probe, 2026-09-13): the xpi is
   // present in the profile before launch, and Playwright's bundled Firefox
