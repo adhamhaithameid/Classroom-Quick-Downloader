@@ -14,7 +14,6 @@
   import BrowserIconSprite from '$lib/components/BrowserIconSprite.svelte';
   import AmbientBackground from '$lib/components/AmbientBackground.svelte';
   import CursorLayer from '$lib/cursor/CursorLayer.svelte';
-  import { initMagneticPin } from '$lib/scroll/magneticPin';
   import '../app.css';
 
   type MenuIconKey =
@@ -158,7 +157,7 @@
           title: 'Releases',
           links: [
             { href: '/changelog', icon: 'clock', label: 'Release history', desc: 'Every improvement, fix, and new feature.' },
-            { href: '/press-kit', icon: 'megaphone', label: 'Press kit', desc: 'Logos, screenshots, and brand assets.' },
+            { href: '/brand', icon: 'megaphone', label: 'Brand kit', desc: 'Logos, colors, and brand assets.' },
             { href: '/featured', icon: 'spark', label: 'Featured mentions', desc: 'Reviews and community shout-outs.' }
           ]
         }
@@ -183,15 +182,6 @@
   let navBarEl: HTMLElement | undefined;
   let panelEl: HTMLElement | undefined;
   let mainEl: HTMLElement | undefined;
-  let sheetCleanups: Array<() => void> = [];
-  /* Reveal-driven ambient gating: each AmbientBackground freezes its orbs
-     and lens canvas while its surface cannot be seen. footerRevealActive
-     mirrors the reveal hysteresis; sheetGone means the sheet has fully
-     lifted off (its own ambient can no longer paint anything visible). */
-  let revealShell: HTMLElement | undefined;
-  let footerRevealActive = false;
-  let sheetGone = false;
-  let magnetDispose: (() => void) | undefined;
   let route = '/';
   let isOverviewStyleRoute = false;
   let hideChrome = false;
@@ -521,155 +511,6 @@
   }
 
   /* ------------------------------------------------------------------
-     Sticky sheet reveal: the page scrolls normally, pins once its end
-     reaches the viewport bottom (acting as the end of the page), then
-     lifts away — rounded edge + shadow onto the footer beneath — while
-     the footer window's own content scrolls on through the rest of the
-     reveal. Mechanics: pure sticky on <main> plus two scroll-linked CSS
-     vars (--lift drives the sheet's departure, --ft-travel drives the
-     footer window's inner travel). Fails open to the plain in-flow
-     footer without JS, under reduced motion, in embed mode, or on pages
-     shorter than the viewport.
-     ------------------------------------------------------------------ */
-  function initSheetReveal(): void {
-    const main = mainEl;
-    if (!main) return;
-    const shell = main.closest<HTMLElement>('.site-shell');
-    /* The travel budget is derived from the sliding content wrapper — the
-       window itself is a fixed 100vh viewport, so measuring it would
-       always yield a zero budget. */
-    const footer = document.querySelector<HTMLElement>('.reveal-footer-content');
-    /* The window's own ambient grid twin — it consumes --ft-grid-y so its
-       CSS pattern stays on the document grid the lens canvas paints. */
-    const footerGrid = document.querySelector<HTMLElement>('.reveal-footer .l2-page-grid');
-    if (!shell || !footer) return;
-    revealShell = shell;
-    /* Reduced motion decides immediately: the footer stays plain in flow
-       (reveal-off keeps the first-paint guard from hiding it forever). */
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      shell.classList.add('reveal-off');
-      return;
-    }
-
-    const apply = (): void => {
-      // While live the footer window keeps its natural height (auto), so
-      // offsetHeight measures the real footer reliably — the travel budget
-      // is simply (natural height − viewport). Deriving it from a clipped
-      // 100vh window's scrollHeight instead made the budget drift and let
-      // the window slide out of the viewport at max scroll.
-      const footerH = footer.offsetHeight;
-      const sheetH = main.offsetHeight;
-      const pin = sheetH - window.innerHeight;
-      const budget = footerH - window.innerHeight;
-      if (pin <= 0 || budget <= 0) {
-        shell.classList.remove('reveal-live');
-        shell.classList.add('reveal-off');
-        shell.style.removeProperty('--sheet-pin');
-        shell.style.removeProperty('--reveal-pad');
-        return;
-      }
-      shell.classList.add('reveal-live');
-      shell.classList.remove('reveal-off');
-      shell.style.setProperty('--sheet-pin', `${Math.round(pin)}px`);
-      /* The sheet's departure consumes one viewport of scroll; the rest of
-         the footer's height becomes the footer's own scroll. */
-      shell.style.setProperty('--reveal-pad', `${Math.round(footerH)}px`);
-      shell.style.setProperty('--reveal-budget', `${Math.round(budget)}px`);
-    };
-    apply();
-
-    const ro = new ResizeObserver(apply);
-    ro.observe(main);
-    ro.observe(footer);
-    window.addEventListener('resize', apply, { passive: true });
-
-    let ticking = false;
-    let revealing = false;
-    let lastLift = -1;
-    let lastTravel = -1;
-    let lastGridY = -1;
-    const writeVars = (): void => {
-      ticking = false;
-      if (!shell.classList.contains('reveal-live')) return;
-      const budget = parseFloat(shell.style.getPropertyValue('--reveal-budget')) || 1;
-      /* Live geometry, scroll-relative: the reveal progress e is the scroll
-         distance past the pin. The pin is derived every frame from
-         untainted quantities — document height minus the footer window's
-         natural height (the runway's exact height) minus the viewport —
-         because every direct measure of main goes stale or circular once
-         it sticks: getBoundingClientRect freezes at the stick (the sheet
-         honestly no longer moves) and offsetTop grows by the stick
-         displacement, which cancels the progress term exactly. Recomputing
-         per frame (instead of caching) keeps the reveal immune to async
-         content growth — map components, metrics, fonts — that would
-         otherwise make the pin stale and flash the footer in and out. */
-      const e =
-        window.scrollY -
-        (document.documentElement.scrollHeight - footer.offsetHeight - window.innerHeight);
-      /* Change-guards: identical setProperty calls still invalidate style,
-         and this runs every scroll frame. Each var is written on its
-         consumer (main / the footer content wrapper) — both are registered
-         non-inheriting @property, so the write re-styles only that element
-         instead of the whole shell subtree. */
-      const lift = Math.round(Math.max(0, Math.min(e, window.innerHeight)));
-      const travel = Math.round(Math.max(0, Math.min(e - window.innerHeight, budget)));
-      if (lift !== lastLift) {
-        lastLift = lift;
-        main.style.setProperty('--lift', `${lift}px`);
-      }
-      if (travel !== lastTravel) {
-        lastTravel = travel;
-        footer.style.setProperty('--ft-travel', `${travel}px`);
-      }
-      /* Same change-guard pattern as the two vars above: the scroll offset
-         behind the footer window's grid twin, keeping its CSS pattern
-         phase-true with the document grid (and the lens canvas). */
-      const gridY = Math.round(window.scrollY);
-      if (gridY !== lastGridY) {
-        lastGridY = gridY;
-        footerGrid?.style.setProperty('--ft-grid-y', `${gridY}px`);
-      }
-      /* Arming, not revealing: the sheet surface and the footer window swap
-         in ~150px ABOVE the pin, while the sheet still fully covers the
-         viewport. Both surfaces are the same canvas color, so the flip is
-         pixel-invisible — but it moves the window's first paint, the
-         sheet's layer promotion and the surface swap OFF the reveal moment.
-         Flipping (or fading) them at the reveal itself read as a flash of
-         the footer as it started appearing: the window snapped in at full
-         strength while the sheet's background was still fading in over it,
-         so the footer bled through the page for the fade's duration.
-         Disarm 50px deeper for hysteresis — every flip is seamless, so the
-         gap only bounds wasted work, not visuals. */
-      if (!revealing && e >= -150) revealing = true;
-      else if (revealing && e < -200) revealing = false;
-      shell.classList.toggle('is-revealing', revealing);
-      /* Ambient gating: these only invalidate on flips (twice per reveal
-         pass), never per frame. */
-      if (footerRevealActive !== revealing) footerRevealActive = revealing;
-      const gone = e >= window.innerHeight - 2;
-      if (sheetGone !== gone) sheetGone = gone;
-    };
-    const onScroll = (): void => {
-      if (ticking) return;
-      ticking = true;
-      requestAnimationFrame(writeVars);
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
-    /* bfcache restores the frozen heap with whatever geometry was live at
-       hide time; a restore can land on a different scroll offset (or after
-       a resize while hidden), so re-sync once the page is shown again. */
-    window.addEventListener('pageshow', onScroll, { passive: true });
-
-    sheetCleanups.push(() => {
-      ro.disconnect();
-      window.removeEventListener('resize', apply);
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('pageshow', onScroll);
-    });
-  }
-
-  /* ------------------------------------------------------------------
      Auto dark/light: sample the page section sitting under the navbar
      band and flip the navbar identity (text, logo, glass surface) when
      it crosses a dark background. Recomputed only on intersection
@@ -781,30 +622,6 @@
     window.addEventListener('scroll', handleWindowScroll, { passive: true });
     window.addEventListener('resize', handleWindowResize);
     if (!hideChrome) initThemeObserver();
-    if (!hideChrome) initSheetReveal();
-    if (!hideChrome) {
-      /* The pre-footer magnetic stop: catches a scroll gesture that comes
-         to rest just before the sheet pins, holds it exactly at the page's
-         end (nothing of the footer shows — the last section IS the end),
-         and releases on deliberate extra scroll. Never engages without the
-         reveal or under reduced motion; native scrolling is never fought
-         (no preventDefault anywhere). */
-      magnetDispose = initMagneticPin({
-        isEligible: () => !!revealShell?.classList.contains('reveal-live'),
-        /* The pin in scroll space, from the same untainted arithmetic
-           writeVars uses (scrollHeight − footer runway − viewport);
-           offsetTop goes stale the moment main sticks. */
-        getPinY: () => {
-          const footerContent = document.querySelector<HTMLElement>('.reveal-footer-content');
-          if (!footerContent) return Number.POSITIVE_INFINITY;
-          return (
-            document.documentElement.scrollHeight -
-            footerContent.offsetHeight -
-            window.innerHeight
-          );
-        }
-      });
-    }
     let disposeWebsiteEvents: (() => void) | undefined;
     let disposeSnapshotStore: (() => void) | undefined;
     try {
@@ -822,8 +639,6 @@
       window.removeEventListener('scroll', handleWindowScroll);
       window.removeEventListener('resize', handleWindowResize);
       themeObserver?.disconnect();
-      for (const fn of sheetCleanups) fn();
-      if (magnetDispose) magnetDispose();
       if (resizeTimer) clearTimeout(resizeTimer);
       if (menuCloseTimer) clearTimeout(menuCloseTimer);
       if (typeof disposeWebsiteEvents === 'function') disposeWebsiteEvents();
@@ -1290,34 +1105,14 @@
     class:site-main-overview-style={isOverviewStyleRoute && !hideChrome}
     class:l2-wrap={!isOverviewStyleRoute && !hideChrome}
   >
-    <!-- The page's ambient world lives inside the sheet: it paints above the
-         sheet's opaque reveal surface and travels with it when the sheet
-         lifts away, so the grid and orbs never flatten out of view. It
-         sleeps once the sheet has fully left the viewport. -->
-    <AmbientBackground paused={sheetGone} />
+    <AmbientBackground />
     <div class="site-route-shell" class:route-dim={$navigating}>
       <slot />
     </div>
   </main>
 
-  <!-- Sticky-sheet runway: the scroll distance past the pin (the reveal).
-       Empty on purpose — see the reveal CSS for why it cannot be main's
-       margin. Height arrives only under .reveal-live. -->
-  <div class="reveal-runway" aria-hidden="true"></div>
-
   {#if !hideChrome}
-  <div class="reveal-footer">
-    <!-- The footer window's own copy of the page's ambient — same orbs and
-         the same interactive cursor-lens grid. The window itself never
-         transforms: only the content wrapper inside it travels, so the
-         lens canvas stays viewport-anchored and bends exactly under the
-         cursor, just like the page. It sleeps whenever the window is
-         hidden (pre-reveal), so nothing paints behind the sheet. -->
-    <AmbientBackground paused={!footerRevealActive} />
-    <div class="reveal-footer-content">
-      <SiteFooter />
-    </div>
-  </div>
+  <SiteFooter />
   {/if}
 </div>
 
@@ -1390,144 +1185,6 @@
     padding: 0 24px;
   }
 
-  /* ── Sticky sheet reveal (driven by initSheetReveal) ────────
-     main becomes the sheet: it scrolls normally, pins at
-     top: -(mainH - 100vh) once its end reaches the viewport bottom, and
-     at that stick point gains its sheet surface — opaque background,
-     rounded bottom, shadow cast onto the footer window — then departs
-     via --lift. The footer is a fixed window beneath the sheet (z 0),
-     hidden until the stick, its inner content travelling through the
-     reveal via --ft-travel so the footer scrolls on after the sheet has
-     gone. Ambient background stays a shell sibling: the sheet only
-     turns opaque at the stick, so the orbs/grid show through the page
-     for its whole length.
-
-     The scroll runway past the pin is a spacer sibling after main, not
-     main's margin-bottom: a sticky element constrained by its own margin
-     box can never travel past the pin — main un-stuck there and the
-     --lift feedback loop ran the sheet away at double speed (measured:
-     lift 150px at pin+120). Shell padding doesn't work either — the
-     sticky constraint rectangle is the shell's CONTENT box, which ends
-     before any padding. The spacer lives inside the content box, so main
-     can stick through the whole reveal while the document height stays
-     identical. */
-  :global(.site-shell.reveal-live) .reveal-runway {
-    height: var(--reveal-pad, 0px);
-  }
-
-  :global(.site-shell.reveal-live) main {
-    position: sticky;
-    top: calc(-1 * var(--sheet-pin, 0px));
-    z-index: 1;
-    /* No transition on the surface — ever. The sheet's background is the
-       same color as the footer window behind it, so an instant swap is
-       pixel-seamless; a fade instead showed the footer through the
-       semi-transparent sheet (the entry flash). The class flip also happens
-       ~150px above the pin, behind full viewport coverage, where even the
-       instant swap is invisible. */
-  }
-
-  :global(.site-shell.reveal-live.is-revealing) main {
-    /* Flat occluding base — the ambient child paints the world texture
-       (orbs + grid + lens) above it, so the sheet never flattens. Applies
-       from arming (band entry), entirely behind full viewport coverage. */
-    background: var(--bg);
-    border-radius: 0 0 28px 28px;
-    box-shadow: 0 26px 60px rgba(15, 20, 25, 0.16);
-    translate: 0 calc(-1 * var(--lift, 0px));
-    /* Layer promotion also lands at arming, off the reveal moment: the
-       sheet re-composites every scroll frame of the reveal — keep that on
-       the compositor instead of repainting the shadowed surface. */
-    will-change: translate;
-  }
-
-  :global(.site-shell.reveal-live) :global(.reveal-footer) {
-    position: fixed;
-    left: 0;
-    right: 0;
-    top: 0;
-    height: 100vh;
-    z-index: 0;
-    overflow: hidden;
-    background: var(--bg);
-    /* The window is a fixed-size 100vh box whose subtree never paints
-       outside it — scope layout/paint to the box so hidden-phase style
-       work stays local (its absolutes are already window-relative; the
-       sticky lens canvas does not need a scroll container). */
-    contain: layout paint;
-    visibility: hidden;
-    /* No opacity and no transition here on purpose. The reveal is pure
-       occlusion: the window is simply behind the sheet, and the sheet
-       physically slides off it. (1) A fade on the way in exposed the CTA
-       block at partial opacity while the sheet lifted — read as a flash.
-       (2) This state is also the EXIT state; fading here ghosted the
-       footer through the page, because dropping .is-revealing fades the
-       sheet's own opaque background back to transparent at the same time.
-       Instant hide is invisible in both directions: hidden-phase pixels
-       equal the html canvas while the sheet covers the viewport. */
-    transition: none;
-  }
-
-  /* The footer content slides within the static window — the window and
-     its ambient never transform, so the lens grid stays cursor-true. */
-  :global(.site-shell.reveal-live) :global(.reveal-footer-content) {
-    translate: 0 calc(-1 * var(--ft-travel, 0px));
-  }
-
-  /* Doc-align the footer window's CSS grid twin with the lens canvas's
-     document-anchored lines (see --ft-grid-y in app.css), so the canvas
-     standing up or sleeping can never shift the grid phase mid-reveal. */
-  :global(.site-shell.reveal-live) :global(.reveal-footer .l2-page-grid) {
-    background-position: 0 calc(-1 * var(--ft-grid-y, 0px));
-  }
-
-  :global(.site-shell.reveal-live.is-revealing) :global(.reveal-footer) {
-    /* Visibility flip only — no fade. The footer is occluded content, not
-       an overlay: it appears exactly as fast as the sheet uncovers it. */
-    visibility: visible;
-  }
-
-  /* First-paint guard (html.js is set inline in app.html): the footer window
-     stays hidden until initSheetReveal decides the mode, killing the load
-     flash where the in-flow SSR footer appeared for a beat and vanished.
-     Plain modes surface it via .reveal-off; no-JS visitors never get html.js. */
-  :global(html.js) :global(.reveal-footer) {
-    visibility: hidden;
-  }
-
-  :global(html.js) :global(.site-shell.reveal-off) :global(.reveal-footer),
-  :global(html.js) :global(.site-shell.reveal-live.is-revealing) :global(.reveal-footer) {
-    visibility: visible;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    :global(.site-shell.reveal-live) .reveal-runway {
-      height: 0;
-    }
-
-    :global(.site-shell.reveal-live) main {
-      position: static;
-    }
-
-    :global(.site-shell.reveal-live.is-revealing) main {
-      background: transparent;
-      border-radius: 0;
-      box-shadow: none;
-      translate: none;
-    }
-
-    :global(.site-shell.reveal-live) :global(.reveal-footer),
-    :global(html.js) :global(.reveal-footer) {
-      position: static;
-      height: auto;
-      overflow: visible;
-      visibility: visible;
-    }
-
-    :global(.site-shell.reveal-live) :global(.reveal-footer-content) {
-      translate: none;
-    }
-  }
 
   /* ============================================================
      Navbar shell — positioning only; the glass surface lives on
