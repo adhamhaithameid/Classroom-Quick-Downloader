@@ -848,34 +848,6 @@ export const seoPages = {
     ]
   }),
 
-  pressKit: withDefaults({
-    path: '/press-kit',
-    title: 'Press Kit: CQD Logos, Screenshots & Brand Assets',
-    description:
-      'Official Classroom Quick Downloader press kit: product summary, logos, screenshots, store links, and brand usage guidelines for writers and reviewers.',
-    eyebrow: 'Media',
-    h1: 'Press Kit',
-    intro:
-      'This page provides a fast media reference for bloggers, student communities, and education tooling directories.',
-    keywords: 'classroom quick downloader press kit, cqd logo, education extension media',
-    sections: [
-      {
-        heading: 'Brand Assets',
-        bullets: [
-          'Use the official CQD logo and extension name as provided.',
-          'Link to official store pages and repository.',
-          'Do not imply affiliation with Google.'
-        ],
-        paragraphs: ['For latest screenshots and product visuals, use the assets folder and website pages linked below.']
-      },
-      {
-        heading: 'Official Links',
-        bullets: [STORE_LINKS.chrome, STORE_LINKS.firefox, STORE_LINKS.edge, STORE_LINKS.github],
-        paragraphs: ['Use these official links in articles and resource pages.']
-      }
-    ]
-  }),
-
   featured: withDefaults({
     path: '/featured',
     title: 'Featured Mentions & Reviews — Classroom Quick Downloader',
@@ -1203,17 +1175,14 @@ const RELATED_PATHS: Record<string, string[]> = {
   ],
   '/security': [
     '/google-workspace-school-accounts-support',
-    '/support',
-    '/press-kit'
+    '/support'
   ],
   '/support': [
     '/google-drive-cant-scan-virus-warning-download',
     '/security',
     '/google-workspace-school-accounts-support'
   ],
-  '/press-kit': ['/featured', '/security', '/download-all-attachments-google-classroom'],
   '/featured': [
-    '/press-kit',
     '/compare/classroom-quick-downloader-vs-classroom-one-click-downloader',
     '/download-all-attachments-google-classroom'
   ],
