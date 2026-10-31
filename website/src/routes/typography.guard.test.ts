@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-// The Google Fonts stylesheet loads Plus Jakarta Sans wght 200..800, so
+// The self-hosted Plus Jakarta Sans variable font covers wght 200..800, so
 // any font-weight: 900 silently clamps to 800. Guard against the dead
 // declaration creeping back.
 const WEIGHT_FILES = [

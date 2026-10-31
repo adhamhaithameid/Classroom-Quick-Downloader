@@ -3,6 +3,10 @@
   import { browser } from '$app/environment';
   import { base } from '$app/paths';
   import { navigating, page } from '$app/stores';
+  /* Self-hosted variable font (bead ts09): no render-blocking Google Fonts
+     request; Vite fingerprints the woff2 files and caches them immutably. */
+  import '@fontsource-variable/plus-jakarta-sans';
+  import '@fontsource-variable/plus-jakarta-sans/wght-italic.css';
   import logo from '$lib/assets/cqd-logo.svg';
   import { APP_VERSION, BING_SITE_VERIFICATION, GOOGLE_SITE_VERIFICATION, STORE_LINKS } from '$lib/config';
   import { browserDisplayName, detectBrowserFromNavigator, type BrowserKey } from '$lib/browser/detect';
