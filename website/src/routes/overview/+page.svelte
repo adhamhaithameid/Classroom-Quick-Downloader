@@ -1457,7 +1457,27 @@
       ? loadDraftPlacements(publishedPlacements)
       : clonePlacements(publishedPlacements);
     initSillyState();
-    const mapComponentsLoad = loadMapComponents().catch(() => undefined);
+    /* The globe + heatmap chunks cost seconds of main-thread work, so they
+       load only when the map section nears the viewport — never during the
+       initial page load (Lighthouse TBT). */
+    const mapSection = document.querySelector('[data-placement-section="map"]');
+    const mapComponentsLoad =
+      isEmbed || editMode || !('IntersectionObserver' in window) || !mapSection
+        ? loadMapComponents().catch(() => undefined)
+        : new Promise<void>((resolve) => {
+            const io = new IntersectionObserver(
+              (entries) => {
+                if (!entries.some((e) => e.isIntersecting)) return;
+                io.disconnect();
+                loadMapComponents().then(
+                  () => resolve(),
+                  () => resolve()
+                );
+              },
+              { rootMargin: '400px 0px' }
+            );
+            io.observe(mapSection);
+          });
 
     /* Reveal must be independent of data loading: if the snapshot API is
        slow or unavailable, sections would otherwise stay hidden forever. */
@@ -1782,7 +1802,7 @@
           <div class="l2-ps-media-card l2-ps-problem">
             <div class="l2-ps-media-badge">Without Classroom Quick Downloader</div>
             <div class="l2-ps-media-wrap">
-              <MediaLoader type="video" src="{base}/videos/problem.mp4" class="l2-ps-video" autoplay loop muted playsinline preload="metadata" ariaLabel="Tedious manual download process" aspectRatio="16/9">
+              <MediaLoader type="video" src="{base}/videos/problem.mp4" class="l2-ps-video" autoplay loop muted playsinline preload="metadata" lazyVideo ariaLabel="Tedious manual download process" aspectRatio="16/9" imgWidth={1878} imgHeight={1080}>
                 <button type="button" class="l2-ps-expand-btn" on:click={() => toggleMediaExpanded('problem-video')} aria-label="Expand video">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
                 </button>
@@ -1798,7 +1818,7 @@
           <div class="l2-ps-media-card l2-ps-solution">
             <div class="l2-ps-media-badge l2-ps-badge-green">With Classroom Quick Downloader</div>
             <div class="l2-ps-media-wrap">
-              <MediaLoader type="video" src="{base}/videos/solution.mp4" class="l2-ps-video" autoplay loop muted playsinline preload="metadata" ariaLabel="Instant batch download with CQD" aspectRatio="16/9">
+              <MediaLoader type="video" src="{base}/videos/solution.mp4" class="l2-ps-video" autoplay loop muted playsinline preload="metadata" lazyVideo ariaLabel="Instant batch download with CQD" aspectRatio="16/9" imgWidth={1878} imgHeight={1080}>
                 <button type="button" class="l2-ps-expand-btn" on:click={() => toggleMediaExpanded('solution-video')} aria-label="Expand video">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
                 </button>
@@ -1825,7 +1845,7 @@
           <div class="l2-ps-media-card l2-ps-problem">
             <div class="l2-ps-media-badge">Without Classroom Quick Downloader</div>
             <div class="l2-ps-media-wrap">
-              <MediaLoader type="image" src="{base}/images/problem-flags.webp" class="l2-ps-img" alt="Classroom posts without edit/comment flags" loading="lazy">
+              <MediaLoader type="image" src="{base}/images/problem-flags.webp" class="l2-ps-img" alt="Classroom posts without edit/comment flags" loading="lazy" aspectRatio="1642/1520" imgWidth={1642} imgHeight={1520}>
                 <button type="button" class="l2-ps-expand-btn" on:click={() => toggleMediaExpanded('problem-flags')} aria-label="Expand image">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
                 </button>
@@ -1841,7 +1861,7 @@
           <div class="l2-ps-media-card l2-ps-solution">
             <div class="l2-ps-media-badge l2-ps-badge-green">With Classroom Quick Downloader</div>
             <div class="l2-ps-media-wrap">
-              <MediaLoader type="image" src="{base}/images/solution-flags.webp" class="l2-ps-img" alt="CQD flags showing edited and commented posts" loading="lazy">
+              <MediaLoader type="image" src="{base}/images/solution-flags.webp" class="l2-ps-img" alt="CQD flags showing edited and commented posts" loading="lazy" aspectRatio="1642/1520" imgWidth={1642} imgHeight={1520}>
                 <button type="button" class="l2-ps-expand-btn" on:click={() => toggleMediaExpanded('solution-flags')} aria-label="Expand image">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
                 </button>
