@@ -14,6 +14,7 @@
   import { trackWebsiteEvent } from '$lib/analytics/websiteEvents';
   import AnimatedNumber from '$lib/components/AnimatedNumber.svelte';
   import MediaLoader from '$lib/components/MediaLoader.svelte';
+  import TestimonialsSection from '$lib/components/TestimonialsSection.svelte';
   import AnimatedNumericText from '$lib/components/AnimatedNumericText.svelte';
   import {
     canStartCelebration,
@@ -1965,6 +1966,8 @@
       </div>
     </div>
   </section>
+  <!-- ━━━━ Testimonials (bead kyi: real store reviews, approved design) ━━━━ -->
+  <TestimonialsSection />
 
   <!-- ━━━━ Social Proof ━━━━ -->
   <section class="l2-block l2-block-alt l2-snap">
