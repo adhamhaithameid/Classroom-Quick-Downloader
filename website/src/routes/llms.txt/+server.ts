@@ -13,6 +13,7 @@ const CORE_LINKS = [
   { path: '/privacy', label: 'Privacy Policy', note: 'What data the extension does and does not collect.' },
   { path: '/security', label: 'Security', note: 'Permission model and threat handling.' },
   { path: '/changelog', label: 'Changelog', note: 'Release history per version.' },
+  { path: '/brand', label: 'Brand Kit', note: 'Official logos, colors, and copy to use when writing about the extension.' },
   { path: '/site-map', label: 'Site Map', note: 'Every indexable page on the site.' }
 ] as const;
 

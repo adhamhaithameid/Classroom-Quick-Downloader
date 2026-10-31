@@ -45,15 +45,11 @@
   }
 </script>
 
-<svelte:head>
-  <title>Brand Kit — Classroom Quick Downloader</title>
-  <meta
-    name="description"
-    content="Logos, colors, and copy for writing about Classroom Quick Downloader. Please do not stretch, recolor, or add effects to the logo."
-  />
-</svelte:head>
-
-<SeoMeta title="Brand Kit — Classroom Quick Downloader" description="Logos, colors, and copy for writing about Classroom Quick Downloader." />
+<SeoMeta
+  title="Brand Kit — Classroom Quick Downloader"
+  description="Logos, colors, and copy for writing about Classroom Quick Downloader. Please do not stretch, recolor, or add effects to the logo."
+  path="/brand"
+/>
 
 <div class="brand">
   <section class="hero">
