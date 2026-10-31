@@ -149,7 +149,7 @@ test('probeEdge: valid Publish API credentials + public version read', async () 
   const calls = [];
   const fetchImpl = async (url, opts = {}) => {
     calls.push({ url, headers: opts.headers });
-    if (url.includes('api.addons.microsoftedge.microsoft.com')) {
+    if (new URL(url).host === 'api.addons.microsoftedge.microsoft.com') {
       return { ok: false, status: 404, json: async () => ({}) };
     }
     return { ok: true, status: 200, json: async () => ({ version: '1.9.3' }) };
