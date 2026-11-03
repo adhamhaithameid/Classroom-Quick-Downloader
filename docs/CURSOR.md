@@ -81,11 +81,12 @@ npx vitest run src/lib/cursor/ src/routes/layout.shell.test.ts
 - `src/lib/cursor/cursorStates.test.ts` — decision table (keyword precedence,
   text-entry and selection escalation, disabled actions, demo overrides),
   easing properties (per-tau fraction, frame-rate independence, clamps),
-  seek angles, approved constants (52px / 80ms / 37 states).
+  seek angles, approved constants (52px / 0ms lag / 37 states).
 - `src/lib/cursor/CursorLayer.guard.test.ts` — pins each reviewed requirement
   in source and rendered output: native stand-down rule, fine-pointer gate,
-  52px, 80ms lag, **no trailing layer**, reduced-motion fallback, glass
-  clearing, seek opt-in, progress fill, all glyph groups.
+  52px, 0ms lag (native pointer tracking, no eased follow), **no trailing
+  layer**, reduced-motion fallback, glass clearing, seek opt-in, progress
+  fill, all glyph groups.
 - `src/routes/layout.shell.test.ts` — the layout mounts the layer on every
   route.
 
