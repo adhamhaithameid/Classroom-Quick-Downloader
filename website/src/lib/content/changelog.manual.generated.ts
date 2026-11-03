@@ -1,6 +1,6 @@
 /* AUTO-GENERATED FILE. DO NOT EDIT DIRECTLY. */
 export const WEBSITE_MANUAL_CHANGELOG = {
-  "generatedAt": 1792569695066,
+  "generatedAt": 1793488979804,
   "source": "manual",
   "entries": [
     {
@@ -26,7 +26,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed the support button rendering as an empty image in production (the SVG asset was referenced but never committed)."
       ],
-      "releasedAtUtc": 1792569695056
+      "releasedAtUtc": 1793488979771
     },
     {
       "id": "manual-1.8.1-2",
@@ -48,7 +48,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed a duplicated static grid showing on the FAQ, Privacy, and Changelog pages.",
         "Fixed a slight horizontal scroll caused by decorative background glow bleeding past the screen edge."
       ],
-      "releasedAtUtc": 1792483295056
+      "releasedAtUtc": 1793402579771
     },
     {
       "id": "manual-1.8.0-3",
@@ -73,7 +73,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed Sheets attachment downloads being rejected as invalid URLs."
       ],
-      "releasedAtUtc": 1792396895056
+      "releasedAtUtc": 1793316179771
     },
     {
       "id": "manual-1.7.9-4",
@@ -88,7 +88,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Firefox downloads report success only on actual completion — no more phantom successes that later vanish."
       ],
       "fixed": [],
-      "releasedAtUtc": 1792310495056
+      "releasedAtUtc": 1793229779771
     },
     {
       "id": "manual-1.7.8-5",
@@ -106,7 +106,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed sign-in and error pages being saved as fake download files — they are now detected and reported as sign-in errors."
       ],
-      "releasedAtUtc": 1792224095056
+      "releasedAtUtc": 1793143379771
     },
     {
       "id": "manual-1.7.7-6",
@@ -126,7 +126,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed cancellations made from the browser's own download panel showing as errors — they now correctly show as cancelled."
       ],
-      "releasedAtUtc": 1792137695056
+      "releasedAtUtc": 1793056979771
     },
     {
       "id": "manual-1.7.6-7",
@@ -137,7 +137,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1792051295056
+      "releasedAtUtc": 1792970579771
     },
     {
       "id": "manual-1.7.5-8",
@@ -148,7 +148,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1791964895056
+      "releasedAtUtc": 1792884179771
     },
     {
       "id": "manual-1.7.4-9",
@@ -159,7 +159,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1791878495056
+      "releasedAtUtc": 1792797779771
     },
     {
       "id": "manual-1.7.3-10",
@@ -176,7 +176,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed the root cause of Download All groups hanging on \"Downloading…\" forever.",
         "Fixed Download All progress not updating when the Classroom tab was in the background."
       ],
-      "releasedAtUtc": 1791792095056
+      "releasedAtUtc": 1792711379771
     },
     {
       "id": "manual-1.7.2-11",
@@ -187,7 +187,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1791705695056
+      "releasedAtUtc": 1792624979771
     },
     {
       "id": "manual-1.7.1-12",
@@ -198,7 +198,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1791619295056
+      "releasedAtUtc": 1792538579771
     },
     {
       "id": "manual-1.7.0-13",
@@ -209,7 +209,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1791532895056
+      "releasedAtUtc": 1792452179771
     },
     {
       "id": "manual-1.6.9-14",
@@ -226,7 +226,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed \"files start but fail\" reports on Firefox-family browsers (zen) and Brave.",
         "Fixed Download All groups with one broken file hanging instead of settling."
       ],
-      "releasedAtUtc": 1791446495056
+      "releasedAtUtc": 1792365779771
     },
     {
       "id": "manual-1.6.8-15",
@@ -237,7 +237,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1791360095056
+      "releasedAtUtc": 1792279379771
     },
     {
       "id": "manual-1.6.7-16",
@@ -248,7 +248,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1791273695056
+      "releasedAtUtc": 1792192979771
     },
     {
       "id": "manual-1.6.6-17",
@@ -267,7 +267,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed download state races where concurrent downloads of the same file could cross wires.",
         "Fixed Google Sheets attachments not getting download buttons."
       ],
-      "releasedAtUtc": 1791187295056
+      "releasedAtUtc": 1792106579771
     },
     {
       "id": "manual-1.6.5-18",
@@ -278,7 +278,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1791100895056
+      "releasedAtUtc": 1792020179771
     },
     {
       "id": "manual-1.6.4-19",
@@ -289,7 +289,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1791014495056
+      "releasedAtUtc": 1791933779771
     },
     {
       "id": "manual-1.6.3-20",
@@ -300,7 +300,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1790928095056
+      "releasedAtUtc": 1791847379771
     },
     {
       "id": "manual-1.6.2-21",
@@ -311,7 +311,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1790841695056
+      "releasedAtUtc": 1791760979771
     },
     {
       "id": "manual-1.6.1-22",
@@ -328,7 +328,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1790755295056
+      "releasedAtUtc": 1791674579771
     },
     {
       "id": "manual-1.6.0-23",
@@ -352,7 +352,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed a race condition where concurrent downloads of the same file could cross wires.",
         "Removed an unused browser permission (least privilege)."
       ],
-      "releasedAtUtc": 1790668895056
+      "releasedAtUtc": 1791588179771
     },
     {
       "id": "manual-1.5.9-24",
@@ -363,7 +363,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1790582495056
+      "releasedAtUtc": 1791501779771
     },
     {
       "id": "manual-1.5.8-25",
@@ -378,7 +378,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Optimized DOM traversal with combined CSS selectors for faster scans on busy pages."
       ],
       "fixed": [],
-      "releasedAtUtc": 1790496095056
+      "releasedAtUtc": 1791415379771
     },
     {
       "id": "manual-1.5.7-26",
@@ -389,7 +389,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1790409695056
+      "releasedAtUtc": 1791328979771
     },
     {
       "id": "manual-1.5.6-27",
@@ -400,7 +400,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [],
       "changed": [],
       "fixed": [],
-      "releasedAtUtc": 1790323295056
+      "releasedAtUtc": 1791242579771
     },
     {
       "id": "manual-1.5.5-28",
@@ -421,7 +421,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed extension package bloat that increased install and update cost on slower networks."
       ],
-      "releasedAtUtc": 1790236895056
+      "releasedAtUtc": 1791156179771
     },
     {
       "id": "manual-1.5.4-29",
@@ -444,7 +444,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed repeated heavy-pass work that could slow down larger Classroom pages."
       ],
-      "releasedAtUtc": 1790150495056
+      "releasedAtUtc": 1791069779771
     },
     {
       "id": "manual-1.5.3-30",
@@ -465,7 +465,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed edge cases where shared wrappers could cause mis-scoped file or flag decisions."
       ],
-      "releasedAtUtc": 1790064095056
+      "releasedAtUtc": 1790983379771
     },
     {
       "id": "manual-1.5.2-31",
@@ -486,7 +486,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed download-state and mapping regressions that could impact reliability under mixed attachment sets."
       ],
-      "releasedAtUtc": 1789977695056
+      "releasedAtUtc": 1790896979771
     },
     {
       "id": "manual-1.5.1-32",
@@ -507,7 +507,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed early Student Work gaps where some submissions were not reachable through the normal download UX."
       ],
-      "releasedAtUtc": 1789891295056
+      "releasedAtUtc": 1790810579771
     },
     {
       "id": "manual-1.5.0-33",
@@ -538,7 +538,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed duplicate or nested flag borders on some posts.",
         "Fixed download states that could stay stuck even after the browser finished the file."
       ],
-      "releasedAtUtc": 1789804895056
+      "releasedAtUtc": 1790724179771
     },
     {
       "id": "manual-1.4.0-34",
@@ -561,7 +561,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed several fragile internal paths by giving the extension clearer runtime boundaries."
       ],
-      "releasedAtUtc": 1789718495056
+      "releasedAtUtc": 1790637779771
     },
     {
       "id": "manual-1.3.9-35",
@@ -588,7 +588,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed issues where changelog visibility could be inconsistent across surfaces.",
         "Fixed multiple reliability edge cases in update-state handling."
       ],
-      "releasedAtUtc": 1789632095056
+      "releasedAtUtc": 1790551379771
     },
     {
       "id": "manual-1.3.8-36",
@@ -615,7 +615,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed same-version publish cases where users could miss new changelog updates.",
         "Fixed stale version-pill and changelog content after changelog updates."
       ],
-      "releasedAtUtc": 1789545695056
+      "releasedAtUtc": 1790464979771
     },
     {
       "id": "manual-1.3.7-37",
@@ -642,7 +642,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed cancelled-download accounting edge cases.",
         "Fixed intermittent long-run progress-state inconsistencies."
       ],
-      "releasedAtUtc": 1789459295056
+      "releasedAtUtc": 1790378579771
     },
     {
       "id": "manual-1.3.6-38",
@@ -669,7 +669,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed stuck-progress scenarios during long runs.",
         "Fixed dependency-path compatibility friction."
       ],
-      "releasedAtUtc": 1789372895056
+      "releasedAtUtc": 1790292179771
     },
     {
       "id": "manual-1.3.0-39",
@@ -696,7 +696,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed remote-config application issues on key limits and timing.",
         "Fixed queue integrity mismatch handling to avoid data drops."
       ],
-      "releasedAtUtc": 1789286495056
+      "releasedAtUtc": 1790205779771
     },
     {
       "id": "manual-1.2.7-40",
@@ -723,7 +723,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed multiple reliability edge cases found during hardening.",
         "Fixed several production stability regressions."
       ],
-      "releasedAtUtc": 1789200095056
+      "releasedAtUtc": 1790119379771
     },
     {
       "id": "manual-1.2.3-41",
@@ -744,7 +744,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed inconsistent telemetry fields in specific event paths."
       ],
-      "releasedAtUtc": 1789113695056
+      "releasedAtUtc": 1790032979771
     },
     {
       "id": "manual-1.2.2-42",
@@ -765,7 +765,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed inconsistent cleanup after cancellation."
       ],
-      "releasedAtUtc": 1789027295056
+      "releasedAtUtc": 1789946579771
     },
     {
       "id": "manual-1.2.1-43",
@@ -786,7 +786,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed slow cancel-state reflection edge cases."
       ],
-      "releasedAtUtc": 1788940895056
+      "releasedAtUtc": 1789860179771
     },
     {
       "id": "manual-1.2.0-44",
@@ -807,7 +807,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed flow limitations where in-flight operations could not be interrupted."
       ],
-      "releasedAtUtc": 1788854495056
+      "releasedAtUtc": 1789773779771
     },
     {
       "id": "manual-1.1.10-45",
@@ -828,7 +828,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed regressions discovered across prolonged usage sessions."
       ],
-      "releasedAtUtc": 1788768095056
+      "releasedAtUtc": 1789687379771
     },
     {
       "id": "manual-1.1.5-46",
@@ -849,7 +849,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed minor behavior mismatches in repeated task flows."
       ],
-      "releasedAtUtc": 1788681695056
+      "releasedAtUtc": 1789600979771
     },
     {
       "id": "manual-1.1.1-47",
@@ -870,7 +870,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed early 1.1 edge-case runtime failures."
       ],
-      "releasedAtUtc": 1788595295056
+      "releasedAtUtc": 1789514579771
     },
     {
       "id": "manual-1.1.0-48",
@@ -891,7 +891,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed packaging and configuration mismatches."
       ],
-      "releasedAtUtc": 1788508895056
+      "releasedAtUtc": 1789428179771
     },
     {
       "id": "manual-1.0.1-49",
@@ -912,7 +912,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed first-wave regressions after 1.0.0 rollout."
       ],
-      "releasedAtUtc": 1788422495056
+      "releasedAtUtc": 1789341779771
     },
     {
       "id": "manual-1.0.0-50",
@@ -933,7 +933,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed pre-stable blockers before public release."
       ],
-      "releasedAtUtc": 1788336095056
+      "releasedAtUtc": 1789255379771
     }
   ]
 } as const;

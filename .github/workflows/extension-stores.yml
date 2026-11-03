@@ -14,31 +14,116 @@ name: Extension Stores — Automated Publish (all three)
 #
 # Each store leg skips itself (with a loud notice) when its secrets are
 # absent, so partial setups still publish what they can.
+#
+# 2026-10-28 (production pipeline): this workflow is also `workflow_call`ed
+# by production.yml after the strict gates + version preflight + human
+# approval. Dispatch remains for emergencies but refuses non-production
+# refs unless allow_non_production=true, and every publish leg carries
+# `environment: production` — the approval click is mandatory on every
+# path that reaches users. Per-store publish inputs (publish_cws/edge/amo)
+# come from the preflight verdicts; a store whose version is already live
+# or in review is never re-attempted (AMO version-exists 409 is a clean
+# skip, matching the CWS/Edge parity below).
 
 on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Git ref to publish (tag or branch, e.g. v1.8.7)'
+        description: 'Git ref to publish (tag or branch, e.g. production)'
         required: true
-        default: 'main'
+        default: 'production'
+      allow_non_production:
+        description: 'Explicitly allow publishing a ref other than production (emergency only)'
+        type: boolean
+        default: false
+      publish_cws:
+        description: 'Publish the Chrome Web Store leg'
+        type: boolean
+        default: true
+      publish_edge:
+        description: 'Publish the Edge Add-ons leg'
+        type: boolean
+        default: true
+      publish_amo:
+        description: 'Publish the Firefox/AMO leg'
+        type: boolean
+        default: true
+      skip_gate:
+        description: 'Skip the mega-e2e gate (only when production.yml already ran the full matrix)'
+        type: boolean
+        default: false
+      dry_run:
+        description: 'Rehearse: build + gate only, no store submission'
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: true
+      allow_non_production:
+        type: boolean
+        default: false
+      publish_cws:
+        type: boolean
+        default: true
+      publish_edge:
+        type: boolean
+        default: true
+      publish_amo:
+        type: boolean
+        default: true
+      skip_gate:
+        type: boolean
+        default: false
+      dry_run:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
+  # DISPATCH PREFLIGHT: emergency dispatches must target production (or
+  # explicitly own the exception). workflow_call entries from production.yml
+  # are exempt — the caller ran the full gates and preflight already.
+  dispatch-preflight:
+    name: Dispatch preflight (ref guard)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Enforce production ref on manual dispatch
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          REF="${{ github.event.inputs.ref }}"
+          ALLOW="${{ github.event.inputs.allow_non_production }}"
+          if [ "$REF" != "production" ] && [ "$ALLOW" != "true" ]; then
+            echo "::error::Store publishes run only from the production branch. Re-dispatch with ref=production, or set allow_non_production=true for a declared emergency."
+            exit 1
+          fi
+          if [ "$ALLOW" = "true" ] && [ "$REF" != "production" ]; then
+            echo "::warning::NON-PRODUCTION emergency publish authorized by the dispatcher (ref=$REF). The environment approval still applies."
+          fi
+      - name: Called from production pipeline — ref guard already enforced upstream
+        if: github.event_name == 'workflow_call'
+        run: echo "ref=${{ inputs.ref }} (called by ${{ github.event.workflow_run.name || 'production pipeline' }}) — preflight owned by caller."
+
   # MEGA-E2E GATE (2026-10-25): no store dispatch may skip the quality
   # suite. CI-side scope is build+unit+golden+drift (the full browser matrix
   # runs in the CI matrix on push; the local-only legs — edge/firefox/live —
   # are recorded as skips in the report). A gate failure blocks every store.
+  # Skippable only via skip_gate=true, which production.yml sets because its
+  # stage 1 ran a strictly larger matrix on the same commit.
   mega-e2e-gate:
+    needs: dispatch-preflight
+    if: inputs.skip_gate != true
     name: Mega-E2E quality gate (pre-deploy)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.inputs.ref || github.ref }}
+          ref: ${{ inputs.ref || github.event.inputs.ref || github.ref }}
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: 12.15.0
@@ -60,14 +145,15 @@ jobs:
           path: qa-artifacts/mega-e2e/
 
   build-chrome:
-    needs: mega-e2e-gate
+    needs: [dispatch-preflight, mega-e2e-gate]
+    if: always() && needs.dispatch-preflight.result == 'success' && (needs.mega-e2e-gate.result == 'success' || needs.mega-e2e-gate.result == 'skipped')
     name: Build Chrome zip
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.inputs.ref || github.ref }}
+          ref: ${{ inputs.ref || github.event.inputs.ref || github.ref }}
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: 12.15.0
@@ -85,13 +171,15 @@ jobs:
           retention-days: 14
 
   build-edge:
+    needs: [dispatch-preflight, mega-e2e-gate]
+    if: always() && needs.dispatch-preflight.result == 'success' && (needs.mega-e2e-gate.result == 'success' || needs.mega-e2e-gate.result == 'skipped')
     name: Build Edge zip
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.inputs.ref || github.ref }}
+          ref: ${{ inputs.ref || github.event.inputs.ref || github.ref }}
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: 12.15.0
@@ -109,13 +197,15 @@ jobs:
           retention-days: 14
 
   build-firefox:
+    needs: [dispatch-preflight, mega-e2e-gate]
+    if: always() && needs.dispatch-preflight.result == 'success' && (needs.mega-e2e-gate.result == 'success' || needs.mega-e2e-gate.result == 'skipped')
     name: Build Firefox zip
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.inputs.ref || github.ref }}
+          ref: ${{ inputs.ref || github.event.inputs.ref || github.ref }}
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: 12.15.0
@@ -133,7 +223,9 @@ jobs:
 
   publish-firefox-listed:
     name: Publish to AMO (listed)
+    environment: production
     needs: [mega-e2e-gate, build-firefox]
+    if: always() && needs.build-firefox.result == 'success' && (needs.mega-e2e-gate.result == 'success' || needs.mega-e2e-gate.result == 'skipped') && inputs.publish_amo == true && inputs.dry_run != true
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -166,7 +258,9 @@ jobs:
 
   publish-edge:
     name: Publish to Edge Add-ons
+    environment: production
     needs: [mega-e2e-gate, build-edge]
+    if: always() && needs.build-edge.result == 'success' && (needs.mega-e2e-gate.result == 'success' || needs.mega-e2e-gate.result == 'skipped') && inputs.publish_edge == true && inputs.dry_run != true
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -196,7 +290,9 @@ jobs:
 
   publish-chrome:
     name: Publish to Chrome Web Store
+    environment: production
     needs: [mega-e2e-gate, build-chrome]
+    if: always() && needs.build-chrome.result == 'success' && (needs.mega-e2e-gate.result == 'success' || needs.mega-e2e-gate.result == 'skipped') && inputs.publish_cws == true && inputs.dry_run != true
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -253,3 +349,14 @@ jobs:
       - name: CWS publish skipped (secrets not set yet)
         if: env.CWS_REFRESH_TOKEN_S == ''
         run: echo "::notice::CWS secrets not configured — add CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN to enable automated Chrome publishing."
+
+  publish-dry-run:
+    name: Dry run — store submission skipped
+    needs: [dispatch-preflight, build-chrome, build-edge, build-firefox]
+    if: always() && inputs.dry_run == true && needs.dispatch-preflight.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Report intended submissions
+        run: |
+          echo "::notice::DRY RUN: would submit stores (cws=${{ inputs.publish_cws }}, edge=${{ inputs.publish_edge }}, amo=${{ inputs.publish_amo }}) from ref ${{ inputs.ref || github.event.inputs.ref }}. No store was contacted."
