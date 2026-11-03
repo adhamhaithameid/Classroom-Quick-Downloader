@@ -159,6 +159,10 @@ export async function launchQaContext(
   scenario: Scenario,
   opts: { skipIfExtensionUnavailable?: boolean } = {},
 ): Promise<QaSession> {
+  // Each session's probe result must be authoritative: a degraded launch in
+  // an earlier session (e.g. a failed Firefox launch) must not poison the
+  // skip decisions of later sessions in the same worker.
+  EXTENSION_UNAVAILABLE_REASON = null;
   const sim = await startSimulatorProxy(scenario);
 
   /* A failed browser launch (e.g. the darwin sandbox denying the bundled
