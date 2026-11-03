@@ -1066,13 +1066,21 @@ describe('background download handler — start-callback timeout (S2)', () => {
       );
 
       const keep = ctx.mod.handleDownloadRequest(
-        { url: 'https://example.com/b.pdf', requestId: 'req-noresponder' },
+        {
+          url: 'https://example.com/b.pdf',
+          requestId: 'req-noresponder',
+          pageType: 'stream',
+          engineMode: 'legacy',
+          strategy: 'direct',
+        },
         { tab: { id: 22 } } as chrome.runtime.MessageSender,
         undefined as unknown as (response?: unknown) => void,
       );
       expect(keep).toBe(true);
       const pending = ctx.stateModule.pendingByRequestId.get('req-noresponder');
       expect(pending?.currentDownloadId).toBe(124);
+      expect(pending?.pageType).toBe('stream');
+      expect(pending?.engineMode).toBe('legacy');
     });
   });
 });
