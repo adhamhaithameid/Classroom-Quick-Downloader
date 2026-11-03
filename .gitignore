@@ -80,6 +80,10 @@ gui-test-screenshots/
 tools/commit-planner/data.js
 tools/commit-planner/data.json
 
+# SEC-001: the DO state dump must never be tracked on the default branch.
+# The backup lane force-adds its redacted copy (data-backups.yml).
+backups/latest/do-storage.json
+
 # session artifacts (local only)
 tests/e2e/.live-profile/
 brag-output/

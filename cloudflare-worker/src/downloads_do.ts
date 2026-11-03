@@ -129,6 +129,73 @@ function normalizeRecentCountReports(input: unknown): RecentCountReport[] {
  */
 export const MAX_DOWNLOAD_COUNT_INSTALLS = 50_000;
 
+// SEC-001: the public backup lane must never carry material that identifies
+// visitors or exposes the admin perimeter. `GET /admin/storage-export?redacted=1`
+// strips it at the source, so the full-fidelity dump never touches a runner or
+// git history. Manual admin exports (no param) keep full fidelity.
+
+const BACKUP_REDACTED_CORE_KEYS: readonly string[] = [
+  "loginAttempts",
+  "ipAllowlist",
+  "ipAllowlistEnabled",
+  "ipAllowlistStepUpBypassEnabled",
+  "dangerActionAuditLogs",
+  "sessionBindingLastExpectedPrefix",
+  "burstCounts",
+];
+
+// Visitor-scoped fields: request-scoped session id, per-view page path, and
+// the free-form event meta (page-error beacons embed URLs). Kept fields stay
+// aggregate-only (eventType/action/placement/tsUtc).
+const BACKUP_REDACTED_VISITOR_KEYS: readonly string[] = ["sessionId", "pagePath", "meta"];
+
+const REDACT_WALK_DEPTH_MAX = 12;
+
+function redactUninstallSubmission(row: unknown): unknown {
+  if (!isPlainObject(row)) return row;
+  return {
+    submissionId: row.submissionId,
+    submittedAtUtc: row.submittedAtUtc,
+    browser: row.browser,
+    version: row.version,
+    source: row.source,
+  };
+}
+
+function redactVisitorFields(value: unknown, depth: number): unknown {
+  if (depth > REDACT_WALK_DEPTH_MAX) return value;
+  if (Array.isArray(value)) return value.map((row) => redactVisitorFields(row, depth + 1));
+  if (!isPlainObject(value)) return value;
+  const out: Record<string, unknown> = {};
+  for (const [key, inner] of Object.entries(value)) {
+    if (BACKUP_REDACTED_VISITOR_KEYS.includes(key)) continue;
+    // Uninstall submissions carry visitor free text wherever they persist —
+    // the analytics_state core and the analytics_uninstall shard alike.
+    if (key === "uninstallSubmissions" && Array.isArray(inner)) {
+      out[key] = inner.map(redactUninstallSubmission);
+      continue;
+    }
+    out[key] = redactVisitorFields(inner, depth + 1);
+  }
+  return out;
+}
+
+export function redactStorageForBackup(
+  storage: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(storage)) {
+    if (key === "analytics_state" && isPlainObject(value)) {
+      const core: Record<string, unknown> = { ...value };
+      for (const redactedKey of BACKUP_REDACTED_CORE_KEYS) delete core[redactedKey];
+      out[key] = redactVisitorFields(core, 0);
+      continue;
+    }
+    out[key] = redactVisitorFields(value, 0);
+  }
+  return out;
+}
+
 type DurableStateShape = {
   totalEvents: number;
   totalDownloads: number;
@@ -3363,7 +3430,7 @@ export class DownloadsDurable {
       if (!this.isAuthorizedAdmin(request)) {
         return json({ ok: false, error: "unauthorized" }, { status: 401 });
       }
-      return this.handleAdminStorageExport();
+      return this.handleAdminStorageExport(request);
     }
 
     if (pathname === "/debug/flush" && request.method === "POST") {
@@ -5524,8 +5591,11 @@ export class DownloadsDurable {
    * Full DO-storage export (admin only). Portability insurance: everything the
    * DO persists (counters, queues, config, audits, archive bookkeeping) in one
    * authenticated JSON dump, so the data can leave Cloudflare anytime.
+   * `?redacted=1` drops visitor-identifying and admin-perimeter material
+   * (see redactStorageForBackup) for the public backup lane.
    */
-  private async handleAdminStorageExport(): Promise<Response> {
+  private async handleAdminStorageExport(request: Request): Promise<Response> {
+    const redacted = new URL(request.url).searchParams.get("redacted") === "1";
     const exported: Record<string, unknown> = {};
     const MAX_BYTES = 8 * 1024 * 1024;
     let totalBytes = 0;
@@ -5540,14 +5610,16 @@ export class DownloadsDurable {
       exported[key] = value;
       totalBytes += text.length;
     }
+    const storage = redacted ? redactStorageForBackup(exported) : exported;
     return json(
       {
         ok: true,
         generatedAtUtc: Date.now(),
-        keyCount: Object.keys(exported).length,
+        redacted,
+        keyCount: Object.keys(storage).length,
         totalBytes,
         truncated,
-        storage: exported,
+        storage,
       },
       { headers: { "cache-control": "no-store" } },
     );
