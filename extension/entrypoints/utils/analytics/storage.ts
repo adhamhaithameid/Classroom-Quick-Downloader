@@ -219,7 +219,10 @@ function buildRollupKey(ev: AnalyticsEvent, bucketStart: number, coarse = false)
   const version = ev.ext_version || '0.0.0';
   const source = ev.source || '';
   const bypass = ev.bypass_used ? '1' : '0';
-  return [bucketStart, status, type, browser, os, lang, version, error, source, bypass].join('|');
+  const pageType = ev.pageType || 'unknown';
+  const engineMode = ev.engineMode || 'unknown';
+  const strategy = ev.strategy || 'unknown';
+  return [bucketStart, status, type, browser, os, lang, version, error, source, bypass, pageType, engineMode, strategy].join('|');
 }
 
 function rollupEvents(events: AnalyticsEvent[], coarse = false): AnalyticsEvent[] {
@@ -269,6 +272,11 @@ function rollupEvents(events: AnalyticsEvent[], coarse = false): AnalyticsEvent[
       id: generateEventId(entry.earliest),
       retryCount: 0,
       source: coarse ? 'rollup' : sample.source,
+      // 1ef6.2: carry the use-case context through compaction so rolled-up
+      // failures still land on their real use-case, not a blended 'unknown'.
+      pageType: coarse ? 'mixed' : (sample.pageType || 'unknown'),
+      engineMode: coarse ? 'mixed' : (sample.engineMode || 'unknown'),
+      strategy: coarse ? 'mixed' : (sample.strategy || 'unknown'),
       count: entry.count,
       rollup: true,
     });

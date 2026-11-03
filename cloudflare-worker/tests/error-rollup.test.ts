@@ -160,3 +160,53 @@ describe("error rollup (1ef6.2)", () => {
     expect(rows.some((row) => row.errorType === "minor_10")).toBe(false); // evicted (11 over the cap)
   });
 });
+
+describe("hostile snake_case ingest (review 2026-11-03)", () => {
+  it("sanitizes direct snake_case context fields instead of persisting them raw", async () => {
+    const obj = makeDO();
+    await postTrack(obj, [
+      failEvent({
+        // No camelCase aliases — hostile snake_case straight in.
+        pageType: undefined,
+        engineMode: undefined,
+        strategy: undefined,
+        page_type: `${"|".repeat(40)}hostile`,
+        engine_mode: "X".repeat(500),
+        strategy: "DROP TABLE students; --",
+      }),
+    ]);
+    const { body } = await getRollup(obj);
+    const rows = body.rows as Array<Record<string, unknown>>;
+    expect(rows).toHaveLength(1);
+    // Off-pattern and over-length values fall back to "unknown"; the
+    // pipe-loaded pageType cannot inject extra key fields.
+    expect(rows[0].pageType).toBe("unknown");
+    expect(rows[0].engineMode).toBe("unknown");
+    expect(rows[0].strategy).toBe("unknown");
+    const text = JSON.stringify(body);
+    expect(text).not.toContain("hostile");
+    expect(text).not.toContain("DROP TABLE");
+  });
+
+  it("keeps well-formed direct snake_case values", async () => {
+    const obj = makeDO();
+    await postTrack(obj, [
+      failEvent({
+        pageType: undefined,
+        engineMode: undefined,
+        strategy: undefined,
+        page_type: "stream",
+        engine_mode: "legacy",
+        strategy: "direct",
+      }),
+    ]);
+    const { body } = await getRollup(obj);
+    const rows = body.rows as Array<Record<string, unknown>>;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      pageType: "stream",
+      engineMode: "legacy",
+      strategy: "direct",
+    });
+  });
+});

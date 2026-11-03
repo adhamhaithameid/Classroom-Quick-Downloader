@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Analytics, recordDownloadEvent } from '../entrypoints/utils/analytics';
 import { eventContextFor } from '../entrypoints/background/download-handler';
 import { loadQueue, __resetStorageForTests } from '../entrypoints/utils/analytics/storage';
+import { STORAGE_KEYS } from '../entrypoints/utils/analytics/constants';
 
 /**
  * Use-case enrichment (bead 1ef6.1): failure + runtime_error events carry
@@ -107,5 +108,29 @@ describe('analytics use-case context (1ef6.1)', () => {
       engineMode: undefined,
       strategy: 'direct',
     });
+  });
+
+  it('storage-time sanitizer drops non-string and strips-to-empty context fields', async () => {
+    // Simulate pre-1ef6.1 persisted rows: context arrives at the storage
+    // sanitizer in shapes the track-time sanitizer would never emit, so the
+    // normalizeContextField fallbacks must hold on their own.
+    store[STORAGE_KEYS.QUEUE] = [
+      {
+        status: 'fail',
+        file_type: 'pdf',
+        error_type: 'sentinel-c',
+        timestamp: Date.now(),
+        id: 'legacy-1',
+        pageType: 42, // non-string → undefined
+        engineMode: '<<<>', // every char stripped → undefined
+        strategy: true, // non-string → undefined
+      },
+    ];
+    const { queue } = await loadQueue();
+    const row = queue.find((ev) => ev.error_type === 'sentinel-c') as Record<string, unknown>;
+    expect(row).toBeDefined();
+    expect(row.pageType).toBeUndefined();
+    expect(row.engineMode).toBeUndefined();
+    expect(row.strategy).toBeUndefined();
   });
 });

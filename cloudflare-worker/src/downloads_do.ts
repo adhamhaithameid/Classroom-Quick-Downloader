@@ -4274,6 +4274,21 @@ export class DownloadsDurable {
       delete rawAny.engineMode;
       // NB: strategy is its own snake_case name — nothing to delete.
 
+      // Review 2026-11-03: a client can submit the snake_case fields
+      // directly, skipping the alias block. Sanitize the persisted fields
+      // unconditionally — over-length or off-pattern values fall back to
+      // "unknown" (sanitizeString), so the rollup key stays bounded and
+      // well-formed.
+      if (ev.page_type) {
+        ev.page_type = sanitizeString(ev.page_type, 20, FIELD_PATTERNS.generic);
+      }
+      if (ev.engine_mode) {
+        ev.engine_mode = sanitizeString(ev.engine_mode, 12, FIELD_PATTERNS.generic);
+      }
+      if (ev.strategy) {
+        ev.strategy = sanitizeString(ev.strategy, 16, FIELD_PATTERNS.generic);
+      }
+
       // PRIVACY: Never persist IPs. Strip any client-provided ip_address.
       delete ev.ip_address;
 
