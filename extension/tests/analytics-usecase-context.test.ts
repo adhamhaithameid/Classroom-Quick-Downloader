@@ -2,8 +2,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Analytics, recordDownloadEvent } from '../entrypoints/utils/analytics';
 import { eventContextFor } from '../entrypoints/background/download-handler';
-import { loadQueue, __resetStorageForTests } from '../entrypoints/utils/analytics/storage';
-import { STORAGE_KEYS } from '../entrypoints/utils/analytics/constants';
+import {
+  loadQueue,
+  __resetStorageForTests,
+  __storageTestInternals,
+} from '../entrypoints/utils/analytics/storage';
 
 /**
  * Use-case enrichment (bead 1ef6.1): failure + runtime_error events carry
@@ -42,7 +45,7 @@ beforeEach(async () => {
     },
     runtime: { id: 'test' },
   };
-  __resetStorageForTests();
+  await __resetStorageForTests(); // async: the IDB close + memory reset must land before the next test
 });
 
 /** The track op chain is async; poll the persisted queue for the sentinel event. */
@@ -110,11 +113,11 @@ describe('analytics use-case context (1ef6.1)', () => {
     });
   });
 
-  it('storage-time sanitizer drops non-string and strips-to-empty context fields', async () => {
+  it('storage-time sanitizer drops non-string and strips-to-empty context fields', () => {
     // Simulate pre-1ef6.1 persisted rows: context arrives at the storage
     // sanitizer in shapes the track-time sanitizer would never emit, so the
     // normalizeContextField fallbacks must hold on their own.
-    store[STORAGE_KEYS.QUEUE] = [
+    const row = __storageTestInternals.sanitizeEvent(
       {
         status: 'fail',
         file_type: 'pdf',
@@ -125,10 +128,9 @@ describe('analytics use-case context (1ef6.1)', () => {
         engineMode: '<<<>', // every char stripped → undefined
         strategy: true, // non-string → undefined
       },
-    ];
-    const { queue } = await loadQueue();
-    const row = queue.find((ev) => ev.error_type === 'sentinel-c') as Record<string, unknown>;
-    expect(row).toBeDefined();
+      Date.now(),
+    ) as Record<string, unknown>;
+    expect(row).toBeTruthy();
     expect(row.pageType).toBeUndefined();
     expect(row.engineMode).toBeUndefined();
     expect(row.strategy).toBeUndefined();
