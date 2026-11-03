@@ -88,11 +88,23 @@ export function createOffscreenCountRenderer(
 
 /** Prod wiring over the real browser APIs (service worker safe). */
 export function createRuntimeCountRenderer(): CountRenderer {
+  // Memoize decoded bitmaps per frame+size: the frame set is finite (spin
+  // frames × SIZES), so one fetch+decode each beats re-fetching on every
+  // new count render.
+  const bitmapCache = new Map<string, Promise<ImageBitmap>>();
   return createOffscreenCountRenderer({
-    async loadBitmap(framePath) {
-      const url = chrome.runtime.getURL(framePath);
-      const blob = await (await fetch(url)).blob();
-      return createImageBitmap(blob);
+    loadBitmap(framePath: string, size: number): Promise<ImageBitmap> {
+      const key = `${framePath}:${size}`;
+      let pending = bitmapCache.get(key);
+      if (!pending) {
+        pending = (async () => {
+          const url = chrome.runtime.getURL(framePath);
+          const blob = await (await fetch(url)).blob();
+          return createImageBitmap(blob);
+        })();
+        bitmapCache.set(key, pending);
+      }
+      return pending;
     },
     makeCanvas(size) {
       const canvas = new OffscreenCanvas(size, size);

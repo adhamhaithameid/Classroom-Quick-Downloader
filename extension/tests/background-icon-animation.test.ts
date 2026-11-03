@@ -225,4 +225,30 @@ describe('background icon animation controller', () => {
     expect(setIcon).toHaveBeenCalledWith({ tabId: 1, path: COLOR_ICON_PATHS });
     expect(setIcon).toHaveBeenCalledWith({ tabId: 2, path: GRAY_ICON_PATHS });
   });
+
+  it('a pending composite cannot overpaint the drain flash (review 2026-11-03)', async () => {
+    let releaseStale!: (v: ImageData | null) => void;
+    const renderer = makeRenderer(true, (path) => {
+      if (path.endsWith('spin-0-16.png')) {
+        // Stall the active composite on its first size.
+        return new Promise((resolve) => {
+          releaseStale = resolve;
+        });
+      }
+      return Promise.resolve({ marker: path } as unknown as ImageData);
+    });
+    const c = createIconAnimationController({ timers, renderer });
+    c.setActiveCount(1); // apply #1: active composite stalls on spin-0-16 (seq captured)
+
+    // The queue drains while the composite is still pending: the flash
+    // paints and must stay the last write.
+    c.notifySettled('success');
+    c.setActiveCount(0);
+    expect(setIcon.mock.calls.at(-1)![0]).toMatchObject({ path: SUCCESS_ICON_PATHS });
+
+    releaseStale({ marker: 'late' } as unknown as ImageData);
+    await vi.advanceTimersByTimeAsync(1);
+    // The stale spinner frame must NOT overpaint the success flash.
+    expect(setIcon.mock.calls.at(-1)![0]).toMatchObject({ path: SUCCESS_ICON_PATHS });
+  });
 });

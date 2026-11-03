@@ -43,7 +43,7 @@ export const ERROR_ICON_PATHS = buildPaths('error');
 
 const BADGE_BG = '#188038';
 const BADGE_FG = '#ffffff';
-const MAX_BADGE_LABEL = '99';
+const MAX_BADGE_LABEL = '99+';
 
 const globalTimers: IconTimers = {
   setInterval: (fn, ms) => setInterval(fn, ms),
@@ -116,6 +116,10 @@ export function createIconAnimationController(deps?: {
 
   // The machine only emits on change, so no extra dedupe lives here.
   const apply = (render: IconRender): void => {
+    // Every new render invalidates all in-flight composites: bump the
+    // sequence FIRST so a pending composite can never overpaint a newer
+    // state (the drain flash, the disabled cleanup, or a plain frame).
+    const seq = ++applySeq;
     if (render.phase === 'disabled') {
       // No repaint here: index.ts calls setEnabled BEFORE updateGlobalIcon,
       // whose gray walk lands right after the overrides are cleared.
@@ -129,7 +133,6 @@ export function createIconAnimationController(deps?: {
       if (activeCount > 0 && renderer.isAvailable()) {
         // Composite the count into each size, latest render wins: a slow
         // composite from an earlier frame must never overwrite a newer one.
-        const seq = ++applySeq;
         const frameIndex = render.frameIndex;
         void (async () => {
           const out: Record<number, ImageData> = {};
