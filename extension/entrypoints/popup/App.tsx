@@ -795,7 +795,7 @@ function App() {
     }
   }, []);
 
-  function handleEngineModeSelect(nextMode: 'legacy' | 'v2' | 'v3') {
+  function handleEngineModeSelect(nextMode: 'legacy' | 'v2' | 'v3' | 'auto') {
     // Any engine decision closes the confirm card first (surface 03 T2:
     // picking another engine while the card is open is a decline + switch).
     if (apiConfirmOpen) setApiConfirmOpen(false);
@@ -812,7 +812,7 @@ function App() {
   }
 
   /** The shared persistence + live-switch path for an engine decision. */
-  function commitEngineMode(nextMode: 'legacy' | 'v2' | 'v3') {
+  function commitEngineMode(nextMode: 'legacy' | 'v2' | 'v3' | 'auto') {
     setEngineMode(nextMode);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const browserApi = (globalThis as any).chrome;
@@ -2015,7 +2015,7 @@ export function PrivacyLedger() {
  *  permission + oauth2 client_id, docs/engine/api-assist-setup.md), and
  *  selecting it while enabled is the user's explicit consent that sets
  *  cqdV2Mode 'v3'. */
-export type PopupEngineMode = 'legacy' | 'v2' | 'v3';
+export type PopupEngineMode = 'legacy' | 'v2' | 'v3' | 'auto';
 
 /**
  * Resolve the popup's engine-mode display from raw storage — the same
@@ -2028,7 +2028,7 @@ export type PopupEngineMode = 'legacy' | 'v2' | 'v3';
  * finding 12).
  */
 export function resolveEngineMode(stored: unknown): PopupEngineMode {
-  if (stored === 'legacy' || stored === 'v2' || stored === 'v3') {
+  if (stored === 'legacy' || stored === 'v2' || stored === 'v3' || stored === 'auto') {
     return stored;
   }
   return 'v2';
@@ -2145,6 +2145,12 @@ export function EngineModeRow({ mode, loading, apiConfigured, onSelect }: Engine
       label: popupMessage('popupEngineModeApi'),
       disabled: !apiConfigured,
       title: apiConfigured ? API_PRIVACY_TOOLTIP : API_SETUP_TOOLTIP,
+    },
+    {
+      value: 'auto',
+      label: 'Auto',
+      disabled: false,
+      title: 'Picks the best engine for you from your own download results. Never sends page data.',
     },
   ];
 
