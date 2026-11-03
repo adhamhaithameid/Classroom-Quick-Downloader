@@ -11,8 +11,10 @@ import type { StoredEvent } from "../src/types";
 
 const STORAGE_KEY = "analytics_state";
 
-vi.mock("../src/event-archive", () => {
+vi.mock("../src/event-archive", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/event-archive")>();
   return {
+    ...actual,
     ensureArchiveSchema: vi.fn(async () => ({ ok: true })),
     archiveBatch: vi.fn(async (..._args: unknown[]) => {
       return { ok: true };
@@ -311,5 +313,83 @@ describe("ldlz: pipeline-health stale thresholds follow the daily cadence", () =
     const thresholds = body.thresholds as Record<string, unknown>;
     expect(thresholds.warnStaleMs).toBe(1000);
     expect(thresholds.criticalStaleMs).toBe(2000);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 0k86: payload-size cap — a batch whose serialized envelope exceeds the D1
+// archive cap fails IDENTICALLY on every attempt. Classify that error and
+// dead-letter the queued batch immediately instead of burning all
+// MAX_BATCH_ATTEMPTS retries on a guaranteed-to-fail write.
+// ---------------------------------------------------------------------------
+describe("0k86: payload-size cap fast-fail", () => {
+  it("dead-letters the queued head batch on the FIRST payload_too_large failure", async () => {
+    vi.setSystemTime(new Date("2026-10-27T00:30:00.000Z"));
+    archiveBatchMock.mockResolvedValue({ ok: false, error: "payload_too_large" });
+    const { obj, state } = makeDO({
+      buffer: [],
+      pendingBatches: [makePendingBatch("oversize-1", 2, 1)], // attempts < MAX
+      lastFlushAt: Date.parse("2026-10-26T12:00:00.000Z"),
+      retryState: { consecutiveFailures: 0 },
+      configMaxBufferSize: 50000,
+    });
+
+    await obj.alarm();
+
+    const after = state.storage.dump() as {
+      pendingBatches?: unknown[];
+      oracleDeadLetters?: Array<{ batchId: string; lastError?: string }>;
+      deadLetteredBatchesTotal?: number;
+    };
+    expect(after.pendingBatches ?? []).toHaveLength(0);
+    expect(after.oracleDeadLetters?.[0]?.batchId).toBe("oversize-1");
+    expect(after.oracleDeadLetters?.[0]?.lastError).toContain("payload_too_large");
+    expect(after.deadLetteredBatchesTotal).toBe(1);
+  });
+
+  it("stashes a fresh oversize flush once, then dead-letters it on the next cycle", async () => {
+    vi.setSystemTime(new Date("2026-10-27T00:30:00.000Z"));
+    archiveBatchMock.mockResolvedValue({ ok: false, error: "payload_too_large" });
+    // Seed a buffer big enough that the flush path builds a batch from it.
+    const events = Array.from({ length: 3 }, (_, i) => ({
+      seq: i + 1,
+      type: "download_start",
+      timestamp: Date.parse("2026-10-26T23:00:00.000Z") + i * 1000,
+      browser: "chrome",
+      os: "mac",
+      country: "US",
+      language: "en",
+      version: "1.9.3",
+      success: 1,
+      weightedCount: 1,
+    }));
+    const { obj, state } = makeDO({
+      buffer: events,
+      pendingBatches: [],
+      lastFlushAt: Date.parse("2026-10-26T12:00:00.000Z"),
+      retryState: { consecutiveFailures: 0 },
+      configMaxBufferSize: 50000,
+    });
+
+    await obj.alarm();
+
+    const after = state.storage.dump() as {
+      pendingBatches?: Array<{ batch: { batchId: string }; attempts?: number }>;
+      oracleDeadLetters?: unknown[];
+    };
+    expect(after.pendingBatches).toHaveLength(1);
+    expect(after.oracleDeadLetters ?? []).toHaveLength(0);
+
+    // Next alarm: the stashed batch flushes as the queued head and must
+    // dead-letter immediately on the size error.
+    archiveBatchMock.mockResolvedValue({ ok: false, error: "payload_too_large" });
+    vi.setSystemTime(new Date("2026-10-28T00:30:00.000Z"));
+    await obj.alarm();
+    const final = state.storage.dump() as {
+      pendingBatches?: unknown[];
+      oracleDeadLetters?: Array<{ batchId: string; lastError?: string }>;
+    };
+    expect(final.pendingBatches ?? []).toHaveLength(0);
+    expect(final.oracleDeadLetters?.[0]?.lastError).toContain("payload_too_large");
   });
 });

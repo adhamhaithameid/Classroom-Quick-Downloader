@@ -24,6 +24,8 @@ export interface ArchiveStats {
 
 const ARCHIVE_TABLE = "event_archive";
 
+const textEncoder = new TextEncoder();
+
 let schemaReady = false;
 
 /**
@@ -57,6 +59,15 @@ export async function ensureArchiveSchema(db: D1Database): Promise<ArchiveWriteR
   }
 }
 
+/** Cap on the serialized envelope bound into the archive row. An envelope
+ * over this size fails the D1 bind IDENTICALLY on every retry — the caller
+ * classifies the error and dead-letters instead of burning the retry ladder
+ * (bead 0k86). Aggregated envelopes are normally a few KB; 1MB is generous. */
+export const MAX_ARCHIVE_PAYLOAD_BYTES = 1_000_000;
+
+/** Exact error string archiveBatch returns for oversize payloads. */
+export const PAYLOAD_TOO_LARGE_ERROR = "payload_too_large";
+
 export interface ArchiveBatchInput {
   batchId: string;
   kind: EventArchiveKind;
@@ -71,6 +82,10 @@ export interface ArchiveBatchInput {
  * delivery pipeline already built (no raw events), so rows stay small.
  */
 export async function archiveBatch(db: D1Database, input: ArchiveBatchInput): Promise<ArchiveWriteResult> {
+  if (textEncoder.encode(input.payload).length > MAX_ARCHIVE_PAYLOAD_BYTES) {
+    return { ok: false, error: PAYLOAD_TOO_LARGE_ERROR };
+  }
+
   const schema = await ensureArchiveSchema(db);
   if (!schema.ok) return schema;
 

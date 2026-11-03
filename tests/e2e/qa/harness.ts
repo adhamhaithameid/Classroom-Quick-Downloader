@@ -159,11 +159,22 @@ export async function launchQaContext(
   scenario: Scenario,
   opts: { skipIfExtensionUnavailable?: boolean } = {},
 ): Promise<QaSession> {
+  // Each session's probe result must be authoritative: a degraded launch in
+  // an earlier session (e.g. a failed Firefox launch) must not poison the
+  // skip decisions of later sessions in the same worker.
+  EXTENSION_UNAVAILABLE_REASON = null;
   const sim = await startSimulatorProxy(scenario);
 
-  const context =
-    browser === "chromium"
-      ? await chromium.launchPersistentContext("", {
+  /* A failed browser launch (e.g. the darwin sandbox denying the bundled
+     Firefox build) must still yield a usable session: callers destructure
+     close() in afterAll unconditionally, and an unassigned closeQa turned
+     the launch failure into a confusing TypeError. Wrap the launch so a
+     dead browser degrades to the standard ENVIRONMENT skip path. */
+  let context: BrowserContext;
+  try {
+    context =
+      browser === "chromium"
+        ? await chromium.launchPersistentContext("", {
           // New headless (channel 'chromium') supports extensions; the bundled
           // old-headless build does not.
           channel: "chromium",
@@ -183,17 +194,31 @@ export async function launchQaContext(
             "--ignore-certificate-errors",
           ],
         })
-      : await firefox.launchPersistentContext(FIREFOX_PROFILE_DIR, {
-          headless: true,
-          acceptDownloads: true,
-          ignoreHTTPSErrors: true,
-          proxy: { server: sim.url },
-          firefoxUserPrefs: {
-            "xpinstall.signatures.required": false,
-            "extensions.autoDisableScopes": 0,
-            "extensions.enabledScopes": 15,
-          },
-        });
+        : await firefox.launchPersistentContext(FIREFOX_PROFILE_DIR, {
+            headless: true,
+            acceptDownloads: true,
+            ignoreHTTPSErrors: true,
+            proxy: { server: sim.url },
+            firefoxUserPrefs: {
+              "xpinstall.signatures.required": false,
+              "extensions.autoDisableScopes": 0,
+              "extensions.enabledScopes": 15,
+            },
+          });
+  } catch (error) {
+    EXTENSION_UNAVAILABLE_REASON =
+      "ENVIRONMENT: browser launch failed (" +
+      String((error as Error).message ?? error).slice(0, 200) +
+      ")";
+    return {
+      context: undefined as unknown as BrowserContext,
+      extensionAvailable: false,
+      servedDownloads: () => [],
+      close: async () => {
+        await sim.close();
+      },
+    };
+  }
 
   // Firefox ENVIRONMENT limitation (verified by probe, 2026-09-13): the xpi is
   // present in the profile before launch, and Playwright's bundled Firefox
@@ -208,6 +233,59 @@ export async function launchQaContext(
   // AMO-signed xpi, which Firefox accepts — the skip downgrade does not
   // apply. A missing background page then fails hard downstream
   // (getExtensionBase), which is the correct signal for a signed build.
+  // w5r6 diagnosis tap: stream extension-relevant console output to stdout so
+  // CI logs carry the extension's own view (background bootstrap, engine
+  // scans, injection decisions) even when journeys fail. Off by default.
+  const verbose = process.env.QA_CONSOLE_VERBOSE === "1";
+  if (verbose) {
+    const tap = (label: string) => (message: {
+      type?: () => string;
+      text: () => string;
+    }) => {
+      const text = message.text();
+      if (message.type?.() === "error" || message.type?.() === "warning" || /[Cc]QD|Uncaught|ReferenceError|TypeError/.test(text)) {
+        console.log(`[qa-console:${label}] ${message.type?.() ?? "log"}: ${text.slice(0, 400)}`);
+      }
+    };
+    const attachPage = (page: Page) => {
+      console.log(`[qa-console] page tapped: ${page.url().slice(0, 80)}`);
+      page.on("console", tap("page"));
+      page.on("pageerror", (e) => console.log(`[qa-console:page] pageerror: ${String(e).slice(0, 300)}`));
+      // DOM-level probe: console capture may be lossy on the bundled Firefox
+      // (juggler pipe), but DOM reads are not. After every load, dump the
+      // markers that answer "did the content script run?" directly.
+      page.on("load", () => {
+        void page
+          .evaluate(() => ({
+            url: location.href.slice(0, 90),
+            title: document.title.slice(0, 60),
+            cqdStyles: document.querySelectorAll("style[data-cqd-v2], style#cqd-v2-styles, style[data-cqd-injected]").length,
+            cqdButtons: document.querySelectorAll(".cqd-download-btn").length,
+            cqdAny: document.querySelectorAll("[class*='cqd']").length,
+            cqdAnyIdentity: [...document.querySelectorAll("[class*='cqd']")].slice(0, 3).map((e) => e.tagName + "." + String(e.className).slice(0, 40)),
+            bootstrapEntered: document.documentElement.getAttribute("data-cqd-bootstrap"),
+            v1Entered: document.documentElement.getAttribute("data-cqd-v1"),
+            bodyChars: document.body?.innerText?.length ?? 0,
+          }))
+          .then((m) => console.log(`[qa-console:dom] ${JSON.stringify(m)}`))
+          .catch(() => {});
+      });
+    };
+    // launchPersistentContext hands us an initial page that predates this
+    // listener — context.on("page") never fires for it, and the journeys
+    // reuse it. Tap existing pages too.
+    for (const page of context.pages()) attachPage(page);
+    context.on("page", attachPage);
+    context.on("backgroundpage", (page) => {
+      console.log("[qa-console] background page attached");
+      page.on("console", tap("bg"));
+      page.on("pageerror", (e) => console.log(`[qa-console:bg] pageerror: ${String(e).slice(0, 300)}`));
+    });
+    context.on("serviceworker", (worker) => {
+      console.log(`[qa-console] service worker started: ${worker.url().slice(0, 80)}`);
+    });
+  }
+
   let extensionAvailable = true;
   const signedXpiMode = Boolean(process.env.QA_SIGNED_XPI);
   if (browser === "firefox" && !signedXpiMode && opts.skipIfExtensionUnavailable !== false) {
@@ -223,6 +301,57 @@ export async function launchQaContext(
       EXTENSION_UNAVAILABLE_REASON =
         "ENVIRONMENT: Playwright's bundled Firefox deletes the unsigned sideloaded xpi at startup (signing pref ignored) — no extension background page; see RUNBOOK firefox section";
     }
+  }
+  if (verbose && browser === "firefox" && signedXpiMode) {
+    // w5r6 round 5: probe from the BACKGROUND side — the page side proved
+    // content scripts never execute; this reads the add-on's own view
+    // (manifest, enabled state, tabs) and attempts a direct injection so
+    // the exact failure reason lands in the log.
+    void (async () => {
+      try {
+        const bg = context.backgroundPages()[0] ??
+          await context.waitForEvent("backgroundpage", { timeout: 5_000 }).catch(() => null);
+        if (!bg) {
+          console.log("[qa-console:bg-probe] no background page to probe");
+          return;
+        }
+        const view = await bg.evaluate(async () => {
+          const manifestCs = (browser.runtime.getManifest() as { content_scripts?: unknown[] }).content_scripts;
+          let self: { enabled?: boolean; type?: string } | null = null;
+          try {
+            const api = (globalThis as { browser?: { management?: { getSelf: () => Promise<{ enabled: boolean; type: string }> } } }).browser;
+            if (api?.management?.getSelf) self = await api.management.getSelf();
+          } catch (e) { self = { enabled: false, type: `management-error: ${String(e).slice(0, 80)}` }; }
+          const tabs = await browser.tabs.query({});
+          return {
+            csCount: manifestCs?.length ?? 0,
+            self,
+            tabs: tabs.map((t) => ({ url: (t.url ?? "").slice(0, 70), status: t.status })),
+          };
+        });
+        console.log(`[qa-console:bg-probe] view: ${JSON.stringify(view)}`);
+        // Direct injection attempt on the classroom tab.
+        const inject = await bg.evaluate(async () => {
+          const tabs = await browser.tabs.query({ url: "https://classroom.google.com/*" });
+          if (tabs.length === 0) return { error: "no classroom tab visible to the api" };
+          const api = (globalThis as { browser?: { tabs: { executeScript: (id: number, details: { code: string }) => Promise<unknown[]> } } }).browser;
+          try {
+            await api.tabs.executeScript(tabs[0].id, { code: "document.documentElement.dataset.cqdFxInjected = 'yes'" });
+            return { ok: true, tabUrl: tabs[0].url?.slice(0, 70) };
+          } catch (e) {
+            return { error: String(e).slice(0, 300), tabUrl: tabs[0].url?.slice(0, 70) };
+          }
+        });
+        console.log(`[qa-console:bg-probe] inject: ${JSON.stringify(inject)}`);
+      } catch (e) {
+        console.log(`[qa-console:bg-probe] crashed: ${String(e).slice(0, 200)}`);
+      }
+    })();
+  }
+  if (verbose) {
+    console.log(
+      `[qa-console] launch verdict: browser=${browser} signedXpi=${signedXpiMode} extensionAvailable=${extensionAvailable}`,
+    );
   }
 
   return {

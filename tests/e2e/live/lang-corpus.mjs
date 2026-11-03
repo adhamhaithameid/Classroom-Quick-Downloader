@@ -134,11 +134,16 @@ function stripTagsToNewlines(html) {
     .join('\n');
 }
 
-/** Visible-ish text lines from raw HTML (script/style stripped, deduped). */
+/** Visible-ish text lines from raw HTML (script/style stripped, deduped).
+ * End tags tolerate whitespace and the parse-error slash (`</script >`);
+ * an unterminated `<script>`/`<style>` swallows the rest of the document,
+ * matching how browsers parse it. */
 export function textLinesFromHtml(raw) {
   const withoutInvisible = String(raw)
-    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script\b[\s\S]*?<\/script[^>]*>/gi, ' ')
+    .replace(/<script\b[^>]*>[\s\S]*$/i, ' ')
+    .replace(/<style\b[\s\S]*?<\/style[^>]*>/gi, ' ')
+    .replace(/<style\b[^>]*>[\s\S]*$/i, ' ')
     .replace(/<!--[\s\S]*?-->/g, ' ');
   const lines = decodeEntities(stripTagsToNewlines(withoutInvisible))
     .split('\n')

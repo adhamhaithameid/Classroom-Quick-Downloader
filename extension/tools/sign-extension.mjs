@@ -312,7 +312,12 @@ async function main() {
       headers: { Authorization: `JWT ${jwt}`, 'content-type': 'application/json' },
       body: JSON.stringify({ upload: uploadUuid }),
     });
-    if (!createRes.ok) {
+    if (createRes.status === 409) {
+      // Re-dispatch after a partial publish: the version already exists and
+      // is in review. Fall through to the polling loop, which waits for the
+      // EXISTING version's signed file instead of failing the run.
+      console.log('ℹ Version already exists on AMO (409) — waiting for its signed file…');
+    } else if (!createRes.ok) {
       fail((await apiError('create-version', createRes.status, await createRes.text())).message);
     }
     const created = await createRes.json().catch(() => null);
