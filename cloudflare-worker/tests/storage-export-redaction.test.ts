@@ -72,6 +72,11 @@ function seedCore(): Record<string, unknown> {
     totalDownloads: 160000,
     totalEvents: 200000,
     loginAttempts: { "203.0.113.9": { attempts: 3, firstAttemptAt: 1 } },
+    trackRates: { "203.0.113.9": { count: 7, minute: 4 } },
+    websiteEventRates: { "203.0.113.9": { count: 3, minute: 4 } },
+    uninstallRates: { "203.0.113.9": { count: 1, minute: 4 } },
+    ipCounts: { "203.0.113.9": 12 },
+    sessionBindingLastActualPrefix: "203.0.113",
     ipAllowlist: ["203.0.113.9", "198.51.100.4"],
     ipAllowlistEnabled: true,
     ipAllowlistStepUpBypassEnabled: false,
@@ -138,8 +143,14 @@ describe("redactStorageForBackup", () => {
       "ipAllowlistEnabled",
       "ipAllowlistStepUpBypassEnabled",
       "sessionBindingLastExpectedPrefix",
+      "sessionBindingLastActualPrefix",
       "dangerActionAuditLogs",
       "burstCounts",
+      // SEC-100: per-IP rate maps are visitor-identifying too.
+      "trackRates",
+      "websiteEventRates",
+      "uninstallRates",
+      "ipCounts",
     ]) {
       expect(core[key], `core.${key} must be gone`).toBeUndefined();
     }
@@ -231,7 +242,15 @@ describe("GET /admin/storage-export redaction param", () => {
       "loginAttempts",
       "dangerActionAuditLogs",
       "sessionBindingLastExpectedPrefix",
+      "sessionBindingLastActualPrefix",
       "burstCounts",
+      "trackRates",
+      "websiteEventRates",
+      "uninstallRates",
+      // JSON key form: the numeric counter ipCountsSize legitimately remains.
+      '"ipCounts":',
+      // The seed's only IP must vanish entirely once every per-IP map is gone.
+      "203.0.113.9",
       "visitor-session-1",
       "/classrooms/teacher-name",
       "it broke my workflow",

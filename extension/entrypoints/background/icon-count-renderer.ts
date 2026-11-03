@@ -102,6 +102,9 @@ export function createRuntimeCountRenderer(): CountRenderer {
           const blob = await (await fetch(url)).blob();
           return createImageBitmap(blob);
         })();
+        // SEC-104 (rescan 2026-11-03): a rejected promise must not poison
+        // the key forever — drop it so the next render retries the fetch.
+        pending.catch(() => bitmapCache.delete(key));
         bitmapCache.set(key, pending);
       }
       return pending;

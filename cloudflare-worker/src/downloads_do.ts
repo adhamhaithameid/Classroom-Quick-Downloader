@@ -141,8 +141,49 @@ const BACKUP_REDACTED_CORE_KEYS: readonly string[] = [
   "ipAllowlistStepUpBypassEnabled",
   "dangerActionAuditLogs",
   "sessionBindingLastExpectedPrefix",
+  "sessionBindingLastActualPrefix",
   "burstCounts",
+  // SEC-100 (rescan 2026-11-03): persist() spreads every non-destructured
+  // field into analytics_state, so per-IP maps must be named here explicitly
+  // or they ride into the public backup lane (up to 5000 IPs per map).
+  "trackRates",
+  "websiteEventRates",
+  "uninstallRates",
+  "ipCounts",
 ];
+
+// SEC-101 (rescan 2026-11-03): /track events are rebuilt from this whitelist
+// before buffering — unknown wire keys never reach storage, the D1 archive,
+// or the backup lane. Mirrors the StoredEvent contract in src/types.ts.
+const TRACK_EVENT_ALLOWED_FIELDS: readonly string[] = [
+  "status",
+  "file_type",
+  "browser",
+  "os",
+  "ext_version",
+  "duration_ms",
+  "bypass_used",
+  "language",
+  "country",
+  "timestamp",
+  "id",
+  "page_type",
+  "engine_mode",
+  "strategy",
+  "error_type",
+  "source",
+  "count",
+  "rollup",
+  "seq",
+];
+
+function rebuildWhitelistedTrackEvent(ev: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const field of TRACK_EVENT_ALLOWED_FIELDS) {
+    if (field in ev) out[field] = ev[field];
+  }
+  return out;
+}
 
 // Visitor-scoped fields: request-scoped session id, per-view page path, and
 // the free-form event meta (page-error beacons embed URLs). Kept fields stay
@@ -4374,7 +4415,12 @@ export class DownloadsDurable {
         this.recordErrorRollup(ev, now);
       }
 
-      this.d.buffer.push(ev);
+      // SEC-101 (rescan 2026-11-03): rebuild from the field whitelist —
+      // unknown wire keys never reach the buffer, the D1 archive, or the
+      // backup lane.
+      this.d.buffer.push(
+        rebuildWhitelistedTrackEvent(ev as Record<string, unknown>) as typeof ev,
+      );
       this.d.totalEvents += eventCount;
       acceptedCount += eventCount;
       acceptedIds.push(eventId);
