@@ -17,9 +17,9 @@ history with it.
 | Data | Primary store | Backed up daily? |
 | --- | --- | --- |
 | Extension download analytics (aggregated batch envelopes) | D1 `SITE_CACHE_DB` → `event_archive` table | ✅ `backups/latest/event-archive.{json,csv}` |
-| Live counters (downloads, countries, browser/OS/language breakdowns) | Durable Object state | ✅ `backups/latest/do-storage.json` |
+| Live counters (downloads, countries, browser/OS/language breakdowns) | Durable Object state | ✅ `backups/latest/do-storage.json` (redacted mode) |
 | Website telemetry (CTA/map/error events) | Durable Object queue → D1 archive | ✅ (kind `website-events` rows) |
-| Uninstall feedback | Durable Object (`analytics_uninstall` shard) | ✅ (inside `do-storage.json`) |
+| Uninstall feedback | Durable Object (`analytics_uninstall` shard) | ✅ (inside `do-storage.json`; free text stripped in redacted mode) |
 | Public website snapshot (last-good) | KV `site:v1:snapshot` | ✅ `backups/latest/public-snapshot.json` |
 | Store stats + scrape health + trends | KV `site:v1:store-stats` / `scrape-health` / `trends` | ❌ regenerable — scraper rebuilds these automatically |
 | Bootstrap snapshot (first-paint fallback) | Git: `website/static/data/bootstrap-snapshot.json` | ✅ by definition (committed) |
@@ -45,13 +45,21 @@ Steps:
    (fresh deployment), the step degrades to an empty sheet instead of failing.
 2. **Sheet build** — `tools/backup-to-sheet.mjs` converts the rows to
    `event-archive.csv` plus a per-kind `backup-summary.csv`.
-3. **DO state dump** — `GET /admin/storage-export` with the
+3. **DO state dump** — `GET /admin/storage-export?redacted=1` with the
    `DO_SHARED_SECRET` secret; writes `do-storage.json` (8 MB cap, truncated
-   flag set if hit). Skips with a warning if the secret is absent.
+   flag set if hit). Redacted mode strips visitor-identifying and
+   admin-perimeter material (SEC-001): login attempts, the IP allowlist,
+   danger-action audit logs, session-binding prefixes, uninstall free text,
+   and telemetry `sessionId`/`pagePath`/`meta`. Skips with a warning if the
+   secret is absent.
 4. **Public snapshot** — fetches `/api/public/website/snapshot` (no auth).
-5. **Commit** — everything lands under `backups/latest/` on the default
-   branch with `[skip ci]`. Git history is the versioned archive: any past
-   day's state is `git show <rev>:backups/latest/event-archive.csv`.
+5. **Commit** — everything lands under `backups/latest/` on the dedicated
+   `data-backups` branch with `[skip ci]` (main's ruleset rejects the bot's
+   unattributed push). The branch is force-reset on top of main per run, so
+   `backups/latest/` holds the newest snapshot; older snapshots live in
+   dangling commits until garbage collection, not in branch history.
+   `do-storage.json` itself is gitignored on main (SEC-001) and force-added
+   here so only the backup lane carries it.
 6. **Google Sheets push (optional)** — overwrites the configured Google Sheet
    with the full archive (see §3). Skipped unless credentials are configured.
 
@@ -62,7 +70,7 @@ Steps:
 | `backups/latest/event-archive.json` | Raw `wrangler d1 execute --json` output |
 | `backups/latest/event-archive.csv` | One row per batch: batch_id, kind, created_at_utc (+ISO), event_count, weighted_count, archived_at_utc (+ISO) |
 | `backups/latest/backup-summary.csv` | Per-kind totals (batches / events / weighted) |
-| `backups/latest/do-storage.json` | Full Durable Object state (all storage keys) |
+| `backups/latest/do-storage.json` | Redacted Durable Object state (SEC-001: no login attempts, IP allowlist, audit logs, session-binding prefixes, uninstall free text, or telemetry `sessionId`/`pagePath`/`meta`). Full-fidelity exports stay on demand: admin curl without the param |
 | `backups/latest/public-snapshot.json` | Last public website snapshot |
 
 ### Manual triggers
@@ -119,13 +127,17 @@ Re-import via `wrangler d1 execute cqd_site_cache --remote --file=<dump>` if a
 database is ever recreated (the table schema lives in
 `cloudflare-worker/src/event-archive.ts`).
 
-**DO state:** `do-storage.json` is a key→value map of the DO's entire storage.
-Restoring means re-seeding a fresh DO from it — feasible because all large
-collections are sharded under stable keys (`analytics_state`,
-`analytics_buffer`, `analytics_pending_batches`, `analytics_processed_ids`,
-`analytics_website_telemetry`, `analytics_changelog`,
-`analytics_uninstall`). Note the DO **rebuilds its live counters from its own
-state**, so restoring the DO restores the website's numbers too.
+**DO state:** `do-storage.json` is a key→value map of the DO's storage in
+redacted form (SEC-001). Restoring means re-seeding a fresh DO from it —
+feasible because all large collections are sharded under stable keys
+(`analytics_state`, `analytics_buffer`, `analytics_pending_batches`,
+`analytics_processed_ids`, `analytics_website_telemetry`,
+`analytics_changelog`, `analytics_uninstall`). Note the DO **rebuilds its
+live counters from its own state**, so restoring the DO restores the
+website's numbers too. The redacted strip is lossy by design: the IP
+allowlist, audit logs, uninstall free text, and telemetry session ids are
+not restorable from backup — the allowlist is owner config (re-add by
+hand) and the rest is diagnostic-only.
 
 **Website numbers with no Cloudflare at all:** the static site bundle carries
 `bootstrap-snapshot.json`; serving `build/` from any static host restores the
