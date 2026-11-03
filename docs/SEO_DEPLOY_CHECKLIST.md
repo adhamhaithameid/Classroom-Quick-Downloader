@@ -32,7 +32,7 @@ This file separates repository-implemented SEO work from manual operations that 
 - New SEO-targeted routes added:
   - Use-case pages
   - Browser install pages
-  - Trust pages (`/security`, `/support`, `/press-kit`)
+  - Trust pages (`/security`, `/support`, `/brand`)
   - Comparison pages
   - `/featured`
 - Indexable changelog rendering improved:
