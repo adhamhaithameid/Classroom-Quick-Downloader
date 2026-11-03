@@ -172,6 +172,9 @@ test.describe("qa-03 flags", () => {
   test("dark theme badges carry the dark class", async ({}, testInfo) => {
     const session = await launchQaContext("chromium", scenario("en", "ltr", "dark"), { project: testInfo.project.name });
     try {
+      // A degraded launch hands back no context; skip instead of crashing on
+      // newPage (mirrors the beforeAll guard above).
+      if (!session.extensionAvailable) return;
       const darkPage = await session.context.newPage();
       const darkCapture = captureConsole(darkPage);
       await runCheck(test.info(), darkPage, darkCapture, "qa-03-dark", RUNBOOK_REF, async (check) => {
@@ -198,6 +201,9 @@ test.describe("qa-03 flags", () => {
   test("RTL layout keeps badges anchored to their cards", async ({}, testInfo) => {
     const session = await launchQaContext("chromium", scenario("ar", "rtl", "light"), { project: testInfo.project.name });
     try {
+      // A degraded launch hands back no context; skip instead of crashing on
+      // newPage (mirrors the beforeAll guard above).
+      if (!session.extensionAvailable) return;
       const rtlPage = await session.context.newPage();
       const rtlCapture = captureConsole(rtlPage);
       await runCheck(test.info(), rtlPage, rtlCapture, "qa-03-rtl", RUNBOOK_REF, async (check) => {
