@@ -81,6 +81,9 @@ export async function createSessionToken(secret: string, ip: string): Promise<st
   return createSessionTokenWithBinding(secret, ip, "", "off");
 }
 
+/** Test hook: the bound-token factory stays private otherwise. */
+export const __tokenTestInternals = { createSessionTokenWithBinding };
+
 function normalizeSessionBindingMode(raw?: string): SessionBindingMode {
   const mode = (raw || "").trim().toLowerCase();
   if (mode === "strict") return "strict";
@@ -311,6 +314,11 @@ export async function verifySessionToken(
     const [payloadB64, sigB64] = token.split(".");
     if (!payloadB64 || !sigB64) return false;
 
+    // Danger-scope tokens are strictly fingerprint-bound no matter what the
+    // caller passes — the 15-minute destructive-action credential must never
+    // fall back to optional acceptance.
+    const effectiveBinding: SessionBindingMode = scope === "danger" ? "strict" : bindingMode;
+
     const encoder = new TextEncoder();
     const key = await deriveSigningKey(secret, scope);
     
@@ -334,19 +342,19 @@ export async function verifySessionToken(
     // Check expiration
     if (Date.now() > payload.exp) return false;
 
-    if (bindingMode === "off") {
+    if (effectiveBinding === "off") {
       return true;
     }
 
     if (!payload.fp) {
-      return bindingMode !== "strict";
+      return effectiveBinding !== "strict";
     }
 
     const expectedFingerprint = await buildSessionFingerprint(clientIp, clientUserAgent);
     if (timingSafeStringEqual(payload.fp, expectedFingerprint)) {
       return true;
     }
-    if (bindingMode === "strict") {
+    if (effectiveBinding === "strict") {
       return false;
     }
     const mismatch = {
