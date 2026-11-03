@@ -19,9 +19,16 @@ import {
   isVersionSeen,
   markAsSeen,
   getLatestChange,
+  UPDATE_PILL_RULE,
   type ChangelogData,
   type ChangelogFetchResult
 } from '../utils/changelog';
+import {
+  CHANGELOG_SEEN_KEY,
+  UPDATE_STATE_KEY,
+  type UpdateState,
+} from '../utils/update-state';
+import { updateTarget } from '../../src/update/update-state';
 import { popupMessage } from './i18n';
 import { CHANGELOG_SITE_URL, WEBSITE_BASE_URL } from '../utils/analytics/constants';
 import { isApiConfigured } from '../../src/engines/v3/api/config';
@@ -355,6 +362,47 @@ function App() {
   const [showChangelog, setShowChangelog] = useState(false);
   const [changelogStatus, setChangelogStatus] = useState<'loading' | 'ready' | 'offline' | 'error'>('loading');
   const [changelogStatusMessage, setChangelogStatusMessage] = useState<string | null>(null);
+
+  // UPDATE-AVAILABLE STATE (bead 08fg.3) — the background owns the live
+  // /changelog check plus the browser update events (onInstalled /
+  // onUpdateAvailable); the popup mirrors its storage key and computes the
+  // same dot target for the pill pulse.
+  const [updateTargetVersion, setUpdateTargetVersion] = useState<string | null>(null);
+  useEffect(() => {
+    const browserApi = (globalThis as any).chrome;
+    if (!browserApi?.storage?.local?.get) return;
+    let alive = true;
+    const recompute = async () => {
+      try {
+        const [stateRes, seenRes] = await Promise.all([
+          browserApi.storage.local.get(UPDATE_STATE_KEY),
+          browserApi.storage.local.get(CHANGELOG_SEEN_KEY),
+        ]);
+        const state = stateRes?.[UPDATE_STATE_KEY] as UpdateState | undefined;
+        const seen =
+          (seenRes?.[CHANGELOG_SEEN_KEY] as Record<string, string | undefined> | undefined) ?? {};
+        const target = updateTarget({
+          pendingVersion: state?.pendingVersion ?? null,
+          latestVersion: state?.latestVersion ?? null,
+          installedVersion: version ?? '',
+          seenVersions: seen,
+        });
+        if (alive) setUpdateTargetVersion(target.version);
+      } catch {
+        if (alive) setUpdateTargetVersion(null);
+      }
+    };
+    void recompute();
+    const listener = (changes: any, area: string) => {
+      if (area !== 'local') return;
+      if (changes[UPDATE_STATE_KEY] || changes[CHANGELOG_SEEN_KEY]) void recompute();
+    };
+    browserApi.storage.onChanged.addListener(listener);
+    return () => {
+      alive = false;
+      browserApi.storage.onChanged.removeListener(listener);
+    };
+  }, [version]);
 
   // ENGINE MODE STATE — the initial value mirrors the runtime default
   // (mode-controller.ts DEFAULT_MODE 'v2'): fresh installs run v2, so the
@@ -933,6 +981,10 @@ function App() {
       }
     : null;
   const effectiveRule = matchedRule ?? fallbackRule;
+  // Any active update signal (newer unseen live release, just-updated, or
+  // scheduled) pulses the pill (08fg.3); dismissal falls back to the manual
+  // rules.
+  const pillRule = updateTargetVersion ? UPDATE_PILL_RULE : effectiveRule;
 
   const isLoadingSettings = loadingState || settings == null;
   const isEnabled = settings?.extensionEnabled ?? true;
@@ -982,7 +1034,7 @@ function App() {
                 {version && (
                   <button
                     type="button"
-                    className={`cqd-brand-version ${getRuleClasses(effectiveRule, seen)}`}
+                    className={`cqd-brand-version ${getRuleClasses(pillRule, seen)}`}
                     aria-label={`Version ${version} - View changelog`}
                     title={getLatestChange(changelogData) ? `Latest: ${getLatestChange(changelogData)}` : "View changelog"}
                     onClick={async () => {
@@ -1007,6 +1059,11 @@ function App() {
                        if (version) {
                          await markAsSeen(version, changelogData);
                          setSeen(true);
+                       }
+                       if (updateTargetVersion && updateTargetVersion !== version) {
+                         // Dismiss the update dot + pill for the target version.
+                         await markAsSeen(updateTargetVersion, changelogData);
+                         setUpdateTargetVersion(null);
                        }
                     }}
                   >
