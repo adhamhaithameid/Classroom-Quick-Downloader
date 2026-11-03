@@ -117,7 +117,8 @@ describe('background/index', () => {
     vi.doMock('../entrypoints/background/download-handler', () => ({
       handleDownloadRequest: vi.fn(() => true),
       startNextDriveAttempt: vi.fn(),
-    }));
+      eventContextFor: (pending: unknown) => ({} as Record<string, unknown>),
+}));
     vi.doMock('../entrypoints/utils/analytics', () => ({
       // W3: the background chains .then on the startup flush, so the mock must
       // resolve like the real Analytics.flush() promise.
@@ -221,7 +222,8 @@ describe('background/index', () => {
     vi.doMock('../entrypoints/background/download-handler', () => ({
       handleDownloadRequest: vi.fn(() => true),
       startNextDriveAttempt: vi.fn(),
-    }));
+      eventContextFor: (pending: unknown) => ({} as Record<string, unknown>),
+}));
     vi.doMock('../entrypoints/utils/analytics', () => ({
       // W3: the background chains .then on the startup flush, so the mock must
       // resolve like the real Analytics.flush() promise.
@@ -296,7 +298,8 @@ describe('background/index', () => {
     vi.doMock('../entrypoints/background/download-handler', () => ({
       handleDownloadRequest: vi.fn(() => true),
       startNextDriveAttempt: vi.fn(),
-    }));
+      eventContextFor: (pending: unknown) => ({} as Record<string, unknown>),
+}));
     vi.doMock('../entrypoints/utils/analytics', () => ({
       // W3: the background chains .then on the startup flush, so the mock must
       // resolve like the real Analytics.flush() promise.
@@ -363,7 +366,8 @@ describe('background/index', () => {
     vi.doMock('../entrypoints/background/download-handler', () => ({
       handleDownloadRequest: vi.fn(() => true),
       startNextDriveAttempt: vi.fn(),
-    }));
+      eventContextFor: (pending: unknown) => ({} as Record<string, unknown>),
+}));
     vi.doMock('../entrypoints/utils/analytics', () => ({
       // W3: the background chains .then on the startup flush, so the mock must
       // resolve like the real Analytics.flush() promise.
@@ -522,7 +526,8 @@ describe('background/index', () => {
     vi.doMock('../entrypoints/background/download-handler', () => ({
       handleDownloadRequest: vi.fn(() => true),
       startNextDriveAttempt,
-    }));
+      eventContextFor: (pending: unknown) => ({} as Record<string, unknown>),
+}));
     vi.doMock('../entrypoints/utils/analytics', () => ({
       // W3: the background chains .then on the startup flush, so the mock must
       // resolve like the real Analytics.flush() promise.

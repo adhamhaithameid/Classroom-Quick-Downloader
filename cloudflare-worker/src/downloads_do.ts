@@ -220,6 +220,11 @@ type DurableStateShape = {
 
   // Buffered events waiting to be archived
   buffer: StoredEvent[];
+
+  // 1ef6.2: pre-aggregated failure rollup keyed by
+  // error_type|os|browser|ext_version|page_type|engine_mode|strategy.
+  // Bounded to ERROR_ROLLUP_CAP keys; evicted smallest-count-first.
+  errorRollup: Record<string, { count: number; lastSeen: number }>;
   
   // Monotonically increasing batch sequence number for stable batchId across retries
   // Only incremented after a batch is successfully archived
@@ -689,6 +694,7 @@ const COMPACT_TARGET_UTIL = 0.5;
 const COMPACT_MAX_BATCH = 5000;
 const MAX_PENDING_BATCHES = 50;
 const MAX_ROLLUP_COUNT = 100_000;
+const ERROR_ROLLUP_CAP = 200;
 
 const HEALTH_WARN_PENDING_BATCHES = 10;
 const HEALTH_CRIT_PENDING_BATCHES = 25;
@@ -2217,6 +2223,7 @@ export class DownloadsDurable {
       hardRemoteOff: false,
 
       buffer: [],
+      errorRollup: {},
       batchSeq: 0,
       eventSeq: 0,
       committedSeq: 0,
@@ -2348,6 +2355,7 @@ export class DownloadsDurable {
       return !isPlainObject(draftRaw);
     })();
     this.data = {
+      errorRollup: stored.errorRollup ?? base.errorRollup,
       totalEvents: stored.totalEvents ?? base.totalEvents,
       totalDownloads: stored.totalDownloads ?? base.totalDownloads,
       totalSuccess: stored.totalSuccess ?? base.totalSuccess,
@@ -3474,6 +3482,10 @@ export class DownloadsDurable {
       return this.handleAdminWebsiteStatus(request);
     }
 
+    if (pathname === "/admin/website/error-rollup" && request.method === "GET") {
+      return this.handleAdminErrorRollup(request);
+    }
+
     if (pathname === "/admin/website/flush-now" && request.method === "POST") {
       return this.handleAdminWebsiteFlushNow(request);
     }
@@ -4314,9 +4326,42 @@ export class DownloadsDurable {
       if (ev.country) {
         ev.country = sanitizeString(ev.country, 2, FIELD_PATTERNS.language);
       }
+      // 1ef6.2: use-case context — alias camelCase to snake_case, sanitize.
+      const rawAny = ev as Record<string, unknown>;
+      if (typeof rawAny.pageType === "string" && rawAny.pageType) {
+        ev.page_type = sanitizeString(rawAny.pageType, 20, FIELD_PATTERNS.generic);
+      }
+      if (typeof rawAny.engineMode === "string" && rawAny.engineMode) {
+        ev.engine_mode = sanitizeString(rawAny.engineMode, 12, FIELD_PATTERNS.generic);
+      }
+      if (typeof rawAny.strategy === "string" && rawAny.strategy) {
+        ev.strategy = sanitizeString(rawAny.strategy, 16, FIELD_PATTERNS.generic);
+      }
+      delete rawAny.pageType;
+      delete rawAny.engineMode;
+      // NB: strategy is its own snake_case name — nothing to delete.
+
+      // Review 2026-11-03: a client can submit the snake_case fields
+      // directly, skipping the alias block. Sanitize the persisted fields
+      // unconditionally — over-length or off-pattern values fall back to
+      // "unknown" (sanitizeString), so the rollup key stays bounded and
+      // well-formed.
+      if (ev.page_type) {
+        ev.page_type = sanitizeString(ev.page_type, 20, FIELD_PATTERNS.generic);
+      }
+      if (ev.engine_mode) {
+        ev.engine_mode = sanitizeString(ev.engine_mode, 12, FIELD_PATTERNS.generic);
+      }
+      if (ev.strategy) {
+        ev.strategy = sanitizeString(ev.strategy, 16, FIELD_PATTERNS.generic);
+      }
 
       // PRIVACY: Never persist IPs. Strip any client-provided ip_address.
       delete ev.ip_address;
+
+      if (ev.status === "fail") {
+        this.recordErrorRollup(ev, now);
+      }
 
       this.d.buffer.push(ev);
       this.d.totalEvents += eventCount;
@@ -4641,6 +4686,61 @@ export class DownloadsDurable {
         topReasons,
       },
     });
+  }
+
+  // 1ef6.2: bounded failure rollup. Key =
+  // error_type|os|browser|ext_version|page_type|engine_mode|strategy.
+  private recordErrorRollup(ev: StoredEvent, now: number): void {
+    const rollup = this.d.errorRollup ?? {};
+    const key = [
+      ev.error_type || "unknown",
+      ev.os || "unknown",
+      ev.browser || "unknown",
+      ev.ext_version || "unknown",
+      ev.page_type || "unknown",
+      ev.engine_mode || "unknown",
+      ev.strategy || "unknown",
+    ].join("|");
+    const entry = rollup[key] ?? { count: 0, lastSeen: 0 };
+    entry.count += 1;
+    entry.lastSeen = now;
+    rollup[key] = entry;
+    const keys = Object.keys(rollup);
+    if (keys.length > ERROR_ROLLUP_CAP) {
+      let smallest: string | null = null;
+      for (const k of keys) {
+        if (smallest === null || rollup[k].count < rollup[smallest].count) {
+          smallest = k;
+        }
+      }
+      if (smallest) delete rollup[smallest];
+    }
+    this.d.errorRollup = rollup;
+  }
+
+  private async handleAdminErrorRollup(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+    const rollup = this.d.errorRollup ?? {};
+    const rows = Object.entries(rollup)
+      .map(([key, value]) => {
+        const [errorType, os, browser, extVersion, pageType, engineMode, strategy] = key.split("|");
+        return {
+          errorType,
+          os,
+          browser,
+          extVersion,
+          pageType,
+          engineMode,
+          strategy,
+          count: value.count,
+          lastSeen: value.lastSeen,
+        };
+      })
+      .sort((a, b) => b.count - a.count || b.lastSeen - a.lastSeen)
+      .slice(0, 50);
+    return json({ ok: true, rows, totalKeys: Object.keys(rollup).length, generatedAt: Date.now() });
   }
 
   private async handleAdminWebsiteStatus(request: Request): Promise<Response> {
@@ -5784,6 +5884,7 @@ export class DownloadsDurable {
       reqDailyCounts: { [today]: 0 },
       hardRemoteOff: false,
       buffer: [],
+      errorRollup: {},
       batchSeq: 0,
       eventSeq: 0,
       committedSeq: 0,

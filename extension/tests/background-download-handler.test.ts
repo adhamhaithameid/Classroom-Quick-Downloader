@@ -1029,4 +1029,58 @@ describe('background download handler — start-callback timeout (S2)', () => {
       expect(out?.name).toBe('report.pdf');
     });
   });
+
+  describe('respondOnce closure contract (review 2026-11-03)', () => {
+    it('ignores the start timeout after the download already responded', async () => {
+      vi.useFakeTimers();
+      try {
+        const ctx = await loadDownloadHandler();
+        (chrome.downloads.download as any).mockImplementation(
+          (_: unknown, cb: (id?: number) => void) => cb(123),
+        );
+        const sendResponse = vi.fn();
+
+        ctx.mod.handleDownloadRequest(
+          { url: 'https://example.com/a.pdf', requestId: 'req-once' },
+          { tab: { id: 21 } } as chrome.runtime.MessageSender,
+          sendResponse,
+        );
+        expect(sendResponse).toHaveBeenCalledTimes(1);
+        expect(sendResponse).toHaveBeenCalledWith(
+          expect.objectContaining({ started: true, downloadId: 123 }),
+        );
+
+        // The armed start timer fires after the flow already answered: the
+        // respondOnce closure must swallow the second response.
+        await vi.advanceTimersByTimeAsync(ctx.mod.DOWNLOAD_START_TIMEOUT_MS + 1);
+        expect(sendResponse).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('tolerates a missing sendResponse callback', async () => {
+      const ctx = await loadDownloadHandler();
+      (chrome.downloads.download as any).mockImplementation(
+        (_: unknown, cb: (id?: number) => void) => cb(124),
+      );
+
+      const keep = ctx.mod.handleDownloadRequest(
+        {
+          url: 'https://example.com/b.pdf',
+          requestId: 'req-noresponder',
+          pageType: 'stream',
+          engineMode: 'legacy',
+          strategy: 'direct',
+        },
+        { tab: { id: 22 } } as chrome.runtime.MessageSender,
+        undefined as unknown as (response?: unknown) => void,
+      );
+      expect(keep).toBe(true);
+      const pending = ctx.stateModule.pendingByRequestId.get('req-noresponder');
+      expect(pending?.currentDownloadId).toBe(124);
+      expect(pending?.pageType).toBe('stream');
+      expect(pending?.engineMode).toBe('legacy');
+    });
+  });
 });

@@ -44,6 +44,10 @@ export type PendingDownload = {
 
   /** File metadata from content script */
   fileMeta?: FileMetaMsg;
+  /** Use-case context (1ef6.1): Classroom view kind at request time. */
+  pageType?: string;
+  /** Use-case context (1ef6.1): engine mode the requester ran. */
+  engineMode?: string;
   /** Final extension detected from actual download */
   finalExtension?: string;
 

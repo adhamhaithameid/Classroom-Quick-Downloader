@@ -94,6 +94,11 @@ function sanitizeEvent(raw: unknown, fallbackNow: number): AnalyticsEvent | null
     duration_ms: duration,
     bypass_used: ev.bypass_used === true,
     error_type: typeof ev.error_type === 'string' && ev.error_type.trim() ? ev.error_type.trim().slice(0, 128) : undefined,
+    // Use-case context (1ef6.1): length-capped passthrough of the already-
+    // sanitized track-time values; unknown characters are dropped here too.
+    pageType: normalizeContextField(ev.pageType, 20),
+    engineMode: normalizeContextField(ev.engineMode, 12),
+    strategy: normalizeContextField(ev.strategy, 16),
     language: normalizeString(ev.language, 'unknown', 12),
     timestamp: normalizeTimestamp(ev.timestamp, fallbackNow),
     id,
@@ -103,6 +108,13 @@ function sanitizeEvent(raw: unknown, fallbackNow: number): AnalyticsEvent | null
     count,
     rollup: ev.rollup === true,
   };
+}
+
+/** Context fields (1ef6.1): keep [a-z0-9_-] runs only, cap length. */
+function normalizeContextField(value: unknown, maxLen: number): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const cleaned = value.toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, maxLen);
+  return cleaned || undefined;
 }
 
 function sanitizeQueue(rawQueue: unknown): { queue: AnalyticsEvent[]; changed: boolean } {
@@ -207,7 +219,10 @@ function buildRollupKey(ev: AnalyticsEvent, bucketStart: number, coarse = false)
   const version = ev.ext_version || '0.0.0';
   const source = ev.source || '';
   const bypass = ev.bypass_used ? '1' : '0';
-  return [bucketStart, status, type, browser, os, lang, version, error, source, bypass].join('|');
+  const pageType = ev.pageType || 'unknown';
+  const engineMode = ev.engineMode || 'unknown';
+  const strategy = ev.strategy || 'unknown';
+  return [bucketStart, status, type, browser, os, lang, version, error, source, bypass, pageType, engineMode, strategy].join('|');
 }
 
 function rollupEvents(events: AnalyticsEvent[], coarse = false): AnalyticsEvent[] {
@@ -257,6 +272,11 @@ function rollupEvents(events: AnalyticsEvent[], coarse = false): AnalyticsEvent[
       id: generateEventId(entry.earliest),
       retryCount: 0,
       source: coarse ? 'rollup' : sample.source,
+      // 1ef6.2: carry the use-case context through compaction so rolled-up
+      // failures still land on their real use-case, not a blended 'unknown'.
+      pageType: coarse ? 'mixed' : (sample.pageType || 'unknown'),
+      engineMode: coarse ? 'mixed' : (sample.engineMode || 'unknown'),
+      strategy: coarse ? 'mixed' : (sample.strategy || 'unknown'),
       count: entry.count,
       rollup: true,
     });
