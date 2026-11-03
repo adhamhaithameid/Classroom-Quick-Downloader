@@ -10,6 +10,17 @@ test('full gate: pushing to main', () => {
   assert.equal(buildPlan({ changedFiles: ['extension/src/a.ts'], pushingToMain: true, fullGateEnv: false, hasBase: true }).mode, 'full');
 });
 
+test('full gate: pushing to production (release lane, even docs-only)', () => {
+  const plan = buildPlan({ changedFiles: ['docs/x.md'], pushingToMain: false, pushingToProduction: true, fullGateEnv: false, hasBase: true });
+  assert.equal(plan.mode, 'full');
+  assert.deepEqual(plan.legs, ['pnpm run test:gate']);
+});
+
+test('production flag defaults off so legacy callers stay scoped', () => {
+  const plan = buildPlan({ changedFiles: ['extension/src/a.ts'], pushingToMain: false, fullGateEnv: false, hasBase: true });
+  assert.equal(plan.mode, 'scoped');
+});
+
 test('full gate: CQD_FULL_GATE=1 overrides everything, even docs-only', () => {
   const plan = buildPlan({ changedFiles: ['docs/x.md'], pushingToMain: false, fullGateEnv: true, hasBase: true });
   assert.equal(plan.mode, 'full');
