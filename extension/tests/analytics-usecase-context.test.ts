@@ -129,7 +129,7 @@ describe('analytics use-case context (1ef6.1)', () => {
         strategy: true, // non-string → undefined
       },
       Date.now(),
-    ) as Record<string, unknown>;
+    ) as unknown as Record<string, unknown>;
     expect(row).toBeTruthy();
     expect(row.pageType).toBeUndefined();
     expect(row.engineMode).toBeUndefined();
