@@ -93,6 +93,15 @@ jobs:
           if [ "${code}" != "200" ]; then
             echo "::warning::DO storage export returned HTTP ${code}; keeping previous dump."
           fi
+          # SEC-001 hard guard: refuse to commit an unredacted dump (e.g. the
+          # live worker predates the ?redacted=1 deployment). The redacted
+          # body carries "redacted":true at the top level.
+          if grep -q '"ipAllowlist"\|"loginAttempts"\|"dangerActionAuditLogs"' backups/latest/do-storage.json 2>/dev/null || \
+            ! grep -q '"redacted":true' backups/latest/do-storage.json 2>/dev/null; then
+            echo "::error::DO storage export is not redacted (worker deployment behind main?); dropping the dump so it is never committed."
+            rm -f backups/latest/do-storage.json
+            echo '{"skipped": "unredacted export refused by the backup guard"}' > backups/latest/do-storage.json
+          fi
 
       - name: Snapshot public website snapshot
         env:

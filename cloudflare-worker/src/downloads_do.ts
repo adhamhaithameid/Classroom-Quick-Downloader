@@ -3365,8 +3365,19 @@ export class DownloadsDurable {
         }
       }
       if (Object.keys(bucket).length > PUBLIC_IP_RATE_MAX_KEYS) {
-        // Emergency reset to avoid unbounded memory growth under abuse.
-        for (const k of Object.keys(bucket)) delete bucket[k];
+        // Still over cap (a same-window flood): evict oldest-minute entries
+        // first instead of wiping the whole bucket. A blanket reset would
+        // hand attackers a free counter reset and strip the current minute's
+        // honest clients — the eviction keeps recent quota state intact.
+        let excess = Object.keys(bucket).length - PUBLIC_IP_RATE_MAX_KEYS;
+        const keysOldestFirst = Object.entries(bucket)
+          .sort((a, b) => (a[1]?.minute ?? 0) - (b[1]?.minute ?? 0))
+          .map(([k]) => k);
+        for (const k of keysOldestFirst) {
+          if (excess <= 0) break;
+          delete bucket[k];
+          excess -= 1;
+        }
       }
     }
 

@@ -84,6 +84,11 @@ tools/commit-planner/data.json
 # The backup lane force-adds its redacted copy (data-backups.yml).
 backups/latest/do-storage.json
 
+# Env variants: only .env itself and tracked examples are allowed through.
+*.env
+.env.*
+!.env.example
+
 # session artifacts (local only)
 tests/e2e/.live-profile/
 brag-output/

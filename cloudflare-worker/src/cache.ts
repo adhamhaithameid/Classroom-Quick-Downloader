@@ -131,7 +131,11 @@ export async function withEdgeCache(
   }
 
   const produced = await produce();
-  if (produced.status === 200 && cache) {
+  // The edge cache keys by URL alone. A response that Varies by a header
+  // (e.g. a future reflected-origin route) must not be edge-cached, or one
+  // origin's variant would serve every origin.
+  const varies = produced.headers.has("vary");
+  if (produced.status === 200 && cache && !varies) {
     try {
       const cached = produced.clone();
       cached.headers.set("cache-control", `public, max-age=${ttlSeconds}`);

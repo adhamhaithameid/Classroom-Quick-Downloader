@@ -209,12 +209,60 @@ function fingerprintPrefix(value: string): string {
   return prefix || "unknown";
 }
 
+type TokenScope = "session" | "danger";
+const SIGNING_KEY_INFO: Record<TokenScope, string> = {
+  session: "cqd-session-signing-v1",
+  danger: "cqd-danger-signing-v1",
+};
+const signingKeyCache = new Map<string, Promise<CryptoKey>>();
+
+/**
+ * Derive a scope-separated HMAC signing key from the dashboard password
+ * (HKDF-SHA-256, fixed salt, per-scope info). The password never signs
+ * tokens directly: a leaked token cannot serve as an offline password
+ * oracle, and the 15-minute danger credential does not share a key with
+ * the session one.
+ */
+async function deriveSigningKey(secret: string, scope: TokenScope): Promise<CryptoKey> {
+  const cacheKey = `${scope}|${secret}`;
+  let keyPromise = signingKeyCache.get(cacheKey);
+  if (!keyPromise) {
+    keyPromise = (async () => {
+      const encoder = new TextEncoder();
+      const base = await crypto.subtle.importKey(
+        "raw",
+        encoder.encode(secret),
+        "HKDF",
+        false,
+        ["deriveBits"],
+      );
+      const bits = await crypto.subtle.deriveBits(
+        {
+          name: "HKDF",
+          hash: "SHA-256",
+          salt: encoder.encode("cqd-dashboard-hmac-v1"),
+          info: encoder.encode(SIGNING_KEY_INFO[scope]),
+        },
+        base,
+        256,
+      );
+      return crypto.subtle.importKey("raw", bits, { name: "HMAC", hash: "SHA-256" }, false, [
+        "sign",
+        "verify",
+      ]);
+    })();
+    signingKeyCache.set(cacheKey, keyPromise);
+  }
+  return keyPromise;
+}
+
 async function createSessionTokenWithBinding(
   secret: string,
   ip: string,
   userAgent: string,
   bindingMode: SessionBindingMode,
   ttlMs = SESSION_DURATION_MS,
+  scope: TokenScope = "session",
 ): Promise<string> {
   const payload: SessionPayload = {
     ip,
@@ -224,23 +272,17 @@ async function createSessionTokenWithBinding(
   if (bindingMode !== "off") {
     payload.fp = await buildSessionFingerprint(ip, userAgent);
   }
-  
+
   const payloadB64 = btoa(JSON.stringify(payload));
   const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  
+  const key = await deriveSigningKey(secret, scope);
+
   const signature = await crypto.subtle.sign(
     "HMAC",
     key,
     encoder.encode(payloadB64)
   );
-  
+
   const sigB64 = btoa(String.fromCharCode(...new Uint8Array(signature)));
   return `${payloadB64}.${sigB64}`;
 }
@@ -249,9 +291,11 @@ async function createDangerStepUpToken(
   secret: string,
   ip: string,
   userAgent: string,
-  bindingMode: SessionBindingMode,
 ): Promise<string> {
-  return createSessionTokenWithBinding(secret, ip, userAgent, bindingMode, DANGER_SESSION_DURATION_MS);
+  // Always fingerprint-bound regardless of the session binding mode: the
+  // danger cookie is verified strictly (see hasDangerStepUp), so it must
+  // carry the fingerprint even when the main session runs "optional".
+  return createSessionTokenWithBinding(secret, ip, userAgent, "strict", DANGER_SESSION_DURATION_MS, "danger");
 }
 
 export async function verifySessionToken(
@@ -261,19 +305,14 @@ export async function verifySessionToken(
   clientUserAgent = "",
   bindingMode: SessionBindingMode = "off",
   options: VerifySessionTokenOptions = {},
+  scope: TokenScope = "session",
 ): Promise<boolean> {
   try {
     const [payloadB64, sigB64] = token.split(".");
     if (!payloadB64 || !sigB64) return false;
-    
+
     const encoder = new TextEncoder();
-    const key = await crypto.subtle.importKey(
-      "raw",
-      encoder.encode(secret),
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["verify"]
-    );
+    const key = await deriveSigningKey(secret, scope);
     
     const signature = Uint8Array.from(atob(sigB64), c => c.charCodeAt(0));
     const isValid = await crypto.subtle.verify(
@@ -1365,7 +1404,6 @@ async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Pro
         dashboardSecret,
         clientIp,
         userAgent,
-        sessionBindingMode,
       );
       responseHeaders.set(
         "Set-Cookie",
@@ -1412,7 +1450,12 @@ async function resolveAuthContext(request: Request, env: WorkerEnv): Promise<Aut
     (
       !!dashboardSecret &&
       !!dangerToken &&
-      await verifySessionToken(dangerToken, dashboardSecret, clientIp, userAgent, bindingMode, sessionVerifyOptions)
+      // The 15-minute danger credential is always fingerprint-bound and
+      // verified strictly (review 2026-11-03): a stolen danger cookie from a
+      // different network cannot trigger destructive actions. The main
+      // session keeps the env-configured mode — strict there would log
+      // mobile admins out on every carrier hand-off.
+      await verifySessionToken(dangerToken, dashboardSecret, clientIp, userAgent, "strict", sessionVerifyOptions, "danger")
     );
 
   return {
