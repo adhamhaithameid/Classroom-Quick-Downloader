@@ -209,4 +209,22 @@ describe("hostile snake_case ingest (review 2026-11-03)", () => {
       strategy: "direct",
     });
   });
+
+  it("drops unknown wire fields before buffering (SEC-101)", async () => {
+    const obj = makeDO();
+    await postTrack(obj, [
+      failEvent({
+        pageType: "stream",
+        injected: "https://attacker.example/collect",
+        junkNumber: 42,
+      }),
+    ]);
+    const buffer = (obj as unknown as { d: { buffer: Array<Record<string, unknown>> } }).d.buffer;
+    const row = buffer.find((e) => e.error_type === "size_mismatch");
+    expect(row).toBeTruthy();
+    expect(row!.page_type).toBe("stream");
+    expect("injected" in row!).toBe(false);
+    expect("junkNumber" in row!).toBe(false);
+    expect("pageType" in row!).toBe(false); // camelCase alias consumed, not stored
+  });
 });

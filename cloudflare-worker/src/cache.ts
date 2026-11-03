@@ -121,6 +121,12 @@ export async function withEdgeCache(
     try {
       const hit = await cache.match(cacheKey);
       if (hit) {
+        // Belt-and-braces: a Vary-marked entry (put-side guard) must never
+        // serve from the URL-keyed edge cache.
+        if (hit.headers.has("vary")) {
+          const fresh = await produce();
+          return fresh;
+        }
         const res = new Response(hit.body, hit);
         res.headers.set("x-cqd-cache", "hit");
         return res;

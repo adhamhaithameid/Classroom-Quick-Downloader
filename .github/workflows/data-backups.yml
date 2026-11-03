@@ -87,10 +87,15 @@ jobs:
             echo '{"skipped": "DO_SHARED_SECRET not configured"}' > backups/latest/do-storage.json
             exit 0
           fi
-          code="$(curl -sS -o backups/latest/do-storage.json -w "%{http_code}" \
+          # SEC-102 (rescan 2026-11-03): fetch to a temp file and move into
+          # place only on HTTP 200 — a transient worker error must not
+          # truncate the previous good dump.
+          code="$(curl -sS -o /tmp/do-storage.fetch.json -w "%{http_code}" \
             -H "X-Admin-Secret: ${DO_SHARED_SECRET}" \
             "${WORKER_BASE_URL%/}/admin/storage-export?redacted=1" || true)"
-          if [ "${code}" != "200" ]; then
+          if [ "${code}" = "200" ]; then
+            mv -f /tmp/do-storage.fetch.json backups/latest/do-storage.json
+          else
             echo "::warning::DO storage export returned HTTP ${code}; keeping previous dump."
           fi
           # SEC-001 hard guard: refuse to commit an unredacted dump (e.g. the
