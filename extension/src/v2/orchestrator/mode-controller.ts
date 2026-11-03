@@ -255,7 +255,17 @@ export async function initModeController(): Promise<void> {
           return message.mode;
         };
         void apply()
-          .then((resolved) => setMode(resolved).then(() => resolved))
+          .then((resolved) => {
+            if (message.mode === 'auto') {
+              // 'auto' stays the persisted choice (the popup already wrote it
+              // to STORAGE_KEY): apply the resolved engine in memory only.
+              // Persisting it here would clobber the stored 'auto' and auto
+              // would never re-evaluate.
+              engineRegistry.setMode(resolved);
+              return resolved;
+            }
+            return setMode(resolved).then(() => resolved);
+          })
           .then((resolved) => {
             sendResponse({ success: true, mode: resolved });
           });

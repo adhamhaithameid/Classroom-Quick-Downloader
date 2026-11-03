@@ -57,3 +57,52 @@ describe('resolveAutoMode (hhpa.3)', () => {
     await expect(resolveAutoMode()).resolves.toBe(DEFAULT_MODE);
   });
 });
+
+describe('cqd-set-mode auto persistence contract', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('applies the resolved engine in memory and never persists over stored auto', async () => {
+    vi.resetModules();
+    // The last resolveAutoMode test detaches the chrome global; rebuild it.
+    (globalThis as { chrome?: unknown }).chrome = {} as never;
+    mockStorage({
+      cqdV2Mode: 'auto',
+      [ROUTER_STATS_STORAGE_KEY]: ring(['saved', 'saved', 'saved']),
+    });
+    const setSpy = vi.fn(async () => undefined);
+    (chrome as any).storage.local.set = setSpy;
+    let listener:
+      | ((message: unknown, sender: unknown, respond: (value: unknown) => void) => boolean)
+      | null = null;
+    (chrome as any).runtime = {
+      onMessage: {
+        addListener: (fn: typeof listener) => {
+          listener = fn;
+        },
+      },
+    };
+    (chrome as any).storage.onChanged = { addListener: vi.fn() };
+
+    const { engineRegistry } = await import('../src/engines/engine-registry');
+    // Dynamic imports AFTER resetModules: controller and registry must share
+    // one module instance (the singleton registry), like production wiring.
+    const { initModeController } = await import('../src/v2/orchestrator/mode-controller');
+    await initModeController();
+
+    const respond = vi.fn();
+    expect(listener).toBeTruthy();
+    const keepOpen = listener!({ type: 'cqd-set-mode', mode: 'auto' }, {}, respond);
+    expect(keepOpen).toBe(true);
+    // Flush the apply() microtask chain (no macrotasks involved).
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
+
+    // The resolved engine is reported…
+    expect(respond).toHaveBeenCalledWith({ success: true, mode: 'v2' });
+    // …applied in memory…
+    expect(engineRegistry.getMode()).toBe('v2');
+    // …and storage is untouched: the popup owns the persisted 'auto'.
+    expect(setSpy).not.toHaveBeenCalled();
+  });
+});
