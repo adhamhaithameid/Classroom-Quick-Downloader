@@ -106,7 +106,7 @@ describe('site layout shell', () => {
     expect(html).toContain('href="/support"');
     expect(html).toContain('href="/google-workspace-school-accounts-support"');
     expect(html).toContain('href="/google-drive-cant-scan-virus-warning-download"');
-    expect(html).toContain('href="/press-kit"');
+    expect(html).toContain('href="/brand"');
     expect(html).toContain('href="/featured"');
     expect(html).toContain('l2-nav-menu-featured');
   });

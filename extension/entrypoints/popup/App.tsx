@@ -19,9 +19,16 @@ import {
   isVersionSeen,
   markAsSeen,
   getLatestChange,
+  UPDATE_PILL_RULE,
   type ChangelogData,
   type ChangelogFetchResult
 } from '../utils/changelog';
+import {
+  CHANGELOG_SEEN_KEY,
+  UPDATE_STATE_KEY,
+  type UpdateState,
+} from '../utils/update-state';
+import { updateTarget } from '../../src/update/update-state';
 import { popupMessage } from './i18n';
 import { CHANGELOG_SITE_URL, WEBSITE_BASE_URL } from '../utils/analytics/constants';
 import { isApiConfigured } from '../../src/engines/v3/api/config';
@@ -355,6 +362,47 @@ function App() {
   const [showChangelog, setShowChangelog] = useState(false);
   const [changelogStatus, setChangelogStatus] = useState<'loading' | 'ready' | 'offline' | 'error'>('loading');
   const [changelogStatusMessage, setChangelogStatusMessage] = useState<string | null>(null);
+
+  // UPDATE-AVAILABLE STATE (bead 08fg.3) — the background owns the live
+  // /changelog check plus the browser update events (onInstalled /
+  // onUpdateAvailable); the popup mirrors its storage key and computes the
+  // same dot target for the pill pulse.
+  const [updateTargetVersion, setUpdateTargetVersion] = useState<string | null>(null);
+  useEffect(() => {
+    const browserApi = (globalThis as any).chrome;
+    if (!browserApi?.storage?.local?.get) return;
+    let alive = true;
+    const recompute = async () => {
+      try {
+        const [stateRes, seenRes] = await Promise.all([
+          browserApi.storage.local.get(UPDATE_STATE_KEY),
+          browserApi.storage.local.get(CHANGELOG_SEEN_KEY),
+        ]);
+        const state = stateRes?.[UPDATE_STATE_KEY] as UpdateState | undefined;
+        const seen =
+          (seenRes?.[CHANGELOG_SEEN_KEY] as Record<string, string | undefined> | undefined) ?? {};
+        const target = updateTarget({
+          pendingVersion: state?.pendingVersion ?? null,
+          latestVersion: state?.latestVersion ?? null,
+          installedVersion: version ?? '',
+          seenVersions: seen,
+        });
+        if (alive) setUpdateTargetVersion(target.version);
+      } catch {
+        if (alive) setUpdateTargetVersion(null);
+      }
+    };
+    void recompute();
+    const listener = (changes: any, area: string) => {
+      if (area !== 'local') return;
+      if (changes[UPDATE_STATE_KEY] || changes[CHANGELOG_SEEN_KEY]) void recompute();
+    };
+    browserApi.storage.onChanged.addListener(listener);
+    return () => {
+      alive = false;
+      browserApi.storage.onChanged.removeListener(listener);
+    };
+  }, [version]);
 
   // ENGINE MODE STATE — the initial value mirrors the runtime default
   // (mode-controller.ts DEFAULT_MODE 'v2'): fresh installs run v2, so the
@@ -795,7 +843,7 @@ function App() {
     }
   }, []);
 
-  function handleEngineModeSelect(nextMode: 'legacy' | 'v2' | 'v3') {
+  function handleEngineModeSelect(nextMode: 'legacy' | 'v2' | 'v3' | 'auto') {
     // Any engine decision closes the confirm card first (surface 03 T2:
     // picking another engine while the card is open is a decline + switch).
     if (apiConfirmOpen) setApiConfirmOpen(false);
@@ -812,7 +860,7 @@ function App() {
   }
 
   /** The shared persistence + live-switch path for an engine decision. */
-  function commitEngineMode(nextMode: 'legacy' | 'v2' | 'v3') {
+  function commitEngineMode(nextMode: 'legacy' | 'v2' | 'v3' | 'auto') {
     setEngineMode(nextMode);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const browserApi = (globalThis as any).chrome;
@@ -933,6 +981,10 @@ function App() {
       }
     : null;
   const effectiveRule = matchedRule ?? fallbackRule;
+  // Any active update signal (newer unseen live release, just-updated, or
+  // scheduled) pulses the pill (08fg.3); dismissal falls back to the manual
+  // rules.
+  const pillRule = updateTargetVersion ? UPDATE_PILL_RULE : effectiveRule;
 
   const isLoadingSettings = loadingState || settings == null;
   const isEnabled = settings?.extensionEnabled ?? true;
@@ -982,7 +1034,7 @@ function App() {
                 {version && (
                   <button
                     type="button"
-                    className={`cqd-brand-version ${getRuleClasses(effectiveRule, seen)}`}
+                    className={`cqd-brand-version ${getRuleClasses(pillRule, seen)}`}
                     aria-label={`Version ${version} - View changelog`}
                     title={getLatestChange(changelogData) ? `Latest: ${getLatestChange(changelogData)}` : "View changelog"}
                     onClick={async () => {
@@ -1007,6 +1059,11 @@ function App() {
                        if (version) {
                          await markAsSeen(version, changelogData);
                          setSeen(true);
+                       }
+                       if (updateTargetVersion && updateTargetVersion !== version) {
+                         // Dismiss the update dot + pill for the target version.
+                         await markAsSeen(updateTargetVersion, changelogData);
+                         setUpdateTargetVersion(null);
                        }
                     }}
                   >
@@ -2015,7 +2072,7 @@ export function PrivacyLedger() {
  *  permission + oauth2 client_id, docs/engine/api-assist-setup.md), and
  *  selecting it while enabled is the user's explicit consent that sets
  *  cqdV2Mode 'v3'. */
-export type PopupEngineMode = 'legacy' | 'v2' | 'v3';
+export type PopupEngineMode = 'legacy' | 'v2' | 'v3' | 'auto';
 
 /**
  * Resolve the popup's engine-mode display from raw storage — the same
@@ -2028,7 +2085,7 @@ export type PopupEngineMode = 'legacy' | 'v2' | 'v3';
  * finding 12).
  */
 export function resolveEngineMode(stored: unknown): PopupEngineMode {
-  if (stored === 'legacy' || stored === 'v2' || stored === 'v3') {
+  if (stored === 'legacy' || stored === 'v2' || stored === 'v3' || stored === 'auto') {
     return stored;
   }
   return 'v2';
@@ -2145,6 +2202,12 @@ export function EngineModeRow({ mode, loading, apiConfigured, onSelect }: Engine
       label: popupMessage('popupEngineModeApi'),
       disabled: !apiConfigured,
       title: apiConfigured ? API_PRIVACY_TOOLTIP : API_SETUP_TOOLTIP,
+    },
+    {
+      value: 'auto',
+      label: 'Auto',
+      disabled: false,
+      title: 'Picks the best engine for you from your own download results. Never sends page data.',
     },
   ];
 

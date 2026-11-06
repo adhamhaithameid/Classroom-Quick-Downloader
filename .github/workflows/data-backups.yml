@@ -87,11 +87,25 @@ jobs:
             echo '{"skipped": "DO_SHARED_SECRET not configured"}' > backups/latest/do-storage.json
             exit 0
           fi
-          code="$(curl -sS -o backups/latest/do-storage.json -w "%{http_code}" \
+          # SEC-102 (rescan 2026-11-03): fetch to a temp file and move into
+          # place only on HTTP 200 — a transient worker error must not
+          # truncate the previous good dump.
+          code="$(curl -sS -o /tmp/do-storage.fetch.json -w "%{http_code}" \
             -H "X-Admin-Secret: ${DO_SHARED_SECRET}" \
-            "${WORKER_BASE_URL%/}/admin/storage-export" || true)"
-          if [ "${code}" != "200" ]; then
+            "${WORKER_BASE_URL%/}/admin/storage-export?redacted=1" || true)"
+          if [ "${code}" = "200" ]; then
+            mv -f /tmp/do-storage.fetch.json backups/latest/do-storage.json
+          else
             echo "::warning::DO storage export returned HTTP ${code}; keeping previous dump."
+          fi
+          # SEC-001 hard guard: refuse to commit an unredacted dump (e.g. the
+          # live worker predates the ?redacted=1 deployment). The redacted
+          # body carries "redacted":true at the top level.
+          if grep -q '"ipAllowlist"\|"loginAttempts"\|"dangerActionAuditLogs"' backups/latest/do-storage.json 2>/dev/null || \
+            ! grep -q '"redacted":true' backups/latest/do-storage.json 2>/dev/null; then
+            echo "::error::DO storage export is not redacted (worker deployment behind main?); dropping the dump so it is never committed."
+            rm -f backups/latest/do-storage.json
+            echo '{"skipped": "unredacted export refused by the backup guard"}' > backups/latest/do-storage.json
           fi
 
       - name: Snapshot public website snapshot
@@ -112,6 +126,10 @@ jobs:
           git config user.name "cqd-backups-bot"
           git config user.email "actions@users.noreply.github.com"
           git add backups/latest
+          # do-storage.json is gitignored on main (SEC-001: never track the DO
+          # dump on the default branch again); the redacted copy is force-added
+          # here so only the backup lane carries it.
+          git add -f backups/latest/do-storage.json
           if git diff --cached --quiet; then
             echo "No backup changes to commit."
             exit 0

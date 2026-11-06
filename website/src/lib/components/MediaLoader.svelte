@@ -22,6 +22,14 @@
   export let loading: 'lazy' | 'eager' = 'eager';
   /** Aspect ratio hint for the skeleton (e.g. '16/9') */
   export let aspectRatio: string = '';
+  /** Intrinsic image width — emitted as width/height attrs so the browser
+     reserves space before the file loads (CLS). */
+  export let imgWidth: number | undefined = undefined;
+  /** Intrinsic image height — pairs with imgWidth. */
+  export let imgHeight: number | undefined = undefined;
+  /** Defer the <video> element (and its file fetch) until the wrapper nears
+     the viewport — autoplay would otherwise download eagerly. */
+  export let lazyVideo: boolean = false;
   /** When true, skip skeleton and show content immediately */
   export let eager: boolean = false;
 
@@ -30,6 +38,8 @@
   let imgEl: HTMLImageElement;
   let videoEl: HTMLVideoElement;
   let retryKey = 0;
+  let mlEl: HTMLDivElement;
+  let videoArmed = !lazyVideo;
 
   function handleLoad() {
     if (state !== 'loaded') state = 'loaded';
@@ -58,6 +68,18 @@
   }
 
   onMount(() => {
+    if (lazyVideo && type === 'video' && 'IntersectionObserver' in window) {
+      const io = new IntersectionObserver(
+        (entries) => {
+          if (!entries.some((e) => e.isIntersecting)) return;
+          io.disconnect();
+          videoArmed = true;
+        },
+        { rootMargin: '300px 0px' }
+      );
+      io.observe(mlEl);
+      return () => io.disconnect();
+    }
     checkAlreadyReady();
     // For videos, also poll briefly in case events were missed
     if (type === 'video') {
@@ -74,7 +96,7 @@
   });
 </script>
 
-<div class="ml" class:ml-loaded={state === 'loaded'} style={aspectRatio ? `aspect-ratio: ${aspectRatio}` : ''}>
+<div class="ml" bind:this={mlEl} class:ml-loaded={state === 'loaded'} style={aspectRatio ? `aspect-ratio: ${aspectRatio}` : ''}>
   <!-- Shimmer skeleton (absolutely positioned overlay, disappears when loaded) -->
   {#if state !== 'error'}
     <div class="ml-skeleton" class:ml-skeleton-out={state === 'loaded'} aria-hidden="true">
@@ -122,13 +144,15 @@
   {/if}
 
   <!-- Actual media element (always in DOM, hidden until loaded) -->
-  {#if type === 'video'}
+  {#if type === 'video' && videoArmed}
     {#key retryKey}
       <!-- svelte-ignore a11y-media-has-caption -->
       <video
         bind:this={videoEl}
         class="{className} ml-media"
         class:ml-visible={state === 'loaded'}
+        width={imgWidth}
+        height={imgHeight}
         {autoplay}
         {loop}
         {muted}
@@ -151,6 +175,8 @@
         class:ml-visible={state === 'loaded'}
         {src}
         {alt}
+        width={imgWidth}
+        height={imgHeight}
         loading={loading}
         decoding="async"
         on:load={handleLoad}

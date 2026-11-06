@@ -142,7 +142,8 @@ describe('analytics storage internals', () => {
     } as any, 1000, false);
     expect(key).toContain('success');
     expect(key).toContain('unknown');
-    expect(key.endsWith('|1')).toBe(true);
+    // The key ends with bypass + the use-case context segments (1ef6.1).
+    expect(key.endsWith('|1|unknown|unknown|unknown')).toBe(true);
 
     const coarse = __storageTestInternals.rollupEvents([
       {
