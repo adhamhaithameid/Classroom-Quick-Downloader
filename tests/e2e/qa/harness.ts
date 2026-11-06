@@ -23,6 +23,7 @@ import {
   test,
   type BrowserContext,
   type Page,
+  type Worker,
 } from "@playwright/test";
 import type { Scenario } from "../../simulator/scenario";
 import { startSimulatorProxy } from "../../simulator/proxy";
@@ -596,17 +597,49 @@ export function getRunId(suiteRunId?: string): string {
 // ---------------------------------------------------------------------------
 // Service-worker probe: record the background download machine's
 // chrome.downloads calls + onChanged transitions where they actually run.
+//
+// zvte findings (2026-11-06, bisected):
+// 1. MV3 service workers idle-restart (~30s without events). The original
+//    probe kept records in a JS global and patched chrome.downloads once —
+//    a restart wipes both, and any onChanged firing while no listener is
+//    attached is lost forever. Terminal continuity now comes from
+//    chrome.downloads.search(): the browser's downloads DB survives
+//    restarts, so the reader synthesizes the terminal lines and the counts
+//    stay monotonic across restart gaps.
+// 2. Evaluating ANY script on the worker once per poll (even a no-op
+//    installer re-arm) stalls the machine's download start while journeys
+//    run back-to-back — reproduced locally 3/3 (the zero-byte case sat
+//    queued, completed only after the 90s poll died), and install-once
+//    passed 3/3. So the installer runs exactly once per WORKER OBJECT:
+//    the reader re-arms only when findSw() hands back a different worker
+//    (a restart), never during steady-state polling.
+// 3. The reader never throws: while the worker is down it serves the
+//    accumulated record set, so expect.poll keeps polling honestly instead
+//    of crashing mid-restart.
 // ---------------------------------------------------------------------------
 
 export interface SwProbe {
   downloads: string[];
 }
 
+type ProbeChrome = {
+  downloads: {
+    download: (opts: unknown, cb?: (id?: number) => void) => void;
+    onChanged: {
+      addListener: (fn: (delta: { id: number; state?: { current: string } }) => void) => void;
+    };
+    search: (query: unknown) => Promise<Array<{ id: number; state?: string }>>;
+  };
+  runtime: { lastError?: { message?: string } };
+};
+
 export async function instrumentSw(
   context: BrowserContext,
   swUrlMatch: string,
 ): Promise<() => Promise<SwProbe>> {
-  let sw = context.serviceWorkers().find((w) => w.url().includes(swUrlMatch));
+  const findSw = (): Worker | undefined =>
+    context.serviceWorkers().find((w) => w.url().includes(swUrlMatch));
+  let sw: Worker | undefined = findSw();
   if (!sw) sw = await context.waitForEvent("serviceworker", { timeout: 15_000 }).catch(() => undefined);
   if (!sw) {
     // Firefox MV2 runs no extension service worker and Playwright does not
@@ -615,30 +648,96 @@ export async function instrumentSw(
       "SKIPPED: HARNESS: no extension service worker — Playwright does not expose Firefox MV2 background contexts; background-seam probes are Chromium-only — content-script journeys cover the extension",
     );
   }
-  await sw.evaluate(() => {
-    const w = self as unknown as {
-      __cqdProbe: { downloads: string[] };
-      chrome: {
-        downloads: {
-          download: (opts: unknown, cb?: (id?: number) => void) => void;
-          onChanged: { addListener: (fn: (delta: { id: number; state?: { current: string } }) => void) => void };
-        };
-        runtime: { lastError?: { message?: string } };
-      };
-    };
-    w.__cqdProbe = { downloads: [] };
-    const api = w.chrome.downloads;
+  await sw.evaluate(installSwProbe);
+  let lastWorker: Worker = sw;
+  // Authoritative record set, deduped Node-side and never shrinking: live
+  // lines from the current worker life plus search()-synthesized terminal
+  // lines from every prior life.
+  const seenLines = new Set<string>();
+
+  const reader = async (): Promise<SwProbe> => {
+    let worker: Worker | undefined = findSw();
+    if (!worker) {
+      // Mid-restart: the worker comes back on its own event stream.
+      worker = await context
+        .waitForEvent("serviceworker", { timeout: 5_000 })
+        .catch(() => undefined);
+    }
+    if (worker) {
+      try {
+        // Re-arm ONLY on a worker change (a restart): flags are JS globals
+        // and reset with the worker, so the fresh life needs one install.
+        // Steady-state polls run NO installer evaluate — see zvte finding 2.
+        if (worker !== lastWorker) {
+          await worker.evaluate(installSwProbe);
+          lastWorker = worker;
+        }
+        const sources = await worker.evaluate(async () => {
+          const w = self as unknown as {
+            __cqdProbeMemory?: string[];
+            chrome: ProbeChrome;
+          };
+          const memory = w.__cqdProbeMemory ?? [];
+          let searched: string[] = [];
+          try {
+            const items = (await w.chrome.downloads.search({})) as Array<{
+              id: number;
+              state?: string;
+            }>;
+            searched = items
+              .filter((item) => item.state === "complete" || item.state === "interrupted")
+              .map((item) => `onChanged id=${item.id} state=${item.state}`);
+          } catch {
+            // search unavailable: fall back to the live-captured lines only.
+          }
+          return { memory, searched };
+        });
+        for (const line of [...sources.searched, ...sources.memory]) {
+          seenLines.add(line);
+        }
+      } catch {
+        // Evaluate raced a restart — the seen set keeps its history and the
+        // next poll reconciles again.
+      }
+    }
+    const downloads = [...seenLines];
+    if (downloads.length > 5000) seenLines.clear();
+    return { downloads };
+  };
+  return reader;
+}
+
+/** Runs INSIDE the extension service worker. Called once per worker life. */
+function installSwProbe(): void {
+  const w = self as unknown as {
+    __cqdProbePatched?: boolean;
+    __cqdProbeListening?: boolean;
+    __cqdProbeMemory?: string[];
+    chrome: ProbeChrome;
+  };
+  // Current-life records: synchronous, always works.
+  w.__cqdProbeMemory ??= [];
+  const memory = w.__cqdProbeMemory;
+  const push = (line: string): void => {
+    memory.push(line);
+    if (memory.length > 2000) memory.splice(0, memory.length - 2000);
+  };
+  const api = w.chrome.downloads;
+  if (!w.__cqdProbePatched) {
+    w.__cqdProbePatched = true;
     const orig = api.download.bind(api);
     api.download = (opts: unknown, cb?: (id?: number) => void) => {
-      w.__cqdProbe.downloads.push(`start ${JSON.stringify(opts).slice(0, 140)}`);
+      push(`start ${JSON.stringify(opts).slice(0, 140)}`);
       return orig(opts, (id?: number) => {
-        w.__cqdProbe.downloads.push(`callback id=${id} err=${w.chrome.runtime.lastError?.message ?? "none"}`);
+        push(`callback id=${id} err=${w.chrome.runtime.lastError?.message ?? "none"}`);
         cb?.(id);
       });
     };
+  }
+  if (!w.__cqdProbeListening) {
+    w.__cqdProbeListening = true;
     api.onChanged.addListener((delta) => {
-      w.__cqdProbe.downloads.push(`onChanged id=${delta.id} state=${delta.state ? delta.state.current : "?"}`);
+      push(`onChanged id=${delta.id} state=${delta.state ? delta.state.current : "?"}`);
     });
-  });
-  return () => sw!.evaluate(() => (self as unknown as { __cqdProbe: SwProbe }).__cqdProbe);
+  }
 }
