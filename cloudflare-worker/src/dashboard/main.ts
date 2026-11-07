@@ -3601,6 +3601,16 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string, admi
           }
         </div>
       </section>
+      <section class="card" id="error-rollup" data-card>
+        <div class="health-header">
+          <h2>Recent Errors</h2>
+          <button class="btn btn-ghost" id="btn-error-rollup-refresh" type="button">Refresh</button>
+        </div>
+        <div class="section-subtitle" style="margin-bottom: 10px; color: var(--text-muted); font-size: 0.85rem;">
+          Failure signatures × OS × browser × version × page type × engine mode (bead 1ef6). Top 50 by count.
+        </div>
+        <div id="error-rollup-body" style="color: var(--text-muted); font-size: 0.85em;">Loading…</div>
+      </section>
       <section class="card" id="pipeline-health" data-card>
         <div class="health-header">
           <h2>Pipeline Health</h2>
@@ -7510,6 +7520,49 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string, admi
       bind('btn-website-status-refresh', () => {
         fetchWebsiteStatus();
       });
+
+      function escapeHtml(value) {
+        return String(value == null ? '' : value).replace(/[&<>"']/g, (ch) => (
+          { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+        ));
+      }
+
+      function fetchErrorRollup() {
+        const body = document.getElementById('error-rollup-body');
+        if (!body) return;
+        fetch('/admin/website/error-rollup', { method: 'GET', credentials: 'same-origin' })
+          .then((r) => r.json())
+          .then((data) => {
+            if (!data || !data.ok) {
+              body.textContent = 'Failed to load the error rollup.';
+              return;
+            }
+            const rows = data.rows || [];
+            if (!rows.length) {
+              body.textContent = 'No failure events recorded yet.';
+              return;
+            }
+            const head = ['error', 'os', 'browser', 'version', 'page', 'engine', 'strategy', 'count', 'last seen'];
+            const html = '<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; font-size:0.8em;">'
+              + '<thead><tr>' + head.map((h) => '<th style="text-align:left; padding:4px 6px; border-bottom:1px solid var(--border-subtle);">' + h + '</th>').join('') + '</tr></thead><tbody>'
+              + rows.map((row) => '<tr>'
+                + [row.errorType, row.os, row.browser, row.extVersion, row.pageType, row.engineMode, row.strategy, row.count, new Date(row.lastSeen).toISOString().slice(0, 16) + 'Z']
+                  .map((cell) => '<td style="padding:4px 6px; border-bottom:1px solid var(--border-subtle); white-space:nowrap;">' + escapeHtml(cell) + '</td>')
+                  .join('')
+                + '</tr>').join('')
+              + '</tbody></table></div>'
+              + '<div style="margin-top:6px; color:var(--text-muted);">Total distinct signatures (capped at 200): ' + Number(data.totalKeys || 0) + '</div>';
+            body.innerHTML = html;
+          })
+          .catch(() => {
+            if (body) body.textContent = 'Network error loading the error rollup.';
+          });
+      }
+
+      bind('btn-error-rollup-refresh', () => {
+        fetchErrorRollup();
+      });
+      fetchErrorRollup();
 
       bind('btn-website-flush-now', () => {
         const btn = document.getElementById('btn-website-flush-now');

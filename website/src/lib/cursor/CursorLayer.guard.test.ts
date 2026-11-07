@@ -44,8 +44,8 @@ describe('branded cursor layer (docs/CURSOR.md)', () => {
     expect(layerSource).toContain('var(--cqd-cursor-size, 52px)');
   });
 
-  it('follows with the approved 80ms lag and no trailing layer', () => {
-    expect(CURSOR_LAG_MS).toBe(80);
+  it('tracks the pointer natively (zero lag, o3ui) and has no trailing layer', () => {
+    expect(CURSOR_LAG_MS).toBe(0);
     expect(actionSource).toContain('CURSOR_LAG_MS');
     /* The two-layer trailing experiment was cut on review: ring and icon
        move together, so no per-layer trail offsets may exist. */

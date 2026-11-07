@@ -12,6 +12,12 @@ export interface AnalyticsEvent {
   duration_ms: number;
   bypass_used: boolean;
   error_type?: string;
+  /** Use-case context (1ef6.1): Classroom view kind at request time. */
+  pageType?: string;
+  /** Use-case context (1ef6.1): engine mode backing the download. */
+  engineMode?: string;
+  /** Use-case context (1ef6.1): acquisition strategy used. */
+  strategy?: string;
   language: string;
   timestamp: number;
   id?: string;
@@ -136,6 +142,12 @@ export interface RecordDownloadEventInput {
   duration_ms?: number;
   bypass_used?: boolean;
   error_type?: string;
+  /** Use-case context (1ef6.1): view kind at request time. */
+  pageType?: string;
+  /** Use-case context (1ef6.1): engine mode backing the download. */
+  engineMode?: string;
+  /** Use-case context (1ef6.1): acquisition strategy used. */
+  strategy?: string;
   /** Download-level retry count at settle (0 = first attempt). */
   retries?: number;
 }

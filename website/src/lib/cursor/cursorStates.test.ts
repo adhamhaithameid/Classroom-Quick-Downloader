@@ -26,9 +26,9 @@ function sample(overrides: Partial<Parameters<typeof resolveCursorState>[0]> = {
 }
 
 describe('cursor constants', () => {
-  it('pins the approved size and lag values', () => {
+  it('pins the approved size and the natural-speed lag (o3ui)', () => {
     expect(CURSOR_SIZE_PX).toBe(52);
-    expect(CURSOR_LAG_MS).toBe(80);
+    expect(CURSOR_LAG_MS).toBe(0);
   });
 
   it('seek targets cover the hero and footer primary CTAs', () => {
@@ -107,7 +107,7 @@ describe('easeExponential', () => {
   });
 
   it('closes a fixed fraction of the gap per tau of elapsed time', () => {
-    const afterOneTau = easeExponential(0, 100, CURSOR_LAG_MS, CURSOR_LAG_MS);
+    const afterOneTau = easeExponential(0, 100, 100, 100);
     expect(afterOneTau).toBeCloseTo(100 * (1 - Math.exp(-1)), 5);
   });
 

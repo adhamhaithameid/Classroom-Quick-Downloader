@@ -26,10 +26,11 @@ locked decisions from that review are baked in as constants and guard tests.
   `[data-cursor-ring]` opt-in) — collapses the cursor to the bare ring:
   no arrow, no glass. The full glass + seeking arrow cursor is the
   empty-space cursor.
-- **80ms follow lag** (`CURSOR_LAG_MS`): the whole cursor (ring and icon
-  together — the trailing-layer experiment was cut on review) eases to the
-  pointer with frame-rate-independent exponential easing, clamped at 250ms
-  per frame so a tab-switch wake never teleports.
+- **Native tracking** (`CURSOR_LAG_MS = 0`): the whole cursor (ring and icon
+  together) sits on the pointer with no follow lag — retuned from the
+  100ms design / 80ms constant after user feedback that it read as slow
+  (bead o3ui, 2026-10-28). The easing machinery stays for reduced-motion
+  and any future tau > 0 tuning; tau <= 0 snaps.
 - **Buttery transitions.** The layer renders every state's glyphs statically;
   state changes flip `data-state` and CSS transitions morph between states
   (glass dissipates, the badge cuts into the ring via `stroke-dasharray`,
@@ -80,11 +81,12 @@ npx vitest run src/lib/cursor/ src/routes/layout.shell.test.ts
 - `src/lib/cursor/cursorStates.test.ts` — decision table (keyword precedence,
   text-entry and selection escalation, disabled actions, demo overrides),
   easing properties (per-tau fraction, frame-rate independence, clamps),
-  seek angles, approved constants (52px / 80ms / 37 states).
+  seek angles, approved constants (52px / 0ms lag / 37 states).
 - `src/lib/cursor/CursorLayer.guard.test.ts` — pins each reviewed requirement
   in source and rendered output: native stand-down rule, fine-pointer gate,
-  52px, 80ms lag, **no trailing layer**, reduced-motion fallback, glass
-  clearing, seek opt-in, progress fill, all glyph groups.
+  52px, 0ms lag (native pointer tracking, no eased follow), **no trailing
+  layer**, reduced-motion fallback, glass clearing, seek opt-in, progress
+  fill, all glyph groups.
 - `src/routes/layout.shell.test.ts` — the layout mounts the layer on every
   route.
 
