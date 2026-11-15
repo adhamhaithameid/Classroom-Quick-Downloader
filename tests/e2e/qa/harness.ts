@@ -285,6 +285,39 @@ export async function launchQaContext(
     context.on("serviceworker", (worker) => {
       console.log(`[qa-console] service worker started: ${worker.url().slice(0, 80)}`);
     });
+    // w5r6 round 2: the run-43705997372 tap showed ZERO background pages and
+    // zero content-script markers on signed Firefox, so the add-on never
+    // activated. Firefox's own extensions.json (written on first startup
+    // scan) names the per-addon state — active/appDisabled/signedState — and
+    // the extensions dir listing shows whether the xpi survived startup at
+    // all. Dump both while the state is fresh.
+    if (browser === "firefox") {
+      try {
+        const extDir = path.join(FIREFOX_PROFILE_DIR, "extensions");
+        const listing = fs.existsSync(extDir) ? fs.readdirSync(extDir) : ["<no extensions dir>"];
+        console.log(`[qa-console:ff] extensions dir: ${JSON.stringify(listing)}`);
+        const extJson = path.join(FIREFOX_PROFILE_DIR, "extensions.json");
+        if (fs.existsSync(extJson)) {
+          const data = JSON.parse(fs.readFileSync(extJson, "utf8"));
+          const addons = (data.addons ?? []).map((a: Record<string, unknown>) => ({
+            id: a.id,
+            active: a.active,
+            userDisabled: a.userDisabled,
+            appDisabled: a.appDisabled,
+            signedState: a.signedState,
+            path: a.path,
+          }));
+          console.log(`[qa-console:ff] extensions.json: ${JSON.stringify(addons)}`);
+        } else {
+          console.log("[qa-console:ff] extensions.json: <absent after launch>");
+        }
+        console.log(
+          `[qa-console:ff] backgroundPages=${context.backgroundPages().length}`,
+        );
+      } catch (e) {
+        console.log(`[qa-console:ff] profile diagnostics failed: ${String(e).slice(0, 200)}`);
+      }
+    }
   }
 
   let extensionAvailable = true;
