@@ -300,7 +300,15 @@ jobs:
 
   deploy-worker:
     name: Deploy worker
-    if: github.event_name != 'pull_request'
+    # s0qj: plain-if legs downstream of the environment-gated release-approval
+    # job were ALL skipped after a successful API approval (run 43717953471)
+    # — the same transitive-skip evaluation quirk as trains 6-10. always()
+    # forces the leg to evaluate, and the explicit needs.result checks keep
+    # the gates strict: a skipped or failed need blocks the leg.
+    if: >-
+      always() && github.event_name != 'pull_request' &&
+      needs.release-approval.result == 'success' &&
+      needs.version-preflight.result == 'success'
     needs: [release-approval, version-preflight]
     uses: ./.github/workflows/deploy-cloudflare-worker.yml
     with:
@@ -309,7 +317,10 @@ jobs:
 
   deploy-website:
     name: Deploy website
-    if: github.event_name != 'pull_request'
+    if: >-
+      always() && github.event_name != 'pull_request' &&
+      needs.deploy-worker.result == 'success' &&
+      needs.version-preflight.result == 'success'
     needs: [deploy-worker, version-preflight]
     uses: ./.github/workflows/website-deploy.yml
     with:
@@ -318,7 +329,10 @@ jobs:
 
   publish-stores:
     name: Publish stores
-    if: github.event_name != 'pull_request'
+    if: >-
+      always() && github.event_name != 'pull_request' &&
+      needs.deploy-website.result == 'success' &&
+      needs.version-preflight.result == 'success'
     needs: [deploy-website, version-preflight]
     uses: ./.github/workflows/extension-stores.yml
     with:
@@ -332,7 +346,10 @@ jobs:
 
   post-publish-verify:
     name: Post-publish verification
-    if: github.event_name != 'pull_request'
+    if: >-
+      always() && github.event_name != 'pull_request' &&
+      needs.deploy-website.result == 'success' &&
+      needs.publish-stores.result == 'success'
     needs: [deploy-website, publish-stores]
     runs-on: ubuntu-latest
     timeout-minutes: 15
