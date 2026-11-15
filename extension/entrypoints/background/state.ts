@@ -137,7 +137,15 @@ export function bindDownloadId(pending: PendingDownload, downloadId: number): bo
  * (used when we cancel a download ourselves but keep the flow alive).
  */
 export function unbindDownloadId(downloadId: number): void {
+  const pending = pendingByDownloadId.get(downloadId);
   pendingByDownloadId.delete(downloadId);
+  // #878 (oso5): a stale currentDownloadId keeps the pending "claimed", so
+  // getUnclaimedPendingByUrl skips it during the next attempt's bind race
+  // and the filename suggestion misses. Unbind means the pending holds no
+  // browser id anymore.
+  if (pending && pending.currentDownloadId === downloadId) {
+    pending.currentDownloadId = undefined;
+  }
 }
 
 /**
