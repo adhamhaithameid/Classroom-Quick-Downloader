@@ -393,3 +393,57 @@ describe("0k86: payload-size cap fast-fail", () => {
     expect(final.oracleDeadLetters?.[0]?.lastError).toContain("payload_too_large");
   });
 });
+
+// ---------------------------------------------------------------------------
+// ic4n follow-up: the DO alarm is a single shared bus (daily flush, retry
+// backoffs, telemetry retries, changelog sync). scheduleRetry must arm
+// earliest-wins like every other writer — clobbering an already-armed
+// earlier alarm delays or loses that machine's transition.
+// ---------------------------------------------------------------------------
+describe("alarm arming discipline: earliest-wins everywhere", () => {
+  function flushFailureDO() {
+    archiveBatchMock.mockResolvedValue({ ok: false, error: "d1_unavailable" });
+    return makeDO({
+      buffer: [],
+      pendingBatches: [makePendingBatch("retry-1", 1, 1)], // attempts < MAX: ladder, not dead-letter
+      lastFlushAt: Date.parse("2026-10-27T00:00:00.000Z"),
+      retryState: { consecutiveFailures: 0 },
+      configMaxBufferSize: 50000,
+    });
+  }
+
+  it("keeps an earlier armed alarm when a flush failure schedules a later retry", async () => {
+    vi.setSystemTime(new Date("2026-10-27T00:30:00.000Z"));
+    const { obj, state } = flushFailureDO();
+    // A machine armed the alarm 30s from now (e.g. a telemetry retry);
+    // scheduleRetry's first-step backoff is 60s — strictly later.
+    const preArmed = Date.now() + 30_000;
+    await state.storage.setAlarm(preArmed);
+
+    await obj.alarm(); // flush fails -> scheduleRetry
+
+    expect(await state.storage.getAlarm()).toBe(preArmed);
+    const after = state.storage.dump() as { retryState?: { nextRetryAt?: number } };
+    expect(after.retryState?.nextRetryAt).toBe(Date.now() + 60_000); // ladder recorded, arming deferred
+  });
+
+  it("arms the retry backoff when no alarm is scheduled", async () => {
+    vi.setSystemTime(new Date("2026-10-27T00:30:00.000Z"));
+    const { obj, state } = flushFailureDO();
+
+    await obj.alarm();
+
+    expect(await state.storage.getAlarm()).toBe(Date.now() + 60_000);
+  });
+
+  it("takes the earlier retry time when the armed alarm is later", async () => {
+    vi.setSystemTime(new Date("2026-10-27T00:30:00.000Z"));
+    const { obj, state } = flushFailureDO();
+    const later = Date.now() + 6 * 60 * 60 * 1000; // an armed 6h-out alarm
+    await state.storage.setAlarm(later);
+
+    await obj.alarm();
+
+    expect(await state.storage.getAlarm()).toBe(Date.now() + 60_000);
+  });
+});
