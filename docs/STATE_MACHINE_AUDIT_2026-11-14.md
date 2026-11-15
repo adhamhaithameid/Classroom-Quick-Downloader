@@ -209,30 +209,29 @@ These patterns explain most of the rows above.
 
 ## Live issues found
 
-Ranked by blast radius. Items 4 and 6 are runtime races; confirm them in a
-browser or integration test before fixing.
+Ranked by blast radius. Status as of 2026-11-15: every item is either
+fixed or reclassified as documented intent; the PR link shows where.
 
-1. **Fork drift in the Download All group machine (verified).**
-   `src/download-all/refresh.ts:102` seeds the sticky `inProgress` flag that
-   the entrypoint fork removed as the #537 hang fix
-   (`entrypoints/download_all.content.ts:596`). The student-work stacks run
-   the un-fixed variant.
-2. **Engine selector can lie about shadow mode.** The popup resolves
-   `shadow` to `v2` for display while the runtime runs shadow
-   (`popup/App.tsx:2087` vs `mode-gate.ts:35`).
-3. **v3 without API config shows the wrong engine.** The registry returns
-   the shadow pair while storage says `v3`
-   (`engine-registry.ts:166`).
-4. **Media modal can hide the navbar site-wide.** The body class lacks
-   unmount cleanup (`overview/+page.svelte:1507`). Needs a browser check.
-5. **Worker alarm clobber.** `scheduleRetry` overwrites an armed alarm
-   unconditionally (`downloads_do.ts:6505`).
-6. **V2 watchdog races queue admission.** A queued request can legitimately
-   exceed the 45 s watchdog (`download-controller.ts:265`). Needs a test.
-7. **Milestone consumed unplayed.** The 1500 ms claim ack loses to a slow
-   settle chain under a batch storm (`download-stats.ts:402`).
-8. **History row drop.** `recordDownloadHistory` writes outside any chain
-   (`history-store.ts:141`).
+1. **Fork drift in the Download All group machine (verified).** Fixed
+   2026-11-15 on PR #882 (live-`inProgress` seeding + bounded trailing
+   flush; the `failed` flag was already sticky — see the correction above).
+2. **Engine selector can lie about shadow mode.** Reclassified 2026-11-15:
+   documented intent. The selector never offered shadow; the popup's
+   `v2` display for a shadow install is the designed display, not a
+   defect. No code change.
+3. **v3 without API config shows the wrong engine.** Reclassified
+   2026-11-15: documented intent — the registry's shadow-pair fallback
+   keeps unconfigured v3 installs working. No code change.
+4. **Media modal can hide the navbar site-wide.** Fixed 2026-11-15 on
+   PR #888 (body class clears on unmount).
+5. **Worker alarm clobber.** Fixed 2026-11-15 on PR #886
+   (`scheduleRetry` arms earliest-wins; 3 new tests).
+6. **V2 watchdog races queue admission.** Fixed 2026-11-15 on PR #891
+   (two-stage watchdog: 45 s demotes to trying, 90 s of silence errors).
+7. **Milestone consumed unplayed.** Fixed 2026-11-15 on PR #890 (claim
+   ack window 1500 ms → 8 s, test-pinned with a 7.5 s storm ack).
+8. **History row drop.** Fixed 2026-11-15 on PR #889 (writes serialize
+   on a promise chain; same-tick settles both land).
 
 ## Extraction candidates
 
@@ -246,16 +245,34 @@ Ranked. Each converges many rows onto one shape.
 2. **Converge the download lifecycle on the existing reducer.**
    `core/acquire/state-machine.ts` already models phases, authuser rotation,
    and retry bounds. Move the production background onto it and delete the
-   boolean cluster.
-3. **One owner for engine-mode validity.** Export the key and the valid-mode
-   list from `mode-controller.ts`. Make `shadow` and the v3 fallback
-   representable in the popup.
-4. **One alarm-arming discipline in the Durable Object.** Route every writer
-   through `scheduleAlarmAtEarliest`.
-5. **Delete the dead quota duplicate.** `cloudflare-worker/src/downloads_do/quota.ts`
-   encodes different thresholds and imports nothing.
+   boolean cluster. Owner epic (engine-v4 program) — not attempted
+   autonomously.
+3. **One owner for engine-mode validity.** Partially landed 2026-11-15 on
+   PR #887: `MODE_STORAGE_KEY` and `isValidMode` are exported from
+   `mode-controller` and the mirrors are deleted. The popup-representable
+   `shadow`/v3-fallback half was reclassified as documented intent.
+4. **One alarm-arming discipline in the Durable Object.** Landed
+   2026-11-15 on PR #886: `scheduleRetry` arms earliest-wins; the midnight
+   writer already did.
+5. **Delete the dead quota duplicate.** Landed 2026-11-15 on PR #886.
 6. **Give the popup one view-state union.** Replace the 15-flag tree with
-   one type per view decision.
+   one type per view decision. Open; UX-shape decision, not a mechanical
+   fix — not attempted autonomously.
+
+Addendum findings status (2026-11-15):
+
+- **Wire or delete the reconciler/viewport pair.** Owner call (documented
+  target architecture vs dead scaffolding). Not attempted autonomously.
+- **Scope the deep-validator module globals.** Landed on PR #895
+  (per-engine tracker; scope-only, decay semantics unchanged).
+- **Consent-denial policy (per-click vs per-install).** Owner call; the
+  code documents per-click intent. Not attempted autonomously.
+- **Share the watchdog constants and hint helpers.** Landed on PR #893
+  and PR #894.
+- **Dashboard dirty-form guard + orphaned dot.** Landed 2026-11-15 on
+  PR #896 (guard + dot in the live config header; dead dot markup removed).
+- **Edge-optional local gate.** Landed on PR #885 (`test:e2e:edge` skips
+  cleanly without Edge; the local full gate now completes end-to-end).
 
 ## Not surveyed
 
