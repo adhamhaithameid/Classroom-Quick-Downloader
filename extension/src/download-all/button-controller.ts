@@ -314,7 +314,6 @@ export function handleDownloadAllClick(group: GroupState): void {
 
   group.activated = true;
   group.isBusy = true;
-  group.currentRunId = Date.now();
   try {
     group.root.dataset.cqdGroupActive = '1';
   } catch {

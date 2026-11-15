@@ -61,7 +61,9 @@ export type StoredEngineMode = EngineMode | 'auto';
  * existing V1 storage keys. The V1 code uses 'cqd-' prefix
  * for its keys, so 'cqdV2Mode' is safe.
  */
-const STORAGE_KEY = 'cqdV2Mode';
+/** The chrome.storage key for the engine mode. Single source of truth:
+ * content/mode-gate.ts and the popup read mode through this module. */
+export const MODE_STORAGE_KEY = 'cqdV2Mode';
 
 /**
  * The default mode when no setting is found in storage.
@@ -119,8 +121,8 @@ export async function readMode(): Promise<EngineMode> {
       return DEFAULT_MODE;
     }
 
-    const result = await chrome.storage.local.get(STORAGE_KEY);
-    const stored = result[STORAGE_KEY];
+    const result = await chrome.storage.local.get(MODE_STORAGE_KEY);
+    const stored = result[MODE_STORAGE_KEY];
 
     if (stored === 'auto') {
       return resolveAutoMode();
@@ -212,7 +214,7 @@ export async function setMode(mode: EngineMode): Promise<void> {
   try {
     // Write to storage
     if (typeof chrome !== 'undefined' && chrome?.storage?.local) {
-      await chrome.storage.local.set({ [STORAGE_KEY]: mode });
+      await chrome.storage.local.set({ [MODE_STORAGE_KEY]: mode });
     }
 
     // Update the registry (fires the mode change callback)
@@ -258,7 +260,7 @@ export async function initModeController(): Promise<void> {
           .then((resolved) => {
             if (message.mode === 'auto') {
               // 'auto' stays the persisted choice (the popup already wrote it
-              // to STORAGE_KEY): apply the resolved engine in memory only.
+              // to MODE_STORAGE_KEY): apply the resolved engine in memory only.
               // Persisting it here would clobber the stored 'auto' and auto
               // would never re-evaluate.
               engineRegistry.setMode(resolved);
@@ -277,8 +279,8 @@ export async function initModeController(): Promise<void> {
   // 3. Listen for storage changes (e.g., from another tab)
   if (typeof chrome !== 'undefined' && chrome?.storage?.onChanged) {
     chrome.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName === 'local' && changes[STORAGE_KEY]) {
-        const newMode = changes[STORAGE_KEY].newValue;
+      if (areaName === 'local' && changes[MODE_STORAGE_KEY]) {
+        const newMode = changes[MODE_STORAGE_KEY].newValue;
         if (newMode === 'auto') {
           void resolveAutoMode().then((resolved) => {
             engineRegistry.setMode(resolved);
@@ -300,7 +302,7 @@ export async function initModeController(): Promise<void> {
 /**
  * Validate that a value is a valid EngineMode.
  */
-function isValidMode(value: unknown): value is EngineMode {
+export function isValidMode(value: unknown): value is EngineMode {
   return (
     typeof value === 'string' &&
     ['legacy', 'shadow', 'v2', 'v3'].includes(value)
