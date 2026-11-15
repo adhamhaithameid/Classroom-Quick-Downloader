@@ -1,6 +1,7 @@
 // filepath: extension/src/student_work/button.ts
 
 import type { FileMeta } from '../../entrypoints/content/types';
+import { DOWNLOAD_WATCHDOG_MESSAGE, DOWNLOAD_WATCHDOG_MS } from '../shared/download-watchdog';
 import { getButtonState, setButtonState } from '../../entrypoints/content/button-state';
 import { setPillProgress } from '../../entrypoints/content/button-state';
 import {
@@ -28,7 +29,6 @@ export interface StudentWorkButtonOptions {
 // what on earth is a weakmap
 const resolveControllers = new WeakMap<HTMLButtonElement, AbortController>();
 const downloadWatchdogTimers = new WeakMap<HTMLButtonElement, number>();
-const STUDENT_WORK_DOWNLOAD_WATCHDOG_MS = 45_000;
 let statusBridgeSetup = false;
 
 function findStudentWorkButtonByRequestId(requestId: string): HTMLButtonElement | null {
@@ -183,8 +183,8 @@ function armDownloadWatchdog(button: HTMLButtonElement): void {
       }
     }
     setPillProgress(button, 0);
-    void showErrorState(button, 'Download did not finish in time. Please retry.');
-  }, STUDENT_WORK_DOWNLOAD_WATCHDOG_MS);
+    void showErrorState(button, DOWNLOAD_WATCHDOG_MESSAGE);
+  }, DOWNLOAD_WATCHDOG_MS);
   downloadWatchdogTimers.set(button, timerId);
 }
 
