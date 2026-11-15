@@ -41,6 +41,12 @@ import {
 } from '../../src/ui/settings/store';
 import { MilestoneCelebration } from './MilestoneCelebration';
 import { LifetimeTrackerCard } from './LifetimeTrackerCard';
+import {
+  deriveEngineRowView,
+  deriveExtensionStatus,
+  derivePopupView,
+  type PopupEngineMode,
+} from '../../src/ui/popup/view-state';
 
 // External Links
 const SURVEY_URL = 'https://forms.gle/wPU2b1Qxa7svHqJa6';
@@ -407,7 +413,7 @@ function App() {
   // ENGINE MODE STATE — the initial value mirrors the runtime default
   // (mode-controller.ts DEFAULT_MODE 'v2'): fresh installs run v2, so the
   // control must render New selected, not Legacy (audit finding 12).
-  const [engineMode, setEngineMode] = useState<string>('v2');
+  const [engineMode, setEngineMode] = useState<PopupEngineMode>('v2');
   const [engineModeLoading, setEngineModeLoading] = useState(true);
   // S13: read once — the manifest's identity/oauth2 setup does not change
   // while the popup is open (a reload picks up a redelivered manifest).
@@ -989,16 +995,29 @@ function App() {
   const isLoadingSettings = loadingState || settings == null;
   const isEnabled = settings?.extensionEnabled ?? true;
 
-  let extensionStatusLabel: string;
-  if (!isClassroomTab) {
-    extensionStatusLabel = 'Open on Google Classroom';
-  } else if (isLoadingSettings) {
-    extensionStatusLabel = 'Loading…';
-  } else {
-    extensionStatusLabel = isEnabled
-      ? 'Extension Enabled'
-      : 'Extension Disabled';
-  }
+  // One decision type per view decision (bead 0fvf): the derivations in
+  // src/ui/popup/view-state.ts own what the popup shows; the useState flags
+  // above are only inputs.
+  const view = derivePopupView(isClassroomTab);
+  const extensionStatus = deriveExtensionStatus({
+    settingsLoaded: !isLoadingSettings,
+    isClassroomTab,
+    isEnabled,
+  });
+  const engineRow = deriveEngineRowView({
+    engineModeLoading,
+    engineMode,
+    apiConfirmOpen,
+  });
+
+  const extensionStatusLabel: string =
+    extensionStatus === 'off-site'
+      ? 'Open on Google Classroom'
+      : extensionStatus === 'loading'
+        ? 'Loading…'
+        : extensionStatus === 'enabled'
+          ? 'Extension Enabled'
+          : 'Extension Disabled';
 
   // Choose logo based on whether we’re on a Classroom tab
   const logoToUse = isClassroomTab ? logoSrc : logoGraySrc;
@@ -1236,7 +1255,7 @@ function App() {
           )}
 
           {/* MAIN BODY: depends on whether we are on Classroom */}
-          {isClassroomTab ? (
+          {view.kind === 'classroom' ? (
             <>
               {/* Section 1: Analytics (only on Classroom) */}
               <section className="cqd-panel">
@@ -1537,8 +1556,8 @@ function App() {
                         <div className="cqd-settings-section-label">{popupMessage('popupSettingsSectionEngine')}</div>
                         <div className="cqd-toggle-group">
                           <EngineModeRow
-                            mode={engineMode}
-                            loading={engineModeLoading}
+                            mode={engineRow.phase === 'ready' ? engineRow.mode : engineMode}
+                            loading={engineRow.phase === 'loading'}
                             apiConfigured={apiConfigured}
                             onSelect={handleEngineModeSelect}
                           />
@@ -1547,7 +1566,7 @@ function App() {
                               explicit "try it" with the way back shown first.
                               Copy verbatim from the approved prototype;
                               hardcoded English per popup convention. */}
-                          {apiConfirmOpen && (
+                          {engineRow.phase === 'ready' && engineRow.confirmOpen && (
                             <div className="cqd-api-confirm" role="group" aria-label="Before you switch to the beta">
                               <h5>Before you switch to the beta</h5>
                               <ul>
@@ -2066,13 +2085,15 @@ export function PrivacyLedger() {
   );
 }
 
-/** The engine modes the popup exposes (#684). S13: the API (beta) option is
+/** The engine modes the popup exposes (#684). The type lives in
+ *  src/ui/popup/view-state.ts (bead 0fvf); re-exported here for the
+ *  popup-engine-mode contract tests. S13: the API (beta) option is
  *  the CONSENT surface (#398) — it renders only as a disabled, tooltip'd
  *  hint until the install is OAuth-configured (isApiConfigured(): identity
  *  permission + oauth2 client_id, docs/engine/api-assist-setup.md), and
  *  selecting it while enabled is the user's explicit consent that sets
  *  cqdV2Mode 'v3'. */
-export type PopupEngineMode = 'legacy' | 'v2' | 'v3' | 'auto';
+export type { PopupEngineMode };
 
 /**
  * Resolve the popup's engine-mode display from raw storage — the same
