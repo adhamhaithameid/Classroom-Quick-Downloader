@@ -59,10 +59,8 @@
      moment each animation ends, so a filling keyframe never blocks the
      hover transforms underneath.
 
-     The sticky sheet reveal itself (content pin, footer window, lift and
-     travel) lives in +layout.svelte. Inside that fixed window the footer's
-     rects are viewport-honest — zones trigger exactly when the rising
-     footer uncovers them. */
+     Zones trigger when their steps sit below the fold at load; everything
+     already on screen stays exactly as rendered, so nothing flashes. */
   onMount(() => {
     detectedBrowser = detectBrowserFromNavigator();
 
@@ -80,20 +78,13 @@
     /* The cascade is progressive enhancement only — reduced motion and
        ancient browsers skip straight to the static wordmark below. */
     if (!reducedMotion && 'IntersectionObserver' in window) {
-      /* Defer one frame: +layout.svelte's own onMount (which arms the sticky
-         sheet reveal and fixes the footer window in place) runs right after
-         this component's. */
+      /* Defer one frame: the layout's own onMount runs right after this
+         component's. */
       const startRaf = requestAnimationFrame(() => requestAnimationFrame(startCascade));
       cleanups.push(() => cancelAnimationFrame(startRaf));
     }
 
     function startCascade(): void {
-      /* Inside the live sheet reveal the footer starts hidden behind the
-         page sheet, so "below the fold" is meaningless at mount — arm every
-         step and let each zone's rect decide when its cascade plays as the
-         window uncovers it. In plain flow only below-fold steps arm. */
-      const liveSheet = getComputedStyle(footer).position === 'fixed';
-
       const zoneSteps = new Map<HTMLElement, HTMLElement[]>();
       const pendingZones = new Set<HTMLElement>();
       let chainUntil = 0;
@@ -121,13 +112,11 @@
 
       for (const zone of footer.querySelectorAll<HTMLElement>('[data-ft-zone]')) {
         let steps = collectSteps(zone);
-        if (!liveSheet) {
-          /* Only steps below the fold arm — everything already on screen at
-             load stays exactly as rendered, so nothing flashes. */
-          steps = steps.filter(
-            (el) => el.getBoundingClientRect().top > window.innerHeight * ARM_LINE
-          );
-        }
+        /* Only steps below the fold arm — everything already on screen at
+           load stays exactly as rendered, so nothing flashes. */
+        steps = steps.filter(
+          (el) => el.getBoundingClientRect().top > window.innerHeight * ARM_LINE
+        );
         if (steps.length === 0) continue;
         zoneSteps.set(zone, steps);
         pendingZones.add(zone);

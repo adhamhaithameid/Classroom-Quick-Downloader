@@ -21,5 +21,4 @@ export interface GroupState {
   isBusy: boolean;
   cancelPending: boolean;
   resetTimeoutId?: number;
-  currentRunId?: number;
 }
