@@ -25,6 +25,7 @@ import {
   type Page,
   type Worker,
 } from "@playwright/test";
+import { withExtension } from "playwright-webextext";
 import type { Scenario } from "../../simulator/scenario";
 import { startSimulatorProxy } from "../../simulator/proxy";
 import type { AssertionResult, QaBrowser, QaCheckResult, QaStatus } from "./qa-types";
@@ -32,6 +33,8 @@ import type { AssertionResult, QaBrowser, QaCheckResult, QaStatus } from "./qa-t
 const REPO_ROOT = path.resolve(__dirname, "../../..");
 export const CHROMIUM_EXTENSION_PATH = path.join(REPO_ROOT, "extension/.output/chrome-mv3");
 export const FIREFOX_PROFILE_DIR = path.join(REPO_ROOT, "tests/e2e/.firefox-profile");
+/** Built unpacked Firefox MV2 extension — the path the debugging-protocol install reads. */
+export const FIREFOX_EXTENSION_DIR = path.join(REPO_ROOT, "extension", ".output", "firefox-mv2");
 export const ARTIFACTS_ROOT = path.join(REPO_ROOT, "qa-artifacts");
 
 // ---------------------------------------------------------------------------
@@ -165,6 +168,7 @@ export async function launchQaContext(
   // skip decisions of later sessions in the same worker.
   EXTENSION_UNAVAILABLE_REASON = null;
   const sim = await startSimulatorProxy(scenario);
+  const signedXpiPath = process.env.QA_SIGNED_XPI;
 
   /* A failed browser launch (e.g. the darwin sandbox denying the bundled
      Firefox build) must still yield a usable session: callers destructure
@@ -195,22 +199,46 @@ export async function launchQaContext(
             "--ignore-certificate-errors",
           ],
         })
-        : await firefox.launchPersistentContext(FIREFOX_PROFILE_DIR, {
-            headless: true,
-            acceptDownloads: true,
-            ignoreHTTPSErrors: true,
-            proxy: { server: sim.url },
-            firefoxUserPrefs: {
-              "xpinstall.signatures.required": false,
-              "extensions.autoDisableScopes": 0,
-              "extensions.enabledScopes": 15,
-            },
-          });
+        : await (signedXpiPath
+          ? // Playwright's bundled Firefox sanitizes the profile at startup and
+            // never scans a pre-seeded extensions/ dir (w5r6 evidence: run
+            // 43708840367 — extensions dir empty, extensions.json lists only
+            // Mozilla built-ins). Install the built UNPACKED firefox-mv2 dir
+            // through Firefox's remote-debugging protocol instead: the lib
+            // reads <path>/manifest.json, so an .xpi file fails with ENOTDIR
+            // (run 43719261151), and a temporary protocol install ignores
+            // signing, which is exactly what the QA leg wants.
+            withExtension(firefox, FIREFOX_EXTENSION_DIR).launchPersistentContext(FIREFOX_PROFILE_DIR, {
+              headless: true,
+              acceptDownloads: true,
+              ignoreHTTPSErrors: true,
+              proxy: { server: sim.url },
+              firefoxUserPrefs: {
+                "xpinstall.signatures.required": false,
+                "extensions.autoDisableScopes": 0,
+                "extensions.enabledScopes": 15,
+              },
+            })
+          : firefox.launchPersistentContext(FIREFOX_PROFILE_DIR, {
+              headless: true,
+              acceptDownloads: true,
+              ignoreHTTPSErrors: true,
+              proxy: { server: sim.url },
+              firefoxUserPrefs: {
+                "xpinstall.signatures.required": false,
+                "extensions.autoDisableScopes": 0,
+                "extensions.enabledScopes": 15,
+              },
+            }));
   } catch (error) {
     EXTENSION_UNAVAILABLE_REASON =
       "ENVIRONMENT: browser launch failed (" +
       String((error as Error).message ?? error).slice(0, 200) +
       ")";
+    // The reason must reach the run log even when a journey ignores the
+    // skip helper (simulator-sanity runs its own hard path and dereferences
+    // the undefined context directly).
+    console.log(`[qa-console] ${EXTENSION_UNAVAILABLE_REASON}`);
     return {
       context: undefined as unknown as BrowserContext,
       extensionAvailable: false,
@@ -221,19 +249,20 @@ export async function launchQaContext(
     };
   }
 
-  // Firefox ENVIRONMENT limitation (verified by probe, 2026-09-13): the xpi is
-  // present in the profile before launch, and Playwright's bundled Firefox
-  // build DELETES it within seconds of startup — it ignores
-  // xpinstall.signatures.required=false, rejects the unsigned add-on and
-  // removes the file, so no background page ever exists. Extension journeys
-  // therefore cannot run there; runCheck skips them with this evidence instead
-  // of failing. Chromium journeys must still fail hard (e.g. the
-  // .cqd-download-btn rename detection criterion), so the probe never skips.
+  // Firefox extension loading, corrected by w5r6 (2026-11-15): Playwright's
+  // bundled Firefox sanitizes the profile at startup, so a pre-seeded xpi —
+  // signed or not — is never scanned as an add-on (run 43708840367: empty
+  // extensions dir, extensions.json with only Mozilla built-ins, zero
+  // background pages). Signed mode therefore installs through the remote
+  // debugging protocol at launch (see withExtension above). Unsigned mode has
+  // no valid install path in the bundled build: the probe below downgrades
+  // those journeys to evidence-backed skips. Chromium journeys must still
+  // fail hard (e.g. the .cqd-download-btn rename detection criterion), so its
+  // probe never skips.
   //
-  // Signed mode (S11 T3): with QA_SIGNED_XPI set, global-setup installed an
-  // AMO-signed xpi, which Firefox accepts — the skip downgrade does not
-  // apply. A missing background page then fails hard downstream
-  // (getExtensionBase), which is the correct signal for a signed build.
+  // The probe is REAL in both Firefox modes now: the old signed-mode bypass
+  // ("the gate does not skip, so the extension loaded") hid w5r6 for weeks —
+  // in signed mode the gate never checked anything at all.
   // w5r6 diagnosis tap: stream extension-relevant console output to stdout so
   // CI logs carry the extension's own view (background bootstrap, engine
   // scans, injection decisions) even when journeys fail. Off by default.
@@ -285,22 +314,56 @@ export async function launchQaContext(
     context.on("serviceworker", (worker) => {
       console.log(`[qa-console] service worker started: ${worker.url().slice(0, 80)}`);
     });
+    // w5r6 round 2: the run-43705997372 tap showed ZERO background pages and
+    // zero content-script markers on signed Firefox, so the add-on never
+    // activated. Firefox's own extensions.json (written on first startup
+    // scan) names the per-addon state — active/appDisabled/signedState — and
+    // the extensions dir listing shows whether the xpi survived startup at
+    // all. Dump both while the state is fresh.
+    if (browser === "firefox") {
+      try {
+        const extDir = path.join(FIREFOX_PROFILE_DIR, "extensions");
+        const listing = fs.existsSync(extDir) ? fs.readdirSync(extDir) : ["<no extensions dir>"];
+        console.log(`[qa-console:ff] extensions dir: ${JSON.stringify(listing)}`);
+        const extJson = path.join(FIREFOX_PROFILE_DIR, "extensions.json");
+        if (fs.existsSync(extJson)) {
+          const data = JSON.parse(fs.readFileSync(extJson, "utf8"));
+          const addons = (data.addons ?? []).map((a: Record<string, unknown>) => ({
+            id: a.id,
+            active: a.active,
+            userDisabled: a.userDisabled,
+            appDisabled: a.appDisabled,
+            signedState: a.signedState,
+            path: a.path,
+          }));
+          console.log(`[qa-console:ff] extensions.json: ${JSON.stringify(addons)}`);
+        } else {
+          console.log("[qa-console:ff] extensions.json: <absent after launch>");
+        }
+        console.log(
+          `[qa-console:ff] backgroundPages=${context.backgroundPages().length}`,
+        );
+      } catch (e) {
+        console.log(`[qa-console:ff] profile diagnostics failed: ${String(e).slice(0, 200)}`);
+      }
+    }
   }
 
   let extensionAvailable = true;
-  const signedXpiMode = Boolean(process.env.QA_SIGNED_XPI);
-  if (browser === "firefox" && !signedXpiMode && opts.skipIfExtensionUnavailable !== false) {
+  const signedXpiMode = Boolean(signedXpiPath);
+  if (browser === "firefox" && opts.skipIfExtensionUnavailable !== false) {
     let pages = context.backgroundPages();
     if (pages.length === 0) {
       await context
-        .waitForEvent("backgroundpage", { timeout: 5_000 })
+        .waitForEvent("backgroundpage", { timeout: 8_000 })
         .catch(() => undefined);
       pages = context.backgroundPages();
     }
     if (pages.length === 0) {
       extensionAvailable = false;
-      EXTENSION_UNAVAILABLE_REASON =
-        "ENVIRONMENT: Playwright's bundled Firefox deletes the unsigned sideloaded xpi at startup (signing pref ignored) — no extension background page; see RUNBOOK firefox section";
+      EXTENSION_UNAVAILABLE_REASON = signedXpiPath
+        ? "ENVIRONMENT: the signed xpi did not activate — no extension background page within 8s of launch (install failed; see the [qa-console:ff] profile dump above)"
+        : "ENVIRONMENT: Playwright's bundled Firefox sanitizes the profile at startup — the unsigned sideloaded xpi is never scanned (signing pref ignored); see RUNBOOK firefox section";
     }
   }
   if (verbose && browser === "firefox" && signedXpiMode) {

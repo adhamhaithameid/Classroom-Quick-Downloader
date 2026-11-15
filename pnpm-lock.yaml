@@ -212,6 +212,9 @@ importers:
       husky:
         specifier: ^9.1.7
         version: 9.1.7
+      playwright-webextext:
+        specifier: ^0.0.5
+        version: 0.0.5(@playwright/test@1.64.1)(playwright@1.64.1)
 
   cloudflare-worker:
     devDependencies:
@@ -2978,6 +2981,18 @@ packages:
     resolution: {integrity: sha512-BC4s8y6SEVA6Q1rSxZTto8hI1KUI3xXlHGZgvGqP4IqPdI/a6FX9H29IDNz7vKo9l21b6LfYosScPL6M3xxyDQ==}
     engines: {node: '>=20'}
     hasBin: true
+
+  playwright-webextext@0.0.5:
+    resolution: {integrity: sha512-PhlMiWOfP8UmYTAbzR7uv09Twz+bkLqsgz/8EVcZROq7C6hgepJFYHD+pw4qFLK8mVGNv88N82yTdRdJDDgtdw==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      '@playwright/test': '>=1.0.0'
+      playwright: '>=1.0.0'
+    peerDependenciesMeta:
+      '@playwright/test':
+        optional: true
+      playwright:
+        optional: true
 
   playwright@1.64.1:
     resolution: {integrity: sha512-HCrVhHr5QQuwYoswEUGTb7gGp522yflbv/ST8nF4sFWGuLjQCt17Q/EubpGGSNKYn1tsTCPZxqHhHCfVURu7UA==}
@@ -6027,6 +6042,11 @@ snapshots:
       pathe: 2.0.3
 
   playwright-core@1.64.1: {}
+
+  playwright-webextext@0.0.5(@playwright/test@1.64.1)(playwright@1.64.1):
+    optionalDependencies:
+      '@playwright/test': 1.64.1
+      playwright: 1.64.1
 
   playwright@1.64.1:
     dependencies:
