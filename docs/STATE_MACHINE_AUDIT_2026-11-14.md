@@ -259,21 +259,90 @@ Ranked. Each converges many rows onto one shape.
 
 ## Not surveyed
 
-These pockets likely hold further machines. They sit outside this census.
+These pockets were surveyed on 2026-11-15; see
+[Addendum 2026-11-15](#addendum-2026-11-15-previously-unsurveyed-pockets).
+The overview page CSS blocks, the globe template tail, and
+`website/src/routes/+layout.svelte` (84 KB) remain uncensored at the
+detail level.
 
-- `extension/src/engines/v2/` internals: `budget-controller.ts` holds a
-  contract-defined `ThrottleLevel` ladder; also `correction-queue.ts`,
-  `deep-validator.ts`, `reconciler.ts`, `viewport-observer.ts`.
-- `extension/src/engines/v3/api/`: token lifecycle with interactive-consent
-  escalation (`InteractiveConsentTokenProvider`, `ChromeIdentityTokenProvider`).
-- `extension/src/student_work/`: `resolver.ts`, `button.ts` (watchdog parity),
-  `channel.ts`.
-- `extension/src/roles/`: the S5 role state behind `publishCycleTopics`.
-- `extension/src/adapters/scheduler/`, `adapters/clock/`, `adapters/identity/`.
-- `cloudflare-worker/src/dashboard/main.ts`: 7,976 generated lines, grepped
-  only. Client-side polling cadences unverified.
-- Website routes `emails/`, `emails2/`, `watch/*`; the overview page CSS
-  blocks and the globe template tail.
+## Addendum 2026-11-15: previously unsurveyed pockets
+
+Two survey passes completed the census. Everything below was verified
+against the code at `c079d4f1`. Corrections to the original hints: the
+v2 telemetry/repair/model modules live under `src/v2/`, not
+`src/engines/v2/` (only `engine-v2.ts` sits in `engines/v2/`).
+
+### v2 engine internals and roles (`extension/src/`)
+
+| Machine | Location | Encoded by | Risk or note |
+|---|---|---|---|
+| Throttle ladder | `src/v2/telemetry/budget-controller.ts:76,437` | Explicit `ThrottleLevel` union, one-step escalation, no de-escalation except reset | Its declared purpose is dead: nothing in production reads `getDebounceMs`. One transient CPU spike pins `critical` until destroy. |
+| Correction retry + instability | `src/v2/repair/correction-queue.ts:131`, `deep-validator.ts:147` | Counters, priorities, timestamp Map, unstable Set | `unstableElements` is module-global, shared by every engine instance (EngineV3 embeds a private EngineV2), and never decays. The `processing` field is write-only. |
+| Reconcile diff machine | `src/v2/model/reconciler.ts:115` | Explicit op union + fingerprints | Dead in production: `engine-v2.ts` never calls it (the live model is its own `postMap`). Built and tested code nothing invokes. |
+| Viewport-zone machine | `src/v2/model/viewport-observer.ts:258` | Explicit `ViewportZone` union, two observers | Also unwired: `engine-v2.ts:1118` passes `undefined` as the zone getter, so every deep-validation correction is priority LOW and the visible-first sort is a no-op. |
+| S5 role cycle state | `src/roles/harden-engine.ts:123` | Edge-publish on `lastLevel` delta | Other roles are stateless verbatim publishers; irrelevant batches republish stale arrays. Mirror types in `harden-engine.ts:46` drift only structurally. |
+| Targeted-vs-full scan | `src/engines/v2/engine-v2.ts:362` | Null-vs-Set return, threshold 8 | A relevant-but-unresolvable mutation silently escalates to a full page scan; the two states are implicit in a nullable return. |
+| Deep-validation scheduler | `src/engines/v2/engine-v2.ts:178,1091` | One boolean + idle callback | Trivial one-shot flag; plus a details-view self-heal rescan keyed on a files-count drop memory cell. |
+
+### v3 API token lifecycle (`extension/src/engines/v3/api/`)
+
+| Machine | Location | Encoded by | Risk or note |
+|---|---|---|---|
+| Token acquisition | `token-provider.ts:55` | Null-vs-throw outcome, boolean `interactive` arg | No token-state type. The interactive escalation fires exactly once per miss and a denial throws; the thrown denial is deliberately not cached, so a denied consent re-prompts on every classroom-wide click (per-click semantics; per-install would need a denial-memory cell). |
+| Snapshot + inventory caches | `cache.ts:11`, `course-inventory.ts:55` | TTL timestamps in Maps | Empty inventories cache for 5 minutes while consent denials never cache — opposite policies on the two empty-looking outcomes. |
+| Rate limiter | `rate-limiter.ts:46` | Rolling timestamp array | Module singleton shared by three consumers; EngineV3 destroy resets it and also throttles the classroom-download-controller's unrelated budget. |
+| Client pagination caps | `classroom-api-client.ts:157,232` | Two counters | `pageGuard < 10` for submissions vs `MAX_LIST_PAGES = 3` for classwork lists in one file. |
+| Refresh re-entrancy guard | `engine-v3.ts:269` | Method-choice convention + comment | Nothing type-level prevents re-arming the snapshot loop; the invariant lives only in a comment. |
+
+The adapter ports (`adapters/scheduler/idle-scheduler.ts`,
+`adapters/clock/system-clock.ts`, `adapters/identity/`) are built and
+tested but unwired in the v2 stack: production still calls raw
+`requestIdleCallback` and `Date.now`. The identity port also hand-duplicates
+the token provider's dual-shape result handling.
+
+### Student-work internals (`extension/src/student_work/`)
+
+| Machine | Location | Encoded by | Risk or note |
+|---|---|---|---|
+| Button lifecycle | `button.ts:282` + `entrypoints/content/button-state.ts:39` | CSS classes are the store; `ButtonState` union derived | Same CSS-as-truth pattern as V1, with `pendingButtons` plus `dataset.cqdRequestId` dual tracking and cleanup duplicated across five sites. |
+| 45 s watchdog | `button.ts:31` vs `src/v2/render/download-controller.ts:49` | Timer handle in a WeakMap / Map | Parity is intentional but enforced by comments: the constant and the error message are duplicated literals. The V1 watchdog arms only after the resolve phase, so worst-case time-to-error is ~60 s under two timeout authorities; V2 auto-resets errors after 3 s while V1 runs a hover-gated loop — a real behavioral divergence. |
+| Resolve cascade | `resolver.ts:360` + `channel.ts:78` | Free-form `reason` strings, one-shot done latch, sender-id auth | `reason` is not a union and `resolveMessageFromReason` (`button.ts:46`) matches substrings — fragile cross-module coupling. The BroadcastChannel fallback was removed for security audit S4; the authenticated relay is the only path. |
+| Extractor ladder | `extractor.ts:467` | Source union + hint gates | The hint decode/parse/scoring helpers are verbatim-duplicated between `extractor.ts` and `resolver.ts` — the easiest extraction win in the pocket. |
+
+### Dashboard client machines (`cloudflare-worker/src/dashboard/`)
+
+| Machine | Location | Encoded by | Risk or note |
+|---|---|---|---|
+| Live WebSocket toggle | `main.ts:7690-7800` | Plain vars + `data-live-state` attr | `off → connecting → live → off`, 10-minute hard auto-close, no auto-reconnect by design (quota-load-bearing). |
+| Live-indicator freshness | `main.ts:5190` | 5 s interval + `data-state` | `live/stale/cold` at 30 s/180 s; the interval runs while the tab is hidden. |
+| Config dirty form | `main.ts:5712-5954` | Module boolean + status text | No `beforeunload` guard: unsaved changes are lost silently on navigation. The `unsaved-dot` indicator exists in HTML and CSS but no JS ever toggles it — orphaned UI. |
+| Tab nav + card search | `main.ts:7825-7922` | Hash routing, aria attrs, 150 ms debounce | Two machines share the `hidden` property (the searching body class overrides panel hiding). |
+| Raw-console unlock | `websiteConsole.ts:494` | Boolean + pill classes | The client "unlocked" state can outlive the server-side danger step-up expiry; no re-lock path except reload. |
+| Minor machines | `main.ts` various | Booleans, timers, server KV | Notification dismissal (server-side KV), changelog action status, 24 h clock toggle in localStorage, and a dormant rules-engine UI kept for rollback behind null guards. Only three intervals exist by design (1 s clock, 5 s indicator, 60 s pipeline health). |
+
+### Website routes
+
+The `watch/` routes are static native-video pages with no state machines.
+`emails/` is unreachable (unconditional 308 redirect to `emails2/`) and its
+svelte page is dead code. `emails2/` is static content plus the
+`AnimatedNumber` counter (pre-animation → animating → settled via rAF and an
+IntersectionObserver latch — `AnimatedNumber.svelte:84-137`).
+
+### New findings folded into the extraction list
+
+1. **Wire or delete the reconciler and viewport-observer pair.** Two fully
+   built, tested machines do nothing in production while the engine passes
+   `undefined` for the zone getter. Dead architecture is worse than no
+   architecture: it misleads readers and the tests pin behavior nothing uses.
+2. **Scope the deep-validator's module globals.** `unstableElements` and the
+   correction history leak across engine instances on one page.
+3. **Decide the consent-denial policy.** Per-click re-prompting is the
+   current behavior; per-install needs a denial-memory cell.
+4. **Share the watchdog constants and the hint helpers.** The 45 s constant,
+   its error message, and the resolver/extractor hint blocks are duplicated
+   literals today.
+5. **Give the dashboard's dirty config form a `beforeunload` guard**, and
+   either wire the orphaned `unsaved-dot` UI or remove it.
 
 ## How to refresh this census
 
