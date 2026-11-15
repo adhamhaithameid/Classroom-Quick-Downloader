@@ -26,7 +26,6 @@ export function scheduleGroupReset(group: GroupState): void {
     group.activated = false;
     group.isBusy = false;
     group.cancelPending = false;
-    group.currentRunId = undefined;
     try {
       delete group.root.dataset.cqdGroupActive;
     } catch {
@@ -142,7 +141,6 @@ export function handleCancelAllClick(group: GroupState): void {
     group.activated = false;
     group.isBusy = false;
     group.cancelPending = false;
-    group.currentRunId = undefined;
     try {
       delete group.root.dataset.cqdGroupActive;
     } catch {

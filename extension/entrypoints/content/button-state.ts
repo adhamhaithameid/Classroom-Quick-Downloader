@@ -12,21 +12,6 @@ import {
 } from './icons';
 import { t } from './i18n';
 
-/**
- * State priority (higher = higher priority, blocks lower).
- */
-// bigger number = more important 💪🏻
-// bigger number = more important 💪🏻
-export const STATE_PRIORITY: Record<ButtonState, number> = {
-  success: 7,
-  error: 6,
-  cancelled: 5,
-  cancel: 4,
-  trying: 3,
-  loading: 2,
-  idle: 1,
-};
-
 const HOVER_STATES: readonly ButtonState[] = ['cancel'];
 const TERMINAL_STATES: readonly ButtonState[] = ['success', 'error', 'cancelled'];
 const ACTIVE_STATES: readonly ButtonState[] = ['loading', 'trying'];
