@@ -24,6 +24,7 @@
 
 import type { EventBus } from '../../bus/event-bus';
 import type { PageTopicMap, RequestId } from '../../contracts/topics';
+import { DOWNLOAD_WATCHDOG_MESSAGE, DOWNLOAD_WATCHDOG_MS } from '../../shared/download-watchdog';
 import type { Unsubscribe } from '../../bus/event-bus';
 import { getButtonStateV2, setButtonStateV2 } from './button-state';
 import { setupDelegatedClickHandler } from './button-renderer';
@@ -48,8 +49,8 @@ const pending = new Map<RequestId, PendingEntry>();
  * a request the bridge never settles must not spin its button forever — the
  * watchdog settles it to an honest error and drops the pending entry.
  */
-export const SETTLE_WATCHDOG_MS = 45_000;
-const SETTLE_WATCHDOG_MESSAGE = 'Download did not finish in time. Please retry.';
+export const SETTLE_WATCHDOG_MS = DOWNLOAD_WATCHDOG_MS;
+export const SETTLE_WATCHDOG_MESSAGE = DOWNLOAD_WATCHDOG_MESSAGE;
 /** Secondary settled listeners — the Download All group controller registers here. */
 const settledListeners = new Set<
   (requestId: RequestId, outcome: PageTopicMap['download:settled']['outcome']) => void
