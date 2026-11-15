@@ -20,6 +20,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { loadFlowHarness } from './helpers/background-flow';
 import {
   CQD_STATS_CLAIM_CELEBRATION,
+  CLAIM_ACK_TIMEOUT_MS,
   DOWNLOAD_STATS_INTEGRITY_KEY,
   DOWNLOAD_STATS_KEY,
   applyDownloadSettle,
@@ -176,13 +177,34 @@ describe('celebration claim protocol (fix round)', () => {
     const writesBefore = setSpy.mock.calls.length;
 
     const pending = claimMilestoneCelebration();
-    await vi.advanceTimersByTimeAsync(1500);
+    await vi.advanceTimersByTimeAsync(CLAIM_ACK_TIMEOUT_MS);
     const claim = await pending;
 
     expect(claim).toEqual({ ok: false, claimed: false, milestone: null });
     expect(setSpy.mock.calls.length - writesBefore).toBe(0);
     const after = store.get(DOWNLOAD_STATS_KEY) as { milestonePending: number };
     expect(after.milestonePending).toBe(1);
+  });
+
+  it('claimMilestoneCelebration accepts an ack that arrives after a batch storm', async () => {
+    installMemoryStore();
+    await saveDownloadStats(applyDownloadSettle(createEmptyStats(), 'req-1').stats);
+    let pendingCb: ((res?: unknown) => void) | undefined;
+    (chrome.runtime as { sendMessage?: unknown }).sendMessage = vi.fn(
+      (_msg: unknown, cb?: (res?: unknown) => void) => {
+        pendingCb = cb;
+      },
+    );
+
+    const pending = claimMilestoneCelebration();
+    // The background's serialized settle chain acks at 7.5s - inside the
+    // current window but after the old 1500 ms one - so the claim must not
+    // be lost.
+    setTimeout(() => pendingCb?.({ ok: true, claimed: true, milestone: 50 }), 7500);
+    await vi.advanceTimersByTimeAsync(CLAIM_ACK_TIMEOUT_MS);
+    const claim = await pending;
+
+    expect(claim).toEqual({ ok: true, claimed: true, milestone: 50 });
   });
 
   it('claimMilestoneCelebration parses the ack and reports an honest loss', async () => {
