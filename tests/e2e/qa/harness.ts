@@ -230,6 +230,10 @@ export async function launchQaContext(
       "ENVIRONMENT: browser launch failed (" +
       String((error as Error).message ?? error).slice(0, 200) +
       ")";
+    // The reason must reach the run log even when a journey ignores the
+    // skip helper (simulator-sanity runs its own hard path and dereferences
+    // the undefined context directly).
+    console.log(`[qa-console] ${EXTENSION_UNAVAILABLE_REASON}`);
     return {
       context: undefined as unknown as BrowserContext,
       extensionAvailable: false,
