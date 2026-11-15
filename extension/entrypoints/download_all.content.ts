@@ -32,7 +32,6 @@ interface GroupState {
   isBusy: boolean;
   cancelPending: boolean; // True when cancel has been requested
   resetTimeoutId?: number;
-  currentRunId?: number;
 }
 
 const groupStates = new WeakMap<HTMLElement, GroupState>();
@@ -741,7 +740,6 @@ function scheduleGroupReset(group: GroupState): void {
     group.activated = false;
     group.isBusy = false;
     group.cancelPending = false; // CRITICAL: Reset cancel flag
-    group.currentRunId = undefined;
     try {
       delete group.root.dataset.cqdGroupActive;
     } catch {
@@ -1316,7 +1314,6 @@ function handleDownloadAllClick(group: GroupState): void {
 
   group.activated = true;
   group.isBusy = true;
-  group.currentRunId = Date.now();
   try {
     group.root.dataset.cqdGroupActive = '1';
   } catch {
@@ -1439,7 +1436,6 @@ function handleCancelAllClick(group: GroupState): void {
     group.activated = false;
     group.isBusy = false;
     group.cancelPending = false;
-    group.currentRunId = undefined;
     try {
       delete group.root.dataset.cqdGroupActive;
     } catch {

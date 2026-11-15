@@ -30,23 +30,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare const chrome: any;
 
-import { DEFAULT_MODE, readMode } from '../../src/v2/orchestrator/mode-controller';
+import {
+  DEFAULT_MODE,
+  MODE_STORAGE_KEY,
+  isValidMode,
+  readMode,
+} from '../../src/v2/orchestrator/mode-controller';
+import type { EngineMode } from '../../src/engines/types';
 
-export type EngineMode = 'legacy' | 'shadow' | 'v2' | 'v3';
-
-/**
- * Mirror of mode-controller's STORAGE_KEY (not exported there). If the key
- * ever changes in mode-controller.ts, it must change here too.
- */
-const MODE_STORAGE_KEY = 'cqdV2Mode';
-
-/** Mirror of mode-controller's isValidMode — keep the two lists in sync. */
-function isValidMode(value: unknown): value is EngineMode {
-  return (
-    typeof value === 'string' &&
-    ['legacy', 'shadow', 'v2', 'v3'].includes(value)
-  );
-}
+export type { EngineMode };
 
 /**
  * True when the V1 self-starting stacks must stay inert (V2 renders).

@@ -10,7 +10,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { CorrectionQueue } from '../src/v2/repair/correction-queue';
 import type { CorrectionHandler, CorrectionRecord, QueueStats } from '../src/v2/repair/correction-queue';
 import type { CorrectionItem, CorrectionPriority, CorrectionOp } from '../src/v2/repair/deep-validator';
-import { clearInstabilityState, recordCorrection } from '../src/v2/repair/deep-validator';
+import { createInstabilityTracker } from '../src/v2/repair/deep-validator';
 
 // ============================================================================
 // HELPERS
@@ -41,19 +41,21 @@ let queue: CorrectionQueue;
 
 beforeEach(() => {
   document.body.innerHTML = '';
-  clearInstabilityState();
-  queue = new CorrectionQueue();
+  instability.clear();
+  queue = new CorrectionQueue(instability);
 });
 
 afterEach(() => {
   queue.flush();
   document.body.innerHTML = '';
-  clearInstabilityState();
+  instability.clear();
 });
 
 // ============================================================================
 // BASIC ENQUEUEING
 // ============================================================================
+
+const instability = createInstabilityTracker();
 
 describe('Basic enqueueing', () => {
   it('enqueues an item', () => {
@@ -281,9 +283,9 @@ describe('Backoff and retry', () => {
 
   it('skips unstable items on enqueue', () => {
     // Make element unstable via direct API
-    recordCorrection('unstable-id');
-    recordCorrection('unstable-id');
-    recordCorrection('unstable-id');
+    instability.recordCorrection('unstable-id');
+    instability.recordCorrection('unstable-id');
+    instability.recordCorrection('unstable-id');
 
     queue.enqueue(makeItem({ id: 'unstable-id' }));
     expect(queue.size).toBe(0); // Should refuse to enqueue

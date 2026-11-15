@@ -30,7 +30,7 @@ import type {
   CorrectionPriority,
   CorrectionOp,
 } from './deep-validator';
-import { recordCorrection, isUnstable } from './deep-validator';
+import { createInstabilityTracker, type InstabilityTracker } from './deep-validator';
 
 // ============================================================================
 // TYPES
@@ -97,6 +97,9 @@ export class CorrectionQueue {
   private history: CorrectionRecord[] = [];
 
   /** Handler to call for each correction */
+
+  /** Per-queue instability tracking (one queue per engine instance). */
+  private readonly instability: InstabilityTracker;
   private handler: CorrectionHandler | null = null;
 
   /** Stats */
@@ -109,6 +112,15 @@ export class CorrectionQueue {
 
   /** Whether the queue is actively processing */
   private processing = false;
+
+  constructor(instability: InstabilityTracker = createInstabilityTracker()) {
+    this.instability = instability;
+  }
+
+  /** Clear instability tracking (engine destroy / route transition). */
+  clearInstability(): void {
+    this.instability.clear();
+  }
 
   // ========================================================================
   // PUBLIC API
@@ -130,7 +142,7 @@ export class CorrectionQueue {
    */
   enqueue(item: CorrectionItem): void {
     // Skip if element is unstable
-    if (isUnstable(item.id)) {
+    if (this.instability.isUnstable(item.id)) {
       this.unstableSkippedCount++;
       return;
     }
@@ -184,7 +196,7 @@ export class CorrectionQueue {
       this.pendingById.delete(item.id);
 
       // Skip if element became unstable since enqueue
-      if (isUnstable(item.id)) {
+      if (this.instability.isUnstable(item.id)) {
         this.unstableSkippedCount++;
         continue;
       }
@@ -221,7 +233,7 @@ export class CorrectionQueue {
         this.failedCount++;
 
         // Record the correction attempt for backoff tracking
-        const isNowUnstable = recordCorrection(item.id);
+        const isNowUnstable = this.instability.recordCorrection(item.id);
 
         if (!isNowUnstable) {
           // Re-enqueue with incremented retry count and downgraded priority

@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildPlan, WORKSPACE_GATES } from './pre-push-scope.mjs';
+import { buildPlan, resolveMergeBase, WORKSPACE_GATES } from './pre-push-scope.mjs';
 
 test('full gate: pushing to main', () => {
   assert.equal(buildPlan({ changedFiles: ['extension/src/a.ts'], pushingToMain: true, fullGateEnv: false, hasBase: true }).mode, 'full');
@@ -94,4 +94,19 @@ test('every configured gate command targets a real workspace script', () => {
       assert.ok(scripts[name], `${ws} must declare script "${name}" (gate: ${command})`);
     }
   }
+});
+
+test('resolveMergeBase passes the fully-qualified upstream ref to git (bare ref is ambiguous here)', () => {
+  const calls = [];
+  const fakeRunner = (args, opts) => {
+    calls.push({ args, opts });
+    return { out: 'abc123def', ok: true };
+  };
+  assert.equal(resolveMergeBase(fakeRunner), 'abc123def');
+  assert.deepEqual(calls, [{ args: ['merge-base', 'HEAD', 'refs/remotes/origin/main'], opts: { allowFail: true } }]);
+});
+
+test('resolveMergeBase returns null on git failure (full-gate fallback contract)', () => {
+  const fakeRunner = () => ({ out: '', ok: false });
+  assert.equal(resolveMergeBase(fakeRunner), null);
 });

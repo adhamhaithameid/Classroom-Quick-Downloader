@@ -5,7 +5,8 @@
 # CI runs the complete matrix on every PR. Skip for one push: --no-verify.
 
 # Self-heal PATH for gate children: arm64 openssl (x86_64 breaks Node's
-# spawnSync with -86), pnpm, go. The gate scripts assume all three exist.
-export PATH="/opt/homebrew/opt/openssl/bin:$HOME/.local/bin:/usr/local/opt/go/bin:$PATH"
+# spawnSync with -86), pnpm. The gate scripts assume both exist. The oracle
+# legs are gone from the gate chains (ADR-0009), so go is not needed here.
+export PATH="/opt/homebrew/opt/openssl/bin:$HOME/.local/bin:$PATH"
 
 exec node tools/pre-push-scope.mjs

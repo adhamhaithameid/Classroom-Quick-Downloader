@@ -399,7 +399,15 @@ export interface MilestoneClaimResult {
   milestone: number | null;
 }
 
-const CLAIM_ACK_TIMEOUT_MS = 1500;
+/**
+ * Ack window for the claim round-trip. The background answers from the
+ * serialized settle chain, so a batch storm can queue the claim behind many
+ * settles; 1500 ms lost the ack in exactly that window and the milestone was
+ * consumed with no celebration ever playing (census live issue). 8 s covers
+ * a long storm; a truly dead channel still times out to CLAIM_LOST and
+ * replays on the next surface open.
+ */
+export const CLAIM_ACK_TIMEOUT_MS = 8000;
 
 const CLAIM_LOST: MilestoneClaimResult = { ok: false, claimed: false, milestone: null };
 
