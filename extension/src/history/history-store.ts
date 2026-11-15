@@ -133,6 +133,11 @@ function hostOf(url: string): string {
   }
 }
 
+// Serialized writes: two settles in the same tick used to load the same
+// entries and the second save dropped the first row (census live issue).
+// Same pattern as download-stats' countChain — per-context only.
+let historyChain: Promise<unknown> = Promise.resolve();
+
 /**
  * Record a terminal download outcome. Only success/failed terminals record —
  * cancelled and in-flight statuses are ignored. Safe to call on every settle;
@@ -149,20 +154,24 @@ export async function recordDownloadHistory(
   status: string,
   errorCode?: string,
 ): Promise<void> {
-  if (status !== 'success' && status !== 'failed') return;
-  const { entries } = await loadHistory();
-  const entry: HistoryEntry = {
-    id: pending.requestId,
-    ts: Date.now(),
-    filename: pending.fileMeta?.name || pending.originalUrl.split('/').pop() || pending.requestId,
-    ...(pending.fileMeta?.ext ? { ext: pending.fileMeta.ext } : {}),
-    ...(typeof pending.totalBytes === 'number' && pending.totalBytes > 0
-      ? { bytes: pending.totalBytes }
-      : {}),
-    status,
-    ...(errorCode ? { errorCode } : {}),
-    host: hostOf(pending.baseUrl || pending.originalUrl),
-    url: pending.originalUrl,
-  };
-  await saveHistory(appendEntry(entries, entry));
+  const run = historyChain.then(async () => {
+    if (status !== 'success' && status !== 'failed') return;
+    const { entries } = await loadHistory();
+    const entry: HistoryEntry = {
+      id: pending.requestId,
+      ts: Date.now(),
+      filename: pending.fileMeta?.name || pending.originalUrl.split('/').pop() || pending.requestId,
+      ...(pending.fileMeta?.ext ? { ext: pending.fileMeta.ext } : {}),
+      ...(typeof pending.totalBytes === 'number' && pending.totalBytes > 0
+        ? { bytes: pending.totalBytes }
+        : {}),
+      status,
+      ...(errorCode ? { errorCode } : {}),
+      host: hostOf(pending.baseUrl || pending.originalUrl),
+      url: pending.originalUrl,
+    };
+    await saveHistory(appendEntry(entries, entry));
+  });
+  historyChain = run.catch(() => undefined);
+  await run;
 }
