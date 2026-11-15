@@ -69,13 +69,14 @@
     "prepare": "husky"
   },
   "_meta": {
-    "removed-deps": "NOTE (2026-08-21): the 2026-02-28 claim that @playwright/test was unused was incorrect \u2014 playwright.config.ts and 4 specs in tests/e2e/ depend on it, so the entire real-browser suite was unrunnable. Restored; run via pnpm test:e2e.",
+    "removed-deps": "NOTE (2026-08-21): the 2026-02-28 claim that @playwright/test was unused was incorrect — playwright.config.ts and 4 specs in tests/e2e/ depend on it, so the entire real-browser suite was unrunnable. Restored; run via pnpm test:e2e.",
     "security-overrides": "shell-quote pinned to 1.9.0 (2026-08-15, supersedes the 1.8.4 pin from 2026-06-24); js-yaml 4.3.2, sharp 0.35.4, devalue ^5.9.2, qs >=6.16.0 bumped 2026-09-18 to clear GHSA-9h9g-9g3h (js-yaml CPU DoS), libheif GHSAs in sharp, devalue DoS, and the qs array-limit/DoS family"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.4",
     "@commitlint/config-conventional": "^21.2.4",
     "@playwright/test": "^1.64.1",
-    "husky": "^9.1.7"
+    "husky": "^9.1.7",
+    "playwright-webextext": "^0.0.5"
   }
 }
