@@ -57,7 +57,7 @@ ws_tests() { # ws_tests <ws> <ws-relative files...>
       ;;
     tools)
       if [ "${#tests[@]}" -gt 0 ]; then
-        run "$ws:test" node --test ${tests[@]+"${tests[@]}"}
+        run "$ws:test" node --test ${tests[@]/#/$ws/}
       else
         run "$ws:test" node --test tools/verify-production.test.mjs
       fi

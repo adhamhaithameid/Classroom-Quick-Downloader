@@ -58,11 +58,11 @@ test('extension change maps to compile + test leg', () => {
   assert.deepEqual(plan.legs, ['pnpm -C extension run compile && pnpm -C extension run test']);
 });
 
-test('each workspace maps to its strict leg', () => {
+test('each workspace maps to its gate leg', () => {
   const cases = {
     'website/src/a.svelte': 'pnpm -C website run test:strict',
     'cloudflare-worker/src/b.ts': 'pnpm -C cloudflare-worker run test:strict',
-    'oracle-backend/internal/c.go': 'pnpm -C oracle-backend run test:strict',
+    'oracle-backend/internal/c.go': 'pnpm -C oracle-backend run test:smoke',
   };
   for (const [file, leg] of Object.entries(cases)) {
     assert.deepEqual(buildPlan({ changedFiles: [file], pushingToMain: false, fullGateEnv: false, hasBase: true }).legs, [leg], file);

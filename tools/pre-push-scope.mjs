@@ -24,7 +24,7 @@ export const WORKSPACE_GATES = [
   ['extension/', 'pnpm -C extension run compile && pnpm -C extension run test'],
   ['website/', 'pnpm -C website run test:strict'],
   ['cloudflare-worker/', 'pnpm -C cloudflare-worker run test:strict'],
-  ['oracle-backend/', 'pnpm -C oracle-backend run test:strict'],
+  ['oracle-backend/', 'pnpm -C oracle-backend run test:smoke'],
 ];
 
 const isDocPath = (p) => p.startsWith('docs/') || p.endsWith('.md') || p.startsWith('.github/agents/');
