@@ -6502,7 +6502,10 @@ export class DownloadsDurable {
     const nextMs = Date.now() + backoffSec * 1000;
 
     rs.nextRetryAt = nextMs;
-    await this.state.storage.setAlarm(nextMs);
+    // Earliest-wins: the alarm is one shared bus (daily flush, telemetry
+    // retries, changelog sync). Clobbering an earlier armed alarm would delay
+    // or lose that machine's transition. (bead ic4n follow-up)
+    await this.scheduleAlarmAtEarliest(nextMs);
   }
 
   /**
