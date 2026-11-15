@@ -13,7 +13,7 @@ import {
   MIN_FILES_FOR_DOWNLOAD_ALL,
   GROUP_FEEDBACK_SUCCESS_MS,
 } from './state';
-import { normalizeFileButtons } from './group-manager';
+import { normalizeFileButtons, markGroupDirty } from './group-manager';
 import { ensureDownloadAllButton } from './button-controller';
 import { setProgressVisual } from './utils';
 import { scheduleGroupReset, resetGroupVisuals } from './cancel-handler';
@@ -21,6 +21,33 @@ import { t } from '../../entrypoints/content/i18n';
 import { CANCEL_ICON_SVG_URL } from '../../entrypoints/content/icons';
 
 export { markGroupDirty } from './group-manager';
+
+/**
+ * While a run is active the group re-evaluates on a bounded trailing timer:
+ * per-button class transitions carry no dirty signal of their own, so without
+ * this the 2-3 s terminal windows (waitForSuccessReset) would go unobserved
+ * and the group label would freeze mid-run. Stops on its own once the group
+ * is neither busy, activated, nor inside a reset window.
+ */
+const TRAILING_FLUSH_MS = 250;
+const trailingFlushTimers = new WeakMap<GroupState, number>();
+
+function armTrailingFlush(group: GroupState): void {
+  if (trailingFlushTimers.has(group)) return;
+  const id = window.setTimeout(() => {
+    trailingFlushTimers.delete(group);
+    markGroupDirty(group);
+    scheduleRefresh();
+  }, TRAILING_FLUSH_MS);
+  trailingFlushTimers.set(group, id);
+}
+
+function clearTrailingFlush(group: GroupState): void {
+  const id = trailingFlushTimers.get(group);
+  if (id == null) return;
+  window.clearTimeout(id);
+  trailingFlushTimers.delete(group);
+}
 
 /**
  * Schedule a refresh of dirty groups.
@@ -68,6 +95,7 @@ export function updateGroupState(group: GroupState): void {
     group.downloadAllBtn = null;
     group.activated = false;
     group.isBusy = false;
+    clearTrailingFlush(group);
     if (group.resetTimeoutId != null) {
       window.clearTimeout(group.resetTimeoutId);
       group.resetTimeoutId = undefined;
@@ -79,7 +107,10 @@ export function updateGroupState(group: GroupState): void {
   const mainSpan = btn.querySelector<HTMLElement>('.cqd-download-all-main');
   const subSpan = btn.querySelector<HTMLElement>('.cqd-download-all-sub');
   
-  if (!mainSpan || !subSpan) return;
+  if (!mainSpan || !subSpan) {
+    clearTrailingFlush(group);
+    return;
+  }
 
   if (!group.activated) {
     group.isBusy = false;
@@ -89,7 +120,8 @@ export function updateGroupState(group: GroupState): void {
     const fileLabel = totalFiles === 1 ? (t('file') || 'file') : (t('files') || 'files');
     subSpan.textContent = `${totalFiles} ${fileLabel}`;
     setProgressVisual(btn, 0);
-    return; 
+    clearTrailingFlush(group);
+    return;
   }
 
   let downloaded = 0;
@@ -97,9 +129,14 @@ export function updateGroupState(group: GroupState): void {
   let inProgress = 0;
 
   for (const file of group.files.values()) {
+    // downloaded/failed seed from the previous pass ON PURPOSE (sticky — the
+    // per-file buttons auto-reset to idle a few seconds after settling, and
+    // the group must remember the outcome). inProgress is LIVE state: seeding
+    // it made it sticky too — a group whose buttons left the loading state
+    // could never reach allCompleted, so Download All hung forever (#537).
     let someSuccess = file.downloaded;
     let someError = file.failed;
-    let someLoading = file.inProgress;
+    let someLoading = false;
     let someCancelled = false;
 
     for (const b of file.buttons) {
@@ -209,4 +246,10 @@ export function updateGroupState(group: GroupState): void {
   mainSpan.textContent = mainText;
   subSpan.textContent = subText;
   setProgressVisual(btn, progressRatio);
+
+  if (group.isBusy || group.activated || group.resetTimeoutId != null) {
+    armTrailingFlush(group);
+  } else {
+    clearTrailingFlush(group);
+  }
 }

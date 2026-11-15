@@ -80,6 +80,7 @@ export function makeFlowState(options: FlowHarnessOptions = {}) {
       // (the queue's settlement hook rides onUnregister — 0h4d.1.2).
       flowListener?.onRegister?.(p);
     },
+    pendingByUrlAdd: (url: string, p: PendingDownload) => indexUrl(url, p),
     bindDownloadId: (p: PendingDownload, downloadId: number) => {
       if (pendingByRequestId.get(p.requestId) !== p) return false;
       const existing = pendingByDownloadId.get(downloadId);
@@ -90,7 +91,10 @@ export function makeFlowState(options: FlowHarnessOptions = {}) {
       return true;
     },
     unbindDownloadId: (downloadId: number) => {
+      const p = pendingByDownloadId.get(downloadId);
       pendingByDownloadId.delete(downloadId);
+      // Faithful to state.ts #878 fix: unbind clears the stale claim.
+      if (p && p.currentDownloadId === downloadId) p.currentDownloadId = undefined;
     },
     unregisterPending: (p: PendingDownload) => {
       if (pendingByRequestId.get(p.requestId) === p) pendingByRequestId.delete(p.requestId);
@@ -159,25 +163,28 @@ export async function loadFlowHarness(options: FlowHarnessOptions = {}) {
     extractDriveFileId: vi.fn(() => null),
     extractAuthUserFromUrl: vi.fn(() => undefined),
   }));
-  vi.doMock('../../entrypoints/background/url-helpers', () => ({
-    getFilenameExt: (f: string) => f?.split('.').pop()?.toLowerCase() ?? '',
-    normalizeUrl: vi.fn((url: string) => {
-      let host = '';
-      try {
-        host = new URL(url).hostname;
-      } catch {
-        host = '';
-      }
-      if (host === 'drive.usercontent.google.com' || host === 'drive.google.com') {
-        return { baseUrl: DRIVE_BASE, isDrive: true };
-      }
-      return { baseUrl: url, isDrive: false };
-    }),
-    buildUrlWithAuthUser: vi.fn(
-      (baseUrl: string, authuser: number) =>
-        `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}authuser=${authuser}`,
-    ),
-  }));
+  vi.doMock('../../entrypoints/background/url-helpers', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../../entrypoints/background/url-helpers')>();
+    return {
+      ...actual,
+      normalizeUrl: vi.fn((url: string) => {
+        let host = '';
+        try {
+          host = new URL(url).hostname;
+        } catch {
+          host = '';
+        }
+        if (host === 'drive.usercontent.google.com' || host === 'drive.google.com') {
+          return { baseUrl: DRIVE_BASE, isDrive: true };
+        }
+        return { baseUrl: url, isDrive: false };
+      }),
+      buildUrlWithAuthUser: vi.fn(
+        (baseUrl: string, authuser: number) =>
+          `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}authuser=${authuser}`,
+      ),
+    };
+  });
   vi.doMock('../../entrypoints/background/cleanup', () => ({
     cleanup: cleanupSpy,
     cleanupOrphanedPendingDownloads: vi.fn(),
@@ -231,6 +238,7 @@ export async function loadFlowHarness(options: FlowHarnessOptions = {}) {
   }) as never;
   chrome.downloads.cancel = vi.fn((_id: number, cb?: () => void) => cb?.()) as never;
   chrome.downloads.erase = vi.fn((_f: object, cb?: () => void) => cb?.()) as never;
+  (chrome.downloads as any).removeFile = vi.fn((_id: number, cb?: () => void) => cb?.());
   chrome.tabs.create = vi.fn(((opts: any, cb?: (t: any) => void) => {
     tabCreations.push({ url: opts?.url });
     cb?.({ id: 100 + tabCreations.length });

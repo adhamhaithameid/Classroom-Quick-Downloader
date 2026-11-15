@@ -11,10 +11,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   validatePost,
   validateBatch,
-  recordCorrection,
-  isUnstable,
-  clearInstabilityState,
-  getUnstableCount,
+  createInstabilityTracker,
 } from '../src/v2/repair/deep-validator';
 import type {
   CorrectionItem,
@@ -104,14 +101,15 @@ function addOverlay(el: HTMLElement): HTMLElement {
 // SETUP
 // ============================================================================
 
+let instability: ReturnType<typeof createInstabilityTracker>;
+
 beforeEach(() => {
   document.body.innerHTML = '';
-  clearInstabilityState();
+  instability = createInstabilityTracker();
 });
 
 afterEach(() => {
   document.body.innerHTML = '';
-  clearInstabilityState();
 });
 
 // ============================================================================
@@ -304,42 +302,42 @@ describe('CHECK 6: Duplicate buttons', () => {
 
 describe('Instability tracking', () => {
   it('marks element as unstable after MAX_RETRIES corrections', () => {
-    expect(isUnstable('test-element')).toBe(false);
+    expect(instability.isUnstable('test-element')).toBe(false);
 
-    recordCorrection('test-element');
-    expect(isUnstable('test-element')).toBe(false);
+    instability.recordCorrection('test-element');
+    expect(instability.isUnstable('test-element')).toBe(false);
 
-    recordCorrection('test-element');
-    expect(isUnstable('test-element')).toBe(false);
+    instability.recordCorrection('test-element');
+    expect(instability.isUnstable('test-element')).toBe(false);
 
-    const result = recordCorrection('test-element'); // 3rd time
+    const result = instability.recordCorrection('test-element'); // 3rd time
     expect(result).toBe(true);
-    expect(isUnstable('test-element')).toBe(true);
+    expect(instability.isUnstable('test-element')).toBe(true);
   });
 
   it('skips unstable elements in validatePost', () => {
     // Make element unstable
-    recordCorrection('test-post');
-    recordCorrection('test-post');
-    recordCorrection('test-post');
+    instability.recordCorrection('test-post');
+    instability.recordCorrection('test-post');
+    instability.recordCorrection('test-post');
 
     const post = makePost({
       files: [{ canonicalId: 'file-1', element: document.createElement('a'), idSource: 'data-drive-id', name: 'doc.pdf', ext: 'pdf', downloadUrl: '' }],
     });
 
-    const corrections = validatePost(post, null, []);
+    const corrections = validatePost(post, null, [], undefined, instability);
     expect(corrections).toHaveLength(0); // Should skip entirely
   });
 
-  it('clearInstabilityState resets everything', () => {
-    recordCorrection('test-1');
-    recordCorrection('test-1');
-    recordCorrection('test-1');
-    expect(isUnstable('test-1')).toBe(true);
+  it('clear resets everything', () => {
+    instability.recordCorrection('test-1');
+    instability.recordCorrection('test-1');
+    instability.recordCorrection('test-1');
+    expect(instability.isUnstable('test-1')).toBe(true);
 
-    clearInstabilityState();
-    expect(isUnstable('test-1')).toBe(false);
-    expect(getUnstableCount()).toBe(0);
+    instability.clear();
+    expect(instability.isUnstable('test-1')).toBe(false);
+    expect(instability.unstableCount()).toBe(0);
   });
 });
 
@@ -461,12 +459,12 @@ describe('validateBatch', () => {
   });
 
   it('counts unstable skips', () => {
-    recordCorrection('unstable-post');
-    recordCorrection('unstable-post');
-    recordCorrection('unstable-post');
+    instability.recordCorrection('unstable-post');
+    instability.recordCorrection('unstable-post');
+    instability.recordCorrection('unstable-post');
 
     const post = makePost({ id: 'unstable-post' });
-    const result = validateBatch([post], new Map(), []);
+    const result = validateBatch([post], new Map(), [], undefined, undefined, undefined, instability);
     expect(result.unstableSkipped).toBe(1);
     expect(result.postsChecked).toBe(0);
   });

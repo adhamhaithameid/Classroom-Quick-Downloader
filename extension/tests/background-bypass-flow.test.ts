@@ -60,6 +60,10 @@ function makeFlowState(options: FlowOptions = {}) {
       if (pendingByRequestId.get(p.requestId) !== p) return;
       indexUrl(url, p);
     },
+    pendingByUrlAdd: (url: string, p: PendingDownload) => {
+      if (pendingByRequestId.get(p.requestId) !== p) return;
+      indexUrl(url, p);
+    },
     bindDownloadId: (p: PendingDownload, downloadId: number) => {
       if (pendingByRequestId.get(p.requestId) !== p) return false;
       const existing = pendingByDownloadId.get(downloadId);
@@ -69,7 +73,10 @@ function makeFlowState(options: FlowOptions = {}) {
       return true;
     },
     unbindDownloadId: (downloadId: number) => {
+      const p = pendingByDownloadId.get(downloadId);
       pendingByDownloadId.delete(downloadId);
+      // Faithful to state.ts #878 fix: unbind clears the stale claim.
+      if (p && p.currentDownloadId === downloadId) p.currentDownloadId = undefined;
     },
     unregisterPending: (p: PendingDownload) => {
       if (pendingByRequestId.get(p.requestId) === p) pendingByRequestId.delete(p.requestId);

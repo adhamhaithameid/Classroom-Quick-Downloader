@@ -375,7 +375,6 @@ function renderNotificationSection(entries: ChangelogEntry[], config: ChangelogC
       <h2>
         <span>🔔</span> Notification Styling
         <span class="release-count-badge" id="notification-counter">${(config.rules || []).length}</span>
-        <span class="unsaved-dot" id="unsaved-indicator" title="Unsaved changes"></span>
       </h2>
       
       <script>window.CURRENT_RULES = ${rulesJson};</script>
@@ -4217,6 +4216,7 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string, admi
           </button>
         </div>
         <div class="rc-status" id="config-status" data-tooltip="Status of the last config operation.">Idle</div>
+        <span class="unsaved-dot" id="unsaved-indicator" title="Unsaved changes"></span>
       </section>
       </div>
       <div class="tab-panel" id="panel-debug" role="tabpanel" aria-labelledby="tab-debug" data-panel="debug" hidden>
@@ -5711,6 +5711,8 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string, admi
 
       function setConfigDirty(flag) {
         configDirty = flag;
+        const dot = document.getElementById("unsaved-indicator");
+        if (dot) dot.classList.toggle("active", flag);
         if (configDirty) {
           setConfigStatus("Unsaved changes", "");
         }
@@ -5782,7 +5784,7 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string, admi
         }
 
         setConfigStatus("Loaded", "ok");
-        configDirty = false;
+        setConfigDirty(false);
       }
 
       function updateRemoteConfigForm(cfg, quota) {
@@ -7797,6 +7799,12 @@ export function renderDashboard(stats: StatsResponse, scriptNonce?: string, admi
       });
       window.addEventListener("beforeunload", function () {
         if (liveSocket) closeLiveSocket("page-unload");
+      });
+      window.addEventListener("beforeunload", function (e) {
+        if (configDirty) {
+          e.preventDefault();
+          e.returnValue = "";
+        }
       });
 
       updateLiveIndicator();
