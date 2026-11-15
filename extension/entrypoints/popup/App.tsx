@@ -1,6 +1,6 @@
 // filepath: entrypoints/popup/App.tsx
 
-import { useEffect, useId, useMemo, useRef, useState, useCallback, type KeyboardEvent, type MouseEvent } from 'react';
+import { useEffect, useId, useMemo, useReducer, useRef, useState, useCallback, type KeyboardEvent, type MouseEvent } from 'react';
 // Stillwater foundation (tokens, reset, focus, motion collapse) — shared
 // with the options page; App.css keeps the popup's surface rules.
 import '../../src/ui/stillwater.css';
@@ -33,7 +33,6 @@ import { popupMessage } from './i18n';
 import { CHANGELOG_SITE_URL, WEBSITE_BASE_URL } from '../utils/analytics/constants';
 import { isApiConfigured } from '../../src/engines/v3/api/config';
 import {
-  DEFAULT_SETTINGS,
   loadSettings,
   saveSetting,
   watchSettings,
@@ -45,6 +44,8 @@ import {
   deriveEngineRowView,
   deriveExtensionStatus,
   derivePopupView,
+  POPUP_CORE_INITIAL,
+  popupCoreReducer,
   type PopupEngineMode,
 } from '../../src/ui/popup/view-state';
 
@@ -343,10 +344,17 @@ function haveColorAssignmentsChanged(
 }
 
 function App() {
-  const [settings, setSettings] = useState<Settings | null>(null);
-
-  const [isClassroomTab, setIsClassroomTab] = useState(false);
-  const [loadingState, setLoadingState] = useState(true);
+  // CORE VIEW STATE (bead r5bu, 0fvf phase B): one reducer owns the six
+  // former view hooks with atomic transitions; the derivations in
+  // view-state.ts stay the decision owners. Local aliases keep every read
+  // site identical.
+  const [core, dispatch] = useReducer(popupCoreReducer, POPUP_CORE_INITIAL);
+  const settings = core.settings;
+  const isClassroomTab = core.isClassroomTab;
+  const loadingState = core.settingsLoading;
+  const engineMode = core.engine.mode;
+  const engineModeLoading = core.engine.loading;
+  const apiConfirmOpen = core.engine.confirmOpen;
 
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState<string | null>(null);
@@ -410,18 +418,12 @@ function App() {
     };
   }, [version]);
 
-  // ENGINE MODE STATE — the initial value mirrors the runtime default
-  // (mode-controller.ts DEFAULT_MODE 'v2'): fresh installs run v2, so the
-  // control must render New selected, not Legacy (audit finding 12).
-  const [engineMode, setEngineMode] = useState<PopupEngineMode>('v2');
-  const [engineModeLoading, setEngineModeLoading] = useState(true);
+  // ENGINE MODE STATE — lives in the core reducer above (bead r5bu); the
+  // initial value mirrors the runtime default (mode-controller.ts
+  // DEFAULT_MODE 'v2': fresh installs run v2, audit finding 12).
   // S13: read once — the manifest's identity/oauth2 setup does not change
   // while the popup is open (a reload picks up a redelivered manifest).
   const [apiConfigured] = useState(isApiConfigured);
-  // Legal round 2, surface 03 T2: the API-beta confirm card. Open while the
-  // user's first v3 pick awaits confirmation; the segment stays on the
-  // previous engine the whole time.
-  const [apiConfirmOpen, setApiConfirmOpen] = useState(false);
 
   // COLLAPSIBLE SETTINGS STATE (persisted)
   const [settingsCollapsed, setSettingsCollapsed] = useState(true);
@@ -517,7 +519,7 @@ function App() {
     
     // Dev environment fallback
     if (!browserApi || !browserApi.tabs || !browserApi.tabs.query) {
-       setIsClassroomTab(true); // Default to true in dev so we see the main UI
+       dispatch({ type: 'tab-detected', isClassroomTab: true }); // Default to true in dev so we see the main UI
        setVersion('dev');
        return;
     }
@@ -544,10 +546,10 @@ function App() {
         try {
           const parsedUrl = new URL(url);
           const hostname = parsedUrl.hostname.toLowerCase();
-          setIsClassroomTab(hostname === 'classroom.google.com');
+          dispatch({ type: 'tab-detected', isClassroomTab: hostname === 'classroom.google.com' });
         } catch {
           // Invalid URL, not a Classroom tab
-          setIsClassroomTab(false);
+          dispatch({ type: 'tab-detected', isClassroomTab: false });
         }
       }
     });
@@ -745,23 +747,17 @@ function App() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const browserApi = (globalThis as any).chrome;
     if (!browserApi || !browserApi.storage || !browserApi.storage.local) {
-      setSettings((prev) => ({
-        ...DEFAULT_SETTINGS,
-        ...prev,
-        extensionEnabled: true, // Default to true in dev
-      }));
-      setLoadingState(false);
+      dispatch({ type: 'dev-fallback-settings' });
       return;
     }
 
     // Initial load + live sync through the shared settings store (0h4d.1.8):
     // one load/save/watch API, shared with the options page.
     void loadSettings().then((loaded) => {
-      setSettings(loaded);
-      setLoadingState(false);
+      dispatch({ type: 'settings-loaded', settings: loaded });
     });
     const unwatch = watchSettings((updated) => {
-      setSettings((prev) => (prev ? updated : prev));
+      dispatch({ type: 'settings-synced', settings: updated });
     });
     return unwatch;
   }, []);
@@ -771,7 +767,7 @@ function App() {
     const nextState = !settings.extensionEnabled;
 
     // Optimistic update
-    setSettings({ ...settings, extensionEnabled: nextState });
+    dispatch({ type: 'settings-patched', settings: { ...settings, extensionEnabled: nextState } });
 
     // Save through the shared store (0h4d.1.8)
     void saveSetting('extensionEnabled', nextState);
@@ -782,7 +778,7 @@ function App() {
   function handleToggleReduceMotion() {
     if (!settings) return;
     const nextState = !settings.reducedMotionPreferred;
-    setSettings({ ...settings, reducedMotionPreferred: nextState });
+    dispatch({ type: 'settings-patched', settings: { ...settings, reducedMotionPreferred: nextState } });
     void saveSetting('reducedMotionPreferred', nextState);
   }
 
@@ -800,7 +796,7 @@ function App() {
     if (!settings) return;
     const nextState = !settings[flag];
     const updatedSettings = { ...settings, [flag]: nextState };
-    setSettings(updatedSettings);
+    dispatch({ type: 'settings-patched', settings: updatedSettings });
 
     // Save through the shared store (0h4d.1.8)
     void saveSetting(flag, nextState);
@@ -826,21 +822,20 @@ function App() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const browserApi = (globalThis as any).chrome;
     if (!browserApi?.storage?.local) {
-      setEngineModeLoading(false);
+      dispatch({ type: 'engine-load-skipped' });
       return;
     }
     browserApi.storage.local.get('cqdV2Mode', (res: { cqdV2Mode?: string }) => {
       // Same source of truth as the runtime (mode-controller.ts readMode):
       // a saved mode wins, no/invalid saved value falls back to DEFAULT_MODE.
-      setEngineMode(resolveEngineMode(res.cqdV2Mode));
-      setEngineModeLoading(false);
+      dispatch({ type: 'engine-resolved', mode: resolveEngineMode(res.cqdV2Mode) });
     });
 
     // Listen for mode changes from content script or other tabs
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const listener = (changes: any, area: string) => {
       if (area === 'local' && changes.cqdV2Mode) {
-        setEngineMode(resolveEngineMode(changes.cqdV2Mode.newValue));
+        dispatch({ type: 'engine-remote-updated', mode: resolveEngineMode(changes.cqdV2Mode.newValue) });
       }
     };
     if (browserApi.storage.onChanged) {
@@ -852,13 +847,13 @@ function App() {
   function handleEngineModeSelect(nextMode: 'legacy' | 'v2' | 'v3' | 'auto') {
     // Any engine decision closes the confirm card first (surface 03 T2:
     // picking another engine while the card is open is a decline + switch).
-    if (apiConfirmOpen) setApiConfirmOpen(false);
+    if (apiConfirmOpen) dispatch({ type: 'engine-confirm-closed' });
     // Legal round 2, surface 03 Treatment 2: the FIRST API (beta) pick opens
     // the confirm card — the three facts as choices, with the way back named.
     // The previous engine stays selected until the user confirms; later picks
     // (apiBetaConfirmed persisted) skip the card.
     if (nextMode === 'v3' && !settings?.apiBetaConfirmed) {
-      setApiConfirmOpen(true);
+      dispatch({ type: 'engine-confirm-opened' });
       return;
     }
     if (nextMode === engineMode) return;
@@ -867,7 +862,7 @@ function App() {
 
   /** The shared persistence + live-switch path for an engine decision. */
   function commitEngineMode(nextMode: 'legacy' | 'v2' | 'v3' | 'auto') {
-    setEngineMode(nextMode);
+    dispatch({ type: 'engine-mode-committed', mode: nextMode });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const browserApi = (globalThis as any).chrome;
     if (browserApi?.storage?.local) {
@@ -886,9 +881,9 @@ function App() {
   /** Confirm on the API-beta card: persist the flat consent key, then run
    *  the v3 switch the user asked for (legal round 2, surface 03 T2). */
   function handleApiBetaConfirm() {
-    setApiConfirmOpen(false);
+    dispatch({ type: 'engine-confirm-closed' });
     if (settings) {
-      setSettings({ ...settings, apiBetaConfirmed: true });
+      dispatch({ type: 'settings-patched', settings: { ...settings, apiBetaConfirmed: true } });
     }
     void saveSetting('apiBetaConfirmed', true);
     commitEngineMode('v3');
@@ -896,7 +891,7 @@ function App() {
 
   /** Decline (Stay on New): close the card; the selection never moved. */
   function handleApiBetaDecline() {
-    setApiConfirmOpen(false);
+    dispatch({ type: 'engine-confirm-closed' });
   }
 
   function handleOpenClassroomClick() {
