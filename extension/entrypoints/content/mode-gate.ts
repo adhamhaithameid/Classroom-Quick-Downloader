@@ -20,8 +20,8 @@
  *    stack hot-starts if the entrypoint's own gating wanted it running
  *
  * The single source of truth for the storage key and the default mode is
- * mode-controller.ts; this module mirrors the unexported key constant and
- * validity check locally because content scripts import statically.
+ * mode-controller.ts, which exports MODE_STORAGE_KEY and isValidMode — this
+ * module consumes them instead of holding its own copy (#887).
  *
  * @author Adham — one gate to keep the rollback honest
  * @since v4.1.0

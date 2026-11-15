@@ -140,6 +140,9 @@ export interface InstabilityTracker {
   unstableCount(): number;
 }
 
+/** wsi7: warns once when a validateBatch caller omits the tracker. */
+let instabilityOmitWarned = false;
+
 /**
  * Per-engine instability tracker. Was module-global state, which leaked
  * across engine instances on one page (EngineV3 embeds a private EngineV2);
@@ -395,6 +398,15 @@ export function validateBatch(
   instability?: InstabilityTracker,
 ): ValidationResult {
   const startTime = performance.now();
+  // wsi7: an omitted tracker silently disables unstable-skip for the whole
+  // batch (engine-v2 always forwards its engine-owned tracker; a future
+  // caller omitting it should know, not fail quiet). Warn once per module.
+  if (!instability && posts.length > 0 && !instabilityOmitWarned) {
+    instabilityOmitWarned = true;
+    console.warn(
+      '[CQD deep-validator] instability tracker omitted — unstable-skip is disabled for this caller',
+    );
+  }
   const allCorrections: CorrectionItem[] = [];
   let postsChecked = 0;
   let unstableSkipped = 0;

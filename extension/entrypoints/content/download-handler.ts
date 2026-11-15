@@ -16,6 +16,7 @@ import {
 } from './state';
 import { toDownloadUrl } from './url-utils';
 import { classifyRoute } from '../../src/v2/context/route-classifier';
+import { MODE_STORAGE_KEY } from '../../src/v2/orchestrator/mode-controller';
 import { getButtonState, setButtonState, setPillProgress } from './button-state';
 import { t } from './i18n';
 
@@ -103,9 +104,9 @@ export function startBackgroundDownload(
   const engineModePromise: Promise<string | undefined> =
     typeof chrome !== 'undefined' && chrome.storage?.local
       ? chrome.storage.local
-          .get('cqdV2Mode')
+          .get(MODE_STORAGE_KEY)
           .then((res: Record<string, unknown>) =>
-            typeof res?.cqdV2Mode === 'string' ? res.cqdV2Mode : undefined,
+            typeof res?.[MODE_STORAGE_KEY] === 'string' ? res[MODE_STORAGE_KEY] : undefined,
           )
           .catch(() => undefined)
       : Promise.resolve(undefined);

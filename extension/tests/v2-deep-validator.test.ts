@@ -542,3 +542,49 @@ describe('CHECK 2: Download All group control (z57)', () => {
     expect(removals).toHaveLength(0);
   });
 });
+
+// ============================================================================
+// wsi7: an omitted instability tracker silently disables unstable-skip for
+// the batch. engine-v2 always forwards its engine-owned tracker; a future
+// caller omitting it must see a warning instead of quiet degradation.
+// ============================================================================
+describe('wsi7: omitted instability tracker warns', () => {
+  it('does not warn when the tracker is forwarded', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const instability = createInstabilityTracker();
+
+    validateBatch([makePost()], new Map(), [], undefined, undefined, undefined, instability);
+
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('warns exactly once per module when a non-empty batch omits the tracker', async () => {
+    vi.resetModules();
+    const fresh = await import('../src/v2/repair/deep-validator');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      fresh.validateBatch([makePost()], new Map(), []);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('instability tracker omitted'));
+
+      // The latch holds: a second omitted batch does not spam.
+      fresh.validateBatch([makePost()], new Map(), []);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('does not warn for an empty batch without a tracker', async () => {
+    vi.resetModules();
+    const fresh = await import('../src/v2/repair/deep-validator');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      fresh.validateBatch([], new Map(), []);
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});
