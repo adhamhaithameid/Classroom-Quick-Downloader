@@ -21,16 +21,22 @@ const require = createRequire(import.meta.url);
 // executablePath() check can point at a stale cache entry while the
 // launcher resolves the branded /Applications install (observed 2026-11-15).
 let edgeOk = false;
+let edgeLaunchError = '';
 try {
   const browser = await chromium.launch({ channel: 'msedge', headless: true });
   await browser.close();
   edgeOk = true;
-} catch {
+} catch (err) {
+  // A transient launch failure must not masquerade as absence: print the
+  // real error so a corrupt cache or missing dependency is visible, while
+  // keeping the exit-0 skip contract (bead 3yoq).
   edgeOk = false;
+  edgeLaunchError = err?.message ?? String(err);
 }
 if (!edgeOk) {
   console.log(
-    'Microsoft Edge not installed — test:e2e:edge skipped. Install Edge or run `pnpm exec playwright install msedge`.',
+    `Microsoft Edge not installed — test:e2e:edge skipped. Install Edge or run \`pnpm exec playwright install msedge\`.` +
+      (edgeLaunchError ? `\n  (launch probe error: ${edgeLaunchError})` : ''),
   );
   process.exit(0);
 }
