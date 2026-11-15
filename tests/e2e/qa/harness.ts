@@ -291,7 +291,10 @@ export async function launchQaContext(
     // answers it directly: an entry with appDisabled=true is mechanism A, no
     // entry for the signed id is mechanism B. Firefox writes extensions.json
     // shortly after startup, so this dumps on a delay rather than eagerly.
-    console.log(`[qa-console] firefox version: ${firefox.version()}`);
+    // This Playwright re-export carries no BrowserType.version(), so the
+    // version comes from the context's browser handle, with the page UA as
+    // a fallback inside the delayed dump.
+    console.log(`[qa-console] firefox version: ${context.browser()?.version() ?? "unknown"}`);
     setTimeout(() => {
       try {
         const extDir = path.join(FIREFOX_PROFILE_DIR, "extensions");
