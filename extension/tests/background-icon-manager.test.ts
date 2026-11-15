@@ -5,6 +5,8 @@ import {
   createIconUpdaters,
   isClassroomUrl,
   setActionIcon,
+  setIconDecorationPaths,
+  setIconOverridePaths,
   updateIconForTab,
 } from '../entrypoints/background/icon-manager';
 
@@ -30,6 +32,30 @@ describe('background icon manager', () => {
     expect(setIcon).toHaveBeenLastCalledWith({ tabId: 1, path: COLOR_ICON_PATHS });
     setActionIcon(1, false);
     expect(setIcon).toHaveBeenLastCalledWith({ tabId: 1, path: GRAY_ICON_PATHS });
+  });
+
+  it('renders decoration variants per classroom state, below animation overrides (08fg.3)', () => {
+    const setIcon = vi.fn();
+    (chrome as any).action = { setIcon };
+    const color = { 16: 'icon/dot/16.png' };
+    const gray = { 16: 'icon/dot-gray/16.png' };
+    setIconDecorationPaths({ color, gray });
+    setActionIcon(1, true);
+    expect(setIcon).toHaveBeenLastCalledWith({ tabId: 1, path: color });
+    setActionIcon(2, false);
+    expect(setIcon).toHaveBeenLastCalledWith({ tabId: 2, path: gray });
+
+    // The download animation override wins while active, then the dot returns.
+    setIconOverridePaths({ 16: 'icon/fx/spin-0-16.png' });
+    setActionIcon(1, true);
+    expect(setIcon).toHaveBeenLastCalledWith({ tabId: 1, path: { 16: 'icon/fx/spin-0-16.png' } });
+    setIconOverridePaths(null);
+    setActionIcon(1, true);
+    expect(setIcon).toHaveBeenLastCalledWith({ tabId: 1, path: color });
+
+    setIconDecorationPaths(null);
+    setActionIcon(1, true);
+    expect(setIcon).toHaveBeenLastCalledWith({ tabId: 1, path: COLOR_ICON_PATHS });
   });
 
   it('handles missing setIcon API and tab failures gracefully', () => {

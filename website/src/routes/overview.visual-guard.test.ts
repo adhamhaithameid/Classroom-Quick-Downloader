@@ -8,40 +8,24 @@ function squish(html: string): string {
   return html.replace(/\s+/g, ' ').trim();
 }
 
-const FONT_STYLESHEET_URL =
-  'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap';
+const FONT_SOURCE_IMPORTS = [
+  "import '@fontsource-variable/plus-jakarta-sans';",
+  "import '@fontsource-variable/plus-jakarta-sans/wght-italic.css';"
+];
 
 describe('overview visual guardrails', () => {
-  it('keeps Plus Jakarta Sans preloaded and does not reintroduce Inter', () => {
-    const { head } = render(OverviewPage);
-    const normalizedHead = squish(head);
+  it('keeps Plus Jakarta Sans self-hosted and does not reintroduce Inter or Google Fonts', () => {
+    const layout = readFileSync(new URL('./+layout.svelte', import.meta.url), 'utf8');
 
-    expect(normalizedHead).toContain('Plus+Jakarta+Sans');
-    expect(normalizedHead).not.toContain('family=Inter');
-  });
+    // The font ships from the repo (fontsource variable package) imported by
+    // the layout — Vite fingerprints the woff2 files, no third-party request.
+    for (const imp of FONT_SOURCE_IMPORTS) {
+      expect(layout, `layout must import ${imp}`).toContain(imp);
+    }
 
-  it('delivers Plus Jakarta Sans from app.html via preconnects and a display=swap stylesheet', () => {
     const html = readFileSync(new URL('../app.html', import.meta.url), 'utf8');
-
-    // Preconnects must be discovered at HTML parse time on every route and
-    // sit before the stylesheet link so the font handshake starts early.
-    const googleapisPreconnect = html.indexOf(
-      '<link rel="preconnect" href="https://fonts.googleapis.com"'
-    );
-    const gstaticPreconnect = html.indexOf(
-      '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin'
-    );
-    const stylesheetMatch = html.match(/<link\s[^>]*rel="stylesheet"[^>]*>/);
-    expect(googleapisPreconnect).toBeGreaterThan(-1);
-    expect(gstaticPreconnect).toBeGreaterThan(-1);
-    expect(stylesheetMatch).not.toBeNull();
-
-    const stylesheetTag = stylesheetMatch![0];
-    expect(stylesheetTag).toContain(`href="${FONT_STYLESHEET_URL}"`);
-    expect(googleapisPreconnect).toBeLessThan(html.indexOf(stylesheetTag));
-    expect(gstaticPreconnect).toBeLessThan(html.indexOf(stylesheetTag));
-
-    // Plus Jakarta Sans stays the primary UI font; never Inter.
+    expect(html).not.toContain('fonts.googleapis.com');
+    expect(html).not.toContain('fonts.gstatic.com');
     expect(html).not.toContain('family=Inter');
   });
 
@@ -142,7 +126,7 @@ describe('overview visual guardrails', () => {
 
     // Primary font must stay ahead of the metric fallback in the stack.
     expect(css).toContain(
-      "--font-ui: 'Plus Jakarta Sans', 'Plus Jakarta Sans Fallback', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui;"
+      "--font-ui: 'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', 'Plus Jakarta Sans Fallback', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui;"
     );
 
     // The shared glass design system lives in app.css; the original body

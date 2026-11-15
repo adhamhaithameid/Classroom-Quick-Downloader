@@ -151,6 +151,8 @@ export async function loadFlowHarness(options: FlowHarnessOptions = {}) {
     // Faithful to the real classifier (icon-manager.ts CLASSROOM_URL_PATTERN).
     isClassroomUrl: (url?: string | null) => !!url && /classroom\.google\.com/.test(url),
     setActionIcon: vi.fn(),
+    setIconOverridePaths: vi.fn(),
+    setIconOverrideImageData: vi.fn(),
     GRAY_ICON_PATHS: {},
   }));
   vi.doMock('../../entrypoints/background/auth-utils', () => ({
@@ -254,6 +256,11 @@ export async function loadFlowHarness(options: FlowHarnessOptions = {}) {
     cb({ extensionEnabled: true }),
   );
   (chrome.runtime as { lastError?: unknown }).lastError = undefined;
+  // Update-dot event registries (bead 08fg.3): registries only; the flow
+  // tests never fire the browser update events.
+  const runtimeWithEvents = chrome.runtime as any;
+  runtimeWithEvents.onInstalled = { addListener: vi.fn() };
+  runtimeWithEvents.onUpdateAvailable = { addListener: vi.fn() };
 
   const mod = await import('../../entrypoints/background/index');
   (mod.default as unknown as () => void)();

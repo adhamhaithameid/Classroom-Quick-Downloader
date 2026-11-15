@@ -682,7 +682,7 @@
             <li><a href="{base}/faq">FAQ</a></li>
             <li><a href="{base}/privacy">Privacy</a></li>
             <li><a href="{base}/security">Security</a></li>
-            <li><a href="{base}/press-kit">Press kit</a></li>
+            <li><a href="{base}/brand">Brand kit</a></li>
             <li><a href="{base}/site-map">Site map</a></li>
           </ul>
         </nav>

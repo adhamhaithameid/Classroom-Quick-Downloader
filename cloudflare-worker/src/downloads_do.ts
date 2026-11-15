@@ -129,6 +129,114 @@ function normalizeRecentCountReports(input: unknown): RecentCountReport[] {
  */
 export const MAX_DOWNLOAD_COUNT_INSTALLS = 50_000;
 
+// SEC-001: the public backup lane must never carry material that identifies
+// visitors or exposes the admin perimeter. `GET /admin/storage-export?redacted=1`
+// strips it at the source, so the full-fidelity dump never touches a runner or
+// git history. Manual admin exports (no param) keep full fidelity.
+
+const BACKUP_REDACTED_CORE_KEYS: readonly string[] = [
+  "loginAttempts",
+  "ipAllowlist",
+  "ipAllowlistEnabled",
+  "ipAllowlistStepUpBypassEnabled",
+  "dangerActionAuditLogs",
+  "sessionBindingLastExpectedPrefix",
+  "sessionBindingLastActualPrefix",
+  "burstCounts",
+  // SEC-100 (rescan 2026-11-03): persist() spreads every non-destructured
+  // field into analytics_state, so per-IP maps must be named here explicitly
+  // or they ride into the public backup lane (up to 5000 IPs per map).
+  "trackRates",
+  "websiteEventRates",
+  "uninstallRates",
+  "ipCounts",
+];
+
+// SEC-101 (rescan 2026-11-03): /track events are rebuilt from this whitelist
+// before buffering — unknown wire keys never reach storage, the D1 archive,
+// or the backup lane. Mirrors the StoredEvent contract in src/types.ts.
+const TRACK_EVENT_ALLOWED_FIELDS: readonly string[] = [
+  "status",
+  "file_type",
+  "browser",
+  "os",
+  "ext_version",
+  "duration_ms",
+  "bypass_used",
+  "language",
+  "country",
+  "timestamp",
+  "id",
+  "page_type",
+  "engine_mode",
+  "strategy",
+  "error_type",
+  "source",
+  "count",
+  "rollup",
+  "seq",
+];
+
+function rebuildWhitelistedTrackEvent(ev: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const field of TRACK_EVENT_ALLOWED_FIELDS) {
+    if (field in ev) out[field] = ev[field];
+  }
+  return out;
+}
+
+// Visitor-scoped fields: request-scoped session id, per-view page path, and
+// the free-form event meta (page-error beacons embed URLs). Kept fields stay
+// aggregate-only (eventType/action/placement/tsUtc).
+const BACKUP_REDACTED_VISITOR_KEYS: readonly string[] = ["sessionId", "pagePath", "meta"];
+
+const REDACT_WALK_DEPTH_MAX = 12;
+
+function redactUninstallSubmission(row: unknown): unknown {
+  if (!isPlainObject(row)) return row;
+  return {
+    submissionId: row.submissionId,
+    submittedAtUtc: row.submittedAtUtc,
+    browser: row.browser,
+    version: row.version,
+    source: row.source,
+  };
+}
+
+function redactVisitorFields(value: unknown, depth: number): unknown {
+  if (depth > REDACT_WALK_DEPTH_MAX) return value;
+  if (Array.isArray(value)) return value.map((row) => redactVisitorFields(row, depth + 1));
+  if (!isPlainObject(value)) return value;
+  const out: Record<string, unknown> = {};
+  for (const [key, inner] of Object.entries(value)) {
+    if (BACKUP_REDACTED_VISITOR_KEYS.includes(key)) continue;
+    // Uninstall submissions carry visitor free text wherever they persist —
+    // the analytics_state core and the analytics_uninstall shard alike.
+    if (key === "uninstallSubmissions" && Array.isArray(inner)) {
+      out[key] = inner.map(redactUninstallSubmission);
+      continue;
+    }
+    out[key] = redactVisitorFields(inner, depth + 1);
+  }
+  return out;
+}
+
+export function redactStorageForBackup(
+  storage: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(storage)) {
+    if (key === "analytics_state" && isPlainObject(value)) {
+      const core: Record<string, unknown> = { ...value };
+      for (const redactedKey of BACKUP_REDACTED_CORE_KEYS) delete core[redactedKey];
+      out[key] = redactVisitorFields(core, 0);
+      continue;
+    }
+    out[key] = redactVisitorFields(value, 0);
+  }
+  return out;
+}
+
 type DurableStateShape = {
   totalEvents: number;
   totalDownloads: number;
@@ -153,6 +261,11 @@ type DurableStateShape = {
 
   // Buffered events waiting to be archived
   buffer: StoredEvent[];
+
+  // 1ef6.2: pre-aggregated failure rollup keyed by
+  // error_type|os|browser|ext_version|page_type|engine_mode|strategy.
+  // Bounded to ERROR_ROLLUP_CAP keys; evicted smallest-count-first.
+  errorRollup: Record<string, { count: number; lastSeen: number }>;
   
   // Monotonically increasing batch sequence number for stable batchId across retries
   // Only incremented after a batch is successfully archived
@@ -622,6 +735,7 @@ const COMPACT_TARGET_UTIL = 0.5;
 const COMPACT_MAX_BATCH = 5000;
 const MAX_PENDING_BATCHES = 50;
 const MAX_ROLLUP_COUNT = 100_000;
+const ERROR_ROLLUP_CAP = 200;
 
 const HEALTH_WARN_PENDING_BATCHES = 10;
 const HEALTH_CRIT_PENDING_BATCHES = 25;
@@ -2150,6 +2264,7 @@ export class DownloadsDurable {
       hardRemoteOff: false,
 
       buffer: [],
+      errorRollup: {},
       batchSeq: 0,
       eventSeq: 0,
       committedSeq: 0,
@@ -2281,6 +2396,7 @@ export class DownloadsDurable {
       return !isPlainObject(draftRaw);
     })();
     this.data = {
+      errorRollup: stored.errorRollup ?? base.errorRollup,
       totalEvents: stored.totalEvents ?? base.totalEvents,
       totalDownloads: stored.totalDownloads ?? base.totalDownloads,
       totalSuccess: stored.totalSuccess ?? base.totalSuccess,
@@ -3298,8 +3414,19 @@ export class DownloadsDurable {
         }
       }
       if (Object.keys(bucket).length > PUBLIC_IP_RATE_MAX_KEYS) {
-        // Emergency reset to avoid unbounded memory growth under abuse.
-        for (const k of Object.keys(bucket)) delete bucket[k];
+        // Still over cap (a same-window flood): evict oldest-minute entries
+        // first instead of wiping the whole bucket. A blanket reset would
+        // hand attackers a free counter reset and strip the current minute's
+        // honest clients — the eviction keeps recent quota state intact.
+        let excess = Object.keys(bucket).length - PUBLIC_IP_RATE_MAX_KEYS;
+        const keysOldestFirst = Object.entries(bucket)
+          .sort((a, b) => (a[1]?.minute ?? 0) - (b[1]?.minute ?? 0))
+          .map(([k]) => k);
+        for (const k of keysOldestFirst) {
+          if (excess <= 0) break;
+          delete bucket[k];
+          excess -= 1;
+        }
       }
     }
 
@@ -3363,7 +3490,7 @@ export class DownloadsDurable {
       if (!this.isAuthorizedAdmin(request)) {
         return json({ ok: false, error: "unauthorized" }, { status: 401 });
       }
-      return this.handleAdminStorageExport();
+      return this.handleAdminStorageExport(request);
     }
 
     if (pathname === "/debug/flush" && request.method === "POST") {
@@ -3405,6 +3532,10 @@ export class DownloadsDurable {
 
     if (pathname === "/admin/website/status" && request.method === "GET") {
       return this.handleAdminWebsiteStatus(request);
+    }
+
+    if (pathname === "/admin/website/error-rollup" && request.method === "GET") {
+      return this.handleAdminErrorRollup(request);
     }
 
     if (pathname === "/admin/website/flush-now" && request.method === "POST") {
@@ -4247,11 +4378,49 @@ export class DownloadsDurable {
       if (ev.country) {
         ev.country = sanitizeString(ev.country, 2, FIELD_PATTERNS.language);
       }
+      // 1ef6.2: use-case context — alias camelCase to snake_case, sanitize.
+      const rawAny = ev as Record<string, unknown>;
+      if (typeof rawAny.pageType === "string" && rawAny.pageType) {
+        ev.page_type = sanitizeString(rawAny.pageType, 20, FIELD_PATTERNS.generic);
+      }
+      if (typeof rawAny.engineMode === "string" && rawAny.engineMode) {
+        ev.engine_mode = sanitizeString(rawAny.engineMode, 12, FIELD_PATTERNS.generic);
+      }
+      if (typeof rawAny.strategy === "string" && rawAny.strategy) {
+        ev.strategy = sanitizeString(rawAny.strategy, 16, FIELD_PATTERNS.generic);
+      }
+      delete rawAny.pageType;
+      delete rawAny.engineMode;
+      // NB: strategy is its own snake_case name — nothing to delete.
+
+      // Review 2026-11-03: a client can submit the snake_case fields
+      // directly, skipping the alias block. Sanitize the persisted fields
+      // unconditionally — over-length or off-pattern values fall back to
+      // "unknown" (sanitizeString), so the rollup key stays bounded and
+      // well-formed.
+      if (ev.page_type) {
+        ev.page_type = sanitizeString(ev.page_type, 20, FIELD_PATTERNS.generic);
+      }
+      if (ev.engine_mode) {
+        ev.engine_mode = sanitizeString(ev.engine_mode, 12, FIELD_PATTERNS.generic);
+      }
+      if (ev.strategy) {
+        ev.strategy = sanitizeString(ev.strategy, 16, FIELD_PATTERNS.generic);
+      }
 
       // PRIVACY: Never persist IPs. Strip any client-provided ip_address.
       delete ev.ip_address;
 
-      this.d.buffer.push(ev);
+      if (ev.status === "fail") {
+        this.recordErrorRollup(ev, now);
+      }
+
+      // SEC-101 (rescan 2026-11-03): rebuild from the field whitelist —
+      // unknown wire keys never reach the buffer, the D1 archive, or the
+      // backup lane.
+      this.d.buffer.push(
+        rebuildWhitelistedTrackEvent(ev as Record<string, unknown>) as typeof ev,
+      );
       this.d.totalEvents += eventCount;
       acceptedCount += eventCount;
       acceptedIds.push(eventId);
@@ -4574,6 +4743,61 @@ export class DownloadsDurable {
         topReasons,
       },
     });
+  }
+
+  // 1ef6.2: bounded failure rollup. Key =
+  // error_type|os|browser|ext_version|page_type|engine_mode|strategy.
+  private recordErrorRollup(ev: StoredEvent, now: number): void {
+    const rollup = this.d.errorRollup ?? {};
+    const key = [
+      ev.error_type || "unknown",
+      ev.os || "unknown",
+      ev.browser || "unknown",
+      ev.ext_version || "unknown",
+      ev.page_type || "unknown",
+      ev.engine_mode || "unknown",
+      ev.strategy || "unknown",
+    ].join("|");
+    const entry = rollup[key] ?? { count: 0, lastSeen: 0 };
+    entry.count += 1;
+    entry.lastSeen = now;
+    rollup[key] = entry;
+    const keys = Object.keys(rollup);
+    if (keys.length > ERROR_ROLLUP_CAP) {
+      let smallest: string | null = null;
+      for (const k of keys) {
+        if (smallest === null || rollup[k].count < rollup[smallest].count) {
+          smallest = k;
+        }
+      }
+      if (smallest) delete rollup[smallest];
+    }
+    this.d.errorRollup = rollup;
+  }
+
+  private async handleAdminErrorRollup(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+    const rollup = this.d.errorRollup ?? {};
+    const rows = Object.entries(rollup)
+      .map(([key, value]) => {
+        const [errorType, os, browser, extVersion, pageType, engineMode, strategy] = key.split("|");
+        return {
+          errorType,
+          os,
+          browser,
+          extVersion,
+          pageType,
+          engineMode,
+          strategy,
+          count: value.count,
+          lastSeen: value.lastSeen,
+        };
+      })
+      .sort((a, b) => b.count - a.count || b.lastSeen - a.lastSeen)
+      .slice(0, 50);
+    return json({ ok: true, rows, totalKeys: Object.keys(rollup).length, generatedAt: Date.now() });
   }
 
   private async handleAdminWebsiteStatus(request: Request): Promise<Response> {
@@ -5524,8 +5748,11 @@ export class DownloadsDurable {
    * Full DO-storage export (admin only). Portability insurance: everything the
    * DO persists (counters, queues, config, audits, archive bookkeeping) in one
    * authenticated JSON dump, so the data can leave Cloudflare anytime.
+   * `?redacted=1` drops visitor-identifying and admin-perimeter material
+   * (see redactStorageForBackup) for the public backup lane.
    */
-  private async handleAdminStorageExport(): Promise<Response> {
+  private async handleAdminStorageExport(request: Request): Promise<Response> {
+    const redacted = new URL(request.url).searchParams.get("redacted") === "1";
     const exported: Record<string, unknown> = {};
     const MAX_BYTES = 8 * 1024 * 1024;
     let totalBytes = 0;
@@ -5540,14 +5767,16 @@ export class DownloadsDurable {
       exported[key] = value;
       totalBytes += text.length;
     }
+    const storage = redacted ? redactStorageForBackup(exported) : exported;
     return json(
       {
         ok: true,
         generatedAtUtc: Date.now(),
-        keyCount: Object.keys(exported).length,
+        redacted,
+        keyCount: Object.keys(storage).length,
         totalBytes,
         truncated,
-        storage: exported,
+        storage,
       },
       { headers: { "cache-control": "no-store" } },
     );
@@ -5712,6 +5941,7 @@ export class DownloadsDurable {
       reqDailyCounts: { [today]: 0 },
       hardRemoteOff: false,
       buffer: [],
+      errorRollup: {},
       batchSeq: 0,
       eventSeq: 0,
       committedSeq: 0,

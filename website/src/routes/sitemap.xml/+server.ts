@@ -28,7 +28,7 @@ function priorityForPath(path: string): string {
 }
 
 function imageTagsForPath(path: string): string {
-  if (path !== '/' && path !== '/press-kit') return '';
+  if (path !== '/' && path !== '/brand') return '';
   const tags = SITEMAP_IMAGE_ASSET_PATHS
     .map((assetPath) => `    <image:image><image:loc>${escapeXml(toAbsoluteSiteUrl(assetPath))}</image:loc></image:image>`)
     .join('\n');

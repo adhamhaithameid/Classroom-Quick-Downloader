@@ -121,6 +121,12 @@ export async function withEdgeCache(
     try {
       const hit = await cache.match(cacheKey);
       if (hit) {
+        // Belt-and-braces: a Vary-marked entry (put-side guard) must never
+        // serve from the URL-keyed edge cache.
+        if (hit.headers.has("vary")) {
+          const fresh = await produce();
+          return fresh;
+        }
         const res = new Response(hit.body, hit);
         res.headers.set("x-cqd-cache", "hit");
         return res;
@@ -131,7 +137,11 @@ export async function withEdgeCache(
   }
 
   const produced = await produce();
-  if (produced.status === 200 && cache) {
+  // The edge cache keys by URL alone. A response that Varies by a header
+  // (e.g. a future reflected-origin route) must not be edge-cached, or one
+  // origin's variant would serve every origin.
+  const varies = produced.headers.has("vary");
+  if (produced.status === 200 && cache && !varies) {
     try {
       const cached = produced.clone();
       cached.headers.set("cache-control", `public, max-age=${ttlSeconds}`);

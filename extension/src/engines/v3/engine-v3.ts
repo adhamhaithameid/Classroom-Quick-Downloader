@@ -26,14 +26,17 @@
  * over V2's tracked posts to publish the 'api-corroboration' LayerTraces on
  * the debug/explanation surface (getApiCorroborationTrace).
  *
- * SCOPING (honest): the corroboration floor does NOT yet alter V2's rendered
- * flags — V2's per-post pipeline (ingestPost → detectFlags →
- * scoreFlagsForPost) is a private, decision-shaped stack that a
- * PostObservation-shaped detector cannot be injected into without rewriting
- * its semantics. So the detector runs REAL end-to-end here (token, snapshot,
- * per-post observe, traces) and its output is surfaced for debugging, while
- * wiring the floor into the rendered decisions is the documented follow-up
- * once the owner OAuth credential step ships (docs/engine/api-assist-setup.md).
+ * RENDERED-FLAGS WIRING (csaa.1 / p8tq, DONE — this supersedes the old
+ * "floor does not yet alter rendered flags" scoping): V2 exposes an optional
+ * `flagCorroborator` Detector that its private pipeline (ingestPost →
+ * detectFlags → scoreFlagsForPost) hands through as the optional observe
+ * path. This engine assigns its ApiDetector in the constructor and runs one
+ * V2-level fullScan after each snapshot refresh (rescanCorroboratedFlags),
+ * so badges scored before the cache was warm upgrade late-but-never-wrong.
+ * The additive-only floor contract is pinned in strategies/api-detector
+ * tests; the rendered wiring is pinned in tests/v2-flag-corroborator.test.ts.
+ * The debug-surface pass (runApiCorroborationPass → getApiCorroborationTrace)
+ * remains as the explanation surface alongside the rendered floor.
  *
  * PRIVACY (#398): token acquisition is non-interactive and happens ONLY on
  * student-work views while v3 is active — never on other views, never in the

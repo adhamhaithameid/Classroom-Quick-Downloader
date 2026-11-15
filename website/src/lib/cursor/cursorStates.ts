@@ -4,12 +4,14 @@
  * lib/actions/brandedCursor.ts; everything testable without a DOM lives
  * here, so vitest's node environment can pin the behavior (see
  * cursorStates.test.ts). Values mirror the approved prototype
- * website/prototype-cursor-v3.html: 44px glass cursor, 100ms follow lag,
- * no trailing layer, 36 states.
+ * website/prototype-cursor-v3.html: 44px glass cursor, no trailing layer,
+ * 36 states. The follow lag shipped at 100ms design / 80ms constant and was
+ * retuned to 0 (native tracking) after user feedback 2026-10-28 (bead o3ui).
  */
 
 export const CURSOR_SIZE_PX = 52;
-export const CURSOR_LAG_MS = 80;
+/** 0 = the cursor tracks the pointer natively; tau <= 0 snaps in easeExponential. */
+export const CURSOR_LAG_MS = 0;
 
 /** Arrow glyph area inside the 32-unit viewBox; drives the progress fill. */
 export const PROGRESS_FILL = { top: 11.8, bottom: 23.9 } as const;

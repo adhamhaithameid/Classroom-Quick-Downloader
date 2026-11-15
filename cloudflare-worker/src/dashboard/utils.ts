@@ -43,11 +43,21 @@ export function topKey(data?: Record<string, number>): string {
   return entries[0][0];
 }
 
+/** Escape HTML-sensitive characters; keys/values reach server-rendered markup. */
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 export function renderTableRows(data: Record<string, number>): string {
   const keys = Object.keys(data).sort((a, b) => data[b] - data[a]);
   if (keys.length === 0) return "<tr><td colspan='2'>—</td></tr>";
   return keys
-    .map((k) => `<tr><td>${k}</td><td>${data[k]}</td></tr>`)
+    .map((k) => `<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(String(data[k]))}</td></tr>`)
     .join("");
 }
 

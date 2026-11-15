@@ -27,6 +27,15 @@ export interface StoredEvent {
   ip_address?: string;
 
   /**
+   * Use-case context (1ef6.1/1ef6.2): Classroom view kind, engine mode,
+   * and acquisition strategy at request time. snake_case on the wire here;
+   * the extension sends camelCase and /track aliases it.
+   */
+  page_type?: string;
+  engine_mode?: string;
+  strategy?: string;
+
+  /**
    * Optional error code / reason for fails.
    * Example: "BROWSER_START_FAIL", "AUTH_ALL_FAILED", etc.
    */

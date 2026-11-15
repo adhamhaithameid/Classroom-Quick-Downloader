@@ -24,7 +24,7 @@
   ];
 
   const CORE_PATHS = new Set(['/', '/privacy', '/faq', '/changelog', '/site-map', '/gamification']);
-  const TRUST_PATHS = new Set(['/security', '/support', '/press-kit', '/featured']);
+  const TRUST_PATHS = new Set(['/security', '/support', '/brand', '/featured']);
 
   function normalizePath(path: string): string {
     if (!path || path === '/') return '/';
@@ -46,7 +46,7 @@
       '/gamification': 'Levels and Milestones',
       '/security': 'Security',
       '/support': 'Support',
-      '/press-kit': 'Press Kit',
+      '/brand': 'Brand kit',
       '/featured': 'Featured',
       '/watch/cqd-demo': 'CQD Demo Video',
       '/watch/manual-vs-cqd': 'Manual Vs CQD Video Comparison',

@@ -51,6 +51,8 @@ function sanitizeField(value: string, maxLen: number, pattern?: RegExp, fallback
 
 const FIELD_PATTERNS = {
   type: /^[a-z0-9._-]+$/,
+  pageType: /^[a-z0-9_-]+$/,
+  engineMode: /^[a-z0-9_-]+$/,
   browser: /^[a-z0-9._-]+$/,
   os: /^[a-z0-9._-]+$/,
   language: /^[a-z0-9-]+$/,
@@ -77,6 +79,15 @@ async function internalTrack(
     ? sanitizeField(event.error_type, 32, FIELD_PATTERNS.error)
     : undefined;
   const source = event.source ? sanitizeField(event.source, 32, FIELD_PATTERNS.source) : undefined;
+  const pageType = (event as { pageType?: unknown }).pageType
+    ? sanitizeField(String((event as { pageType?: unknown }).pageType), 20, FIELD_PATTERNS.pageType)
+    : undefined;
+  const engineMode = (event as { engineMode?: unknown }).engineMode
+    ? sanitizeField(String((event as { engineMode?: unknown }).engineMode), 12, FIELD_PATTERNS.engineMode)
+    : undefined;
+  const strategy = (event as { strategy?: unknown }).strategy
+    ? sanitizeField(String((event as { strategy?: unknown }).strategy), 16, FIELD_PATTERNS.engineMode)
+    : undefined;
 
   const fullEvent: AnalyticsEvent = {
     ...event,
@@ -88,6 +99,9 @@ async function internalTrack(
     file_type: fileType,
     error_type: errorType,
     source,
+    pageType,
+    engineMode,
+    strategy,
     id: generateEventId(safeTime.nowMs || Date.now()),
     retryCount: 0,
     download_retries: clampInt(event.download_retries ?? 0, 0, 99),
@@ -152,6 +166,9 @@ export function recordDownloadEvent(input: RecordDownloadEventInput): void {
     bypass_used: input.bypass_used ?? false,
     error_type: input.error_type,
     source: input.source,
+    pageType: input.pageType,
+    engineMode: input.engineMode,
+    strategy: input.strategy,
     download_retries: input.retries ?? 0,
   });
 }

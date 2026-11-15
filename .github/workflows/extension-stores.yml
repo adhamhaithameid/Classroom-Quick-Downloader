@@ -278,7 +278,7 @@ jobs:
           HAVE_EDGE: ${{ secrets.EDGE_CLIENT_ID != '' && secrets.EDGE_API_KEY != '' }}
         if: env.HAVE_EDGE == 'true'
         continue-on-error: true
-        uses: wdzeng/edge-addon@v2
+        uses: wdzeng/edge-addon@9881f57720358040d079eaa06a4596dc9c273eb6 # v2 (tag-pinned mutable; SHA per repo convention — it receives EDGE_API_KEY)
         with:
           product-id: ${{ secrets.EDGE_PRODUCT_ID }}
           client-id: ${{ secrets.EDGE_CLIENT_ID }}

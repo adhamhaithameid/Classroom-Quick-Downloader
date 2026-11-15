@@ -1,7 +1,7 @@
 import { SITE_URL } from '$lib/config';
 import { seoPages } from '$lib/content/seoPages';
 
-const CORE_INDEXABLE_PATHS = ['/', '/privacy', '/faq', '/changelog', '/site-map', '/gamification'] as const;
+const CORE_INDEXABLE_PATHS = ['/', '/privacy', '/faq', '/changelog', '/site-map', '/gamification', '/brand'] as const;
 const VIDEO_INDEXABLE_PATHS = ['/watch/cqd-demo', '/watch/manual-vs-cqd'] as const;
 
 export const SITE_NAME = 'Classroom Quick Downloader' as const;
@@ -62,6 +62,7 @@ export const SITE_PATH_LASTMOD: Record<string, string> = {
   '/changelog': '2026-08-22',
   '/site-map': '2026-03-22',
   '/gamification': '2026-10-09',
+  '/brand': '2026-10-31',
   '/watch/cqd-demo': '2026-03-22',
   '/watch/manual-vs-cqd': '2026-03-22',
   // Pages whose copy was corrected in the September 2026 accuracy pass.

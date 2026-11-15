@@ -112,6 +112,8 @@ async function loadFlow(options: FlowOptions = {}) {
     createIconUpdaters: () => ({ updateTabIcon: vi.fn(), updateGlobalIcon: vi.fn() }),
     isClassroomUrl: () => true,
     setActionIcon: vi.fn(),
+    setIconOverridePaths: vi.fn(),
+    setIconOverrideImageData: vi.fn(),
     GRAY_ICON_PATHS: {},
   }));
   vi.doMock('../entrypoints/background/auth-utils', () => ({
@@ -189,6 +191,10 @@ async function loadFlow(options: FlowOptions = {}) {
   chrome.runtime.onMessage.addListener = vi.fn((l: any) => {
     onMessageListeners.push(l);
   }) as never;
+  // Update-dot event registries (bead 08fg.3); the flow tests never fire them.
+  const runtimeWithEvents = chrome.runtime as any;
+  runtimeWithEvents.onInstalled = { addListener: vi.fn() };
+  runtimeWithEvents.onUpdateAvailable = { addListener: vi.fn() };
   chrome.downloads.onChanged.addListener = vi.fn((l: any) => {
     downloadChangedListeners.push(l);
   }) as never;

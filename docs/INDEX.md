@@ -54,7 +54,6 @@ Historical/point-in-time files live in `archive/`.
 ## Testing & QA
 
 - [E2E_BROWSER_MATRIX.md](E2E_BROWSER_MATRIX.md) — which browsers automate, which don't, and the local gate
-- [FOOTER_REVEAL.md](FOOTER_REVEAL.md) — footer-reveal/magnetic animation system: file map, contracts, drift traps, guards
 - [LIVE_CLASSROOM_TESTING.md](LIVE_CLASSROOM_TESTING.md) — real-classroom testing runbook
 - [CLASSROOM_FIXTURE_CAPTURE_GUIDE.md](CLASSROOM_FIXTURE_CAPTURE_GUIDE.md) — capturing classroom fixtures
 - [VISUAL_GUARDRAILS.md](VISUAL_GUARDRAILS.md) — website visual guardrail tests
