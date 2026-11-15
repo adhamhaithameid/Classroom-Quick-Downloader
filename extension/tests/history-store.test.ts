@@ -148,3 +148,37 @@ describe('history store (0h4d.1.6)', () => {
     );
   });
 });
+
+// ============================================================================
+// Census live issue (bead from the 2026-11-14 audit): recordDownloadHistory
+// used to load-append-save without a chain, so two settles in the same tick
+// both read the same entries and the second save dropped the first row.
+// The store now serializes on a promise chain (same pattern as
+// download-stats countChain).
+// ============================================================================
+describe('history write serialization', () => {
+  function useRealMapStorage(): void {
+    const store = new Map<string, unknown>();
+    (chrome.storage.local.get as any) = vi.fn(
+      (keys: unknown, cb: (r: unknown) => void) => {
+        const res: Record<string, unknown> = {};
+        const list = Array.isArray(keys) ? keys : [keys];
+        for (const k of list) if (store.has(k)) res[k] = store.get(k);
+        cb(res);
+      },
+    );
+    (chrome.storage.local.set as any) = vi.fn((kv: Record<string, unknown>, cb?: () => void) => {
+      for (const [k, v] of Object.entries(kv)) store.set(k, v);
+      cb?.();
+    });
+  }
+
+  it('keeps both rows when two settles land in the same tick', async () => {
+    useRealMapStorage();
+    const first = recordDownloadHistory(makePending({ requestId: 'req-b' }), 'success');
+    const second = recordDownloadHistory(makePending({ requestId: 'req-c' }), 'success');
+    await Promise.all([first, second]);
+    const entries = await getHistory();
+    expect(entries.map((e) => e.id).sort()).toEqual(['req-b', 'req-c']);
+  });
+});
