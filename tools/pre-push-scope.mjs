@@ -65,6 +65,18 @@ function git(args, { allowFail = false } = {}) {
   return { out: (r.stdout || '').trim(), ok: r.status === 0 };
 }
 
+// Bare `origin/main` resolves ambiguously here (a stray local branch carried
+// that name until 2026-11-15), so upstream comparisons always use the
+// fully-qualified ref. See bead 942e.
+export const UPSTREAM_REF = 'refs/remotes/origin/main';
+
+/** Merge base of HEAD against upstream main, or null when undeterminable
+ * (null keeps the full-gate fallback). Injectable runner for tests. */
+export function resolveMergeBase(gitRunner = git) {
+  const r = gitRunner(['merge-base', 'HEAD', UPSTREAM_REF], { allowFail: true });
+  return r.ok && r.out ? r.out : null;
+}
+
 function main() {
   const printOnly = process.argv.includes('--plan');
 
@@ -75,9 +87,9 @@ function main() {
   const pushingToProduction = pushedRefs.includes('refs/heads/production');
 
   const fullGateEnv = process.env.CQD_FULL_GATE === '1';
-  const mergeBase = git(['merge-base', 'HEAD', 'origin/main'], { allowFail: true });
-  const hasBase = mergeBase.ok && !!mergeBase.out;
-  const changedFiles = hasBase ? git(['diff', '--name-only', `${mergeBase.out}`, 'HEAD']).out.split('\n').filter(Boolean) : [];
+  const mergeBase = resolveMergeBase();
+  const hasBase = mergeBase !== null;
+  const changedFiles = hasBase ? git(['diff', '--name-only', mergeBase, 'HEAD']).out.split('\n').filter(Boolean) : [];
 
   const plan = buildPlan({ changedFiles, pushingToMain, pushingToProduction, fullGateEnv, hasBase });
 
