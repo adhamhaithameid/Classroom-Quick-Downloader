@@ -129,6 +129,9 @@ async function loadDownloadHandler(options: LoadOptions = {}): Promise<TestConte
   vi.doMock('../entrypoints/background/state', () => stateModule);
   vi.doMock('../entrypoints/background/auth-utils', () => ({
     extractAuthUserFromUrl: extractAuthSpy,
+    // pwug slice 1: machineFor reads the drive file id for the machine's
+    // FileRef; the id never affects sweep decisions.
+    extractDriveFileId: () => null,
   }));
   vi.doMock('../entrypoints/background/url-helpers', () => ({
     normalizeUrl: normalizeUrlSpy,
@@ -256,10 +259,10 @@ describe('background download handler', () => {
   });
 
   it('startNextDriveAttempt fails when all auth users are exhausted', async () => {
-    const ctx = await loadDownloadHandler({ authCandidates: [0, 1] });
+    const ctx = await loadDownloadHandler({});
     const pending = makePending({
       isDrive: true,
-      attemptedAuthUsers: [0, 1],
+      attemptedAuthUsers: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
     });
     ctx.mod.startNextDriveAttempt(pending);
     expect(ctx.sendStatusSpy).toHaveBeenCalledWith(
@@ -273,10 +276,10 @@ describe('background download handler', () => {
   });
 
   it('startNextDriveAttempt uses unknown type for exhausted auth when metadata is missing', async () => {
-    const ctx = await loadDownloadHandler({ authCandidates: [0] });
+    const ctx = await loadDownloadHandler({});
     const pending = makePending({
       isDrive: true,
-      attemptedAuthUsers: [0],
+      attemptedAuthUsers: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
       fileMeta: undefined as any,
     });
     ctx.mod.startNextDriveAttempt(pending);
@@ -287,13 +290,15 @@ describe('background download handler', () => {
   });
 
   it('startNextDriveAttempt downloads natively in Firefox mode (zero-tab contract)', async () => {
-    const ctx = await loadDownloadHandler({ isFirefox: true, authCandidates: [3] });
+    const ctx = await loadDownloadHandler({ isFirefox: true });
     const pending = makePending({ isDrive: true, attemptedAuthUsers: [] });
     ctx.stateModule.registerPending(pending); // D11: binds require authority
     ctx.mod.startNextDriveAttempt(pending);
-    expect(pending.currentAuthUser).toBe(3);
+    // The real candidate table rotates from 0 (the specific account is
+    // incidental to the zero-tab contract under test).
+    expect(pending.currentAuthUser).toBe(0);
     expect(chrome.downloads.download).toHaveBeenCalledWith(
-      expect.objectContaining({ url: expect.stringContaining('authuser=3') }),
+      expect.objectContaining({ url: expect.stringContaining('authuser=0') }),
       expect.any(Function),
     );
     expect(chrome.tabs.create).not.toHaveBeenCalled();

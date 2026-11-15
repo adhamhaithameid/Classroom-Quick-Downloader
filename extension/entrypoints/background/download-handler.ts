@@ -10,11 +10,15 @@ import {
   registerPending,
   bindDownloadId,
   pendingByUrlAdd,
-  AUTHUSER_CANDIDATES,
 } from './state';
 import { sanitizeFileName } from '../../src/core/name/sanitize';
-import { extractAuthUserFromUrl } from './auth-utils';
+import { extractAuthUserFromUrl, extractDriveFileId } from './auth-utils';
 import { normalizeUrl, buildUrlWithAuthUser, getFilenameExt } from './url-helpers';
+import {
+  nextAcquireState,
+  type AcquireEffect,
+  type AcquireMachineState,
+} from '../../src/core/acquire/state-machine';
 import { cleanup } from './cleanup';
 import { sendStatusToTab } from './message-sender';
 import { recordDownloadEvent } from '../utils/analytics';
@@ -196,17 +200,49 @@ export function startSingleAttempt(
 }
 
 /**
+ * The pure acquire machine decides the account sweep (pwug slice 1, the
+ * no-dead-ends corpus's Phase-3 differential contract): 'auth-attempt-failed'
+ * keeps today's rotate-to-next-account semantics for every caller — richer
+ * per-cause semantics (transient-failed retry bounds) are later slices. The
+ * registry flags mirror the machine's decision; the URL builders and the
+ * index.ts retry path read them.
+ */
+function machineFor(pending: PendingDownload): AcquireMachineState {
+  return {
+    phase: 'drive-auth',
+    requestId: pending.requestId,
+    file: { fileId: extractDriveFileId(pending.baseUrl) ?? '', url: pending.baseUrl },
+    nameHint: {
+      preferredStem: pending.fileMeta?.name ?? 'classroom_download',
+      ext: pending.fileMeta?.ext ?? '',
+      source: 'title',
+    },
+    isDrive: true,
+    attemptedAuthUsers: pending.attemptedAuthUsers,
+    authUser: pending.currentAuthUser,
+  };
+}
+
+/**
  * Try the next auth user for a Drive download.
  * Cycles through authuser=0..9 to find one with access.
  */
 export function startNextDriveAttempt(pending: PendingDownload): void {
   pending.htmlSeen = false;
 
-  const nextAuth = AUTHUSER_CANDIDATES.find(
-    (n) => !pending.attemptedAuthUsers.includes(n)
+  const { state: swept, effects } = nextAcquireState(machineFor(pending), {
+    type: 'auth-attempt-failed',
+  });
+  pending.attemptedAuthUsers = swept.attemptedAuthUsers;
+  const settle = effects.find(
+    (e): e is Extract<AcquireEffect, { type: 'settle' }> => e.type === 'settle',
   );
+  const begin = effects.find(
+    (e): e is Extract<AcquireEffect, { type: 'begin-strategy' }> => e.type === 'begin-strategy',
+  );
+  const nextAuth = begin?.authUser;
 
-  if (nextAuth == null) {
+  if (settle?.outcome.status === 'auth-exhausted' || nextAuth == null) {
     // Terminal after every signed-in account was tried: the next honest step
     // is for the user to confirm access directly in Drive.
     sendStatusToTab(
@@ -230,7 +266,6 @@ export function startNextDriveAttempt(pending: PendingDownload): void {
     return;
   }
 
-  pending.attemptedAuthUsers.push(nextAuth);
   pending.currentAuthUser = nextAuth;
 
   // Both browsers download natively: the usercontent byte-serving endpoint
