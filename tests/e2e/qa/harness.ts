@@ -285,6 +285,44 @@ export async function launchQaContext(
     context.on("serviceworker", (worker) => {
       console.log(`[qa-console] service worker started: ${worker.url().slice(0, 80)}`);
     });
+    // w5r6 round 6: split "Firefox disabled the signed MV2 add-on" (newer
+    // bundled Firefox retiring MV2 — survey #822's reporter runs 157/158)
+    // from "the xpi never reached the profile" (install drift). extensions.json
+    // answers it directly: an entry with appDisabled=true is mechanism A, no
+    // entry for the signed id is mechanism B. Firefox writes extensions.json
+    // shortly after startup, so this dumps on a delay rather than eagerly.
+    console.log(`[qa-console] firefox version: ${firefox.version()}`);
+    setTimeout(() => {
+      try {
+        const extDir = path.join(FIREFOX_PROFILE_DIR, "extensions");
+        const files = fs.existsSync(extDir) ? fs.readdirSync(extDir) : [];
+        console.log(`[qa-console:profile] extensions dir (${files.length}): ${files.slice(0, 6).join(", ")}`);
+        const ejPath = path.join(FIREFOX_PROFILE_DIR, "extensions.json");
+        if (fs.existsSync(ejPath)) {
+          const ej = JSON.parse(fs.readFileSync(ejPath, "utf8")) as {
+            addons?: Array<{
+              id?: string;
+              active?: boolean;
+              appDisabled?: boolean;
+              signedState?: number;
+              version?: string;
+            }>;
+          };
+          const addons = (ej.addons ?? []).map((a) => ({
+            id: a.id?.slice(0, 60),
+            active: a.active,
+            appDisabled: a.appDisabled,
+            signedState: a.signedState,
+            version: a.version,
+          }));
+          console.log(`[qa-console:profile] addons: ${JSON.stringify(addons)}`);
+        } else {
+          console.log("[qa-console:profile] no extensions.json in profile yet");
+        }
+      } catch (e) {
+        console.log(`[qa-console:profile] probe failed: ${String(e).slice(0, 160)}`);
+      }
+    }, 12_000);
   }
 
   let extensionAvailable = true;
