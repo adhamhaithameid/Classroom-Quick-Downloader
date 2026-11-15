@@ -33,6 +33,8 @@ import type { AssertionResult, QaBrowser, QaCheckResult, QaStatus } from "./qa-t
 const REPO_ROOT = path.resolve(__dirname, "../../..");
 export const CHROMIUM_EXTENSION_PATH = path.join(REPO_ROOT, "extension/.output/chrome-mv3");
 export const FIREFOX_PROFILE_DIR = path.join(REPO_ROOT, "tests/e2e/.firefox-profile");
+/** Built unpacked Firefox MV2 extension — the path the debugging-protocol install reads. */
+export const FIREFOX_EXTENSION_DIR = path.join(REPO_ROOT, "extension", ".output", "firefox-mv2");
 export const ARTIFACTS_ROOT = path.join(REPO_ROOT, "qa-artifacts");
 
 // ---------------------------------------------------------------------------
@@ -201,9 +203,12 @@ export async function launchQaContext(
           ? // Playwright's bundled Firefox sanitizes the profile at startup and
             // never scans a pre-seeded extensions/ dir (w5r6 evidence: run
             // 43708840367 — extensions dir empty, extensions.json lists only
-            // Mozilla built-ins). Install the signed xpi through Firefox's own
-            // remote-debugging protocol instead.
-            withExtension(firefox, signedXpiPath).launchPersistentContext(FIREFOX_PROFILE_DIR, {
+            // Mozilla built-ins). Install the built UNPACKED firefox-mv2 dir
+            // through Firefox's remote-debugging protocol instead: the lib
+            // reads <path>/manifest.json, so an .xpi file fails with ENOTDIR
+            // (run 43719261151), and a temporary protocol install ignores
+            // signing, which is exactly what the QA leg wants.
+            withExtension(firefox, FIREFOX_EXTENSION_DIR).launchPersistentContext(FIREFOX_PROFILE_DIR, {
               headless: true,
               acceptDownloads: true,
               ignoreHTTPSErrors: true,
