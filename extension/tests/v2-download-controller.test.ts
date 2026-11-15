@@ -229,16 +229,18 @@ describe('download controller (page side)', () => {
     expect(seen).toEqual([requestId]);
   });
 
-  it('a request that never settles watchdogs the button to an honest error after 45 s (V1 parity)', () => {
+  it('a request that never settles watchdogs the button through trying to an honest error (V1 parity, two stages)', () => {
     const requested: Array<PageTopicMap['download:requested']> = [];
     bus.subscribe('download:requested', (p) => requested.push(p));
     const btn = makeButton();
     handleSingleDownloadClickV2(btn, 'drive-F1', btn.dataset.cqdUrl!, 'lecture.pdf', 'pdf');
     expect(getButtonStateV2(btn)).toBe('loading');
 
-    // No download:settled ever arrives — V1's student-work watchdog (45 s).
+    // No download:settled ever arrives — 45 s demotes, 90 s settles honestly.
     vi.advanceTimersByTime(45_000);
+    expect(getButtonStateV2(btn)).toBe('trying');
 
+    vi.advanceTimersByTime(45_000);
     expect(getButtonStateV2(btn)).toBe('error');
     expect(btn.querySelector('.cqd-error-detail')?.textContent).toBe(
       'Download did not finish in time. Please retry.',
@@ -268,4 +270,61 @@ describe('download controller (page side)', () => {
     setButtonStateV2(btn, 'idle'); // reset always applies
     expect(getButtonStateV2(btn)).toBe('idle');
   });
+
+    it('the first silent window demotes to trying and keeps the request in flight', () => {
+      const requested: Array<PageTopicMap['download:requested']> = [];
+      bus.subscribe('download:requested', (p) => requested.push(p));
+      const btn = makeButton();
+      handleSingleDownloadClickV2(btn, 'drive-F1', btn.dataset.cqdUrl!, 'lecture.pdf', 'pdf');
+  
+      vi.advanceTimersByTime(45_000);
+  
+      expect(getButtonStateV2(btn)).toBe('trying');
+      expect(isRequestInFlight(requested[0].requestId)).toBe(true);
+    });
+  
+    it('a settle landing after the demote stage still applies', () => {
+      const requested: Array<PageTopicMap['download:requested']> = [];
+      bus.subscribe('download:requested', (p) => requested.push(p));
+      const btn = makeButton();
+      handleSingleDownloadClickV2(btn, 'drive-F1', btn.dataset.cqdUrl!, 'lecture.pdf', 'pdf');
+  
+      vi.advanceTimersByTime(45_000); // demote: the queued request finally starts
+      bus.publish('download:settled', { requestId: requested[0].requestId, outcome: { status: 'saved' } });
+  
+      expect(getButtonStateV2(btn)).toBe('success');
+      expect(isRequestInFlight(requested[0].requestId)).toBe(false);
+    });
+  
+    it('the second silent window settles honestly to error (90 s total silence)', () => {
+      const requested: Array<PageTopicMap['download:requested']> = [];
+      bus.subscribe('download:requested', (p) => requested.push(p));
+      const btn = makeButton();
+      handleSingleDownloadClickV2(btn, 'drive-F1', btn.dataset.cqdUrl!, 'lecture.pdf', 'pdf');
+  
+      vi.advanceTimersByTime(90_000);
+  
+      expect(getButtonStateV2(btn)).toBe('error');
+      expect(btn.querySelector('.cqd-error-detail')?.textContent).toBe(
+        'Download did not finish in time. Please retry.',
+      );
+      expect(isRequestInFlight(requested[0].requestId)).toBe(false);
+    });
+  
+    it('cancel still works during the demoted stage', () => {
+      const requested: Array<PageTopicMap['download:requested']> = [];
+      bus.subscribe('download:requested', (p) => requested.push(p));
+      const btn = makeButton();
+      const requestId = handleSingleDownloadClickV2(btn, 'drive-F1', btn.dataset.cqdUrl!, 'lecture.pdf', 'pdf');
+  
+      vi.advanceTimersByTime(45_000); // demoted to trying
+      cancelInFlight(btn);
+  
+      expect(getButtonStateV2(btn)).toBe('cancelled');
+      expect(isRequestInFlight(requestId!)).toBe(false);
+      expect(sendMessage).toHaveBeenCalledWith(
+        { type: 'CQD_CANCEL_DOWNLOAD', requestId },
+        expect.any(Function),
+      );
+    });
 });

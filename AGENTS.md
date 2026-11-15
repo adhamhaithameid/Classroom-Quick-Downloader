@@ -112,7 +112,9 @@ Workflow facts:
   idle wait once) and its exit code masks the real one.
 - Pre-push gate PATH — the hook self-heals this into its own environment, but
   for manual gate runs export:
-  `export PATH="/opt/homebrew/opt/openssl/bin:$HOME/.local/bin:/usr/local/opt/go/bin:$PATH"`
+  `export PATH="/opt/homebrew/opt/openssl/bin:$HOME/.local/bin:$PATH"`
+  (go lives in `~/.local/bin` when needed; the gate chains no longer run
+  oracle legs — see docs/adr/0009.)
   The gate is scoped: it runs only the workspaces your push touches
   (`tools/pre-push-scope.mjs`); full gate for main pushes or `CQD_FULL_GATE=1`.
 - Commits are commitlint-checked (conventional): subject lowercase after
