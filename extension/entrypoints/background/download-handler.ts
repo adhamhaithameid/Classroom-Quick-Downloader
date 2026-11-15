@@ -9,6 +9,7 @@ import type { FileMetaMsg, PendingDownload } from './types';
 import {
   registerPending,
   bindDownloadId,
+  pendingByUrlAdd,
   AUTHUSER_CANDIDATES,
 } from './state';
 import { sanitizeFileName } from '../../src/core/name/sanitize';
@@ -100,6 +101,12 @@ export function startDownloadWithTimeout(
   handleStart: StartHandler,
   onTimeout: () => void,
 ): void {
+  // #878 (oso5): the URL bucket must cover every URL the download can arrive
+  // under, authuser-rotated attempt URLs included. Otherwise the filename
+  // suggestion misses during the bind race and Chrome falls back to its bare
+  // `download` stem (the download1, download2… junk the user reported).
+  // Re-registering the baseUrl is a no-op: buckets are Sets of pendings.
+  pendingByUrlAdd(url, pending);
   let settled = false;
   const timer = setTimeout(() => {
     // No settled re-check here: both settle paths (callback, sync throw)

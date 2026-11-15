@@ -632,8 +632,15 @@ export default defineBackground(() => {
             cancelledByUs.add(delta.id);
             chrome.downloads.cancel(delta.id, () => {
               const _e = chrome.runtime.lastError;
-              chrome.downloads.erase({ id: delta.id }, () => {
-                const _e2 = chrome.runtime.lastError;
+              // #878 (oso5): erase drops the LIST entry only — the completed
+              // HTML body stays on disk and accumulates as download(1..9)
+              // junk. removeFile first (valid on completed downloads), then
+              // erase the entry.
+              chrome.downloads.removeFile(delta.id, () => {
+                const _eRem = chrome.runtime.lastError;
+                chrome.downloads.erase({ id: delta.id }, () => {
+                  const _e2 = chrome.runtime.lastError;
+                });
               });
               unbindDownloadId(delta.id);
               handleForbiddenFailure(pending);
@@ -649,8 +656,13 @@ export default defineBackground(() => {
             cancelledByUs.add(delta.id);
             chrome.downloads.cancel(delta.id, () => {
               const _e3 = chrome.runtime.lastError;
-              chrome.downloads.erase({ id: delta.id }, () => {
-                const _e4 = chrome.runtime.lastError;
+              // #878 (oso5): same disk hygiene as the HTML path — the
+              // truncated partial must leave the disk, not only the list.
+              chrome.downloads.removeFile(delta.id, () => {
+                const _eRem = chrome.runtime.lastError;
+                chrome.downloads.erase({ id: delta.id }, () => {
+                  const _e4 = chrome.runtime.lastError;
+                });
               });
               unbindDownloadId(delta.id);
               handleSizeMismatch(pending);
