@@ -38,6 +38,8 @@ interface PendingEntry {
   startedAt: number;
   /** Settle watchdog (V1 student-work parity): fires when no settled ever lands. */
   watchdog: ReturnType<typeof setTimeout> | null;
+  /** True after the first silent window demoted the button to 'trying'. */
+  watchdogEscalated?: boolean;
 }
 
 const pending = new Map<RequestId, PendingEntry>();
@@ -267,6 +269,16 @@ function armSettleWatchdog(requestId: RequestId, button: HTMLButtonElement): Ret
   return setTimeout(() => {
     const entry = pending.get(requestId);
     if (!entry || entry.button !== button) return; // already settled/cancelled
+    // Stage 1: total silence so far may just mean the request is still
+    // queued behind the background's concurrency cap — demote to 'trying'
+    // (still working) and re-arm once. Stage 2 (90 s of silence) settles
+    // honestly. (census live issue: the 45 s watchdog raced queue admission)
+    if (!entry.watchdogEscalated) {
+      entry.watchdogEscalated = true;
+      setButtonStateV2(button, 'trying');
+      entry.watchdog = armSettleWatchdog(requestId, button);
+      return;
+    }
     pending.delete(requestId);
     clearSettleWatchdog(entry);
     // Settle honestly: the pipeline never answered, say so on the button.
