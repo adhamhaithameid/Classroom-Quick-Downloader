@@ -81,7 +81,7 @@ test and the shared `AcquireOutcome` vocabulary.
 | V2 single-file controller | `src/v2/render/download-controller.ts:265` | Map membership, watchdog timer, sequence counter | The 45 s watchdog races queue admission. A request queued behind three active downloads can legitimately exceed 45 s; the button errors while the background later completes the download. Runtime race, needs a test. |
 | V2 button state | `src/v2/render/button-state.ts:38` | CSS classes read back; union only for parameters | Weaker gate than V1: no hover rule. The `cancel` state is never set by anyone. |
 | V2 group run machine | `src/v2/render/download-all-controller.ts:128` | Per-file union plus run flags and timers | A button re-rendered by the engine mid-run tears the run UI down while in-flight downloads continue. |
-| Shared V1 group machine | `src/download-all/refresh.ts:102` | Boolean clusters, WeakMaps, dirty set | Verified divergence from the entrypoint fork: still seeds the sticky `inProgress` flag that the entrypoint fork removed as the #537 hang fix. The student-work stacks run this variant. |
+| Shared V1 group machine | `src/download-all/refresh.ts:102` | Boolean clusters, WeakMaps, dirty set | Verified divergence from the entrypoint fork: still seeds the sticky `inProgress` flag that the entrypoint fork removed as the #537 hang fix. The student-work stacks run this variant. Correction 2026-11-15: the `failed` flag was already sticky via the `someError = file.failed` seed; only the `inProgress` seeding and the missing mid-run re-flush diverged. Both fixed on PR #882 with a pinned regression suite. |
 | Classroom-wide run | `src/v2/render/classroom-download-controller.ts:201` | Module `run` field, counters, request-id set | No phase between "stopping" and "stopped". Published files keep downloading after the stop click; the label is the only difference. |
 | Copyright gate | `src/v2/render/copyright-reminder.ts:51` | Persisted boolean plus singleton dialog | Gate await sits after the stop-branch check, so a stop click cannot land while a gate dialog is open. |
 | Keyword cache | `src/v2/decision/keyword-loader.ts:131` | Map, `lastActivity` timestamp, 60 s idle timer | A scan that runs past 60 s without touching the getters re-triggers loads. Correct, but a silent perf cliff. |
@@ -240,7 +240,9 @@ Ranked. Each converges many rows onto one shape.
 
 1. **Align or delete the `src/download-all` fork.** Carry the #537 fix into
    the shared fork, or route the student-work stacks through the entrypoint
-   fork. Smallest change with the largest bug-shaped payoff.
+   fork. Smallest change with the largest bug-shaped payoff. Landed
+   2026-11-15 on PR #882: live-`inProgress` seeding plus a bounded trailing
+   flush while a group is active.
 2. **Converge the download lifecycle on the existing reducer.**
    `core/acquire/state-machine.ts` already models phases, authuser rotation,
    and retry bounds. Move the production background onto it and delete the
