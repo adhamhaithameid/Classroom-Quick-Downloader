@@ -550,6 +550,21 @@
     };
   }
 
+  // The map-prompt typewriter chains bare timeouts; track them so teardown
+  // cannot leave the chain mutating state after unmount.
+  let promptTimers: ReturnType<typeof setTimeout>[] = [];
+  const promptTimeout = (fn: () => void, ms: number): void => {
+    const id = setTimeout(() => {
+      promptTimers = promptTimers.filter((t) => t !== id);
+      fn();
+    }, ms);
+    promptTimers.push(id);
+  };
+  function clearPromptTimers(): void {
+    for (const id of promptTimers) clearTimeout(id);
+    promptTimers = [];
+  }
+
   function onMapYes() {
     if (sillyAnswered) return;
     trackWebsiteEvent({
@@ -586,16 +601,16 @@
         idx++;
         const char = msg[idx - 1];
         const speed = char === ' ' ? 30 : char === '?' ? 200 : 40 + Math.random() * 30;
-        setTimeout(type, speed);
+        promptTimeout(type, speed);
       } else {
         // Dramatic pause, then emoji
-        setTimeout(() => {
+        promptTimeout(() => {
           noTypedText = msg + ' 🚀';
-          setTimeout(() => { noShowCta = true; }, 400);
+          promptTimeout(() => { noShowCta = true; }, 400);
         }, 500);
       }
     };
-    setTimeout(type, 300); // brief pause before typing starts
+    promptTimeout(type, 300); // brief pause before typing starts
   }
 
   function formatNumber(v: number | null): string {
@@ -720,7 +735,10 @@
       if (offset > maxBound) offset -= setW;
     };
 
-    /* Auto-scroll tick */
+    /* Auto-scroll tick — driven by the visibility observer below: the loop
+     * parks itself offscreen instead of transforming at 60 fps forever. */
+    let parked = true;
+    let coastRafId = 0;
     const tick = (ts: number) => {
       if (!isDragging && !isCoasting) {
         const setW = getSetWidth();
@@ -733,7 +751,7 @@
           applyTransform();
         }
       }
-      rafId = requestAnimationFrame(tick);
+      if (!parked) rafId = requestAnimationFrame(tick);
     };
 
     /* Pointer drag */
@@ -774,21 +792,35 @@
       if (Math.abs(v) > 0.5) {
         isCoasting = true;
         const coast = () => {
-          if (Math.abs(v) < 0.5) { isCoasting = false; lastTime = 0; return; }
+          if (Math.abs(v) < 0.5 || parked) { isCoasting = false; lastTime = 0; return; }
           offset += v;
           normalize();
           applyTransform();
           v *= 0.92;
-          requestAnimationFrame(coast);
+          coastRafId = requestAnimationFrame(coast);
         };
-        requestAnimationFrame(coast);
+        coastRafId = requestAnimationFrame(coast);
       } else {
         lastTime = 0;
       }
     };
 
+    const marqueeVisibility = new IntersectionObserver((entries) => {
+      const visible = entries.some((e) => e.isIntersecting);
+      if (visible === parked) {
+        parked = !visible;
+        if (!parked) {
+          lastTime = 0;
+          rafId = requestAnimationFrame(tick);
+        } else {
+          cancelAnimationFrame(rafId);
+          lastTime = 0;
+        }
+      }
+    });
+    marqueeVisibility.observe(viewport);
+
     setInitialOffset();
-    rafId = requestAnimationFrame(tick);
     window.addEventListener('resize', setInitialOffset);
     viewport.addEventListener('pointerdown', onDown);
     viewport.addEventListener('pointermove', onMove);
@@ -797,6 +829,8 @@
 
     return () => {
       cancelAnimationFrame(rafId);
+      cancelAnimationFrame(coastRafId);
+      marqueeVisibility.disconnect();
       window.removeEventListener('resize', setInitialOffset);
       viewport.removeEventListener('pointerdown', onDown);
       viewport.removeEventListener('pointermove', onMove);
@@ -1515,6 +1549,8 @@
       if (typeof stopReveal === 'function') stopReveal();
       if (statusTimer) clearTimeout(statusTimer);
       document.body.classList.remove('l2-map-modal-open');
+      document.body.classList.remove('l2-media-modal-open');
+      clearPromptTimers();
     };
   });
 
