@@ -3721,6 +3721,26 @@ export class DownloadsDurable {
       });
     }
 
+    // 7d1o: an earlier unrelated alarm (changelog sync, midnight catch-up)
+    // consumes the DO's single alarm slot, and the midnight re-arm above is
+    // the only writer left when this alarm ends. A retry already recorded
+    // with a future due-time would then slip to the midnight catch-up,
+    // delaying flushed data by up to ~24h. Re-arm the earliest still-future
+    // retry due-time across both queues (scheduleAlarmAtEarliest keeps any
+    // even-earlier alarm that a late writer raced in).
+    const pendingRetryDueAt: number[] = [];
+    if (this.d.retryState?.nextRetryAt && this.d.retryState.nextRetryAt > now) {
+      pendingRetryDueAt.push(this.d.retryState.nextRetryAt);
+    }
+    for (const batch of this.d.websiteTelemetryQueue) {
+      if (batch.nextRetryAtUtc && batch.nextRetryAtUtc > now) {
+        pendingRetryDueAt.push(batch.nextRetryAtUtc);
+      }
+    }
+    if (pendingRetryDueAt.length > 0) {
+      await this.scheduleAlarmAtEarliest(Math.min(...pendingRetryDueAt));
+    }
+
     const health = this.buildPipelineHealthPayload(now);
     this.state.waitUntil(this.notifyHealthIfNeeded(health).catch(() => {}));
   }
