@@ -9,6 +9,7 @@
 ## Table of Contents
 
 - [Quick Start](#quick-start)
+- [The Verification Bar](#the-verification-bar)
 - [Latest Major Scan Snapshot (2026-02-28)](#latest-major-scan-snapshot-2026-02-28)
 - [Project Structure](#project-structure)
 - [Extension Tests (Vitest)](#extension-tests-vitest)
@@ -43,6 +44,54 @@ cd oracle-backend && go test ./...            # Oracle Backend Go tests
 # Enforce coverage gates
 pnpm -C extension test:coverage:all           # Critical + runtime 100 % gates
 ```
+
+## The Verification Bar
+
+Decision bead sqa9.5 (2026-11-15). "No bugs anywhere" is unprovable, so the
+bar is honest and runnable:
+
+> Zero known bugs. Every known bug carries a regression test. Every blocking
+> tier is green.
+
+### Tiers
+
+| Tier | Gates | Blocks |
+| --- | --- | --- |
+| Per-merge | Required CI checks: Extension Tests & Coverage, Website Checks, Cloudflare Worker Tests & Lint, the three build legs, CodeQL, dependency audits, Attribution Guard, gosec | Every PR |
+| Per-push | The scoped pre-push gate (`tools/pre-push-scope.mjs`) runs only the workspaces the push touches | Every push |
+| Per-release | The mega-e2e pre-deploy gate blocks all store publishes. `production.yml` needs the production-environment approval | Every release |
+| Advisory | svelte-check CSS warnings; mutation testing (scope-gated, PR only); Socket Security; the nightly full suite; E2E legs beyond Chromium while signed-Firefox coverage restores (bead w5r6) | Nothing |
+| Manual | Live-Classroom HITL check before every store publish; CWS token preflight (bead hvty) | Release |
+
+### Out-of-reach classes
+
+These stay outside the bar, stated plainly:
+
+- Google Classroom DOM drift. Fixtures, characterization tests, and selector
+  stats soften it; they cannot end it.
+- Real-network flakiness. Live journeys need a real signed-in account.
+- Third-party store review behavior. Reviews arrive on the store's schedule.
+- The Playwright-bundled Firefox environment. bead w5r6 tracks the signed
+  Firefox QA coverage.
+
+### The runnable checklist
+
+Run these from the repo root. Each command must end with exit code 0.
+
+```bash
+pnpm -C extension test:coverage:all   # the CI coverage gate
+pnpm -C website test                  # website suite
+pnpm -C cloudflare-worker test        # worker suite
+pnpm test:e2e                         # Chromium E2E (per-merge tier)
+scripts/check --changed               # scoped local gate for your diff
+```
+
+Then check `gh pr checks <number>` before merge, and keep the nightly full
+suite green on main. The live-Classroom HITL check happens before any store
+publish; no automation replaces it.
+
+The Gemini key rotation (bead 5w5) closed 2026-09-24. It stays standalone and
+is not part of this bar.
 
 ## Phase 12 + 13 Execution
 
