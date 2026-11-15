@@ -85,7 +85,7 @@ import { sanitizeFileName } from '../../core/name/sanitize';
 import { injectV2Styles, removeV2Styles } from '../../v2/render/button-styles';
 import { renderFlagBadge, removeAllV2Badges } from '../../v2/render/flag-renderer';
 import { removeFlagStyles } from '../../v2/render/flag-styles';
-import { validateBatch, clearInstabilityState } from '../../v2/repair/deep-validator';
+import { validateBatch, createInstabilityTracker, type InstabilityTracker } from '../../v2/repair/deep-validator';
 import { getPageDomPort } from '../../adapters/dom/mutation-observer-dom-port';
 import { CorrectionQueue } from '../../v2/repair/correction-queue';
 import { BudgetController } from '../../v2/telemetry/budget-controller';
@@ -172,7 +172,8 @@ export class EngineV2 implements CQDEngine {
   private totalScanMs = 0;
 
   // -- Phase 5: Repair + Telemetry --
-  private correctionQueue = new CorrectionQueue();
+  private readonly instability: InstabilityTracker = createInstabilityTracker();
+  private correctionQueue = new CorrectionQueue(this.instability);
   private budgetController = new BudgetController();
   private performanceMonitor = new PerformanceMonitor();
   private deepValidationScheduled = false;
@@ -218,7 +219,7 @@ export class EngineV2 implements CQDEngine {
     this.correctionQueue.flush();
     this.budgetController.reset();
     this.performanceMonitor.reset();
-    clearInstabilityState();
+    this.instability.clear();
 
     // Set up correction handler
     this.correctionQueue.setHandler((item) => this.handleCorrection(item));
@@ -260,7 +261,7 @@ export class EngineV2 implements CQDEngine {
 
     // Flush Phase 5 systems
     this.correctionQueue.flush();
-    clearInstabilityState();
+    this.instability.clear();
     this.deepValidationScheduled = false;
 
     // Clear all state
@@ -1118,6 +1119,7 @@ export class EngineV2 implements CQDEngine {
       undefined, // viewport zone getter (would come from orchestrator)
       timeRemaining,
       this.signal ?? undefined,
+      this.instability,
     );
 
     const elapsed = this.performanceMonitor.stopTimer('deepValidation');

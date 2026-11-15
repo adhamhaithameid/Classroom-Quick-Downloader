@@ -5,6 +5,9 @@ on:
     branches: [main, master, Not_Stable]
   pull_request:
     branches: [main, master, Not_Stable]
+  # The signed-Firefox QA leg gates on workflow_dispatch (AMO flood
+  # control); dispatching also re-runs it against any ref on demand.
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}

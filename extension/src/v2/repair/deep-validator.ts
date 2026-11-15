@@ -129,69 +129,63 @@ const MIN_TIME_REMAINING_MS = 2;
 // INSTABILITY TRACKER
 // ============================================================================
 
-/**
- * Tracks which elements have been corrected recently.
- * Key: element ID (postId or postId:fileId), Value: correction timestamps.
- */
-const correctionHistory = new Map<string, number[]>();
-
-/**
- * Elements marked as unstable (too many corrections in short time).
- */
-const unstableElements = new Set<string>();
-
-/**
- * Record a correction attempt for an element.
- * Returns true if the element is now unstable (should be skipped).
- */
-export function recordCorrection(elementId: string): boolean {
-  const now = Date.now();
-
-  // Get or create history
-  let history = correctionHistory.get(elementId);
-  if (!history) {
-    history = [];
-    correctionHistory.set(elementId, history);
-  }
-
-  // Add timestamp
-  history.push(now);
-
-  // Prune old entries outside the window
-  const cutoff = now - UNSTABLE_WINDOW_MS;
-  const recent = history.filter(t => t > cutoff);
-  correctionHistory.set(elementId, recent);
-
-  // Check if unstable
-  if (recent.length >= MAX_RETRIES) {
-    unstableElements.add(elementId);
-    return true;
-  }
-
-  return false;
+export interface InstabilityTracker {
+  /** Record a correction attempt. True when the element is now unstable. */
+  recordCorrection(elementId: string): boolean;
+  /** True when the element is marked unstable (should be skipped). */
+  isUnstable(elementId: string): boolean;
+  /** Clear all tracking (engine destroy / route transition). */
+  clear(): void;
+  /** Unstable count (telemetry). */
+  unstableCount(): number;
 }
 
 /**
- * Check if an element is marked as unstable (should be skipped).
+ * Per-engine instability tracker. Was module-global state, which leaked
+ * across engine instances on one page (EngineV3 embeds a private EngineV2);
+ * each CorrectionQueue now owns one. (census, v2 engine internals)
  */
-export function isUnstable(elementId: string): boolean {
-  return unstableElements.has(elementId);
-}
+export function createInstabilityTracker(): InstabilityTracker {
+  const correctionHistory = new Map<string, number[]>();
+  const unstableElements = new Set<string>();
 
-/**
- * Clear all instability tracking state.
- * Called on engine destroy or route transition.
- */
-export function clearInstabilityState(): void {
-  correctionHistory.clear();
-  unstableElements.clear();
-}
+  return {
+    recordCorrection(elementId: string): boolean {
+      const now = Date.now();
 
-/**
- * Get count of unstable elements (for telemetry).
- */
-export function getUnstableCount(): number {
-  return unstableElements.size;
+      let history = correctionHistory.get(elementId);
+      if (!history) {
+        history = [];
+        correctionHistory.set(elementId, history);
+      }
+
+      history.push(now);
+
+      const cutoff = now - UNSTABLE_WINDOW_MS;
+      const recent = history.filter(t => t > cutoff);
+      correctionHistory.set(elementId, recent);
+
+      if (recent.length >= MAX_RETRIES) {
+        unstableElements.add(elementId);
+        return true;
+      }
+
+      return false;
+    },
+
+    isUnstable(elementId: string): boolean {
+      return unstableElements.has(elementId);
+    },
+
+    clear(): void {
+      correctionHistory.clear();
+      unstableElements.clear();
+    },
+
+    unstableCount(): number {
+      return unstableElements.size;
+    },
+  };
 }
 
 // ============================================================================
@@ -208,6 +202,7 @@ export function validatePost(
   flagDecision: FlagDecision | null,
   placements: PlacementDecision[],
   getViewportZone?: (el: HTMLElement) => ViewportZone,
+  instability?: InstabilityTracker,
 ): CorrectionItem[] {
   const corrections: CorrectionItem[] = [];
   const postEl = post.element;
@@ -216,7 +211,7 @@ export function validatePost(
   if (!postEl.isConnected) return corrections;
 
   // Skip if element is unstable
-  if (isUnstable(post.id)) return corrections;
+  if (instability?.isUnstable(post.id)) return corrections;
 
   const zone = getViewportZone?.(postEl) ?? 'offscreen';
   const basePriority = zoneToPriority(zone);
@@ -397,6 +392,7 @@ export function validateBatch(
   getViewportZone?: (el: HTMLElement) => ViewportZone,
   timeRemaining?: () => number,
   signal?: AbortSignal,
+  instability?: InstabilityTracker,
 ): ValidationResult {
   const startTime = performance.now();
   const allCorrections: CorrectionItem[] = [];
@@ -431,7 +427,7 @@ export function validateBatch(
     }
 
     // Skip unstable elements
-    if (isUnstable(post.id)) {
+    if (instability?.isUnstable(post.id)) {
       unstableSkipped++;
       continue;
     }
@@ -439,7 +435,7 @@ export function validateBatch(
     const flagDecision = flagDecisions.get(post.id) || null;
     const postPlacements = placements.filter(p => p.fileId && post.files.some(f => f.canonicalId === p.fileId));
 
-    const corrections = validatePost(post, flagDecision, postPlacements, getViewportZone);
+    const corrections = validatePost(post, flagDecision, postPlacements, getViewportZone, instability);
     allCorrections.push(...corrections);
     postsChecked++;
   }
