@@ -38,11 +38,16 @@ export default defineContentScript({
   matches: ['https://classroom.google.com/*'],
   runAt: 'document_idle',
   async main() {
-    // w5r6 probe: the earliest possible footprint marker. If this attribute
-    // is absent on a loaded page, THIS content script never executed.
-    try {
-      document.documentElement.dataset.cqdBootstrap = "entered";
-    } catch { /* pre-document edge */ }
+    // w5r6 stage markers: the qa harness DOM probe reads data-cqd-bootstrap
+    // on every page load, so each stage value pinpoints where a silent
+    // bootstrap death happened: entered → engines → mode → orchestrator →
+    // done; "error" plus data-cqd-bootstrap-error names the throw.
+    const mark = (stage: string) => {
+      try {
+        document.documentElement.dataset.cqdBootstrap = stage;
+      } catch { /* pre-document edge */ }
+    };
+    mark("entered");
     try {
       // Dynamic imports to prevent module-level errors from
       // breaking other content scripts (legacy downloads, flags, etc.)
@@ -61,6 +66,7 @@ export default defineContentScript({
       engineRegistry.register(new EngineV1());
       engineRegistry.register(engineV2);
       engineRegistry.register(new EngineV3());
+      mark("engines");
 
       console.log('[CQD V2 Bootstrap] Engines registered:', engineRegistry.getSummary());
 
@@ -90,6 +96,7 @@ export default defineContentScript({
       //    Sets up message listener for popup → content script mode changes
       //    Sets up storage.onChanged listener for cross-tab mode sync
       await initModeController();
+      mark("mode");
 
       console.log('[CQD V2 Bootstrap] Mode controller initialized, mode:', engineRegistry.getMode());
 
@@ -99,6 +106,7 @@ export default defineContentScript({
       //    Initializes engines for the current page
       //    In shadow mode: starts ShadowComparator for V1 vs V2 comparison
       orchestrator.start();
+      mark("orchestrator");
 
       console.log('[CQD V2 Bootstrap] Orchestrator started');
 
@@ -210,9 +218,14 @@ export default defineContentScript({
       } catch {
         // Debug panel is non-critical — silently skip on error
       }
+      mark("done");
     } catch (e) {
       // This MUST NOT propagate — legacy features must keep working
       console.error('[CQD V2 Bootstrap] Failed to initialize (legacy unaffected):', e);
+      mark("error");
+      try {
+        document.documentElement.dataset.cqdBootstrapError = String(e).slice(0, 160);
+      } catch { /* pre-document edge */ }
     }
   },
 });
