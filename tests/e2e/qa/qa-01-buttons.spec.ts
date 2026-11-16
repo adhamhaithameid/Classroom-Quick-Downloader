@@ -90,6 +90,7 @@ test.describe("qa-01 buttons", () => {
   let closeQa: () => Promise<void>;
 
   test.beforeAll(async ({}, testInfo) => {
+    test.setTimeout(180_000); // cold browser start can exceed the 60s default (bead 3qxp)
     browser = projectBrowser(testInfo.project.name);
     const session = await launchQaContext(browser, scenario(), { project: testInfo.project.name });
     context = session.context;
@@ -104,7 +105,7 @@ test.describe("qa-01 buttons", () => {
   });
 
   test.afterAll(async () => {
-    await closeQa();
+    await closeQa?.();
   });
 
   test("manual checks 1-2 / golden rules 1-4: buttons, exclusions, metadata, dedup", async () => {

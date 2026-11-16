@@ -68,8 +68,9 @@ test.describe("qa-08 resilience", () => {
   let readProbe: (() => Promise<SwProbe>) | null = null;
 
   test.beforeAll(async ({}, testInfo) => {
+    test.setTimeout(180_000); // cold browser start can exceed the 60s default (bead 3qxp)
     browser = projectBrowser(testInfo.project.name);
-    const session = await launchQaContext(browser, scenario());
+    const session = await launchQaContext(browser, scenario(), { project: testInfo.project.name });
     context = session.context;
     closeQa = session.close;
     if (!session.extensionAvailable) return;
@@ -87,7 +88,7 @@ test.describe("qa-08 resilience", () => {
   });
 
   test.afterAll(async () => {
-    await closeQa();
+    await closeQa?.();
   });
 
   test("every failure shape reaches a classified terminal — no dead ends", async () => {
