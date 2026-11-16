@@ -5,7 +5,7 @@
  * ============================================================================
  *
  * Import everything model-related from here:
- *   import { DOMScanner, reconcile, CourseContext, ... } from '../../v2/model';
+ *   import { DOMScanner, CourseContext, ... } from '../../v2/model';
  *
  * @author Adham - i need help
  * @since v4.0.0
@@ -24,12 +24,3 @@ export {
 // DOM Scanner
 export { DOMScanner } from './dom-scanner';
 export type { ScanResult, ScannedPost, ScannedFile } from './dom-scanner';
-
-// Reconciler
-export { reconcile, applyOpsToModel } from './reconciler';
-export type { ReconcileOp, ReconcileResult } from './reconciler';
-
-
-// Viewport observer
-export { ViewportObserver } from './viewport-observer';
-export type { ViewportZone, ViewportChangeCallback, ViewportObserverOptions } from './viewport-observer';

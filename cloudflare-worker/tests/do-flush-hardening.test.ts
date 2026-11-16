@@ -447,3 +447,88 @@ describe("alarm arming discipline: earliest-wins everywhere", () => {
     expect(await state.storage.getAlarm()).toBe(Date.now() + 60_000);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 7d1o: an earlier unrelated alarm (changelog sync, midnight catch-up)
+// consumes the DO's single alarm slot, and alarm() used to re-arm ONLY the
+// midnight flush at its end. A retry already recorded with a future
+// due-time — extension archive or website telemetry — then silently slips
+// to the midnight catch-up, delaying flushed data by up to ~24h. alarm()
+// must re-arm the earliest still-future retry due-time before returning.
+// ---------------------------------------------------------------------------
+describe("7d1o: alarm() re-arms pending retry due-times it skipped", () => {
+  it("re-arms a recorded extension retry whose due-time is still future", async () => {
+    vi.setSystemTime(new Date("2026-10-27T01:30:00.000Z")); // flushed today, outside hour 0
+    const retryAt = Date.now() + 30 * 60 * 1000;
+    const { obj, state } = makeDO({
+      buffer: [],
+      pendingBatches: [],
+      lastFlushAt: Date.parse("2026-10-27T00:15:00.000Z"),
+      retryState: { consecutiveFailures: 1, nextRetryAt: retryAt },
+      configMaxBufferSize: 50000,
+    });
+
+    await obj.alarm();
+
+    expect(await state.storage.getAlarm()).toBe(retryAt);
+  });
+
+  it("re-arms the earliest website telemetry batch retry after a skipped alarm", async () => {
+    vi.setSystemTime(new Date("2026-10-27T01:30:00.000Z"));
+    const retryAt = Date.now() + 5 * 60 * 1000;
+    const { obj, state } = makeDO({
+      buffer: [],
+      pendingBatches: [],
+      lastFlushAt: Date.parse("2026-10-27T00:15:00.000Z"),
+      retryState: { consecutiveFailures: 0 },
+      configMaxBufferSize: 50000,
+    });
+    state.storage.seed("analytics_website_telemetry", {
+      websiteTelemetryQueue: [
+        {
+          schemaVersion: 1,
+          batchId: "ws-retry",
+          correlationId: "c-7d1o",
+          generatedAtUtc: Date.now() - 60 * 60 * 1000,
+          sessionId: "visitor-session-7d1o",
+          pagePath: "/classrooms/teacher-name",
+          attempt: 1,
+          nextRetryAtUtc: retryAt,
+          lastError: "d1_unavailable",
+          events: [
+            {
+              eventId: "e-7d1o",
+              eventType: "page_error",
+              action: "error",
+              placement: "overview",
+              meta: { message: "simulated retry backlog" },
+            },
+          ],
+        },
+      ],
+      websiteTelemetryDeadLetter: [],
+    });
+
+    await obj.alarm();
+
+    expect(await state.storage.getAlarm()).toBe(retryAt);
+  });
+
+  it("does not re-arm when both retries are already due — alarm() processes them", async () => {
+    vi.setSystemTime(new Date("2026-10-27T01:30:00.000Z"));
+    const past = Date.now() - 1000;
+    const { obj, state } = makeDO({
+      buffer: [makeEvent(1)],
+      pendingBatches: [],
+      lastFlushAt: Date.parse("2026-10-27T00:15:00.000Z"),
+      retryState: { consecutiveFailures: 1, nextRetryAt: past },
+      configMaxBufferSize: 50000,
+    });
+
+    await obj.alarm(); // due retry is processed by the existing paths
+
+    // No future due-time left: the midnight catch-up is the only armed alarm.
+    const midnight = Date.parse("2026-10-28T00:15:00.000Z");
+    expect(await state.storage.getAlarm()).toBe(midnight);
+  });
+});

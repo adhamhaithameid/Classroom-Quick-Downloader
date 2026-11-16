@@ -23,23 +23,6 @@ export const DEFAULT_RETRY_STATE: RetryState = {
   consecutiveFailures: 0,
 };
 
-// --- Quota limits ---
-
-/** Soft limit: Start suggesting smaller batches */
-export const QUOTA_SOFT_LIMIT = 50_000;
-
-/** Normal limit: Standard operation range */
-export const QUOTA_NORMAL_LIMIT = 60_000;
-
-/** Hard normal limit: Slightly elevated, reduce batch sizes */
-export const QUOTA_HARD_NORMAL_LIMIT = 70_000;
-
-/** Hard limit: Significant load, aggressive batching */
-export const QUOTA_HARD_LIMIT = 80_000;
-
-/** Very hard limit: Emergency mode, minimal analytics */
-export const QUOTA_VERY_HARD_LIMIT = 90_000;
-
 // --- Storage ---
 
 /** Key used to store analytics state in DO storage */
