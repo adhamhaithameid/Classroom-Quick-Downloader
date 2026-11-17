@@ -297,18 +297,55 @@
       const ENABLE_WATER_DROP_RIPPLE = true;
       const ENABLE_CURSOR_CIRCLE = true;
 
-      function drawAll(): void {
-        if (!ctx) return;
-        ctx.clearRect(0, 0, cw, ch);
-        ctx.fillStyle = '#1a8b55';
+      /* One pre-rendered dot, blitted per particle. Tessellating thousands
+         of arcs into a fresh Path2D every frame was the hover lag. */
+      let sprite: HTMLCanvasElement | null = null;
+      /* The whole wordmark at rest, rendered once. Each frame blits it in a
+         single call and repaints only the dots that have left home. */
+      let rest: HTMLCanvasElement | null = null;
+
+      function buildSprite(): void {
         const r = gridSize * 0.45;
-        const path = new Path2D();
+        const side = Math.max(2, Math.ceil(r * 2 * dpr));
+        const s = document.createElement('canvas');
+        s.width = side;
+        s.height = side;
+        const sctx = s.getContext('2d');
+        if (!sctx) return;
+        sctx.fillStyle = '#1a8b55';
+        sctx.beginPath();
+        sctx.arc(side / 2, side / 2, side / 2, 0, 6.2832);
+        sctx.fill();
+        sprite = s;
+
+        const base = document.createElement('canvas');
+        base.width = cv.width;
+        base.height = cv.height;
+        const bctx = base.getContext('2d');
+        if (!bctx) return;
+        bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        bctx.globalAlpha = 0.82;
+        const d = r * 2;
+        for (const p of dots) bctx.drawImage(s, p.hx - r, p.hy - r, d, d);
+        rest = base;
+      }
+
+      function drawAll(): void {
+        if (!ctx || !sprite || !rest) return;
+        const r = gridSize * 0.45;
+        const d = r * 2;
+        ctx.clearRect(0, 0, cw, ch);
+        ctx.drawImage(rest, 0, 0, cw, ch);
+        /* Erase the rest-frame dot of every particle that moved, then paint
+           it at its live position. Clears are exact dot boxes (grid gap
+           keeps neighbours untouched). */
+        const moved: Dot[] = [];
         for (const p of dots) {
-          path.moveTo(p.x + r, p.y);
-          path.arc(p.x, p.y, r, 0, 6.2832);
+          if (Math.abs(p.x - p.hx) > 0.25 || Math.abs(p.y - p.hy) > 0.25) moved.push(p);
         }
+        for (const p of moved) ctx.clearRect(p.hx - r, p.hy - r, d, d);
         ctx.globalAlpha = 0.82;
-        ctx.fill(path);
+        for (const p of moved) ctx.drawImage(sprite, p.x - r, p.y - r, d, d);
         ctx.globalAlpha = 1;
       }
 
@@ -336,13 +373,22 @@
         const cursorLive = pointerInside && now - lastPointerMoveAt < CURSOR_LIVE_MS;
         const maxFront = Math.hypot(cw, ch) + PULSE_BAND;
         pulses = pulses.filter((pulse) => (now - pulse.t0) * PULSE_SPEED < maxFront);
+        /* Per-frame wavefront bounds, squared, so the dot loop rejects dots
+           outside the band without a square root. */
+        const fronts = pulses.map((pulse) => {
+          const front = (now - pulse.t0) * PULSE_SPEED;
+          const lo = Math.max(0, front - PULSE_BAND);
+          const hi = front + PULSE_BAND;
+          return { pulse, front, lo2: lo * lo, hi2: hi * hi };
+        });
         let energy = false;
         for (const p of dots) {
           if (cursorLive && ENABLE_CURSOR_CIRCLE) {
             const dx = p.x - px;
             const dy = p.y - py;
-            const d = Math.hypot(dx, dy);
-            if (d > 0.001 && d < REPEL_RADIUS) {
+            const d2 = dx * dx + dy * dy;
+            if (d2 > 0.000001 && d2 < REPEL_RADIUS * REPEL_RADIUS) {
+              const d = Math.sqrt(d2);
               const fall = 1 - d / REPEL_RADIUS;
               const f = REPEL_FORCE * fall * fall * df;
               const inv = 1 / d;
@@ -350,12 +396,12 @@
               p.vy += (dy * inv + dx * inv * p.spin * REPEL_SPIN) * f;
             }
           }
-          for (const pulse of pulses) {
+          for (const { pulse, front, lo2, hi2 } of fronts) {
             const dx = p.x - pulse.x;
             const dy = p.y - pulse.y;
-            const d = Math.hypot(dx, dy);
-            if (d < 0.001) continue;
-            const front = (now - pulse.t0) * PULSE_SPEED;
+            const d2 = dx * dx + dy * dy;
+            if (d2 < 0.000001 || d2 <= lo2 || d2 >= hi2) continue;
+            const d = Math.sqrt(d2);
             const band = d - front;
             if (band > -PULSE_BAND && band < PULSE_BAND) {
               /* Amplitude falls off with distance traveled, so the wave
@@ -368,10 +414,11 @@
           }
           p.vx *= DRAG;
           p.vy *= DRAG;
-          const sp = Math.hypot(p.vx, p.vy);
-          if (sp > MAX_SPEED) {
-            p.vx = p.vx / sp * MAX_SPEED;
-            p.vy = p.vy / sp * MAX_SPEED;
+          const sp2 = p.vx * p.vx + p.vy * p.vy;
+          if (sp2 > MAX_SPEED * MAX_SPEED) {
+            const sp = Math.sqrt(sp2);
+            p.vx = (p.vx / sp) * MAX_SPEED;
+            p.vy = (p.vy / sp) * MAX_SPEED;
           }
           p.x += p.vx + (p.hx - p.x) * EASE * df;
           p.y += p.vy + (p.hy - p.y) * EASE * df;
@@ -479,6 +526,7 @@
         cv.style.height = `${height}px`;
         ctx = cv.getContext('2d');
         if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        buildSprite();
         drawAll();
       }
 
@@ -1099,6 +1147,8 @@
   .ft-credit {
     display: inline-flex;
     align-items: center;
+    /* WCAG 2.2 AA 2.5.8: minimum 24px target height. */
+    min-height: 24px;
     gap: 4px;
     color: var(--ft-text-2);
     font-size: 11.5px;
@@ -1248,10 +1298,6 @@
 
     .ft-col-product {
       order: 3;
-    }
-
-    .ft-col-support {
-      order: 4;
     }
 
     .ft-links a {
