@@ -75,6 +75,43 @@ describe('isApiConfigured (S13 consent gate)', () => {
     expect(isApiConfigured()).toBe(true);
   });
 
+  // Content scripts never see chrome.identity, and the engines run in one.
+  // There the manifest permission + the Google Chrome brand stand in for it.
+  describe('in a content script (no chrome.identity)', () => {
+    const manifest = {
+      permissions: ['downloads', 'identity'],
+      oauth2: { client_id: 'cqd-extension.apps.googleusercontent.com' },
+    };
+    const stubBrands = (...brands: string[]) =>
+      vi.stubGlobal('navigator', { userAgentData: { brands: brands.map((brand) => ({ brand })) } });
+
+    it('is true on Google Chrome with the identity permission and a client_id', () => {
+      stubChrome({ runtime: { getManifest: () => manifest } });
+      stubBrands('Chromium', 'Google Chrome');
+      expect(isApiConfigured()).toBe(true);
+    });
+
+    it('is false on Chromium browsers whose getAuthToken does not work (Edge, Brave, Opera)', () => {
+      stubChrome({ runtime: { getManifest: () => manifest } });
+      for (const brand of ['Microsoft Edge', 'Brave', 'Opera']) {
+        stubBrands('Chromium', brand);
+        expect(isApiConfigured()).toBe(false);
+      }
+    });
+
+    it('is false where userAgentData does not exist (Firefox)', () => {
+      stubChrome({ runtime: { getManifest: () => manifest } });
+      vi.stubGlobal('navigator', {});
+      expect(isApiConfigured()).toBe(false);
+    });
+
+    it('is false without the identity permission', () => {
+      stubChrome({ runtime: { getManifest: () => ({ ...manifest, permissions: ['downloads'] }) } });
+      stubBrands('Google Chrome');
+      expect(isApiConfigured()).toBe(false);
+    });
+  });
+
   it('survives a throwing getManifest (never breaks a caller)', () => {
     stubChrome({
       identity: { getAuthToken: () => {} },
