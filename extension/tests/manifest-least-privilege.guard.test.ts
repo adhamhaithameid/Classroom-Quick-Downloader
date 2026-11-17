@@ -39,7 +39,7 @@ describe('manifest least-privilege guard (S3)', () => {
   });
 
   it('requests exactly the read-only Classroom scopes the API client needs', () => {
-    const scopes = wxtConfig.match(/auth\/classroom\.[a-z.-]+/g);
+    const scopes = wxtConfig.match(/auth\/classroom\.[A-Za-z0-9.-]+/g);
     expect(scopes).toEqual([
       'auth/classroom.coursework.me.readonly',
       'auth/classroom.coursework.students.readonly',

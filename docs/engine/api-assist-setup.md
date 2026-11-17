@@ -171,7 +171,7 @@ only (D12 precedent): never creates, lowers, or rewrites a finding.
 - **Explicit consent:** the assist runs only when the user selects API
   (beta) — an explicit Engine Mode choice persisted as `cqdV2Mode: 'v3'`.
   It is never a default and never implied by another mode.
-- **No background token acquisition:** token requests stay non-interactive
+- **No proactive token acquisition:** token requests stay non-interactive
   (`getAuthToken({ interactive: false })`) and ONLY fire while v3 is active
   AND the current view is a student-work view
   (`STUDENT_WORK_TEACHER` / `STUDENT_SUBMISSIONS`). Any other view, any other
