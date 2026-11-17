@@ -16,6 +16,21 @@ function isValidHttpsUrl(value: string): boolean {
   }
 }
 
+describe('SITE_URL hydration safety (bead vsyk)', () => {
+  it('does not change with the browser origin, so server and client SEO tags match', async () => {
+    const { vi } = await import('vitest');
+    vi.resetModules();
+    vi.stubGlobal('window', { location: { origin: 'http://localhost:5199' } });
+    try {
+      const mod = await import('./config');
+      expect(mod.SITE_URL).not.toContain('localhost');
+      expect(mod.SITE_URL).toBe(SITE_URL);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
 describe('website config exports', () => {
   it('exports valid HTTPS base URLs for site and APIs', () => {
     expect(isValidHttpsUrl(SITE_URL)).toBe(true);
