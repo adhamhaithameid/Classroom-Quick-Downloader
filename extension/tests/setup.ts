@@ -48,7 +48,7 @@ const mockChrome = {
       addListener: vi.fn(),
       removeListener: vi.fn(),
     },
-    lastError: null,
+    lastError: null as chrome.runtime.LastError | null,
   },
   tabs: {
     create: vi.fn(),
