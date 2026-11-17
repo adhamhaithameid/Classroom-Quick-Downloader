@@ -28,7 +28,21 @@ const mockChrome = {
     },
   },
   runtime: {
-    sendMessage: vi.fn(),
+    // Real Chrome NEVER leaves a one-shot sendMessage callback uncalled: with
+    // no async responder the callback fires with lastError set ("port
+    // closed"). A silent vi.fn() wedges every awaiter (e.g. the csaa.7 token
+    // relay) — so the mock mirrors the browser and answers with lastError,
+    // then clears it like Chrome does.
+    sendMessage: vi.fn(
+      (_message: unknown, callback?: (response: unknown) => void) => {
+        if (typeof callback !== 'function') return;
+        mockChrome.runtime.lastError = {
+          message: 'The message port closed before a response was received.',
+        };
+        callback(undefined);
+        mockChrome.runtime.lastError = null;
+      },
+    ),
     getManifest: vi.fn(() => ({ version: '1.3.0-test' })),
     onMessage: {
       addListener: vi.fn(),
