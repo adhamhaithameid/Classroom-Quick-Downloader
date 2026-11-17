@@ -1,10 +1,10 @@
 <script lang="ts">
   import { onMount, afterUpdate } from 'svelte';
-  import { STORE_LINKS } from '$lib/config';
-  import { trackWebsiteEvent } from '$lib/analytics/websiteEvents';
-  import { fetchChangelog } from '$lib/api/changelog';
-  import { WEBSITE_MANUAL_CHANGELOG } from '$lib/content/changelog.manual.generated';
-  import SeoMeta from '$lib/components/SeoMeta.svelte';
+  import { STORE_LINKS } from '#lib/config.ts';
+  import { trackWebsiteEvent } from '#lib/analytics/websiteEvents.ts';
+  import { fetchChangelog } from '#lib/api/changelog.ts';
+  import { WEBSITE_MANUAL_CHANGELOG } from '#lib/content/changelog.manual.generated.ts';
+  import SeoMeta from '#lib/components/SeoMeta.svelte';
 
   type ChangelogMdEntry = {
     version: string;

@@ -1,40 +1,30 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'svelte/server';
-import { APP_VERSION, GOOGLE_SITE_VERIFICATION, STORE_LINKS } from '$lib/config';
+import { APP_VERSION, GOOGLE_SITE_VERIFICATION, STORE_LINKS } from '#lib/config.ts';
 
 const mockState = vi.hoisted(() => ({
   path: '/overview',
   status: 200
 }));
 
-vi.mock('$app/environment', () => ({
+vi.mock('$app/env', () => ({
   browser: false
 }));
 
 vi.mock('$app/paths', () => ({
-  base: ''
+  resolve: (p: string) => `/${p}`
 }));
 
-vi.mock('$app/stores', () => ({
-  navigating: {
-    subscribe(run: (value: boolean) => void) {
-      run(false);
-      return () => {};
-    }
-  },
-  page: {
-    subscribe(run: (value: { url: URL; status: number }) => void) {
-      run({ url: new URL(`https://example.com${mockState.path}`), status: mockState.status });
-      return () => {};
-    }
-  }
+vi.mock('$app/navigation', () => ({
+  beforeNavigate: vi.fn(),
+  afterNavigate: vi.fn()
 }));
 
-vi.mock('$lib/assets/cqd-logo.svg', () => ({
+vi.mock('#lib/assets/cqd-logo.svg', () => ({
   default: '/test-logo.svg'
 }));
 
-vi.mock('$lib/analytics/websiteEvents', () => ({
+vi.mock('#lib/analytics/websiteEvents.ts', () => ({
   flushWebsiteEvents: vi.fn(async () => {}),
   initWebsiteEventsClient: vi.fn(() => () => {}),
   trackWebsiteEvent: vi.fn()
@@ -42,13 +32,26 @@ vi.mock('$lib/analytics/websiteEvents', () => ({
 
 import Layout from './+layout.svelte';
 
+// +layout.svelte takes its page data as a prop since the kit 3 migration
+// (universal load in +layout.ts); mirror mockState into it.
+function renderLayout() {
+  return render(Layout, {
+    props: {
+      data: {
+        pathname: mockState.path,
+        isErrorRoute: mockState.status === 404
+      }
+    }
+  });
+}
+
 function squish(html: string): string {
   return html.replace(/\s+/g, ' ').trim();
 }
 
 describe('site layout shell', () => {
   it('emits the default google verification metadata in head', () => {
-    const { head } = render(Layout);
+    const { head } = renderLayout();
     expect(head).toContain('google-site-verification');
     expect(head).toContain(GOOGLE_SITE_VERIFICATION);
   });
@@ -56,7 +59,7 @@ describe('site layout shell', () => {
   it('shows nav and footer chrome on overview route', () => {
     mockState.path = '/overview';
     mockState.status = 200;
-    const { body } = render(Layout);
+    const { body } = renderLayout();
     const html = squish(body);
 
     expect(html).toContain('l2-nav-shell');
@@ -69,7 +72,7 @@ describe('site layout shell', () => {
   it('mounts the shared ambient background (orbs + grid) on every route', () => {
     mockState.path = '/faq';
     mockState.status = 200;
-    const { body } = render(Layout);
+    const { body } = renderLayout();
     const html = squish(body);
 
     expect(html).toContain('l2-page-orbs');
@@ -79,7 +82,7 @@ describe('site layout shell', () => {
   it('mounts the branded cursor layer on every route', () => {
     mockState.path = '/faq';
     mockState.status = 200;
-    const { body } = render(Layout);
+    const { body } = renderLayout();
     const html = squish(body);
 
     expect(html).toContain('cqd-cursor');
@@ -90,7 +93,7 @@ describe('site layout shell', () => {
   it('renders crawlable hover megamenus with described links in server markup', () => {
     mockState.path = '/overview';
     mockState.status = 200;
-    const { body } = render(Layout);
+    const { body } = renderLayout();
     const html = squish(body);
 
     expect(html).toContain('aria-haspopup="true"');
@@ -114,7 +117,7 @@ describe('site layout shell', () => {
   it('renders the GitHub hover preview and alternate-browser install circles', () => {
     mockState.path = '/overview';
     mockState.status = 200;
-    const { body } = render(Layout);
+    const { body } = renderLayout();
     const html = squish(body);
 
     // GitHub link is a menu trigger wired to the shared panel.
@@ -134,7 +137,7 @@ describe('site layout shell', () => {
   it('ships the pill scroll shell without a pre-hydrated scrolled state', () => {
     mockState.path = '/overview';
     mockState.status = 200;
-    const { body } = render(Layout);
+    const { body } = renderLayout();
     const html = squish(body);
 
     expect(html).toContain('l2-nav-float');
@@ -148,7 +151,7 @@ describe('site layout shell', () => {
   it('renders the four-layer premium footer with CTA, navigation, principles, and legal bar', () => {
     mockState.path = '/overview';
     mockState.status = 200;
-    const { body } = render(Layout);
+    const { body } = renderLayout();
     const html = squish(body);
 
     // Layer 1: final installation CTA
@@ -195,7 +198,7 @@ describe('site layout shell', () => {
     // permanently blank. SSR ships the zone/step markers only.
     mockState.path = '/overview';
     mockState.status = 200;
-    const { body } = render(Layout);
+    const { body } = renderLayout();
 
     expect(body).toContain('data-ft-zone');
     expect(body).toContain('data-ft');
@@ -211,7 +214,7 @@ describe('site layout shell', () => {
   it('keeps chrome visible on standard content routes', () => {
     mockState.path = '/privacy';
     mockState.status = 200;
-    const { body } = render(Layout);
+    const { body } = renderLayout();
     const html = squish(body);
 
     expect(html).toContain('l2-nav-shell');
@@ -224,7 +227,7 @@ describe('site layout shell', () => {
   it('renders missing-path 404s in the full-bleed route shell', () => {
     mockState.path = '/does-not-exist';
     mockState.status = 404;
-    const { body } = render(Layout);
+    const { body } = renderLayout();
     const html = squish(body);
 
     expect(html).toContain('site-main-overview-style');

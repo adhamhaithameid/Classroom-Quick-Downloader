@@ -1,11 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { base } from '$app/paths';
-  import SeoMeta from '$lib/components/SeoMeta.svelte';
+  import { resolve } from '$app/paths';
+  import SeoMeta from '#lib/components/SeoMeta.svelte';
 
   onMount(() => {
-    goto(`${base}/overview`, { replaceState: true });
+    goto(resolve(`overview`), { replaceState: true });
   });
 </script>
 

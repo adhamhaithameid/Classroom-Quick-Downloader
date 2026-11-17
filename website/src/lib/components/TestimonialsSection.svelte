@@ -12,14 +12,14 @@
    * slide counter (user decisions, 2026-09-20).
    */
   import { onMount } from 'svelte';
-  import { magnetic } from '$lib/actions/magnetic';
-  import { websiteSnapshotStore } from '$lib/stores/websiteSnapshot';
+  import { magnetic } from '#lib/actions/magnetic.ts';
+  import { websiteSnapshotStore } from '#lib/stores/websiteSnapshot.ts';
   import {
     TESTIMONIALS,
     TESTIMONIAL_AGGREGATE,
     mergeLiveTestimonials,
     type Testimonial
-  } from '$lib/testimonials/data';
+  } from '#lib/testimonials/data.ts';
 
   const AUTOPLAY_MS = 6000;
 

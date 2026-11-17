@@ -5,7 +5,7 @@
  * params; this module owns the payload shape.
  */
 
-import type { WebsiteEventAction, WebsiteEventType, WebsiteEventPayload } from '$lib/types/public';
+import type { WebsiteEventAction, WebsiteEventType, WebsiteEventPayload } from '#lib/types/public.ts';
 
 type UninstallViewEvent = Omit<WebsiteEventPayload, 'tsUtc'> & { pagePath: string };
 

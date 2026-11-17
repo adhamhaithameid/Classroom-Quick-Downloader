@@ -1,6 +1,6 @@
-import { APP_VERSION, STORE_LINKS } from '$lib/config';
-import { seoPages } from '$lib/content/seoPages';
-import { SITE_NAME, toAbsoluteSiteUrl } from '$lib/seo/site';
+import { APP_VERSION, STORE_LINKS } from '#lib/config.ts';
+import { seoPages } from '#lib/content/seoPages.ts';
+import { SITE_NAME, toAbsoluteSiteUrl } from '#lib/seo/site.ts';
 
 export const prerender = true;
 

@@ -1,6 +1,6 @@
-import { WORKER_BASE_URL } from '$lib/config';
-import { submitWebsiteEvents } from '$lib/api/publicSite';
-import type { WebsiteEventAction, WebsiteEventPayload, WebsiteEventType } from '$lib/types/public';
+import { WORKER_BASE_URL } from '#lib/config.ts';
+import { submitWebsiteEvents } from '#lib/api/publicSite.ts';
+import type { WebsiteEventAction, WebsiteEventPayload, WebsiteEventType } from '#lib/types/public.ts';
 
 const QUEUE_STORAGE_KEY = 'cqd.website.events.queue.v1';
 const SESSION_STORAGE_KEY = 'cqd.website.events.session.v1';

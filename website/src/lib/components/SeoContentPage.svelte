@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { base } from '$app/paths';
-  import { APP_VERSION, SITE_URL, STORE_LINKS } from '$lib/config';
-  import SeoMeta from '$lib/components/SeoMeta.svelte';
-  import { relatedPagesFor, type SeoPageConfig } from '$lib/content/seoPages';
-  import { SITE_NAME, SOCIAL_IMAGE, lastModForPath } from '$lib/seo/site';
-  import { trackGuideCtaClick, trackGuideEngaged, GUIDE_ENGAGEMENT_PERCENT } from '$lib/analytics/websiteEvents';
-  import { magnetic } from '$lib/actions/magnetic';
+  import { resolvePath } from '#lib/navigation/resolvePath.ts';
+  import { APP_VERSION, SITE_URL, STORE_LINKS } from '#lib/config.ts';
+  import SeoMeta from '#lib/components/SeoMeta.svelte';
+  import { relatedPagesFor, type SeoPageConfig } from '#lib/content/seoPages.ts';
+  import { SITE_NAME, SOCIAL_IMAGE, lastModForPath } from '#lib/seo/site.ts';
+  import { trackGuideCtaClick, trackGuideEngaged, GUIDE_ENGAGEMENT_PERCENT } from '#lib/analytics/websiteEvents.ts';
+  import { magnetic } from '#lib/actions/magnetic.ts';
 
   export let config: SeoPageConfig;
 
@@ -30,16 +30,16 @@
   function resolveHref(href: string): string {
     if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('mailto:')) return href;
     if (!href.startsWith('/')) return href;
-    return `${base}${href}`;
+    return resolvePath(`${href}`.slice(1));
   }
 
   // Tiny inline-link syntax for section copy: [label](href). Only
   // site-relative and https hrefs are linkified — anything else (and any
   // unlinked text) stays literal. Segments render through plain Svelte
   // elements (never {@html}), so the output is XSS-safe by construction.
-  type InlineSegment =
-    | { kind: 'text'; value: string }
-    | { kind: 'link'; label: string; href: string; external: boolean };
+  type InlineSegment = 
+    { kind: 'text'; value: string } |
+    { kind: 'link'; label: string; href: string; external: boolean };
 
   const INLINE_LINK_PATTERN = /\[([^\]]+)\]\(([^)]+)\)/g;
 
@@ -194,8 +194,8 @@
     webPageStructuredData,
     techArticleStructuredData,
     breadcrumbStructuredData,
-    ...(faqStructuredData ? [faqStructuredData] : []),
-    ...(relatedStructuredData ? [relatedStructuredData] : [])
+    ...faqStructuredData ? [faqStructuredData] : [],
+    ...relatedStructuredData ? [relatedStructuredData] : []
   ];
 </script>
 
@@ -208,7 +208,7 @@
   structuredData={seoStructuredData}
 />
 
-<svelte:window on:scroll={handleGuideScroll} />
+<svelte:window on:scroll={handleGuideScroll}></svelte:window>
 
 <article class="seo-page">
   <section class="seo-hero glass-panel">

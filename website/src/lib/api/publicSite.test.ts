@@ -10,7 +10,7 @@ import {
   submitUninstallFeedback,
   submitWebsiteEvents
 } from './publicSite';
-import { WEBSITE_MANUAL_CHANGELOG } from '$lib/content/changelog.manual.generated';
+import { WEBSITE_MANUAL_CHANGELOG } from '#lib/content/changelog.manual.generated.ts';
 
 afterEach(() => {
   vi.restoreAllMocks();

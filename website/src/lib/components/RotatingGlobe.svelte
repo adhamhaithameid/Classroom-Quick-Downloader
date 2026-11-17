@@ -5,8 +5,8 @@
   import { scaleLinear } from 'd3-scale';
   import iso3166 from 'iso-3166-1';
   import worldAtlas from 'world-atlas/countries-110m.json';
-  import type { MapResponse } from '$lib/types/public';
-  import AnimatedNumber from '$lib/components/AnimatedNumber.svelte';
+  import type { MapResponse } from '#lib/types/public.ts';
+  import AnimatedNumber from '#lib/components/AnimatedNumber.svelte';
 
   type WorldFeature = {
     id?: string | number;

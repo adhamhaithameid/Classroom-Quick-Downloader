@@ -24,8 +24,8 @@ import CompareClassfetchPage from './compare/classroom-quick-downloader-vs-class
 import SiteMapPage from './site-map/+page.svelte';
 import CqdDemoVideoPage from './watch/cqd-demo/+page.svelte';
 import ManualVsCqdVideoPage from './watch/manual-vs-cqd/+page.svelte';
-import { privacyContent } from '$lib/content/privacy';
-import { APP_VERSION, INDEXNOW_KEY, SITE_URL } from '$lib/config';
+import { privacyContent } from '#lib/content/privacy.ts';
+import { APP_VERSION, INDEXNOW_KEY, SITE_URL } from '#lib/config.ts';
 import { GET as getRobotsTxt } from './robots.txt/+server';
 import { GET as getSitemapXml } from './sitemap.xml/+server';
 import { GET as getIndexNowKeyTxt } from './indexnow-key.txt/+server';

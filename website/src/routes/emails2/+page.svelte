@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { base } from '$app/paths';
-  import AnimatedNumber from '$lib/components/AnimatedNumber.svelte';
-  import SeoMeta from '$lib/components/SeoMeta.svelte';
+  import { asset } from '$app/paths';
+  import AnimatedNumber from '#lib/components/AnimatedNumber.svelte';
+  import SeoMeta from '#lib/components/SeoMeta.svelte';
 
   const stats = [
     { value: 2, suffix: 'K+', label: 'Installs' },
@@ -87,7 +87,7 @@
         <p class="hero-badge">Free Browser Extension</p>
 
         <img
-          src={`${base}/images/email-logo.png`}
+          src={asset('images/email-logo.png')}
           alt="Classroom Quick Downloader"
           width="72"
           height="72"
@@ -139,7 +139,7 @@
             <div class="compare-card compare-card-bad">
               <p class="compare-label compare-label-bad">Without CQD</p>
               <img
-                src={`${base}/images/email-problem.png`}
+                src={asset('images/email-problem.png')}
                 alt="Without extension"
                 class="compare-image"
               />
@@ -153,7 +153,7 @@
             <div class="compare-card compare-card-good">
               <p class="compare-label compare-label-good">With CQD</p>
               <img
-                src={`${base}/images/email-solution.png`}
+                src={asset('images/email-solution.png')}
                 alt="With extension"
                 class="compare-image"
               />
@@ -222,7 +222,7 @@
         <div class="flag-grid">
           <figure class="flag-item">
             <img
-              src={`${base}/images/email-edits-flag.png`}
+              src={asset('images/email-edits-flag.png')}
               alt="Edited post flag"
               class="flag-image"
             />
@@ -231,7 +231,7 @@
 
           <figure class="flag-item">
             <img
-              src={`${base}/images/email-comment-flag.png`}
+              src={asset('images/email-comment-flag.png')}
               alt="Comment flag"
               class="flag-image"
             />
@@ -244,7 +244,7 @@
         <p class="section-label">The button itself</p>
 
         <img
-          src={`${base}/images/email-buttons.png`}
+          src={asset('images/email-buttons.png')}
           alt="Download Buttons"
           class="buttons-image"
         />
@@ -261,7 +261,7 @@
           {/each}
         </div>
 
-        <p class="browser-note">Also works on Brave, Opera, Vivaldi, Arc &amp; all Chromium browsers</p>
+        <p class="browser-note">Also works on Brave, Opera, Vivaldi, Arc & all Chromium browsers</p>
       </section>
 
       <section class="section-block section-dark section-dark-end">

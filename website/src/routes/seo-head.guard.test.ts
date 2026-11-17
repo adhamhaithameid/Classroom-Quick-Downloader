@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { render } from 'svelte/server';
 import RootRedirectPage from './+page.svelte';
-import { SITE_URL } from '$lib/config';
+import { SITE_URL } from '#lib/config.ts';
 
 /* SERP head guard (2026-10-03 SEO pass; rating contract updated 2026-10-21).
    Google truncated the previous 59-char homepage title mid-word ("Bulk ...")

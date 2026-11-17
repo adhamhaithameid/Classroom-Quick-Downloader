@@ -1,17 +1,17 @@
 <script lang="ts">
-  import { base } from '$app/paths';
-  import { SITE_URL } from '$lib/config';
-  import SeoMeta from '$lib/components/SeoMeta.svelte';
-  import { INDEXABLE_SITE_PATHS } from '$lib/seo/site';
+  import { resolvePath } from '#lib/navigation/resolvePath.ts';
+  import { SITE_URL } from '#lib/config.ts';
+  import SeoMeta from '#lib/components/SeoMeta.svelte';
+  import { INDEXABLE_SITE_PATHS } from '#lib/seo/site.ts';
 
-  type SiteMapGroup =
-    | 'Core pages'
-    | 'Video demos'
-    | 'Install guides'
-    | 'Use-case guides'
-    | 'Comparison pages'
-    | 'Trust and support'
-    | 'Additional pages';
+  type SiteMapGroup = 
+    'Core pages' |
+    'Video demos' |
+    'Install guides' |
+    'Use-case guides' |
+    'Comparison pages' |
+    'Trust and support' |
+    'Additional pages';
 
   const GROUP_ORDER: SiteMapGroup[] = [
     'Core pages',
@@ -33,7 +33,7 @@
   }
 
   function hrefForPath(path: string): string {
-    return `${base}${path === '/' ? '/' : path}`;
+    return resolvePath(`${path === '/' ? '/' : path}`.slice(1));
   }
 
   function labelForPath(path: string): string {
