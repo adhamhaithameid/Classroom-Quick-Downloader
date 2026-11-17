@@ -1,7 +1,7 @@
 <script lang="ts">
   import { fade } from 'svelte/transition';
-  import type { BalloonParticle } from '$lib/celebration/balloons';
-  import { portalToBody } from '$lib/actions/portalToBody';
+  import type { BalloonParticle } from '#lib/celebration/balloons/index.ts';
+  import { portalToBody } from '#lib/actions/portalToBody.ts';
 
   export let visible = false;
   export let particles: readonly BalloonParticle[] = [];

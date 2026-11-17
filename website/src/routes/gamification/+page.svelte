@@ -1,6 +1,6 @@
 <script lang="ts">
-  import SeoMeta from '$lib/components/SeoMeta.svelte';
-  import { SITE_URL } from '$lib/config';
+  import SeoMeta from '#lib/components/SeoMeta.svelte';
+  import { SITE_URL } from '#lib/config.ts';
 
   /* Mirrors MILESTONE_LADDER in extension/src/history/download-stats.ts (see
      docs/GAMIFICATION.md). Level N = the Nth rung reached. Keep in sync. */

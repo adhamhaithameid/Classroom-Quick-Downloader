@@ -1,4 +1,4 @@
-import { INDEXNOW_KEY } from '$lib/config';
+import { INDEXNOW_KEY } from '#lib/config.ts';
 
 export const prerender = true;
 

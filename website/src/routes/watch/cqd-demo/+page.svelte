@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { base } from '$app/paths';
-  import { SITE_URL } from '$lib/config';
-  import SeoMeta from '$lib/components/SeoMeta.svelte';
+  import { resolve } from '$app/paths';
+  import { SITE_URL } from '#lib/config.ts';
+  import SeoMeta from '#lib/components/SeoMeta.svelte';
 
   const pagePath = '/watch/cqd-demo';
   const canonicalUrl = `${SITE_URL}${pagePath}`;
@@ -79,8 +79,15 @@
   </p>
 
   <div class="watch-frame">
-    <video controls preload="metadata" poster="{base}/images/solution-flags.webp">
-      <source src="{base}/videos/solution.mp4" type="video/mp4" />
+    <video
+      controls
+      preload="metadata"
+      poster="{resolve('')}/images/solution-flags.webp"
+    >
+      <source
+        src="{resolve('')}/videos/solution.mp4"
+        type="video/mp4"
+      />
     </video>
   </div>
 
@@ -107,10 +114,25 @@
   </p>
 
   <p class="watch-links">
-    <a class="glass-panel glass-hover" href="{base}/install/chrome">Install for Chrome</a>
-    <a class="glass-panel glass-hover" href="{base}/download-all-attachments-google-classroom">Step-by-step guide</a>
-    <a class="glass-panel glass-hover" href="{base}/watch/manual-vs-cqd">Watch the manual vs CQD comparison video</a>
-    <a class="glass-panel glass-hover" href="{base}/">Back to homepage</a>
+    <a
+      class="glass-panel glass-hover"
+      href="{resolve('')}/install/chrome"
+    >Install for Chrome</a>
+
+    <a
+      class="glass-panel glass-hover"
+      href="{resolve('')}/download-all-attachments-google-classroom"
+    >Step-by-step guide</a>
+
+    <a
+      class="glass-panel glass-hover"
+      href="{resolve('')}/watch/manual-vs-cqd"
+    >Watch the manual vs CQD comparison video</a>
+
+    <a
+      class="glass-panel glass-hover"
+      href="{resolve('')}/"
+    >Back to homepage</a>
   </p>
 </article>
 

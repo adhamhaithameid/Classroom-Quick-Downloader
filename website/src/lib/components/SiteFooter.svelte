@@ -1,13 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { base } from '$app/paths';
-  import { page } from '$app/stores';
-  import { APP_VERSION, STORE_LINKS } from '$lib/config';
-  import { trackWebsiteEvent } from '$lib/analytics/websiteEvents';
-  import { websiteSnapshotStore } from '$lib/stores/websiteSnapshot';
-  import { browserDisplayName, detectBrowserFromNavigator, type BrowserKey } from '$lib/browser/detect';
-  import type { OverviewResponse } from '$lib/types/public';
-  import logo from '$lib/assets/cqd-logo.svg';
+  import { resolve } from '$app/paths';
+  import { page } from '$app/state';
+  import { APP_VERSION, STORE_LINKS } from '#lib/config.ts';
+  import { trackWebsiteEvent } from '#lib/analytics/websiteEvents.ts';
+  import { websiteSnapshotStore } from '#lib/stores/websiteSnapshot.ts';
+  import { browserDisplayName, detectBrowserFromNavigator, type BrowserKey } from '#lib/browser/detect.ts';
+  import type { OverviewResponse } from '#lib/types/public.ts';
+  import logo from '#lib/assets/cqd-logo.svg';
 
   type SnapshotLinks = OverviewResponse['links'];
 
@@ -42,7 +42,7 @@
       eventType: 'cta',
       action: 'install_click',
       placement: `footer_install_${browser}`,
-      pagePath: $page.url.pathname
+      pagePath: page.url.pathname
     });
   }
 
@@ -360,18 +360,18 @@
             if (band > -PULSE_BAND && band < PULSE_BAND) {
               /* Amplitude falls off with distance traveled, so the wave
                  dies out toward the far edge instead of churning there. */
-              const w =
-                (1 - Math.abs(band) / PULSE_BAND) * Math.pow(1 - front / maxFront, 1.5);
-              p.vx += (dx / d) * PULSE_KICK * w * df;
-              p.vy += (dy / d) * PULSE_KICK * w * df;
+              const w = (1 - Math.abs(band) / PULSE_BAND) * Math.pow(1 - front / maxFront, 1.5);
+
+              p.vx += dx / d * PULSE_KICK * w * df;
+              p.vy += dy / d * PULSE_KICK * w * df;
             }
           }
           p.vx *= DRAG;
           p.vy *= DRAG;
           const sp = Math.hypot(p.vx, p.vy);
           if (sp > MAX_SPEED) {
-            p.vx = (p.vx / sp) * MAX_SPEED;
-            p.vy = (p.vy / sp) * MAX_SPEED;
+            p.vx = p.vx / sp * MAX_SPEED;
+            p.vy = p.vy / sp * MAX_SPEED;
           }
           p.x += p.vx + (p.hx - p.x) * EASE * df;
           p.y += p.vy + (p.hy - p.y) * EASE * df;
@@ -427,7 +427,7 @@
            of shrinking one long line to fit. */
         const lines = innerW < 640 ? ['CLASSROOM', 'QUICK', 'DOWNLOADER'] : [LINE_1, LINE_2];
         const widest = Math.max(...lines.map((l) => pctx.measureText(l).width)) || 900;
-        const fontSize = Math.max(30, (innerW / widest) * 100);
+        const fontSize = Math.max(30, innerW / widest * 100);
         const lineStep = fontSize * 0.94;
         const baselines = lines.map((_, i) => fontSize * 0.82 + i * lineStep);
         const height = Math.ceil(baselines[baselines.length - 1] + fontSize * 0.2);
@@ -450,7 +450,7 @@
         /* Density scales with canvas area: ~5k dots on a full-size desktop
            canvas, proportionally fewer on small screens, always dense
            enough that letterforms read as solid halftone. */
-        let grid = Math.max(3, Math.min(8, Math.round(Math.sqrt((innerW * height) / 16000))));
+        let grid = Math.max(3, Math.min(8, Math.round(Math.sqrt(innerW * height / 16000))));
         const collect = (): Dot[] => {
           const out: Dot[] = [];
           for (let y = 0; y < height; y += grid) {
@@ -578,6 +578,9 @@
   });
 </script>
 
+<!-- kit 3: page comes from $app/state; this component reads it only inside
+     click handlers, so no runes conversion is needed. -->
+
 <footer class="cqd-footer" bind:this={footerEl}>
   <!-- Layer 1 — final installation CTA. data-ft-zone marks a cascade zone;
        data-ft marks its steps, which run in DOM order on reveal. -->
@@ -599,8 +602,20 @@
               rel="noopener noreferrer"
               on:click={() => trackFooterInstall(b)}
             >
-              <img src="{base}/images/{b}.svg" alt="" width="18" height="18" loading="lazy" decoding="async" />
-              {#if b === detectedBrowser}Install for {browserDisplayName(b)}{:else}{browserDisplayName(b)}{/if}
+              <img
+                src="{resolve('')}/images/{b}.svg"
+                alt=""
+                width="18"
+                height="18"
+                loading="lazy"
+                decoding="async"
+              />
+
+              {#if b === detectedBrowser}
+                Install for {browserDisplayName(b)}
+              {:else}
+                {browserDisplayName(b)}
+              {/if}
             </a>
           </span>
         {/each}
@@ -625,19 +640,33 @@
         <nav class="ft-col ft-col-product" data-ft aria-label="Product">
           <h2 class="ft-label">Product</h2>
           <ul class="ft-links">
-            <li><a href="{base}/">Overview</a></li>
-            <li><a href="{base}/#how-it-works">How it works</a></li>
-            <li><a href="{base}/changelog">Changelog</a></li>
-            <li><a href="{base}/featured">Featured</a></li>
+            <li><a href="{resolve('')}/">Overview</a></li>
+            <li><a href="{resolve('')}/#how-it-works">How it works</a></li>
+            <li><a href="{resolve('')}/changelog">Changelog</a></li>
+            <li><a href="{resolve('')}/featured">Featured</a></li>
           </ul>
         </nav>
 
         <nav class="ft-col ft-col-compare" data-ft aria-label="Compare">
           <h2 class="ft-label">Compare</h2>
           <ul class="ft-links">
-            <li><a href="{base}/compare/classroom-quick-downloader-vs-classfetch">vs ClassFetch</a></li>
-            <li><a href="{base}/compare/classroom-quick-downloader-vs-classmate">vs Classmate</a></li>
-            <li><a href="{base}/compare/classroom-quick-downloader-vs-classroom-one-click-downloader">vs One-Click</a></li>
+            <li>
+              <a
+                href="{resolve('')}/compare/classroom-quick-downloader-vs-classfetch"
+              >vs ClassFetch</a>
+            </li>
+
+            <li>
+              <a
+                href="{resolve('')}/compare/classroom-quick-downloader-vs-classmate"
+              >vs Classmate</a>
+            </li>
+
+            <li>
+              <a
+                href="{resolve('')}/compare/classroom-quick-downloader-vs-classroom-one-click-downloader"
+              >vs One-Click</a>
+            </li>
           </ul>
         </nav>
 
@@ -659,20 +688,20 @@
                 Edge <span class="ft-arrow" aria-hidden="true">↗</span>
               </a>
             </li>
-            <li><a href="{base}/install/chrome">Chrome guide</a></li>
-            <li><a href="{base}/install/firefox">Firefox guide</a></li>
-            <li><a href="{base}/install/edge">Edge guide</a></li>
+            <li><a href="{resolve('')}/install/chrome">Chrome guide</a></li>
+            <li><a href="{resolve('')}/install/firefox">Firefox guide</a></li>
+            <li><a href="{resolve('')}/install/edge">Edge guide</a></li>
           </ul>
         </nav>
 
         <nav class="ft-col ft-col-resources" data-ft aria-label="Resources">
           <h2 class="ft-label">Resources</h2>
           <ul class="ft-links">
-            <li><a href="{base}/faq">FAQ</a></li>
-            <li><a href="{base}/privacy">Privacy</a></li>
-            <li><a href="{base}/security">Security</a></li>
-            <li><a href="{base}/brand">Brand kit</a></li>
-            <li><a href="{base}/site-map">Site map</a></li>
+            <li><a href="{resolve('')}/faq">FAQ</a></li>
+            <li><a href="{resolve('')}/privacy">Privacy</a></li>
+            <li><a href="{resolve('')}/security">Security</a></li>
+            <li><a href="{resolve('')}/brand">Brand kit</a></li>
+            <li><a href="{resolve('')}/site-map">Site map</a></li>
           </ul>
         </nav>
 
@@ -688,8 +717,8 @@
             <li>
               <a href={reportIssueUrl} target="_blank" rel="noopener noreferrer">Report issue</a>
             </li>
-            <li><a href="{base}/support">Support</a></li>
-            <li><a href="{base}/watch/cqd-demo">Watch demo</a></li>
+            <li><a href="{resolve('')}/support">Support</a></li>
+            <li><a href="{resolve('')}/watch/cqd-demo">Watch demo</a></li>
           </ul>
         </nav>
       </div>

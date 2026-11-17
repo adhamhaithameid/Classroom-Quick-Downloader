@@ -1,15 +1,15 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { base } from '$app/paths';
-  import { submitUninstallFeedback } from '$lib/api/publicSite';
-  import { STORE_LINKS } from '$lib/config';
-  import { trackWebsiteEvent } from '$lib/analytics/websiteEvents';
-  import { parseUninstallStatsParams } from '$lib/analytics/uninstallParams';
-  import { buildUninstallViewEvent } from '$lib/analytics/uninstallViewEvent';
-  import { buildUninstallNotesPayload } from '$lib/uninstall/feedback';
-  import { browserDisplayName, detectBrowserFromUserAgent, type BrowserKey } from '$lib/browser/detect';
-  import SeoMeta from '$lib/components/SeoMeta.svelte';
-  import { magnetic } from '$lib/actions/magnetic';
+  import { resolve } from '$app/paths';
+  import { submitUninstallFeedback } from '#lib/api/publicSite.ts';
+  import { STORE_LINKS } from '#lib/config.ts';
+  import { trackWebsiteEvent } from '#lib/analytics/websiteEvents.ts';
+  import { parseUninstallStatsParams } from '#lib/analytics/uninstallParams.ts';
+  import { buildUninstallViewEvent } from '#lib/analytics/uninstallViewEvent.ts';
+  import { buildUninstallNotesPayload } from '#lib/uninstall/feedback.ts';
+  import { browserDisplayName, detectBrowserFromUserAgent, type BrowserKey } from '#lib/browser/detect.ts';
+  import SeoMeta from '#lib/components/SeoMeta.svelte';
+  import { magnetic } from '#lib/actions/magnetic.ts';
 
   const reasons: { label: string; icon: string }[] = [
     { label: "Didn't work as expected", icon: '⚙️' },
@@ -65,7 +65,7 @@
   /** Put the detected browser in the centre of the row */
   $: orderedBrowsers = (() => {
     const all: BrowserKey[] = ['chrome', 'firefox', 'edge'];
-    const others = all.filter(b => b !== detectedBrowser);
+    const others = all.filter((b) => b !== detectedBrowser);
     return others.length === 2 ? [others[0], detectedBrowser, others[1]] : all;
   })();
 
@@ -189,7 +189,21 @@
                 <span class="un-pill-icon" aria-hidden="true">{icon}</span>
                 {label}
                 {#if selectedReason === label}
-                  <svg class="un-pill-check" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                  <svg
+                    class="un-pill-check"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    width="14"
+                    height="14"
+                    aria-hidden="true"
+                    focusable="false"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                      clip-rule="evenodd"
+                    ></path>
+                  </svg>
                 {/if}
               </button>
             {/each}
@@ -238,7 +252,19 @@
                   <span class="un-mini-icon">{icon}</span>
                   {label}
                   {#if selectedFeatures.includes(label)}
-                    <svg class="un-mini-check" viewBox="0 0 20 20" fill="currentColor" width="12" height="12"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                    <svg
+                      class="un-mini-check"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      width="12"
+                      height="12"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                        clip-rule="evenodd"
+                      ></path>
+                    </svg>
                   {/if}
                 </button>
               {/each}
@@ -265,10 +291,40 @@
             on:click={submitFeedback}
           >
             {#if submitState === 'sending'}
-              <svg class="un-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18"><circle cx="12" cy="12" r="10" stroke-dasharray="60" stroke-dashoffset="20"/></svg>
+              <svg
+                class="un-spinner"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                width="18"
+                height="18"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke-dasharray="60"
+                  stroke-dashoffset="20"
+                ></circle>
+              </svg>
+
               Sending…
             {:else}
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></svg>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                width="18"
+                height="18"
+              >
+                <path d="m22 2-7 20-4-9-9-4z"></path>
+                <path d="M22 2 11 13"></path>
+              </svg>
+
               Submit feedback
             {/if}
           </button>
@@ -311,8 +367,17 @@
               use:magnetic={isDetected}
               on:click={() => trackReinstallClick(browser)}
             >
-              <img src="{base}/images/{browser}.svg" alt="" class="un-browser-icon" />
-              {#if isDetected}Reinstall for {browserDisplayName(browser)}{:else}{browserDisplayName(browser)}{/if}
+              <img
+                src="{resolve('')}/images/{browser}.svg"
+                alt=""
+                class="un-browser-icon"
+              />
+
+              {#if isDetected}
+                Reinstall for {browserDisplayName(browser)}
+              {:else}
+                {browserDisplayName(browser)}
+              {/if}
             </a>
           {/each}
         </div>

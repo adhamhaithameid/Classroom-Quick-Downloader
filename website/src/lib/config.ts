@@ -1,7 +1,16 @@
-import * as publicEnvModule from '$env/static/public';
-import { WEBSITE_MANUAL_RELEASE_VERSION } from '$lib/content/release-version.manual.generated';
-
-const publicEnv = publicEnvModule as Record<string, string | undefined>;
+import { WEBSITE_MANUAL_RELEASE_VERSION } from '#lib/content/release-version.manual.generated.ts';
+import {
+  PUBLIC_SITE_URL as ENV_SITE_URL,
+  PUBLIC_API_BASE_URL as ENV_API_BASE_URL,
+  PUBLIC_ORACLE_API_BASE_URL as ENV_ORACLE_API_BASE_URL,
+  PUBLIC_WORKER_BASE_URL as ENV_WORKER_BASE_URL,
+  PUBLIC_SITE_BACKEND_BASE_URL as ENV_SITE_BACKEND_BASE_URL,
+  PUBLIC_APP_VERSION as ENV_APP_VERSION,
+  PUBLIC_ENABLE_FEEDBACK_NAV as ENV_ENABLE_FEEDBACK_NAV,
+  PUBLIC_GOOGLE_SITE_VERIFICATION as ENV_GOOGLE_SITE_VERIFICATION,
+  PUBLIC_BING_SITE_VERIFICATION as ENV_BING_SITE_VERIFICATION,
+  PUBLIC_INDEXNOW_KEY as ENV_INDEXNOW_KEY
+} from '$app/env/public';
 
 const DEFAULT_SITE_URL = 'https://classroom-quick-downloader.adhamhaithameid.is-a.dev';
 const DEFAULT_WORKER_URL = 'https://cqd-analytics.adhamhaithameid.workers.dev';
@@ -52,27 +61,27 @@ function envText(value: string | undefined, fallback = ''): string {
   return normalized;
 }
 
-export const SITE_URL = ensureUrl(publicEnv.PUBLIC_SITE_URL ?? '', resolveDefaultSiteUrl());
+export const SITE_URL = ensureUrl(ENV_SITE_URL ?? '', resolveDefaultSiteUrl());
 // Canonical base for public website data. The Cloudflare Worker serves this
 // data itself (edge snapshot + live store stats); the legacy env name is still
 // honored so existing deployments keep working.
 export const PUBLIC_API_BASE_URL = ensureUrl(
-  publicEnv.PUBLIC_API_BASE_URL ?? publicEnv.PUBLIC_ORACLE_API_BASE_URL ?? '',
+  ENV_API_BASE_URL ?? ENV_ORACLE_API_BASE_URL ?? '',
   DEFAULT_PUBLIC_API_URL
 );
 /** @deprecated Use {@link PUBLIC_API_BASE_URL} — kept for backward compatibility. */
 export const ORACLE_API_BASE_URL = PUBLIC_API_BASE_URL;
-export const WORKER_BASE_URL = ensureUrl(publicEnv.PUBLIC_WORKER_BASE_URL ?? '', DEFAULT_WORKER_URL);
-export const SITE_BACKEND_BASE_URL = ensureUrl(publicEnv.PUBLIC_SITE_BACKEND_BASE_URL ?? '', WORKER_BASE_URL);
+export const WORKER_BASE_URL = ensureUrl(ENV_WORKER_BASE_URL ?? '', DEFAULT_WORKER_URL);
+export const SITE_BACKEND_BASE_URL = ensureUrl(ENV_SITE_BACKEND_BASE_URL ?? '', WORKER_BASE_URL);
 export const APP_VERSION = (() => {
-  const raw = (publicEnv.PUBLIC_APP_VERSION ?? DEFAULT_APP_VERSION).trim();
+  const raw = (ENV_APP_VERSION ?? DEFAULT_APP_VERSION).trim();
   if (!raw) return DEFAULT_APP_VERSION;
   return raw.startsWith('v') ? raw : `v${raw}`;
 })();
-export const ENABLE_FEEDBACK_NAV = envBool(publicEnv.PUBLIC_ENABLE_FEEDBACK_NAV, false);
-export const GOOGLE_SITE_VERIFICATION = envText(publicEnv.PUBLIC_GOOGLE_SITE_VERIFICATION, DEFAULT_GOOGLE_SITE_VERIFICATION);
-export const BING_SITE_VERIFICATION = envText(publicEnv.PUBLIC_BING_SITE_VERIFICATION);
-export const INDEXNOW_KEY = envText(publicEnv.PUBLIC_INDEXNOW_KEY);
+export const ENABLE_FEEDBACK_NAV = envBool(ENV_ENABLE_FEEDBACK_NAV, false);
+export const GOOGLE_SITE_VERIFICATION = envText(ENV_GOOGLE_SITE_VERIFICATION, DEFAULT_GOOGLE_SITE_VERIFICATION);
+export const BING_SITE_VERIFICATION = envText(ENV_BING_SITE_VERIFICATION);
+export const INDEXNOW_KEY = envText(ENV_INDEXNOW_KEY);
 
 export const STORE_LINKS = {
   chrome:

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import BalloonsOverlay from './BalloonsOverlay.svelte';
-import type { BalloonParticle } from '$lib/celebration/balloons';
+import type { BalloonParticle } from '#lib/celebration/balloons/index.ts';
 
 function particle(id: number): BalloonParticle {
   return {

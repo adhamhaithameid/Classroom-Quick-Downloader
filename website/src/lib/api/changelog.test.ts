@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fetchChangelog } from './changelog';
-import { WEBSITE_MANUAL_CHANGELOG } from '$lib/content/changelog.manual.generated';
+import { WEBSITE_MANUAL_CHANGELOG } from '#lib/content/changelog.manual.generated.ts';
 
 describe('fetchChangelog (manual source)', () => {
   it('returns manual changelog payload with stable schema', async () => {

@@ -102,7 +102,7 @@ describe('testimonials section guardrails', () => {
   it('uses the shared browser icon sprite and the magnetic action', () => {
     expect(componentSource).toContain('use:magnetic');
     expect(componentSource).toContain('#cqd-logo-');
-    expect(componentSource).toContain("from '$lib/actions/magnetic'");
+    expect(componentSource).toMatch(/from '#lib\/actions\/magnetic(\.ts)?'/);
   });
 
   it('references real reviewer avatars that exist on disk', () => {

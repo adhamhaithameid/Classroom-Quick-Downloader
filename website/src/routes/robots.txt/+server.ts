@@ -1,4 +1,4 @@
-import { SITE_URL } from '$lib/config';
+import { SITE_URL } from '#lib/config.ts';
 
 export const prerender = true;
 

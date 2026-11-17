@@ -5,7 +5,7 @@ import {
   SITEMAP_VIDEO_ENTRIES,
   escapeXml,
   toAbsoluteSiteUrl
-} from '$lib/seo/site';
+} from '#lib/seo/site.ts';
 
 export const prerender = true;
 

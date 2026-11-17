@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
-import defaultPlacementsSeed from '$lib/svgCatalog/defaultPlacements.v2.json';
+import defaultPlacementsSeed from '#lib/svgCatalog/defaultPlacements.v2.json';
 import OverviewPage from './overview/+page.svelte';
 
 function squish(html: string): string {

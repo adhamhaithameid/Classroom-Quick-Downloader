@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { SITE_URL, STORE_LINKS } from '$lib/config';
-  import { DEFAULT_LANGUAGE, SITE_LOCALE, SITE_NAME, SOCIAL_IMAGE } from '$lib/seo/site';
+  import { SITE_URL, STORE_LINKS } from '#lib/config.ts';
+  import { DEFAULT_LANGUAGE, SITE_LOCALE, SITE_NAME, SOCIAL_IMAGE } from '#lib/seo/site.ts';
 
   export let title: string;
   export let description: string;
