@@ -33,20 +33,6 @@ function ensureUrl(value: string, fallback: string): string {
 	}
 }
 
-function resolveDefaultSiteUrl(): string {
-	if (typeof window !== 'undefined') {
-		try {
-			const origin = cleanBaseUrl(window.location.origin);
-			if (origin.startsWith('https://') || origin.startsWith('http://')) {
-				return origin;
-			}
-		} catch {
-			// fall through to static fallback
-		}
-	}
-	return DEFAULT_SITE_URL;
-}
-
 function envBool(value: string | undefined, fallback = false): boolean {
   if (typeof value !== 'string') return fallback;
   const normalized = value.trim().toLowerCase();
@@ -61,7 +47,9 @@ function envText(value: string | undefined, fallback = ''): string {
   return normalized;
 }
 
-export const SITE_URL = ensureUrl(ENV_SITE_URL ?? '', resolveDefaultSiteUrl());
+// Deterministic on server and client: canonical/JSON-LD must not depend on the
+// browser origin, or hydration sees different SEO tags (bead vsyk).
+export const SITE_URL = ensureUrl(ENV_SITE_URL ?? '', DEFAULT_SITE_URL);
 // Canonical base for public website data. The Cloudflare Worker serves this
 // data itself (edge snapshot + live store stats); the legacy env name is still
 // honored so existing deployments keep working.

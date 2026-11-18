@@ -73,6 +73,32 @@ describe('live review merge guard rails', () => {
   });
 });
 
+describe('live review merge whitespace tolerance (bead 9ltz)', () => {
+  it('treats a live review as a duplicate when only whitespace and case differ', () => {
+    const multiline = TESTIMONIALS.find((r) => r.text.includes('\n'));
+    expect(multiline).toBeDefined();
+    const merged = mergeLiveTestimonials(TESTIMONIALS, [
+      {
+        reviewer: multiline!.name,
+        rating: 5,
+        text: multiline!.text.replace(/\n/g, ' '),
+        dateText: multiline!.date,
+        store: multiline!.store
+      }
+    ]);
+    expect(merged.length).toBe(TESTIMONIALS.length);
+  });
+
+  it('never yields two entries with the same reviewer and date key', () => {
+    const merged = mergeLiveTestimonials(TESTIMONIALS, [
+      { reviewer: 'Twin Person', rating: 5, text: 'first review text', dateText: 'Oct 1, 2026', store: 'chrome' },
+      { reviewer: 'Twin Person', rating: 5, text: 'second review text', dateText: 'Oct 1, 2026', store: 'chrome' }
+    ]);
+    expect(merged.length).toBe(TESTIMONIALS.length + 2);
+    expect(componentSource).not.toMatch(/\{#each allReviews as r, i \(r\.name \+ r\.date\)\}/);
+  });
+});
+
 describe('testimonials section guardrails', () => {
   it('renders reviews from the shared data module with no progress bar or counter', () => {
     expect(componentSource).toContain('r.text.replace');

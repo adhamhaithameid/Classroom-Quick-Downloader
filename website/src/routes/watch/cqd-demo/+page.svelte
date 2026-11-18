@@ -205,8 +205,7 @@
   }
 
   /* K4: step/check lists cascade in once per page load. */
-  .watch-steps li,
-  .watch-checklist li {
+  .watch-steps li {
     animation: watch-li-rise 0.5s var(--glass-ease) backwards;
     animation-delay: calc(0.1s + var(--li, 0) * 0.07s);
   }
@@ -247,8 +246,7 @@
       transition: none;
     }
 
-    .watch-steps li,
-    .watch-checklist li {
+    .watch-steps li {
       animation: none;
     }
   }

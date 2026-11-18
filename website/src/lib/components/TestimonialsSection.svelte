@@ -172,7 +172,7 @@
 
     <div class="ts-viewport">
       <div class="ts-track" bind:this={trackEl}>
-        {#each allReviews as r, i (r.name + r.date)}
+        {#each allReviews as r, i (i)}
           <div class="ts-slide" role="group" aria-roledescription="slide" aria-label="{i + 1} of {allReviews.length}">
             <a class="tcard" href={r.href} target="_blank" rel="noopener noreferrer">
               <span class="sheen" aria-hidden="true"></span>
