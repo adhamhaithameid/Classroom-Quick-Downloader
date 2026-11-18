@@ -5,6 +5,14 @@ DO_SHARED_SECRET=replace-me-with-a-strong-secret
 DANGER_PASSWORD=replace-me-with-a-strong-secret
 DASHBOARD_PASSWORD=replace-me-with-a-strong-secret
 
+# Licensing (bead 0h4d.2.2). Required for /license/validate and
+# /license/activate (entitlement HMAC) and /license/webhook (provider
+# signature verification). See README "Licensing endpoints".
+ENTITLEMENT_SIGNING_KEY=replace-me-with-a-strong-secret
+LICENSE_WEBHOOK_SECRET=replace-me-with-a-strong-secret
+# Provider selector; "lemonsqueezy" is the only production value.
+# LICENSE_PROVIDER=lemonsqueezy
+
 # Optional local D1 for the event archive (wrangler pages dev / wrangler dev
 # can bind a local D1 automatically; adjust to taste):
 # SITE_CACHE_DB=local-archive-db

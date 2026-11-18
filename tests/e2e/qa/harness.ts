@@ -94,6 +94,34 @@ export function projectBrowser(projectName: string): QaBrowser {
 }
 
 /**
+ * Map a Playwright project name to the launch channel. qa-edge runs on Edge
+ * stable; every other Chromium project uses the new-headless Chromium build
+ * (the only bundled build that supports extensions). launchPersistentContext
+ * ignores the project's `use.channel`, so the brand can only reach the launch
+ * through this resolution — without it the qa-edge leg silently runs vanilla
+ * Chromium and reports fake Edge coverage.
+ */
+export function projectChannel(projectName: string): "msedge" | "chromium" {
+  return projectName === "qa-edge" ? "msedge" : "chromium";
+}
+
+/**
+ * True when the given channel's browser is installed on this runner. Edge
+ * absence must degrade to the standard ENVIRONMENT skip before any launch
+ * attempt (bead 6mfg): a missing msedge executable otherwise surfaces as a
+ * deep Playwright launch error instead of a classified skip.
+ */
+export function channelBrowserInstalled(channel: "msedge" | "chromium"): boolean {
+  if (channel === "chromium") return true; // bundled with Playwright
+  try {
+    const p = chromium.executablePath({ channel });
+    return Boolean(p) && fs.existsSync(p);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Run one QA check: body executes against a live page; every assertion goes
  * through the check collector; the result artifact is always written; the
  * re-thrown error makes the Playwright test itself reflect the outcome.
@@ -161,12 +189,29 @@ export interface QaSession {
 export async function launchQaContext(
   browser: QaBrowser,
   scenario: Scenario,
-  opts: { skipIfExtensionUnavailable?: boolean } = {},
+  opts: { skipIfExtensionUnavailable?: boolean; project?: string } = {},
 ): Promise<QaSession> {
   // Each session's probe result must be authoritative: a degraded launch in
   // an earlier session (e.g. a failed Firefox launch) must not poison the
   // skip decisions of later sessions in the same worker.
   EXTENSION_UNAVAILABLE_REASON = null;
+
+  // Resolve the brand BEFORE touching the network so an absent browser
+  // degrades without ever starting (or leaking) a simulator proxy (bead 6mfg).
+  const channel = projectChannel(opts.project ?? "");
+  if (browser === "chromium" && !channelBrowserInstalled(channel)) {
+    EXTENSION_UNAVAILABLE_REASON =
+      "ENVIRONMENT: browser for channel '" +
+      channel +
+      "' is not installed on this runner — journeys skipped";
+    return {
+      context: undefined as unknown as BrowserContext,
+      extensionAvailable: false,
+      servedDownloads: () => [],
+      close: async () => {},
+    };
+  }
+
   const sim = await startSimulatorProxy(scenario);
   const signedXpiPath = process.env.QA_SIGNED_XPI;
 
@@ -181,8 +226,9 @@ export async function launchQaContext(
       browser === "chromium"
         ? await chromium.launchPersistentContext("", {
           // New headless (channel 'chromium') supports extensions; the bundled
-          // old-headless build does not.
-          channel: "chromium",
+          // old-headless build does not. qa-edge overrides the channel to
+          // Edge stable via projectChannel().
+          channel,
           headless: true,
           acceptDownloads: true,
           ignoreHTTPSErrors: true,
@@ -192,7 +238,14 @@ export async function launchQaContext(
             `--load-extension=${CHROMIUM_EXTENSION_PATH}`,
             "--disable-blink-features=AutomationControlled",
             "--no-first-run",
+            "--no-default-browser-check",
             "--disable-default-apps",
+            // Edge (channel 'msedge') runs its own first-run/welcome flow on a
+            // fresh profile even under --no-first-run; an extra welcome tab
+            // during a journey would trip the no-dead-ends tab-count
+            // invariant. These switches keep the profile quiet.
+            "--disable-features=msFirstRunExperience,msSecondaryTilingRecommendation,EdgeWelcomePage",
+            "--disable-edge-search-on-first-prompt",
             // The download manager verifies certificates outside Playwright's
             // ignoreHTTPSErrors reach; the simulator's test-only CA must be
             // accepted there or chrome.downloads fails with a cert error.

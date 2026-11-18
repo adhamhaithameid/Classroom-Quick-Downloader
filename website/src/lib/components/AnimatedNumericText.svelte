@@ -1,5 +1,5 @@
 <script lang="ts">
-  import AnimatedNumber from '$lib/components/AnimatedNumber.svelte';
+  import AnimatedNumber from '#lib/components/AnimatedNumber.svelte';
 
   export let text = '';
   export let useGrouping = false;

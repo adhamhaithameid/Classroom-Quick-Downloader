@@ -1,5 +1,5 @@
-import type { ChangelogResponse } from '$lib/types/public';
-import { WEBSITE_MANUAL_CHANGELOG } from '$lib/content/changelog.manual.generated';
+import type { ChangelogResponse } from '#lib/types/public.ts';
+import { WEBSITE_MANUAL_CHANGELOG } from '#lib/content/changelog.manual.generated.ts';
 
 function toIsoFromReleasedAt(value: unknown): string {
   const num = Number(value);

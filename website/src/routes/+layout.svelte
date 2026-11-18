@@ -1,36 +1,48 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { browser } from '$app/environment';
-  import { base } from '$app/paths';
-  import { navigating, page } from '$app/stores';
+  import { browser } from '$app/env';
+  import { resolve } from '$app/paths';
+  import { resolvePath } from '#lib/navigation/resolvePath.ts';
+  import { afterNavigate, beforeNavigate } from '$app/navigation';
+  // kit 3: pathname + error-route flag arrive as reactive data props from
+  // +layout.js (universal load reruns per navigation); navigation-in-flight
+  // edges arrive through before/afterNavigate callbacks.
+  export let data: { pathname: string; isErrorRoute: boolean };
+  let navigating = false;
+  beforeNavigate(() => {
+    navigating = true;
+  });
+  afterNavigate(() => {
+    navigating = false;
+  });
   /* Self-hosted variable font (bead ts09): no render-blocking Google Fonts
      request; Vite fingerprints the woff2 files and caches them immutably. */
   import '@fontsource-variable/plus-jakarta-sans';
   import '@fontsource-variable/plus-jakarta-sans/wght-italic.css';
-  import logo from '$lib/assets/cqd-logo.svg';
-  import { APP_VERSION, BING_SITE_VERIFICATION, GOOGLE_SITE_VERIFICATION, STORE_LINKS } from '$lib/config';
-  import { browserDisplayName, detectBrowserFromNavigator, type BrowserKey } from '$lib/browser/detect';
-  import { flushWebsiteEvents, initWebsiteEventsClient, trackWebsiteEvent } from '$lib/analytics/websiteEvents';
-  import { initializeWebsiteSnapshotStore, websiteSnapshotStore } from '$lib/stores/websiteSnapshot';
-  import LoadingScreen from '$lib/components/LoadingScreen.svelte';
-  import SiteFooter from '$lib/components/SiteFooter.svelte';
-  import BrowserIcon from '$lib/components/BrowserIcon.svelte';
-  import BrowserIconSprite from '$lib/components/BrowserIconSprite.svelte';
-  import AmbientBackground from '$lib/components/AmbientBackground.svelte';
-  import CursorLayer from '$lib/cursor/CursorLayer.svelte';
+  import logo from '#lib/assets/cqd-logo.svg';
+  import { APP_VERSION, BING_SITE_VERIFICATION, GOOGLE_SITE_VERIFICATION, STORE_LINKS } from '#lib/config.ts';
+  import { browserDisplayName, detectBrowserFromNavigator, type BrowserKey } from '#lib/browser/detect.ts';
+  import { flushWebsiteEvents, initWebsiteEventsClient, trackWebsiteEvent } from '#lib/analytics/websiteEvents.ts';
+  import { initializeWebsiteSnapshotStore, websiteSnapshotStore } from '#lib/stores/websiteSnapshot.ts';
+  import LoadingScreen from '#lib/components/LoadingScreen.svelte';
+  import SiteFooter from '#lib/components/SiteFooter.svelte';
+  import BrowserIcon from '#lib/components/BrowserIcon.svelte';
+  import BrowserIconSprite from '#lib/components/BrowserIconSprite.svelte';
+  import AmbientBackground from '#lib/components/AmbientBackground.svelte';
+  import CursorLayer from '#lib/cursor/CursorLayer.svelte';
   import '../app.css';
 
-  type MenuIconKey =
-    | 'spark'
-    | 'bolt'
-    | 'play'
-    | 'shield'
-    | 'download'
-    | 'doc'
-    | 'question'
-    | 'lock'
-    | 'clock'
-    | 'megaphone';
+  type MenuIconKey = 
+    'spark' |
+    'bolt' |
+    'play' |
+    'shield' |
+    'download' |
+    'doc' |
+    'question' |
+    'lock' |
+    'clock' |
+    'megaphone';
 
   type MenuLink = {
     href: string;
@@ -204,7 +216,7 @@
   function resolveMenuHref(href: string): string {
     if (href === 'github') return githubHref;
     if (!href.startsWith('/')) return href;
-    return `${base}${href}`;
+    return resolvePath(`${href}`.slice(1));
   }
 
   function normalizePath(path: string): string {
@@ -318,7 +330,7 @@
       eventType: 'cta',
       action: 'install_click',
       placement,
-      pagePath: $page.url.pathname
+      pagePath: data.pathname
     });
   }
 
@@ -329,7 +341,7 @@
     const [hrefPath, hash] = href.split('#');
     if (!hash) return;
 
-    const currentPath = normalizePath($page.url.pathname);
+    const currentPath = normalizePath(data.pathname);
     const targetPath = normalizePath(hrefPath || currentPath);
     if (targetPath !== currentPath) return;
 
@@ -343,7 +355,7 @@
     history.replaceState(
       history.state,
       '',
-      `${base}${targetPath === '/' ? '' : targetPath}#${hash}`
+      resolvePath(`${targetPath === '/' ? '' : targetPath}#${hash}`.slice(1))
     );
   }
 
@@ -372,7 +384,7 @@
     if (now - lastPointerWrite < 50) return;
     lastPointerWrite = now;
     if (!navBarRect.width) return;
-    const ratio = ((event.clientX - navBarRect.left) / navBarRect.width) * 100;
+    const ratio = (event.clientX - navBarRect.left) / navBarRect.width * 100;
     navBarEl.style.setProperty('--nav-pointer-x', `${ratio.toFixed(1)}%`);
   }
 
@@ -390,7 +402,7 @@
         headers: { Accept: 'application/vnd.github+json' }
       });
       if (!response.ok) return;
-      const data = (await response.json()) as Record<string, unknown>;
+      const data = await response.json() as Record<string, unknown>;
       githubStats = {
         stars: typeof data.stargazers_count === 'number' ? data.stargazers_count : 0,
         forks: typeof data.forks_count === 'number' ? data.forks_count : 0,
@@ -594,9 +606,9 @@
     }
   }
 
-  $: route = $page.url.pathname.replace(/\/$/, '') || '/';
+  $: route = data.pathname.replace(/\/$/, '') || '/';
   $: isOverviewStyleRoute =
-    $page.status === 404 ||
+    data.isErrorRoute ||
     route === '/' ||
     route === '/overview' ||
     route === '/landing2' ||
@@ -606,7 +618,7 @@
     route === '/faq' ||
     route === '/changelog';
   $: if (browser) syncBarMode(scrolled);
-  $: if ($page.url.pathname) {
+  $: if (data.pathname) {
     mobileNavOpen = false;
     closeMenus();
   }
@@ -652,6 +664,9 @@
   });
 </script>
 
+<!-- kit 3: layout stays legacy-mode; page data flows through the +layout.js
+     universal load as reactive props instead of the removed store module. -->
+
 <svelte:head>
   {#if GOOGLE_SITE_VERIFICATION}
     <meta
@@ -667,7 +682,10 @@
   {/if}
 </svelte:head>
 
-<svelte:window on:focusin={handleDocFocusIn} on:focusout={handleDocFocusOut} />
+<svelte:window
+  on:focusin={handleDocFocusIn}
+  on:focusout={handleDocFocusOut}
+></svelte:window>
 
 <LoadingScreen />
 <BrowserIconSprite />
@@ -677,429 +695,491 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
   {#if !hideChrome}
   <header class="l2-nav-shell" class:is-scrolled={scrolled} class:menu-open={openMenu !== null} class:nav-dark={navDark}>
-    <div class="l2-nav-float">
-      <div
-        class="l2-nav-bar"
-        role="presentation"
-        bind:this={navBarEl}
-        on:pointerenter={handleBarPointerEnter}
-        on:pointerleave={handleBarPointerLeave}
-        on:pointermove={handleBarPointerMove}
-      >
-        <div class="l2-nav-inner">
-          <a href="{base}/" class="l2-nav-brand">
-            <img src={logo} alt="Classroom Quick Downloader" class="l2-nav-logo" width="42" height="36" loading="eager" decoding="async" />
-            <span class="l2-nav-brand-text">Classroom Quick Downloader</span>
-          </a>
+      <div class="l2-nav-float">
+        <div
+          class="l2-nav-bar"
+          role="presentation"
+          bind:this={navBarEl}
+          on:pointerenter={handleBarPointerEnter}
+          on:pointerleave={handleBarPointerLeave}
+          on:pointermove={handleBarPointerMove}
+        >
+          <div class="l2-nav-inner">
+            <a href={resolvePath('')} class="l2-nav-brand">
+              <img
+                src={logo}
+                alt="Classroom Quick Downloader"
+                class="l2-nav-logo"
+                width="42"
+                height="36"
+                loading="eager"
+                decoding="async"
+              />
+
+              <span class="l2-nav-brand-text">Classroom Quick Downloader</span>
+            </a>
 
           <nav class="l2-nav-links l2-nav-links-desktop" aria-label="Primary">
-            {#each navMenus as menu (menu.key)}
-              <a
-                class="l2-nav-link"
-                data-menu-key={menu.key}
-                href="{base}{menu.href}"
-                class:active={isActive(menu.href, $page.url.pathname)}
-                class:open={openMenu === menu.key}
-                aria-current={isActive(menu.href, $page.url.pathname) ? 'page' : undefined}
-                aria-haspopup="true"
-                aria-expanded={openMenu === menu.key ? 'true' : 'false'}
-                aria-controls={`nav-menu-${menu.key}`}
-                on:mouseenter={() => openMenuFor(menu.key)}
-                on:mouseleave={scheduleMenuClose}
-                on:click={(event) => handleSiteLinkClick(event, menu.href)}
-              >
-                {menu.label}
-                <svg class="l2-nav-caret" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="m6.5 9.5 5.5 5 5.5-5" />
-                </svg>
-              </a>
-            {/each}
-            <a
-              class="l2-nav-link l2-nav-github"
-              data-menu-key="github"
-              href={githubHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-haspopup="true"
-              aria-expanded={openMenu === 'github' ? 'true' : 'false'}
-              aria-controls="nav-menu-github"
-              on:mouseenter={() => openMenuFor('github')}
-              on:mouseleave={scheduleMenuClose}
-              on:click={closeMenus}
-            >
-              GitHub
-              <svg class="l2-nav-caret" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="m6.5 9.5 5.5 5 5.5-5" />
-              </svg>
-            </a>
-          </nav>
+              {#each navMenus as menu (menu.key)}
+                <a
+                  class="l2-nav-link"
+                  data-menu-key={menu.key}
+                  href={resolveMenuHref(menu.href)}
+                  class:active={isActive(menu.href, data.pathname)}
+                  class:open={openMenu === menu.key}
+                  aria-current={isActive(menu.href, data.pathname) ? 'page' : undefined}
+                  aria-haspopup="true"
+                  aria-expanded={openMenu === menu.key ? 'true' : 'false'}
+                  aria-controls={`nav-menu-${menu.key}`}
+                  on:mouseenter={() => openMenuFor(menu.key)}
+                  on:mouseleave={scheduleMenuClose}
+                  on:click={(event) => handleSiteLinkClick(event, menu.href)}
+                >
+                  {menu.label} 
 
-          <div class="l2-nav-actions">
-            <div class="l2-nav-cta-wrap">
-              <a
-                class="l2-nav-cta l2-nav-cta-desktop"
-                data-menu-key="install"
-                href={browserLink(detectedBrowser)}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={`Install for ${browserDisplayName(detectedBrowser)}`}
-                aria-haspopup="true"
-                aria-expanded={openMenu === 'install' ? 'true' : 'false'}
-                aria-controls="nav-menu-install"
-                on:mouseenter={() => openMenuFor('install')}
-                on:mouseleave={scheduleMenuClose}
-                on:click={() => {
-                  closeMenus();
-                  trackInstallClick('nav_install');
-                }}
-              >
-                <span class="l2-nav-cta-label">Install for {browserDisplayName(detectedBrowser)}</span>
-                <!-- Pill mode swaps the long label for this compact one and
-                     rides the three store marks inside the button as a
-                     decorative avatar stack; per-store links live in the
-                     hover dropdown. -->
-                <span class="l2-nav-cta-label-short" aria-hidden="true">Install</span>
-                <span class="l2-nav-store-stack" aria-hidden="true">
-                  <span class="l2-nav-store-bubble"><BrowserIcon browser="chrome" /></span>
-                  <span class="l2-nav-store-bubble"><BrowserIcon browser="firefox" /></span>
-                  <span class="l2-nav-store-bubble"><BrowserIcon browser="edge" /></span>
-                </span>
-              </a>
-              <div
-                class="l2-nav-alt-browsers"
-                id="nav-menu-install"
-                role="presentation"
-                class:open={openMenu === 'install'}
-                on:mouseenter={cancelMenuClose}
-                on:mouseleave={scheduleMenuClose}
-                aria-label="Install for another browser"
-              >
-                <p class="l2-nav-menu-title">
-                  <span class="l2-nav-menu-title-rest">Other browsers</span>
-                  <span class="l2-nav-menu-title-pill">Install options</span>
-                </p>
-                <!-- The Chrome Web Store row is the pill mode's extra hover
-                     option: the compact button no longer names a browser, so
-                     the store for Chrome & all Chromium browsers gets a row. -->
-                <a
-                  class="l2-nav-alt l2-nav-alt-chrome"
-                  href={browserLink('chrome')}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Chrome Web Store"
-                  style="--alt-i: 0"
-                  on:click={() => {
-                    closeMenus();
-                    trackInstallClick('nav_menu_install');
-                  }}
-                >
-                  <span class="l2-nav-menu-glyph l2-nav-menu-glyph-brand" aria-hidden="true">
-                    <BrowserIcon browser="chrome" />
-                  </span>
-                  <span class="l2-nav-menu-copy">
-                    <span class="l2-nav-menu-label">Chrome Web Store</span>
-                    <span class="l2-nav-menu-desc">For Chrome, Brave, Arc & all Chromium browsers.</span>
-                  </span>
+                  <svg
+                    class="l2-nav-caret"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    aria-hidden="true"
+                  ><path d="m6.5 9.5 5.5 5 5.5-5"></path></svg>
                 </a>
-                <a
-                  class="l2-nav-alt"
-                  href={browserLink('firefox')}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Install for Firefox"
-                  style="--alt-i: 1"
-                  on:click={() => {
-                    closeMenus();
-                    trackInstallClick('nav_install_firefox');
-                  }}
-                >
-                  <span class="l2-nav-menu-glyph l2-nav-menu-glyph-brand" aria-hidden="true">
-                    <BrowserIcon browser="firefox" />
-                  </span>
-                  <span class="l2-nav-menu-copy">
-                    <span class="l2-nav-menu-label">Install for Firefox</span>
-                    <span class="l2-nav-menu-desc">From the Mozilla Add-ons store.</span>
-                  </span>
-                </a>
-                <a
-                  class="l2-nav-alt"
-                  href={browserLink('edge')}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Install for Microsoft Edge"
-                  style="--alt-i: 2"
-                  on:click={() => {
-                    closeMenus();
-                    trackInstallClick('nav_install_edge');
-                  }}
-                >
-                  <span class="l2-nav-menu-glyph l2-nav-menu-glyph-brand" aria-hidden="true">
-                    <BrowserIcon browser="edge" />
-                  </span>
-                  <span class="l2-nav-menu-copy">
-                    <span class="l2-nav-menu-label">Install for Edge</span>
-                    <span class="l2-nav-menu-desc">From the Edge Add-ons store.</span>
-                  </span>
-                </a>
-              </div>
-            </div>
-            <button
-              type="button"
-              class="l2-nav-menu-btn"
-              on:click={toggleMobileMenu}
-              aria-expanded={mobileNavOpen}
-              aria-controls="site-mobile-nav"
-              aria-label={mobileNavOpen ? 'Close site navigation' : 'Open site navigation'}
-            >
-              {#if mobileNavOpen}
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M6 6l12 12M18 6 6 18" />
-                </svg>
-              {:else}
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M4 7h16M4 12h16M4 17h16" />
-                </svg>
-              {/if}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Shared hover module: centered under the navbar, morphs between
-           menus. All four content blocks ship in SSR for crawlers. -->
-      <div
-        class="l2-nav-dropdown"
-        role="presentation"
-        class:open={openMenu !== null && openMenu !== 'install'}
-        bind:this={panelEl}
-        on:mouseenter={cancelMenuClose}
-        on:mouseleave={scheduleMenuClose}
-      >
-        {#each navMenus as menu (menu.key)}
-          <div
-            class="l2-nav-menu-block"
-            id={`nav-menu-${menu.key}`}
-            class:active={openMenu === menu.key}
-            inert={openMenu === null || openMenu !== menu.key}
-          >
-            <div class="l2-nav-menu-row">
-              {#each menu.columns as column}
-                <div class="l2-nav-menu-col">
-                  <p class="l2-nav-menu-title">{column.title}</p>
-                  <ul class="l2-nav-menu-list">
-                    {#each column.links as link, linkIndex}
-                      <li style={`--menu-i: ${linkIndex}`}>
-                        <a
-                          class="l2-nav-menu-link"
-                          href={resolveMenuHref(link.href)}
-                          target={link.external ? '_blank' : undefined}
-                          rel={link.external ? 'noopener noreferrer' : undefined}
-                          tabindex={openMenu === menu.key ? undefined : -1}
-                        >
-                          <span class="l2-nav-menu-glyph" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" fill="none">
-                              {#each MENU_ICONS[link.icon] as glyphPath}
-                                <path d={glyphPath} />
-                              {/each}
-                            </svg>
-                          </span>
-                          <span class="l2-nav-menu-copy">
-                            <span class="l2-nav-menu-label">{link.label}</span>
-                            <span class="l2-nav-menu-desc">{link.desc}</span>
-                          </span>
-                        </a>
-                      </li>
-                    {/each}
-                  </ul>
-                </div>
               {/each}
-
-              <div class="l2-nav-menu-featured-col">
-                {#if menu.featured.kind === 'install'}
-                  <a
-                    class="l2-nav-menu-featured"
-                    href={browserLink(detectedBrowser)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    tabindex={openMenu === menu.key ? undefined : -1}
-                    on:click={handleFeaturedInstallClick}
-                  >
-                    <span class="l2-nav-menu-featured-title">{menu.featured.title}</span>
-                    <span class="l2-nav-menu-featured-desc">{menu.featured.desc}</span>
-                    <span class="l2-nav-menu-featured-cta">
-                      Install for {browserDisplayName(detectedBrowser)}
-                      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 17 17 7" /><path d="M9 7h8v8" /></svg>
-                    </span>
-                  </a>
-                {:else}
-                  <a
-                    class="l2-nav-menu-featured"
-                    href={resolveMenuHref(menu.featured.href)}
-                    target={menu.featured.external ? '_blank' : undefined}
-                    rel={menu.featured.external ? 'noopener noreferrer' : undefined}
-                    tabindex={openMenu === menu.key ? undefined : -1}
-                    on:click={closeMenus}
-                  >
-                    <span class="l2-nav-menu-featured-title">{menu.featured.title}</span>
-                    <span class="l2-nav-menu-featured-desc">{menu.featured.desc}</span>
-                    <span class="l2-nav-menu-featured-cta">
-                      {menu.featured.cta}
-                      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 17 17 7" /><path d="M9 7h8v8" /></svg>
-                    </span>
-                  </a>
-                {/if}
-                <span class="l2-nav-bmc-label">Support Me</span>
-                <a
-                  class="l2-nav-bmc"
-                  href={BUY_COFFEE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer nofollow"
-                  tabindex={openMenu === menu.key ? undefined : -1}
-                >
-                  <img src="/bmc-button.svg" alt="Buy Me a Coffee" width="545" height="153" loading="lazy" />
-                </a>
-              </div>
-            </div>
-          </div>
-        {/each}
-
-        <!-- GitHub hover preview: live stats once fetched, static fallback
-             otherwise. Ships in SSR so the repo link is crawlable. -->
-        <div
-          class="l2-nav-menu-block l2-nav-menu-block-github"
-          id="nav-menu-github"
-          class:active={openMenu === 'github'}
-          inert={openMenu === null || openMenu !== 'github'}
-        >
-          <div class="l2-gh-wrap">
-          <div class="l2-gh-card">
-            <div class="l2-gh-chrome" aria-hidden="true">
-              <span></span><span></span><span></span>
-            </div>
-            <div class="l2-gh-body">
-              <a class="l2-gh-repo" href={githubHref} target="_blank" rel="noopener noreferrer" tabindex={openMenu === 'github' ? undefined : -1}>
-                <svg class="l2-gh-mark" viewBox="0 0 16 16" aria-hidden="true">
-                  <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
-                </svg>
-                <span class="l2-gh-name">adhamhaithameid/Classroom-Quick-Downloader</span>
-                <svg class="l2-gh-arrow" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M7 17 17 7" /><path d="M9 7h8v8" />
-                </svg>
-              </a>
-              <p class="l2-gh-desc">
-                Free, source-available browser extension that batch-downloads every Google Classroom attachment in one click. The full code is public on GitHub and auditable by anyone.
-              </p>
-              <div class="l2-gh-stats">
-                <span class="l2-gh-stat" title="Stars">
-                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3.6 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 17l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9Z"/></svg>
-                  {formatCount(githubStats?.stars ?? 24)}
-                </span>
-                <span class="l2-gh-stat" title="Forks">
-                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="6" cy="5" r="2.2"/><circle cx="18" cy="5" r="2.2"/><circle cx="12" cy="19" r="2.2"/><path d="M6 7.2v2a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3v-2"/><path d="M12 12.2v4.6"/></svg>
-                  {formatCount(githubStats?.forks ?? 4)}
-                </span>
-                <span class="l2-gh-stat" title="Open issues">
-                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8.6"/><path d="M12 7.6v5.2"/><path d="M12 16.4h.01"/></svg>
-                  {formatCount(githubStats?.issues ?? 2)}
-                </span>
-                <span class="l2-gh-stat l2-gh-version" title="Latest release">{APP_VERSION}</span>
-              </div>
               <a
-                class="l2-gh-cta"
+                class="l2-nav-link l2-nav-github"
+                data-menu-key="github"
                 href={githubHref}
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-haspopup="true"
+                aria-expanded={openMenu === 'github' ? 'true' : 'false'}
+                aria-controls="nav-menu-github"
+                on:mouseenter={() => openMenuFor('github')}
+                on:mouseleave={scheduleMenuClose}
+                on:click={closeMenus}
+              >
+                GitHub 
+
+                <svg
+                  class="l2-nav-caret"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden="true"
+                ><path d="m6.5 9.5 5.5 5 5.5-5"></path></svg>
+              </a>
+            </nav>
+
+            <div class="l2-nav-actions">
+              <div class="l2-nav-cta-wrap">
+                <a
+                  class="l2-nav-cta l2-nav-cta-desktop"
+                  data-menu-key="install"
+                  href={browserLink(detectedBrowser)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Install for ${browserDisplayName(detectedBrowser)}`}
+                  aria-haspopup="true"
+                  aria-expanded={openMenu === 'install' ? 'true' : 'false'}
+                  aria-controls="nav-menu-install"
+                  on:mouseenter={() => openMenuFor('install')}
+                  on:mouseleave={scheduleMenuClose}
+                  on:click={() => {
+                    closeMenus();
+                    trackInstallClick('nav_install');
+                  }}
+                >
+                  <span class="l2-nav-cta-label">Install for {browserDisplayName(detectedBrowser)}</span>
+                  <!-- Pill mode swaps the long label for this compact one and
+                     rides the three store marks inside the button as a
+                     decorative avatar stack; per-store links live in the
+                     hover dropdown. -->
+                  <span class="l2-nav-cta-label-short" aria-hidden="true">Install</span>
+                  <span class="l2-nav-store-stack" aria-hidden="true">
+                    <span class="l2-nav-store-bubble"><BrowserIcon browser="chrome" /></span>
+                    <span class="l2-nav-store-bubble"><BrowserIcon browser="firefox" /></span>
+                    <span class="l2-nav-store-bubble"><BrowserIcon browser="edge" /></span>
+                  </span>
+                </a>
+                <div
+                  class="l2-nav-alt-browsers"
+                  id="nav-menu-install"
+                  role="presentation"
+                  class:open={openMenu === 'install'}
+                  on:mouseenter={cancelMenuClose}
+                  on:mouseleave={scheduleMenuClose}
+                  aria-label="Install for another browser"
+                >
+                  <p class="l2-nav-menu-title">
+                    <span class="l2-nav-menu-title-rest">Other browsers</span>
+                    <span class="l2-nav-menu-title-pill">Install options</span>
+                  </p>
+                  <!-- The Chrome Web Store row is the pill mode's extra hover
+                     option: the compact button no longer names a browser, so
+                     the store for Chrome & all Chromium browsers gets a row. -->
+                  <a
+                    class="l2-nav-alt l2-nav-alt-chrome"
+                    href={browserLink('chrome')}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Chrome Web Store"
+                    style="--alt-i: 0"
+                    on:click={() => {
+                      closeMenus();
+                      trackInstallClick('nav_menu_install');
+                    }}
+                  >
+                  <span class="l2-nav-menu-glyph l2-nav-menu-glyph-brand" aria-hidden="true">
+                    <BrowserIcon browser="chrome" />
+                  </span>
+                    <span class="l2-nav-menu-copy">
+                      <span class="l2-nav-menu-label">Chrome Web Store</span>
+                      <span class="l2-nav-menu-desc">For Chrome, Brave, Arc & all Chromium browsers.</span>
+                    </span>
+                  </a>
+                  <a
+                    class="l2-nav-alt"
+                    href={browserLink('firefox')}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Install for Firefox"
+                    style="--alt-i: 1"
+                    on:click={() => {
+                      closeMenus();
+                      trackInstallClick('nav_install_firefox');
+                    }}
+                  >
+                  <span class="l2-nav-menu-glyph l2-nav-menu-glyph-brand" aria-hidden="true">
+                    <BrowserIcon browser="firefox" />
+                  </span>
+                    <span class="l2-nav-menu-copy">
+                      <span class="l2-nav-menu-label">Install for Firefox</span>
+                      <span class="l2-nav-menu-desc">From the Mozilla Add-ons store.</span>
+                    </span>
+                  </a>
+                  <a
+                    class="l2-nav-alt"
+                    href={browserLink('edge')}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Install for Microsoft Edge"
+                    style="--alt-i: 2"
+                    on:click={() => {
+                      closeMenus();
+                      trackInstallClick('nav_install_edge');
+                    }}
+                  >
+                  <span class="l2-nav-menu-glyph l2-nav-menu-glyph-brand" aria-hidden="true">
+                    <BrowserIcon browser="edge" />
+                  </span>
+                    <span class="l2-nav-menu-copy">
+                      <span class="l2-nav-menu-label">Install for Edge</span>
+                      <span class="l2-nav-menu-desc">From the Edge Add-ons store.</span>
+                    </span>
+                  </a>
+                </div>
+              </div>
+              <button
+                type="button"
+                class="l2-nav-menu-btn"
+                on:click={toggleMobileMenu}
+                aria-expanded={mobileNavOpen}
+                aria-controls="site-mobile-nav"
+                aria-label={mobileNavOpen ? 'Close site navigation' : 'Open site navigation'}
+              >
+                {#if mobileNavOpen}
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
+                {:else}
+                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+                {/if}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Shared hover module: centered under the navbar, morphs between
+           menus. All four content blocks ship in SSR for crawlers. -->
+        <div
+          class="l2-nav-dropdown"
+          role="presentation"
+          class:open={openMenu !== null && openMenu !== 'install'}
+          bind:this={panelEl}
+          on:mouseenter={cancelMenuClose}
+          on:mouseleave={scheduleMenuClose}
+        >
+          {#each navMenus as menu (menu.key)}
+            <div
+              class="l2-nav-menu-block"
+              id={`nav-menu-${menu.key}`}
+              class:active={openMenu === menu.key}
+              inert={openMenu === null || openMenu !== menu.key}
+            >
+              <div class="l2-nav-menu-row">
+                {#each menu.columns as column}
+                  <div class="l2-nav-menu-col">
+                    <p class="l2-nav-menu-title">{column.title}</p>
+                    <ul class="l2-nav-menu-list">
+                      {#each column.links as link, linkIndex}
+                        <li style={`--menu-i: ${linkIndex}`}>
+                          <a
+                            class="l2-nav-menu-link"
+                            href={resolveMenuHref(link.href)}
+                            target={link.external ? '_blank' : undefined}
+                            rel={link.external ? 'noopener noreferrer' : undefined}
+                            tabindex={openMenu === menu.key ? undefined : -1}
+                          >
+                            <span class="l2-nav-menu-glyph" aria-hidden="true">
+                              <svg viewBox="0 0 24 24" fill="none">
+                                {#each MENU_ICONS[link.icon] as glyphPath}
+                                  <path d={glyphPath}></path>
+                                {/each}
+                              </svg>
+                            </span>
+                            <span class="l2-nav-menu-copy">
+                              <span class="l2-nav-menu-label">{link.label}</span>
+                              <span class="l2-nav-menu-desc">{link.desc}</span>
+                            </span>
+                          </a>
+                        </li>
+                      {/each}
+                    </ul>
+                  </div>
+                {/each}
+
+                <div class="l2-nav-menu-featured-col">
+                  {#if menu.featured.kind === 'install'}
+                    <a
+                      class="l2-nav-menu-featured"
+                      href={browserLink(detectedBrowser)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      tabindex={openMenu === menu.key ? undefined : -1}
+                      on:click={handleFeaturedInstallClick}
+                    >
+                      <span class="l2-nav-menu-featured-title">{menu.featured.title}</span>
+                      <span class="l2-nav-menu-featured-desc">{menu.featured.desc}</span>
+                      <span class="l2-nav-menu-featured-cta">
+                        Install for {browserDisplayName(detectedBrowser)} 
+
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M7 17 17 7"></path>
+                          <path d="M9 7h8v8"></path>
+                        </svg>
+                      </span>
+                    </a>
+                  {:else}
+                    <a
+                      class="l2-nav-menu-featured"
+                      href={resolveMenuHref(menu.featured.href)}
+                      target={menu.featured.external ? '_blank' : undefined}
+                      rel={menu.featured.external ? 'noopener noreferrer' : undefined}
+                      tabindex={openMenu === menu.key ? undefined : -1}
+                      on:click={closeMenus}
+                    >
+                      <span class="l2-nav-menu-featured-title">{menu.featured.title}</span>
+                      <span class="l2-nav-menu-featured-desc">{menu.featured.desc}</span>
+                      <span class="l2-nav-menu-featured-cta">
+                        {menu.featured.cta} 
+
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                          <path d="M7 17 17 7"></path>
+                          <path d="M9 7h8v8"></path>
+                        </svg>
+                      </span>
+                    </a>
+                  {/if}
+                  <span class="l2-nav-bmc-label">Support Me</span>
+                  <a
+                    class="l2-nav-bmc"
+                    href={BUY_COFFEE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer nofollow"
+                    tabindex={openMenu === menu.key ? undefined : -1}
+                  >
+                  <img src="/bmc-button.svg" alt="Buy Me a Coffee" width="545" height="153" loading="lazy" />
+                  </a>
+                </div>
+              </div>
+            </div>
+          {/each}
+
+          <!-- GitHub hover preview: live stats once fetched, static fallback
+             otherwise. Ships in SSR so the repo link is crawlable. -->
+          <div
+            class="l2-nav-menu-block l2-nav-menu-block-github"
+            id="nav-menu-github"
+            class:active={openMenu === 'github'}
+            inert={openMenu === null || openMenu !== 'github'}
+          >
+            <div class="l2-gh-wrap">
+              <div class="l2-gh-card">
+            <div class="l2-gh-chrome" aria-hidden="true">
+              <span></span><span></span><span></span>
+            </div>
+                <div class="l2-gh-body">
+                  <a
+                    class="l2-gh-repo"
+                    href={githubHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    tabindex={openMenu === 'github' ? undefined : -1}
+                  >
+                    <svg
+                      class="l2-gh-mark"
+                      viewBox="0 0 16 16"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"
+                      ></path>
+                    </svg>
+                    <span class="l2-gh-name">adhamhaithameid/Classroom-Quick-Downloader</span>
+
+                    <svg
+                      class="l2-gh-arrow"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      aria-hidden="true"
+                    >
+                      <path d="M7 17 17 7"></path>
+                      <path d="M9 7h8v8"></path>
+                    </svg>
+                  </a>
+                  <p class="l2-gh-desc">
+                    Free, source-available browser extension that batch-downloads every Google Classroom attachment in one click. The full code is public on GitHub and auditable by anyone.
+                  </p>
+                  <div class="l2-gh-stats">
+                    <span class="l2-gh-stat" title="Stars">
+                      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path
+                          d="m12 3.6 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 17l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9Z"
+                        ></path>
+                      </svg>
+
+                      {formatCount(githubStats?.stars ?? 24)}
+                    </span>
+                    <span class="l2-gh-stat" title="Forks">
+                      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle cx="6" cy="5" r="2.2"></circle>
+                        <circle cx="18" cy="5" r="2.2"></circle>
+                        <circle cx="12" cy="19" r="2.2"></circle>
+                        <path d="M6 7.2v2a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3v-2"></path>
+                        <path d="M12 12.2v4.6"></path>
+                      </svg>
+
+                      {formatCount(githubStats?.forks ?? 4)}
+                    </span>
+                    <span class="l2-gh-stat" title="Open issues">
+                      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle cx="12" cy="12" r="8.6"></circle>
+                        <path d="M12 7.6v5.2"></path>
+                        <path d="M12 16.4h.01"></path>
+                      </svg>
+
+                      {formatCount(githubStats?.issues ?? 2)}
+                    </span>
+                <span class="l2-gh-stat l2-gh-version" title="Latest release">{APP_VERSION}</span>
+                  </div>
+                  <a
+                    class="l2-gh-cta"
+                    href={githubHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    tabindex={openMenu === 'github' ? undefined : -1}
+                  >
+                    Star on GitHub 
+
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path
+                        d="m12 3.6 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 17l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9Z"
+                      ></path>
+                    </svg>
+                  </a>
+                </div>
+              </div>
+              <span class="l2-nav-bmc-label l2-nav-bmc-label-center">Support Me</span>
+              <a
+                class="l2-nav-bmc"
+                href={BUY_COFFEE_URL}
+                target="_blank"
+                rel="noopener noreferrer nofollow"
                 tabindex={openMenu === 'github' ? undefined : -1}
               >
-                Star on GitHub
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3.6 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 17l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9Z"/></svg>
+            <img src="/bmc-button.svg" alt="Buy Me a Coffee" width="545" height="153" loading="lazy" />
               </a>
             </div>
           </div>
-          <span class="l2-nav-bmc-label l2-nav-bmc-label-center">Support Me</span>
-          <a
-            class="l2-nav-bmc"
-            href={BUY_COFFEE_URL}
-            target="_blank"
-            rel="noopener noreferrer nofollow"
-            tabindex={openMenu === 'github' ? undefined : -1}
-          >
-            <img src="/bmc-button.svg" alt="Buy Me a Coffee" width="545" height="153" loading="lazy" />
-          </a>
-          </div>
         </div>
-      </div>
 
-      {#if mobileNavOpen}
-        <div class="l2-nav-mobile-panel" id="site-mobile-nav">
+        {#if mobileNavOpen}
+          <div class="l2-nav-mobile-panel" id="site-mobile-nav">
           <nav class="l2-nav-mobile-links" aria-label="Mobile Primary">
-            {#each navMenus as menu (menu.key)}
-              <a
-                href="{base}{menu.href}"
-                class:active={isActive(menu.href, $page.url.pathname)}
-                aria-current={isActive(menu.href, $page.url.pathname) ? 'page' : undefined}
-                on:click={(event) => handleSiteLinkClick(event, menu.href)}
+              {#each navMenus as menu (menu.key)}
+                <a
+                  href={resolveMenuHref(menu.href)}
+                  class:active={isActive(menu.href, data.pathname)}
+                  aria-current={isActive(menu.href, data.pathname) ? 'page' : undefined}
+                  on:click={(event) => handleSiteLinkClick(event, menu.href)}
               >
                 {menu.label}
               </a>
-            {/each}
+              {/each}
             <a href={githubHref} target="_blank" rel="noopener noreferrer" on:click={closeMobileMenu}>
               GitHub
             </a>
-          </nav>
-          <a
-            class="l2-nav-cta l2-nav-cta-mobile"
-            href={browserLink(detectedBrowser)}
-            target="_blank"
-            rel="noopener noreferrer"
-            on:click={() => {
-              closeMobileMenu();
-              trackInstallClick('nav_mobile_install');
-            }}
-          >
-            Install for {browserDisplayName(detectedBrowser)}
-          </a>
-          <!-- Touch has no hover: the desktop submenu's Firefox/Edge links
-               need a reachable home in the mobile panel. -->
-          <div class="l2-nav-mobile-alt">
+            </nav>
             <a
-              class="l2-nav-mobile-alt-link"
-              href={browserLink('firefox')}
+              class="l2-nav-cta l2-nav-cta-mobile"
+              href={browserLink(detectedBrowser)}
               target="_blank"
               rel="noopener noreferrer"
               on:click={() => {
                 closeMobileMenu();
-                trackInstallClick('nav_install_firefox');
+                trackInstallClick('nav_mobile_install');
               }}
+          >
+            Install for {browserDisplayName(detectedBrowser)}
+          </a>
+            <!-- Touch has no hover: the desktop submenu's Firefox/Edge links
+               need a reachable home in the mobile panel. -->
+            <div class="l2-nav-mobile-alt">
+              <a
+                class="l2-nav-mobile-alt-link"
+                href={browserLink('firefox')}
+                target="_blank"
+                rel="noopener noreferrer"
+                on:click={() => {
+                  closeMobileMenu();
+                  trackInstallClick('nav_install_firefox');
+                }}
             >
               <BrowserIcon browser="firefox" />
               Firefox
             </a>
-            <a
-              class="l2-nav-mobile-alt-link"
-              href={browserLink('edge')}
-              target="_blank"
-              rel="noopener noreferrer"
-              on:click={() => {
-                closeMobileMenu();
-                trackInstallClick('nav_install_edge');
-              }}
+              <a
+                class="l2-nav-mobile-alt-link"
+                href={browserLink('edge')}
+                target="_blank"
+                rel="noopener noreferrer"
+                on:click={() => {
+                  closeMobileMenu();
+                  trackInstallClick('nav_install_edge');
+                }}
             >
               <BrowserIcon browser="edge" />
               Edge
             </a>
+            </div>
           </div>
-        </div>
-      {/if}
-    </div>
-    <button
-      type="button"
-      class="l2-nav-backdrop"
-      tabindex="-1"
-      aria-label="Close navigation menu"
-      on:click={closeMenus}
-    ></button>
-  </header>
+        {/if}
+      </div>
+      <button
+        type="button"
+        class="l2-nav-backdrop"
+        tabindex="-1"
+        aria-label="Close navigation menu"
+        on:click={closeMenus}
+      ></button>
+    </header>
   {/if}
 
   <main
@@ -1110,9 +1190,11 @@
     class:l2-wrap={!isOverviewStyleRoute && !hideChrome}
   >
     <AmbientBackground />
-    <div class="site-route-shell" class:route-dim={$navigating}>
-      <slot />
-    </div>
+
+    <div
+      class="site-route-shell"
+      class:route-dim={navigating}
+    ><slot></slot></div>
   </main>
 
   {#if !hideChrome}

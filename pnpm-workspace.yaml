@@ -29,7 +29,9 @@ overrides:
   "devalue": "^5.9.2"
   "defu": "^6.1.5"
   "vite": "^8.3.4"
-  "cookie": "0.7.2"
+  # 2026-11-18: kit 3 requires cookie ^2.0.1 (parseCookie); no workspace
+  # code imports cookie directly, so the kit-2-era 0.7.2 pin lifts with it.
+  "cookie": "^2.0.1"
   "flatted": ">=3.4.2"
   "uuid": ">=14.0.0"
   "postcss": ">=8.5.23"
@@ -54,3 +56,8 @@ auditConfig:
     # @sveltejs/vite-plugin-svelte). No patched version exists yet; accepted
     # per the audit-gate policy until upstream ships a fix.
     - GHSA-gcqx-w48m-w2h4
+    # 2026-11-17: picomatch GHSA-fc5q-39xc-vjpf (high, ReDoS through
+    # single-branch repeated extglobs). Vulnerable <=4.0.7, NO patched version
+    # exists; 113 transitive paths (wxt visualizer, svelte-check>fdir).
+    # Accepted per the audit-gate policy; revisit when upstream patches.
+    - GHSA-fc5q-39xc-vjpf

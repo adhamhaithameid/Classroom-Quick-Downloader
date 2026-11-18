@@ -55,6 +55,7 @@ describe('settings store (0h4d.1.8)', () => {
       'downloadAllEnabled',
       'editedFlagEnabled',
       'extensionEnabled',
+      'namingTemplate',
       'reducedMotionPreferred',
     ]);
     expect(DEFAULT_SETTINGS).toEqual({
@@ -66,6 +67,7 @@ describe('settings store (0h4d.1.8)', () => {
       reducedMotionPreferred: false,
       apiBetaConfirmed: false,
       copyrightReminderAcknowledged: false,
+      namingTemplate: '',
     });
   });
 
@@ -127,6 +129,7 @@ describe('settings store (0h4d.1.8)', () => {
       reducedMotionPreferred: true,
       apiBetaConfirmed: true,
       copyrightReminderAcknowledged: true,
+      namingTemplate: '{course}/{filename}',
       cqdSettingsSchemaVersion: 2,
     };
     const { settings, migrationWrites } = migrateRawSettings(full);
@@ -134,6 +137,7 @@ describe('settings store (0h4d.1.8)', () => {
     expect(settings.combinedFlagEnabled).toBe(false);
     expect(settings.reducedMotionPreferred).toBe(true);
     expect(settings.apiBetaConfirmed).toBe(true);
+    expect(settings.namingTemplate).toBe('{course}/{filename}');
     expect(settings.copyrightReminderAcknowledged).toBe(true);
     expect(migrationWrites).toBeNull();
   });
@@ -160,7 +164,7 @@ describe('settings store (0h4d.1.8)', () => {
 
   it('watchSettings fires on relevant local changes with normalized settings', () => {
     installStorage();
-    const seen: Array<Record<string, boolean>> = [];
+    const seen: Array<Record<string, unknown>> = [];
     const unwatch = watchSettings((s) => seen.push({ ...s }));
 
     const listener = (chrome.storage.onChanged.addListener as any).mock.calls[0][0];

@@ -11,17 +11,20 @@ import { useEffect, useState } from 'react';
 import '../../src/ui/stillwater.css';
 import './options.css';
 import { isApiConfigured } from '../../src/engines/v3/api/config';
+import { loadCachedEntitlementState, createChromeLocalStoragePort } from '../../src/entitlement/cache';
+import { DEFAULT_NAMING_TEMPLATE, renderNamingTemplate } from '../../src/core/name/template';
 import {
   DEFAULT_SETTINGS,
   loadSettings,
   saveSetting,
   watchSettings,
   type Settings,
+  type BooleanSettingsKey,
   type SettingsKey,
 } from '../../src/ui/settings/store';
 
 interface Row {
-  key: SettingsKey;
+  key: BooleanSettingsKey;
   label: string;
   description: string;
   primary?: boolean;
@@ -117,6 +120,7 @@ export function OptionsApp() {
           </div>
         ))}
       </section>
+      <NamingTemplateCard loading={loading} settings={settings} />
       {/* Legal round 2, surface 02 Treatment 2 (legal-round2.html): the
           standing Permissions reference — every permission the manifest asks
           for, each row expanding on tap to the plain-language reason plus the
@@ -292,6 +296,116 @@ export function PermissionsExplainer() {
           </div>
         );
       })}
+    </section>
+  );
+}
+
+/**
+ * The naming-template picker (0h4d.3.1, Pro-gated). Free users see a quiet
+ * locked row (the store stays byte-identical — '' means off, files keep
+ * today's flat names); Pro users pick from presets or write their own, with
+ * a live preview over sample parts. Saves are optimistic like every other
+ * control here; the write lands on blur / preset tap, not per keystroke.
+ */
+function NamingTemplateCard({ loading, settings }: { loading: boolean; settings: Settings }) {
+  const [isPro, setIsPro] = useState(false);
+  const [draft, setDraft] = useState(settings.namingTemplate);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    void loadCachedEntitlementState(createChromeLocalStoragePort())
+      .then((state) => {
+        if (!alive) return;
+        setIsPro(state?.state === 'licensed' || state?.state === 'grace');
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Follow external changes (another surface, migration) while not editing.
+  useEffect(() => {
+    setDraft((current) => (current === settings.namingTemplate ? current : settings.namingTemplate));
+  }, [settings.namingTemplate]);
+
+  const save = (value: string): void => {
+    setDraft(value);
+    if (loading) return;
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 1500);
+    void saveSetting('namingTemplate', value);
+  };
+
+  const preview = renderNamingTemplate(draft || DEFAULT_NAMING_TEMPLATE, {
+    course: 'Biology',
+    type: '',
+    filename: 'worksheet.pdf',
+    now: new Date(2026, 0, 24),
+    index: 2,
+  });
+
+  return (
+    <section className="cqd-options-card" aria-label="Download folders">
+      <div className="cqd-options-folder-head">
+        <div className="cqd-options-row-text">
+          <span className="cqd-options-label-primary cqd-options-label">Download folders (Pro)</span>
+          <span className="cqd-options-description">
+            Sort downloads into per-course folders with a naming template.
+          </span>
+        </div>
+        {!isPro && <span className="cqd-options-pro-lock">Pro</span>}
+      </div>
+      {isPro && (
+        <>
+          <div className="cqd-options-row">
+            <input
+              type="text"
+              value={draft}
+              aria-label="Naming template"
+              spellCheck={false}
+              disabled={loading}
+              className="cqd-options-template-input"
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={() => save(draft.trim())}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+              }}
+              placeholder={DEFAULT_NAMING_TEMPLATE}
+            />
+            <span className="cqd-options-template-preview" aria-live="polite">
+              {preview || 'worksheet.pdf'}
+            </span>
+          </div>
+          <div className="cqd-options-row">
+            <div className="cqd-options-row-text">
+              <span className="cqd-options-description">
+                Tokens: {'{course}'} {'{filename}'} {'{date}'} {'{index}'} {'{type}'}. Unknown tokens
+                disappear; folders stay two levels deep.
+              </span>
+            </div>
+          </div>
+          <div className="cqd-options-template-presets">
+            {[
+              { label: 'Course folders', value: DEFAULT_NAMING_TEMPLATE },
+              { label: 'Date folders', value: '{date}/{filename}' },
+              { label: 'No folders', value: '' },
+            ].map((preset) => (
+              <button
+                key={preset.value || 'flat'}
+                type="button"
+                className="cqd-options-template-preset"
+                disabled={loading}
+                onClick={() => save(preset.value)}
+              >
+                {preset.label}
+              </button>
+            ))}
+            {saved && <span className="cqd-options-template-saved">Saved</span>}
+          </div>
+        </>
+      )}
     </section>
   );
 }

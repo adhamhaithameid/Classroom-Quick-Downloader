@@ -11,6 +11,8 @@ export type FileMetaMsg = {
   name?: string;
   ext?: string;
   kind?: string;
+  /** 0h4d.3.1: Classroom course title for naming templates ('' when unknown). */
+  courseTitle?: string;
 };
 
 /**

@@ -1,4 +1,4 @@
-import { PUBLIC_API_BASE_URL, SITE_BACKEND_BASE_URL, SITE_URL, STORE_LINKS, WORKER_BASE_URL } from '$lib/config';
+import { PUBLIC_API_BASE_URL, SITE_BACKEND_BASE_URL, SITE_URL, STORE_LINKS, WORKER_BASE_URL } from '#lib/config.ts';
 import type {
   InstallBrowser,
   MapResponse,
@@ -19,8 +19,8 @@ import type {
   WebsiteTrendDay,
   WebsiteTrendsSeries,
   WorkerHealth
-} from '$lib/types/public';
-import { WEBSITE_MANUAL_CHANGELOG } from '$lib/content/changelog.manual.generated';
+} from '#lib/types/public.ts';
+import { WEBSITE_MANUAL_CHANGELOG } from '#lib/content/changelog.manual.generated.ts';
 
 const REQUEST_TIMEOUT_MS = 8000;
 export const SNAPSHOT_REFRESH_MS = 6 * 60 * 60 * 1000;

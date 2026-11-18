@@ -38,8 +38,13 @@ describe('manifest least-privilege guard (S3)', () => {
     }
   });
 
-  it('keeps the oauth2 classroom.readonly scope', () => {
-    expect(wxtConfig).toContain('classroom.readonly');
+  it('requests exactly the read-only Classroom scopes the API client needs', () => {
+    const scopes = wxtConfig.match(/auth\/classroom\.[A-Za-z0-9.-]+/g);
+    expect(scopes).toEqual([
+      'auth/classroom.coursework.me.readonly',
+      'auth/classroom.coursework.students.readonly',
+      'auth/classroom.courseworkmaterials.readonly',
+    ]);
   });
 
   it('still allowlists the hosts the extension actually talks to', () => {

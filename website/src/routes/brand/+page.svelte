@@ -1,6 +1,6 @@
 <script lang="ts">
-  import SeoMeta from '$lib/components/SeoMeta.svelte';
-  import favicon from '$lib/assets/favicon.svg';
+  import SeoMeta from '#lib/components/SeoMeta.svelte';
+  import favicon from '#lib/assets/favicon.svg';
 
   type BrandColor = {
     name: string;

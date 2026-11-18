@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { base } from '$app/paths';
-  import { STORE_LINKS } from '$lib/config';
-  import SeoMeta from '$lib/components/SeoMeta.svelte';
-  import { trackFaqExpand } from '$lib/analytics/websiteEvents';
-  import { magnetic } from '$lib/actions/magnetic';
+  import { resolve } from '$app/paths';
+  import { STORE_LINKS } from '#lib/config.ts';
+  import SeoMeta from '#lib/components/SeoMeta.svelte';
+  import { trackFaqExpand } from '#lib/analytics/websiteEvents.ts';
+  import { magnetic } from '#lib/actions/magnetic.ts';
 
   type FaqItem = {
     id: string;
@@ -418,14 +418,16 @@
   }
 
   $: filteredSections = (() => {
-    if (!searchQuery.trim()) return activeSection ? sections.filter(s => s.title === activeSection) : sections;
+    if (!searchQuery.trim()) return activeSection
+      ? sections.filter((s) => s.title === activeSection)
+      : sections;
+
     const q = searchQuery.toLowerCase();
-    return sections
-      .map(s => ({
-        ...s,
-        items: s.items.filter(i => i.q.toLowerCase().includes(q) || i.a.toLowerCase().includes(q))
-      }))
-      .filter(s => s.items.length > 0);
+
+    return sections.map((s) => ({
+      ...s,
+      items: s.items.filter((i) => i.q.toLowerCase().includes(q) || i.a.toLowerCase().includes(q))
+    })).filter((s) => s.items.length > 0);
   })();
 
 
@@ -489,7 +491,19 @@
   <section class="fq-controls-section">
     <div class="fq-wrap">
       <div class="fq-search-bar fq-reveal">
-        <svg class="fq-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <svg
+          class="fq-search-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+
         <input
           type="text"
           class="fq-search-input"
@@ -544,10 +558,10 @@
                     <span class="fq-chevron" aria-hidden="true">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         {#if openIds.has(item.id)}
-                          <line x1="5" y1="12" x2="19" y2="12" />
+                          <line x1="5" y1="12" x2="19" y2="12"></line>
                         {:else}
-                          <line x1="12" y1="5" x2="12" y2="19" />
-                          <line x1="5" y1="12" x2="19" y2="12" />
+                          <line x1="12" y1="5" x2="12" y2="19"></line>
+                          <line x1="5" y1="12" x2="19" y2="12"></line>
                         {/if}
                       </svg>
                     </span>
@@ -789,9 +803,22 @@
     border-radius: 20px;
   }
 
-  .fq-empty-icon { font-size: 48px; display: block; margin-bottom: 12px; }
-  .fq-empty h3 { margin: 0 0 8px; font-size: 20px; font-weight: 800; }
-  .fq-empty p { color: var(--text-secondary); font-size: 15px; }
+  .fq-empty-icon {
+    font-size: 48px;
+    display: block;
+    margin-bottom: 12px;
+  }
+
+  .fq-empty h3 {
+    margin: 0 0 8px;
+    font-size: 20px;
+    font-weight: 800;
+  }
+
+  .fq-empty p {
+    color: var(--text-secondary);
+    font-size: 15px;
+  }
 
   .fq-clear-link {
     background: none; border: none; color: var(--green);

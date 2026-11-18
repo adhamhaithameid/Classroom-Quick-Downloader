@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanAttachmentName, extractFileMeta } from '../entrypoints/content/file-meta';
+import { cleanAttachmentName, extractCourseTitle, extractFileMeta } from '../entrypoints/content/file-meta';
 import { getTypeLabels } from '../src/core/name/type-labels';
 
 describe('content file meta', () => {
@@ -65,6 +65,29 @@ describe('content file meta', () => {
     const meta = extractFileMeta(container, 'not-a-valid-url');
     expect(meta.name).toBeUndefined();
     expect(meta.ext).toBeUndefined();
+  });});
+
+describe('extractCourseTitle (0h4d.3.1)', () => {
+  const doc = (title: string) => ({ title }) as Document;
+
+  it('keeps the part before the last " - " separator', () => {
+    expect(extractCourseTitle(doc('Math 101 - Home'))).toBe('Math 101');
+    expect(extractCourseTitle(doc('Biology - Classwork - Google Classroom'))).toBe('Biology - Classwork');
+  });
+
+  it('degrades to empty on service pages without a separator', () => {
+    expect(extractCourseTitle(doc('Classroom'))).toBe('');
+    expect(extractCourseTitle(doc(''))).toBe('');
+    expect(extractCourseTitle(doc('   '))).toBe('');
+  });
+
+  it('trims whitespace around the course segment', () => {
+    expect(extractCourseTitle(doc('  Physics  -  Home'))).toBe('Physics');
+  });
+
+  it('never throws on odd titles', () => {
+    expect(extractCourseTitle(doc('- starts with separator'))).toBe('');
+    expect(extractCourseTitle(undefined as unknown as Document)).toBe('');
   });
 });
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import DOMPurify from 'isomorphic-dompurify';
 import SeoContentPage from './SeoContentPage.svelte';
-import type { SeoPageConfig } from '$lib/content/seoPages';
+import type { SeoPageConfig } from '#lib/content/seoPages.ts';
 
 /* Inline-link renderer guard: section paragraphs/bullets support a tiny
    markdown-style link syntax ([label](href)) so guides can cross-link

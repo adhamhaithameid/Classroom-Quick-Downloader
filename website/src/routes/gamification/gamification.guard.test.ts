@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import GamificationPage from './+page.svelte';
-import { SITE_URL } from '$lib/config';
-import { INDEXABLE_SITE_PATHS, SITE_PATH_LASTMOD, lastModForPath } from '$lib/seo/site';
+import { SITE_URL } from '#lib/config.ts';
+import { INDEXABLE_SITE_PATHS, SITE_PATH_LASTMOD, lastModForPath } from '#lib/seo/site.ts';
 
 /* SERP head guard for /gamification (levels + milestone celebrations page).
    Same contract as seo-head.guard.test.ts: the title/description/canonical

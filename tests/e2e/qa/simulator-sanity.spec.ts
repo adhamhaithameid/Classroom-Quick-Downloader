@@ -14,7 +14,7 @@
  * (HARNESS/ENVIRONMENT), never the assertions.
  */
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
-import { launchQaContext, captureConsole, projectBrowser } from "./harness";
+import { launchQaContext, captureConsole, projectBrowser, skipWhenExtensionUnavailable } from "./harness";
 import { createScenario, streamPath, classworkPath, drive, sheets, forms, youtube, external } from "../../simulator/scenario";
 
 const STREAM = streamPath();
@@ -70,6 +70,7 @@ test.describe("simulator sanity", () => {
   let closeQa: () => Promise<void>;
 
   test.beforeAll(async ({}, testInfo) => {
+    test.setTimeout(180_000); // cold browser start can exceed the 60s default (bead 3qxp)
     browser = projectBrowser(testInfo.project.name);
     testInfo.annotations.push({ type: "runbook", description: "harness sanity — not a manual check" });
     // Sanity must run even where the extension cannot (Firefox): it tests the
@@ -77,11 +78,16 @@ test.describe("simulator sanity", () => {
     const session = await launchQaContext(browser, buildScenario(), { skipIfExtensionUnavailable: false, project: testInfo.project.name });
     context = session.context;
     closeQa = session.close;
+    // A fully absent browser (qa-edge on a runner without Edge) leaves nothing
+    // to sanity-check: skip with the recorded ENVIRONMENT reason. The Firefox
+    // degraded case still runs — the browser launched, only the extension is
+    // gone, which is exactly what this spec must tolerate (bead 6mfg).
+    if (!session.context) skipWhenExtensionUnavailable();
     page = await context.newPage();
   });
 
   test.afterAll(async () => {
-    await closeQa();
+    await closeQa?.();
   });
 
   test("serves the scenario under the real Classroom origin with primitives and the built extension", async () => {

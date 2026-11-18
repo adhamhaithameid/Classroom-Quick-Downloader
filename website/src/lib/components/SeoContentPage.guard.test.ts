@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import SeoContentPage from './SeoContentPage.svelte';
-import type { SeoPageConfig } from '$lib/content/seoPages';
+import type { SeoPageConfig } from '#lib/content/seoPages.ts';
 
 const config: SeoPageConfig = {
   path: '/test-page',

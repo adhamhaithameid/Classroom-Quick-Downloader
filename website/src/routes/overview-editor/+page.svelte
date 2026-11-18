@@ -1,22 +1,21 @@
 <script lang="ts">
+  import { resolvePath } from '#lib/navigation/resolvePath.ts';
   import { onMount, type ComponentType } from 'svelte';
   import { fade, fly, scale } from 'svelte/transition';
   import { quintOut } from 'svelte/easing';
-  import { magnetic } from '$lib/actions/magnetic';
-  import { base } from '$app/paths';
-  import { APP_VERSION, SITE_URL, STORE_LINKS } from '$lib/config';
-  import SeoMeta from '$lib/components/SeoMeta.svelte';
-  import { detectBrowserFromNavigator, type BrowserKey } from '$lib/browser/detect';
-  import { refreshWebsiteSnapshotStore, websiteSnapshotStore } from '$lib/stores/websiteSnapshot';
-  import type { MapResponse, OverviewResponse } from '$lib/types/public';
-  import { trackWebsiteEvent } from '$lib/analytics/websiteEvents';
-  import AnimatedNumber from '$lib/components/AnimatedNumber.svelte';
-  import MediaLoader from '$lib/components/MediaLoader.svelte';
-  import AnimatedNumericText from '$lib/components/AnimatedNumericText.svelte';
-  import {
-    canStartCelebration,
-    nextCooldownUntil
-  } from '$lib/celebration/balloons';
+  import { magnetic } from '#lib/actions/magnetic.ts';
+  import { resolve } from '$app/paths';
+  import { APP_VERSION, SITE_URL, STORE_LINKS } from '#lib/config.ts';
+  import SeoMeta from '#lib/components/SeoMeta.svelte';
+  import { detectBrowserFromNavigator, type BrowserKey } from '#lib/browser/detect.ts';
+  import { refreshWebsiteSnapshotStore, websiteSnapshotStore } from '#lib/stores/websiteSnapshot.ts';
+  import type { MapResponse, OverviewResponse } from '#lib/types/public.ts';
+  import { trackWebsiteEvent } from '#lib/analytics/websiteEvents.ts';
+  import AnimatedNumber from '#lib/components/AnimatedNumber.svelte';
+  import MediaLoader from '#lib/components/MediaLoader.svelte';
+  import AnimatedNumericText from '#lib/components/AnimatedNumericText.svelte';
+  import { canStartCelebration, nextCooldownUntil } from '#lib/celebration/balloons/index.ts';
+
   import {
     type PlacementSection,
     type ElementPlacement,
@@ -31,9 +30,9 @@
     genPlacementId, getBuiltinSvg,
     maxPlacementZIndex,
     isSafeSvgMarkup
-  } from '$lib/svgCatalog/placements';
-  import { categories as svgCategories, doodleItems, threeDElements } from '$lib/svgCatalog/index';
-  import type { SvgItem } from '$lib/svgCatalog/index';
+  } from '#lib/svgCatalog/placements.ts';
+  import { categories as svgCategories, doodleItems, threeDElements } from '#lib/svgCatalog/index.ts';
+  import type { SvgItem } from '#lib/svgCatalog/index.ts';
 
   /* ━━━ Feature toggle: set to false to hide the silly question ━━━ */
   const ENABLE_SILLY_QUESTION = true;
@@ -205,10 +204,7 @@
   $: hoursSaved = computeTimeSaved(downloadCount).hours;
   $: clicksSaved = computeTimeSaved(downloadCount).clicks;
   $: metricsReady = downloadCount !== null && userCount !== null && countryCount !== null;
-  $: hasMeaningfulProof =
-    (typeof downloadCount === 'number' && downloadCount > 0) ||
-    (typeof userCount === 'number' && userCount > 0) ||
-    (typeof countryCount === 'number' && countryCount > 0);
+  $: hasMeaningfulProof = typeof downloadCount === 'number' && downloadCount > 0 || typeof userCount === 'number' && userCount > 0 || typeof countryCount === 'number' && countryCount > 0;
 
   /* Top 3 countries by download count */
   $: topCountries = (mapData?.countries ?? [])
@@ -218,7 +214,7 @@
 
   /* Ordered browser CTAs — detected browser in the middle */
   $: orderedBrowserCtas = (() => {
-    const others = browserCtas.filter(b => b !== detectedBrowser);
+    const others = browserCtas.filter((b) => b !== detectedBrowser);
     return [others[0], detectedBrowser, others[1]] as Array<'chrome' | 'firefox' | 'edge'>;
   })();
 
@@ -306,8 +302,8 @@
   async function loadMapComponents(): Promise<void> {
     if (RotatingGlobeComponent && CountryHeatmapComponent) return;
     const [globeModule, heatmapModule] = await Promise.all([
-      import('$lib/components/RotatingGlobe.svelte'),
-      import('$lib/components/CountryHeatmap.svelte')
+      import('#lib/components/RotatingGlobe.svelte'),
+      import('#lib/components/CountryHeatmap.svelte')
     ]);
     RotatingGlobeComponent = globeModule.default;
     CountryHeatmapComponent = heatmapModule.default;
@@ -320,14 +316,14 @@
     const burstTasks = Array.from({ length: CELEBRATION_BURST_COUNT }, (_, index) => {
       return new Promise<boolean>((resolve) => {
         const timer = window.setTimeout(async () => {
-          try {
-            const launchHyperBalloons = await getLaunchHyperBalloons();
-            await launchHyperBalloons();
-            forceCelebrationLayerZIndex();
-            resolve(true);
-          } catch {
-            resolve(false);
-          }
+            try {
+              const launchHyperBalloons = await getLaunchHyperBalloons();
+              await launchHyperBalloons();
+              forceCelebrationLayerZIndex();
+              resolve(true);
+            } catch {
+              resolve(false);
+            }
         }, index * CELEBRATION_BURST_STAGGER_MS);
 
         celebrationBurstTimers.push(timer);
@@ -585,7 +581,7 @@
       if (setW <= 0) return;
       // Keep offset in the middle band so the illusion of infinite scroll holds
       const minBound = -(setW * 6);
-      const maxBound = -(setW);
+      const maxBound = -setW;
       if (offset < minBound) offset += setW;
       if (offset > maxBound) offset -= setW;
     };
@@ -950,7 +946,7 @@
     if (canvasHeight > 0) {
       const vh = window.innerHeight;
       const sy = window.scrollY;
-      spawnY = ((sy + vh / 2) / canvasHeight) * 100;
+      spawnY = (sy + vh / 2) / canvasHeight * 100;
       spawnY = Math.round(spawnY * 10) / 10;
     }
 
@@ -996,7 +992,7 @@
   }
 
   function deleteElement(id: string) {
-    placements = placements.filter(p => p.id !== id);
+    placements = placements.filter((p) => p.id !== id);
     persistEditingState();
     if (selectedElementId === id) selectedElementId = null;
     setEditorStatus(`Deleted '${id}'.`, 'warn');
@@ -1004,14 +1000,14 @@
 
   function assignSample(sampleId: string) {
     if (!selectedElementId) return;
-    placements = placements.map(p => p.id === selectedElementId ? { ...p, sampleId } : p);
+    placements = placements.map((p) => p.id === selectedElementId ? { ...p, sampleId } : p);
     persistEditingState();
     pickerOpen = false;
     setEditorStatus(`Applied sample '${sampleId}'.`);
   }
 
   function updatePlacement(id: string, updates: Partial<ElementPlacement>) {
-    placements = placements.map(p => p.id === id ? { ...p, ...updates } : p);
+    placements = placements.map((p) => p.id === id ? { ...p, ...updates } : p);
     persistEditingState();
   }
 
@@ -1047,12 +1043,17 @@
     const pageH = placementCanvasHeight > 0 ? placementCanvasHeight : pageEl.scrollHeight;
     const dx = e.clientX - editDrag.startX;
     const dy = e.clientY - editDrag.startY;
-    const newX = Math.max(-25, Math.min(125, editDrag.origX + (dx / pageW) * 100));
-    const newY = Math.max(-25, Math.min(125, editDrag.origY + (dy / pageH) * 100));
+    const newX = Math.max(-25, Math.min(125, editDrag.origX + dx / pageW * 100));
+    const newY = Math.max(-25, Math.min(125, editDrag.origY + dy / pageH * 100));
     const dragId = editDrag.id;
-    placements = placements.map(p =>
-      p.id === dragId ? { ...p, x: Math.round(newX * 10) / 10, y: Math.round(newY * 10) / 10 } : p
-    );
+
+    placements = placements.map((p) => p.id === dragId
+      ? {
+        ...p,
+        x: Math.round(newX * 10) / 10,
+        y: Math.round(newY * 10) / 10
+      }
+      : p);
   }
 
   function onEditPointerUp(e: PointerEvent) {
@@ -1114,7 +1115,7 @@
   function getPickerItems(tab: 'float' | 'doodle' | '3d', search: string): SvgItem[] {
     let items: SvgItem[] = [];
     if (tab === 'float') {
-      items = svgCategories.flatMap(c => c.items);
+      items = svgCategories.flatMap((c) => c.items);
     } else if (tab === 'doodle') {
       items = doodleItems;
     } else {
@@ -1122,7 +1123,7 @@
     }
     if (search.trim()) {
       const q = search.toLowerCase();
-      items = items.filter(i => i.id.toLowerCase().includes(q) || i.label.toLowerCase().includes(q));
+      items = items.filter((i) => i.id.toLowerCase().includes(q) || i.label.toLowerCase().includes(q));
     }
     return items;
   }
@@ -1161,8 +1162,8 @@
     const next: Record<string, { leftPx: number; topPx: number }> = {};
     for (const placement of visiblePlacements) {
       next[placement.id] = {
-        leftPx: Number(((canvasWidth * placement.renderX) / 100).toFixed(2)),
-        topPx: Number(((canvasHeight * placement.renderY) / 100).toFixed(2))
+        leftPx: Number((canvasWidth * placement.renderX / 100).toFixed(2)),
+        topPx: Number((canvasHeight * placement.renderY / 100).toFixed(2))
       };
     }
     frozenPlacementCoords = next;
@@ -1205,7 +1206,7 @@
       ),
       renderColor: onMobile && placement.mobileColor ? placement.mobileColor : placement.color || 'var(--green)',
       renderZIndex: Math.round(clampForRender(onMobile && placement.mobileZIndex !== undefined ? placement.mobileZIndex : placement.zIndex ?? 0, 0, 30000)),
-      renderHidden: Boolean(placement.hidden || (onMobile && placement.mobileHidden === true))
+      renderHidden: Boolean(placement.hidden || onMobile && placement.mobileHidden === true)
     };
   }
 
@@ -1244,7 +1245,7 @@
     return 'running';
   }
 
-  $: selectedPlacement = placements.find(p => p.id === selectedElementId) || null;
+  $: selectedPlacement = placements.find((p) => p.id === selectedElementId) || null;
   $: pinnedSuperchargeStar = isMobilePlacementsViewport
     ? null
     : placements
@@ -1385,7 +1386,7 @@
   on:pointermove={onEditPointerMove}
   on:pointerup={onEditPointerUp}
   on:pointercancel={onEditPointerUp}
-/>
+></svelte:window>
 
 <SeoMeta
   title="Overview Editor — Classroom Quick Downloader"
@@ -1494,8 +1495,17 @@
             use:magnetic={b === detectedBrowser}
             on:click={() => trackInstallClick('hero_install')}
           >
-            <img src="{base}/images/{b}.svg" alt="" class="l2-cta-icon" />
-            {#if b === detectedBrowser}Install for {browserDisplayName(b)}{:else}{browserDisplayName(b)}{/if}
+            <img
+              src={resolvePath('images/{b}.svg')}
+              alt=""
+              class="l2-cta-icon"
+            />
+
+            {#if b === detectedBrowser}
+              Install for {browserDisplayName(b)}
+            {:else}
+              {browserDisplayName(b)}
+            {/if}
           </a>
         {/each}
       </div>
@@ -1526,9 +1536,16 @@
       <div class="l2-student-grid" role="list">
         <article class="l2-student-card" role="listitem">
           <span class="l2-student-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 8v5l3 3" />
-              <circle cx="12" cy="12" r="9" />
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 8v5l3 3"></path>
+              <circle cx="12" cy="12" r="9"></circle>
             </svg>
           </span>
           <h3>Less repetitive clicking</h3>
@@ -1536,20 +1553,32 @@
         </article>
         <article class="l2-student-card" role="listitem">
           <span class="l2-student-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-            </svg>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            ><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
           </span>
           <h3>Faster study prep</h3>
           <p>Get course files quickly so your time goes into understanding material, not managing downloads.</p>
         </article>
         <article class="l2-student-card" role="listitem">
           <span class="l2-student-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M9 6h11M9 12h11M9 18h11" />
-              <path d="m3 6 1.5 1.5L6.5 5.5" />
-              <path d="m3 12 1.5 1.5L6.5 11.5" />
-              <path d="m3 18 1.5 1.5L6.5 17.5" />
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M9 6h11M9 12h11M9 18h11"></path>
+              <path d="m3 6 1.5 1.5L6.5 5.5"></path>
+              <path d="m3 12 1.5 1.5L6.5 11.5"></path>
+              <path d="m3 18 1.5 1.5L6.5 17.5"></path>
             </svg>
           </span>
           <h3>Consistent workflow</h3>
@@ -1599,32 +1628,110 @@
       <!-- Feature 1: Downloads (video) -->
       <div class="l2-ps-feature">
         <div class="l2-ps-feature-label">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            width="18"
+            height="18"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+
           <span>File Downloads</span>
         </div>
         <div class="l2-ps-pair">
           <div class="l2-ps-media-card l2-ps-problem">
             <div class="l2-ps-media-badge">Without Classroom Quick Downloader</div>
             <div class="l2-ps-media-wrap">
-              <MediaLoader type="video" src="{base}/videos/problem.mp4" class="l2-ps-video" autoplay loop muted playsinline preload="metadata" ariaLabel="Tedious manual download process" aspectRatio="16/9">
-                <button type="button" class="l2-ps-expand-btn" on:click={() => toggleMediaExpanded('problem-video')} aria-label="Expand video">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
+              <MediaLoader
+                type="video"
+                src={resolvePath('videos/problem.mp4')}
+                class="l2-ps-video"
+                autoplay
+                loop
+                muted
+                playsinline
+                preload="metadata"
+                ariaLabel="Tedious manual download process"
+                aspectRatio="16/9"
+              >
+                <button
+                  type="button"
+                  class="l2-ps-expand-btn"
+                  on:click={() => toggleMediaExpanded('problem-video')}
+                  aria-label="Expand video"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  ><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"></path></svg>
                 </button>
               </MediaLoader>
             </div>
           </div>
           <div class="l2-ps-flow-arrow" aria-hidden="true">
-            <svg viewBox="0 0 64 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <line x1="4" y1="16" x2="44" y2="16" stroke="var(--gc-green)" stroke-width="2" stroke-dasharray="4 4" stroke-linecap="round" opacity="0.5"/>
-              <path d="M40 8l12 8-12 8" stroke="var(--gc-green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <svg
+              viewBox="0 0 64 32"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <line
+                x1="4"
+                y1="16"
+                x2="44"
+                y2="16"
+                stroke="var(--gc-green)"
+                stroke-width="2"
+                stroke-dasharray="4 4"
+                stroke-linecap="round"
+                opacity="0.5"
+              ></line>
+
+              <path
+                d="M40 8l12 8-12 8"
+                stroke="var(--gc-green)"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                fill="none"
+              ></path>
             </svg>
           </div>
           <div class="l2-ps-media-card l2-ps-solution">
             <div class="l2-ps-media-badge l2-ps-badge-green">With Classroom Quick Downloader</div>
             <div class="l2-ps-media-wrap">
-              <MediaLoader type="video" src="{base}/videos/solution.mp4" class="l2-ps-video" autoplay loop muted playsinline preload="metadata" ariaLabel="Instant batch download with CQD" aspectRatio="16/9">
-                <button type="button" class="l2-ps-expand-btn" on:click={() => toggleMediaExpanded('solution-video')} aria-label="Expand video">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
+              <MediaLoader
+                type="video"
+                src={resolvePath('videos/solution.mp4')}
+                class="l2-ps-video"
+                autoplay
+                loop
+                muted
+                playsinline
+                preload="metadata"
+                ariaLabel="Instant batch download with CQD"
+                aspectRatio="16/9"
+              >
+                <button
+                  type="button"
+                  class="l2-ps-expand-btn"
+                  on:click={() => toggleMediaExpanded('solution-video')}
+                  aria-label="Expand video"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  ><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"></path></svg>
                 </button>
               </MediaLoader>
             </div>
@@ -1642,32 +1749,102 @@
       <!-- Feature 2: Flags (images) -->
       <div class="l2-ps-feature">
         <div class="l2-ps-feature-label">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            width="18"
+            height="18"
+          >
+            <path
+              d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"
+            ></path>
+
+            <line x1="4" y1="22" x2="4" y2="15"></line>
+          </svg>
+
           <span>Post Flags</span>
         </div>
         <div class="l2-ps-pair">
           <div class="l2-ps-media-card l2-ps-problem">
             <div class="l2-ps-media-badge">Without Classroom Quick Downloader</div>
             <div class="l2-ps-media-wrap">
-              <MediaLoader type="image" src="{base}/images/problem-flags.webp" class="l2-ps-img" alt="Classroom posts without edit/comment flags" loading="lazy">
-                <button type="button" class="l2-ps-expand-btn" on:click={() => toggleMediaExpanded('problem-flags')} aria-label="Expand image">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
+              <MediaLoader
+                type="image"
+                src={resolvePath('images/problem-flags.webp')}
+                class="l2-ps-img"
+                alt="Classroom posts without edit/comment flags"
+                loading="lazy"
+              >
+                <button
+                  type="button"
+                  class="l2-ps-expand-btn"
+                  on:click={() => toggleMediaExpanded('problem-flags')}
+                  aria-label="Expand image"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  ><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"></path></svg>
                 </button>
               </MediaLoader>
             </div>
           </div>
           <div class="l2-ps-flow-arrow" aria-hidden="true">
-            <svg viewBox="0 0 64 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <line x1="4" y1="16" x2="44" y2="16" stroke="var(--gc-green)" stroke-width="2" stroke-dasharray="4 4" stroke-linecap="round" opacity="0.5"/>
-              <path d="M40 8l12 8-12 8" stroke="var(--gc-green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <svg
+              viewBox="0 0 64 32"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <line
+                x1="4"
+                y1="16"
+                x2="44"
+                y2="16"
+                stroke="var(--gc-green)"
+                stroke-width="2"
+                stroke-dasharray="4 4"
+                stroke-linecap="round"
+                opacity="0.5"
+              ></line>
+
+              <path
+                d="M40 8l12 8-12 8"
+                stroke="var(--gc-green)"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                fill="none"
+              ></path>
             </svg>
           </div>
           <div class="l2-ps-media-card l2-ps-solution">
             <div class="l2-ps-media-badge l2-ps-badge-green">With Classroom Quick Downloader</div>
             <div class="l2-ps-media-wrap">
-              <MediaLoader type="image" src="{base}/images/solution-flags.webp" class="l2-ps-img" alt="CQD flags showing edited and commented posts" loading="lazy">
-                <button type="button" class="l2-ps-expand-btn" on:click={() => toggleMediaExpanded('solution-flags')} aria-label="Expand image">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
+              <MediaLoader
+                type="image"
+                src={resolvePath('images/solution-flags.webp')}
+                class="l2-ps-img"
+                alt="CQD flags showing edited and commented posts"
+                loading="lazy"
+              >
+                <button
+                  type="button"
+                  class="l2-ps-expand-btn"
+                  on:click={() => toggleMediaExpanded('solution-flags')}
+                  aria-label="Expand image"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  ><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"></path></svg>
                 </button>
               </MediaLoader>
             </div>
@@ -1680,10 +1857,25 @@
         <span class="l2-label">THE SOLUTION</span>
         <h3>One click. Every file. Clear flags. Done.</h3>
         <ul class="l2-check-list">
-          <li><span class="l2-check">✓</span> Batch download all files instantly</li>
-          <li><span class="l2-check">✓</span> Visual flags for edited &amp; commented posts</li>
-          <li><span class="l2-check">✓</span> Works with Classwork &amp; Stream tabs</li>
-          <li><span class="l2-check">✓</span> Supports Google Workspace accounts</li>
+          <li>
+            <span class="l2-check">✓</span>
+            Batch download all files instantly
+          </li>
+
+          <li>
+            <span class="l2-check">✓</span>
+            Visual flags for edited & commented posts
+          </li>
+
+          <li>
+            <span class="l2-check">✓</span>
+            Works with Classwork & Stream tabs
+          </li>
+
+          <li>
+            <span class="l2-check">✓</span>
+            Supports Google Workspace accounts
+          </li>
         </ul>
       </div>
     </div>
@@ -1696,30 +1888,91 @@
 
       <!-- Prev arrow (outside modal to avoid overflow: hidden clipping) -->
       {#if nav.hasPrev}
-        <button type="button" class="l2-media-nav-btn l2-media-nav-prev" on:click|stopPropagation={() => navigateMedia('prev')} aria-label="Previous" title="Previous">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
+        <button
+          type="button"
+          class="l2-media-nav-btn l2-media-nav-prev"
+          on:click|stopPropagation={() => navigateMedia('prev')}
+          aria-label="Previous"
+          title="Previous"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          ><polyline points="15 18 9 12 15 6"></polyline></svg>
         </button>
       {/if}
 
-      <div class="l2-media-modal" transition:scale={{ duration: 220, start: 0.96 }} role="dialog" tabindex="-1" aria-modal="true" aria-label="Expanded media">
-        <button type="button" class="l2-media-modal-close l2-ps-expand-btn l2-ps-expand-btn-modal" on:click={closeMediaExpanded} aria-label="Close" title="Collapse">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M6 6l12 12" />
-            <path d="M18 6 6 18" />
+      <div
+        class="l2-media-modal"
+        transition:scale={{ duration: 220, start: 0.96 }}
+        role="dialog"
+        tabindex="-1"
+        aria-modal="true"
+        aria-label="Expanded media"
+      >
+        <button
+          type="button"
+          class="l2-media-modal-close l2-ps-expand-btn l2-ps-expand-btn-modal"
+          on:click={closeMediaExpanded}
+          aria-label="Close"
+          title="Collapse"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M6 6l12 12"></path>
+            <path d="M18 6 6 18"></path>
           </svg>
         </button>
         {#key mediaExpanded}
           <div class="l2-media-crossfade" in:fade={{ duration: 120 }} out:fade={{ duration: 100 }}>
             {#if mediaExpanded === 'problem-video'}
-              <MediaLoader type="video" src="{base}/videos/problem.mp4" class="l2-media-modal-content" autoplay loop muted playsinline preload="auto" eager />
+              <MediaLoader
+                type="video"
+                src={resolvePath('videos/problem.mp4')}
+                class="l2-media-modal-content"
+                autoplay
+                loop
+                muted
+                playsinline
+                preload="auto"
+                eager
+              />
             {:else if mediaExpanded === 'solution-video'}
-              <MediaLoader type="video" src="{base}/videos/solution.mp4" class="l2-media-modal-content" autoplay loop muted playsinline preload="auto" eager />
+              <MediaLoader
+                type="video"
+                src={resolvePath('videos/solution.mp4')}
+                class="l2-media-modal-content"
+                autoplay
+                loop
+                muted
+                playsinline
+                preload="auto"
+                eager
+              />
             {:else if mediaExpanded === 'problem-flags'}
-              <MediaLoader type="image" src="{base}/images/problem-flags.webp" class="l2-media-modal-content" alt="Expanded view" eager />
+              <MediaLoader
+                type="image"
+                src={resolvePath('images/problem-flags.webp')}
+                class="l2-media-modal-content"
+                alt="Expanded view"
+                eager
+              />
             {:else if mediaExpanded === 'solution-flags'}
-              <MediaLoader type="image" src="{base}/images/solution-flags.webp" class="l2-media-modal-content" alt="Expanded view" eager />
+              <MediaLoader
+                type="image"
+                src={resolvePath('images/solution-flags.webp')}
+                class="l2-media-modal-content"
+                alt="Expanded view"
+                eager
+              />
             {/if}
           </div>
         {/key}
@@ -1727,10 +1980,21 @@
 
       <!-- Next arrow (outside modal to avoid overflow: hidden clipping) -->
       {#if nav.hasNext}
-        <button type="button" class="l2-media-nav-btn l2-media-nav-next" on:click|stopPropagation={() => navigateMedia('next')} aria-label="Next" title="Next">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
+        <button
+          type="button"
+          class="l2-media-nav-btn l2-media-nav-next"
+          on:click|stopPropagation={() => navigateMedia('next')}
+          aria-label="Next"
+          title="Next"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          ><polyline points="9 18 15 12 9 6"></polyline></svg>
         </button>
       {/if}
     </div>
@@ -1843,9 +2107,7 @@
                 aria-label="Expand map to full screen popup"
                 title="Expand map"
               >
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" />
-                </svg>
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"></path></svg>
               </button>
               <svelte:component
                 this={RotatingGlobeComponent}
@@ -1878,46 +2140,51 @@
           </div>
 
           {#if ENABLE_SILLY_QUESTION && mapPromptVisible}
-          <div
-            class="l2-silly-entrance"
-            in:fly={{ y: 20, duration: 600, easing: quintOut }}
-          >
-            <div class="l2-silly-divider"></div>
-            <div class="l2-silly-inline">
-              {#if mapInteractionState === 'idle'}
-                <h3 class="l2-silly-q">Is your country downloading? 🌍</h3>
+            <div
+              class="l2-silly-entrance"
+              in:fly={{ y: 20, duration: 600, easing: quintOut }}
+            >
+              <div class="l2-silly-divider"></div>
+              <div class="l2-silly-inline">
+                {#if mapInteractionState === 'idle'}
+                  <h3 class="l2-silly-q">Is your country downloading? 🌍</h3>
                 <p class="l2-silly-sub">Join students from <strong>{metricsReady ? `${countryCount}+` : 'many'}</strong> countries already using CQD</p>
-                <div class="l2-silly-btns">
+                  <div class="l2-silly-btns">
                   <button type="button" class="l2-silly-btn l2-silly-yes" on:click={onMapYes} disabled={sillyAnswered}>Yes 🎉</button>
                   <button type="button" class="l2-silly-btn l2-silly-no" on:click={onMapNo} disabled={sillyAnswered}>Not yet 😢</button>
-                </div>
-              {:else if mapInteractionState === 'yes'}
+                  </div>
+                {:else if mapInteractionState === 'yes'}
                 <div class="l2-silly-result l2-silly-yay" transition:scale={{ duration: 400, start: 0.3 }}>
-                  <span class="l2-silly-yay-text">Yay! 🎊</span>
-                  <p class="l2-silly-yay-sub">You're part of the global Classroom Quick Downloader family!</p>
-                </div>
-              {:else if mapInteractionState === 'no'}
+                    <span class="l2-silly-yay-text">Yay! 🎊</span>
+                    <p class="l2-silly-yay-sub">You're part of the global Classroom Quick Downloader family!</p>
+                  </div>
+                {:else if mapInteractionState === 'no'}
                 <div class="l2-silly-result l2-silly-waiting" transition:scale={{ duration: 400, start: 0.3 }}>
                   <p class="l2-silly-typed">{noTypedText}<span class="l2-typing-cursor">|</span></p>
-                  {#if noShowCta}
+                    {#if noShowCta}
                     <div class="l2-silly-cta-reveal" transition:scale={{ duration: 300, start: 0.7 }}>
-                      <a
-                        class="l2-cta l2-cta-current l2-silly-install"
-                        href={browserLink(detectedBrowser)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        use:magnetic
-                        on:click={() => trackInstallClick('map_prompt_install')}
-                      >
-                        <img src="{base}/images/{detectedBrowser}.svg" alt="" class="l2-cta-icon" />
-                        Install for {browserDisplayName(detectedBrowser)}
-                      </a>
-                    </div>
-                  {/if}
-                </div>
-              {/if}
+                        <a
+                          class="l2-cta l2-cta-current l2-silly-install"
+                          href={browserLink(detectedBrowser)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          use:magnetic
+                          on:click={() => trackInstallClick('map_prompt_install')}
+                        >
+                          <img
+                            src={resolvePath('images/{detectedBrowser}.svg')}
+                            alt=""
+                            class="l2-cta-icon"
+                          />
+
+                          Install for {browserDisplayName(detectedBrowser)}
+                        </a>
+                      </div>
+                    {/if}
+                  </div>
+                {/if}
+              </div>
             </div>
-          </div>
           {/if}
         </div>
       </div>
@@ -1947,8 +2214,8 @@
           title="Collapse"
         >
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M6 6l12 12" />
-            <path d="M18 6 6 18" />
+            <path d="M6 6l12 12"></path>
+            <path d="M18 6 6 18"></path>
           </svg>
         </button>
         {#if CountryHeatmapComponent}
@@ -2009,8 +2276,17 @@
             use:magnetic={b === detectedBrowser}
             on:click={() => trackInstallClick('final_install')}
           >
-            <img src="{base}/images/{b}.svg" alt="" class="l2-cta-icon" />
-            {#if b === detectedBrowser}Install for {browserDisplayName(b)}{:else}{browserDisplayName(b)}{/if}
+            <img
+              src={resolvePath('images/{b}.svg')}
+              alt=""
+              class="l2-cta-icon"
+            />
+
+            {#if b === detectedBrowser}
+              Install for {browserDisplayName(b)}
+            {:else}
+              {browserDisplayName(b)}
+            {/if}
           </a>
         {/each}
       </div>
@@ -2642,7 +2918,7 @@
     gap: 8px 14px;
     align-items: center;
   }
-  .edit-color-input input[type='color'] {
+  .edit-color-input input[type="color"] {
     width: 28px;
     height: 22px;
     border: 0;
@@ -2836,10 +3112,29 @@
     letter-spacing: 0.08em; text-transform: uppercase;
     display: block; margin-bottom: 12px;
   }
-  .l2-check-list { list-style: none; padding: 0; margin: 16px 0 0; display: flex; flex-direction: column; gap: 10px; }
-  .l2-check-list li { display: flex; align-items: center; gap: 10px; font-size: 15px; color: var(--text); }
-  .l2-check { color: var(--green); font-weight: 700; font-size: 16px; }
 
+  .l2-check-list {
+    list-style: none;
+    padding: 0;
+    margin: 16px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .l2-check-list li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    color: var(--text);
+  }
+
+  .l2-check {
+    color: var(--green);
+    font-weight: 700;
+    font-size: 16px;
+  }
 
   /* ── Problem / Solution pair layout ── */
   .l2-ps-section {
@@ -3120,8 +3415,13 @@
     -webkit-backdrop-filter: blur(8px);
   }
 
-  .l2-media-nav-prev { left: 20px; }
-  .l2-media-nav-next { right: 20px; }
+  .l2-media-nav-prev {
+    left: 20px;
+  }
+
+  .l2-media-nav-next {
+    right: 20px;
+  }
 
   .l2-media-nav-btn svg {
     width: 22px;
@@ -3894,8 +4194,13 @@
     }
   }
   @media (max-width: 600px) {
-    .l2-feature-grid { grid-template-columns: 1fr; }
-    .l2-hero-actions { flex-direction: column; align-items: center; }
+    .l2-feature-grid {
+      grid-template-columns: 1fr;
 
+    }
+    .l2-hero-actions {
+      flex-direction: column;
+      align-items: center;
+    }
   }
 </style>
