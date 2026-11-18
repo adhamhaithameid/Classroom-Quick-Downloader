@@ -98,7 +98,7 @@ test.describe("qa-08 resilience", () => {
         check.skip("HARNESS: download probe instruments the extension service worker — Chromium-only; Firefox MV2 has no SW and Playwright hides its background");
         return;
       }
-      const pagesBefore = context.pages().length;
+      const pagesBefore = context.pages().filter((pg) => /^https?:/.test(pg.url())).length;
       const cases = [
         { id: "srvfail-res-1", terminalClass: /cqd-error|cqd-success/, name: "transient 5xx" },
         { id: "quota-res-1", terminalClass: /cqd-error|cqd-success/, name: "quota html" },
@@ -152,11 +152,17 @@ test.describe("qa-08 resilience", () => {
         );
       }
 
-      // Zero dead ends: no window or tab was ever opened.
-      const pagesAfter = context.pages().length;
+      // Zero dead ends: no window or tab was ever opened. Count only real
+      // http(s) pages: browser chrome like Edge's own downloads hub
+      // (edge://downloads-hub/) opens as a side effect of download activity
+      // itself (run 44206202899: pages=about:blank | classroom |
+      // edge://downloads-hub/ with every per-shape assertion green) and is
+      // not an extension dead-end window.
+      const realPages = () =>
+        context.pages().filter((pg) => /^https?:/.test(pg.url())).length;
       check.assert(
         "zero dead ends — no window opened across all failures",
-        pagesAfter === pagesBefore,
+        realPages() === pagesBefore,
         `pages=${context.pages().map((pg) => pg.url().slice(0, 120)).join(" | ")}`,
       );
       await check.screenshot("resilience-terminals");
