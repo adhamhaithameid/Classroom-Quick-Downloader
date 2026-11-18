@@ -13,6 +13,8 @@ import type { Env as WorkerEnv } from "../types";
 import {
   getLicenseProvider,
   type LicenseProvider,
+  type ProviderLicenseStatus,
+  type ProviderWebhookEvent,
 } from "./provider";
 
 // ---------------------------------------------------------------------------
@@ -64,6 +66,7 @@ const LICENSES_TABLE_SQL = `CREATE TABLE IF NOT EXISTS licenses (
   status TEXT NOT NULL,
   provider TEXT NOT NULL,
   provider_resource_id TEXT,
+  provider_subscription_id TEXT,
   plan TEXT NOT NULL,
   issued_at INTEGER NOT NULL,
   expires_at INTEGER,
@@ -278,7 +281,17 @@ export interface LicenseRecord {
   key_hash: string;
   status: "active" | "revoked" | "refunded";
   provider: string;
+  /**
+   * Provider-side identifier in the "license/order" namespace: the
+   * license-key id for validate-self-registered rows, the order id for
+   * webhook-registered rows. Refund lookups target this column.
+   */
   provider_resource_id: string | null;
+  /**
+   * Provider-side subscription id (separate namespace from order ids).
+   * Subscription events look up and backfill this column.
+   */
+  provider_subscription_id: string | null;
   plan: string;
   issued_at: number;
   expires_at: number | null;
@@ -291,6 +304,7 @@ type LicenseRow = {
   status: string;
   provider: string;
   provider_resource_id: string | null;
+  provider_subscription_id: string | null;
   plan: string;
   issued_at: number;
   expires_at: number | null;
@@ -306,6 +320,8 @@ function toRecord(row: Record<string, unknown>): LicenseRecord | null {
     status,
     provider: typeof row.provider === "string" ? row.provider : "unknown",
     provider_resource_id: typeof row.provider_resource_id === "string" ? row.provider_resource_id : null,
+    provider_subscription_id:
+      typeof row.provider_subscription_id === "string" ? row.provider_subscription_id : null,
     plan: typeof row.plan === "string" ? row.plan : DEFAULT_LICENSE_PLAN,
     issued_at: typeof row.issued_at === "number" ? row.issued_at : Date.now(),
     expires_at: typeof row.expires_at === "number" ? row.expires_at : null,
@@ -314,7 +330,7 @@ function toRecord(row: Record<string, unknown>): LicenseRecord | null {
 }
 
 const LICENSE_COLUMNS =
-  "id, key_hash, status, provider, provider_resource_id, plan, issued_at, expires_at, revoked_at";
+  "id, key_hash, status, provider, provider_resource_id, provider_subscription_id, plan, issued_at, expires_at, revoked_at";
 
 async function findLicenseByKeyHash(db: LicensingD1, keyHash: string): Promise<LicenseRecord | null> {
   const result = await db
@@ -334,10 +350,45 @@ async function findLicenseById(db: LicensingD1, licenseId: string): Promise<Lice
   return row ? toRecord(row) : null;
 }
 
+/** Order-id namespace lookup (refund events against webhook-registered rows). */
+async function findLicenseByProviderResource(
+  db: LicensingD1,
+  provider: string,
+  providerResourceId: string,
+): Promise<LicenseRecord | null> {
+  const result = await db
+    .prepare(
+      `SELECT ${LICENSE_COLUMNS} FROM licenses
+       WHERE provider_resource_id = ?1 AND provider = ?2`,
+    )
+    .bind(providerResourceId, provider)
+    .all<Record<string, unknown>>();
+  const row = result?.results?.[0];
+  return row ? toRecord(row) : null;
+}
+
+/** Subscription-id namespace lookup (subscription events). */
+async function findLicenseByProviderSubscription(
+  db: LicensingD1,
+  provider: string,
+  providerSubscriptionId: string,
+): Promise<LicenseRecord | null> {
+  const result = await db
+    .prepare(
+      `SELECT ${LICENSE_COLUMNS} FROM licenses
+       WHERE provider_subscription_id = ?1 AND provider = ?2`,
+    )
+    .bind(providerSubscriptionId, provider)
+    .all<Record<string, unknown>>();
+  const row = result?.results?.[0];
+  return row ? toRecord(row) : null;
+}
+
 interface NewLicenseInput {
   keyHash: string;
   provider: string;
   providerResourceId: string | null;
+  providerSubscriptionId: string | null;
   plan: string;
   expiresAt: number | null;
   now: number;
@@ -348,8 +399,9 @@ async function insertLicense(db: LicensingD1, input: NewLicenseInput): Promise<L
   await db
     .prepare(
       `INSERT INTO licenses
-         (id, key_hash, status, provider, provider_resource_id, plan, issued_at, expires_at, revoked_at, created_at)
-       VALUES (?1, ?2, 'active', ?3, ?4, ?5, ?6, ?7, NULL, ?6)
+         (id, key_hash, status, provider, provider_resource_id, provider_subscription_id,
+          plan, issued_at, expires_at, revoked_at, created_at)
+       VALUES (?1, ?2, 'active', ?3, ?4, ?5, ?6, ?7, ?8, NULL, ?7)
        ON CONFLICT (key_hash) DO NOTHING`,
     )
     .bind(
@@ -357,6 +409,7 @@ async function insertLicense(db: LicensingD1, input: NewLicenseInput): Promise<L
       input.keyHash,
       input.provider,
       input.providerResourceId,
+      input.providerSubscriptionId,
       input.plan,
       input.now,
       input.expiresAt,
@@ -385,6 +438,21 @@ async function updateLicenseExpiry(
   await db
     .prepare(`UPDATE licenses SET expires_at = ?1 WHERE id = ?2`)
     .bind(expiresAt, licenseId)
+    .run();
+}
+
+/**
+ * Bind a subscription id to a license row (subscription-event namespace).
+ * Later subscription events without a license key reach the row through it.
+ */
+async function bindLicenseSubscription(
+  db: LicensingD1,
+  licenseId: string,
+  subscriptionId: string,
+): Promise<void> {
+  await db
+    .prepare(`UPDATE licenses SET provider_subscription_id = ?1 WHERE id = ?2`)
+    .bind(subscriptionId, licenseId)
     .run();
 }
 
@@ -419,6 +487,23 @@ async function auditEvent(db: LicensingD1, type: string, licenseId: string | nul
   await recordLicenseEvent(db, { licenseId, type, payloadDigest: digest, now });
 }
 
+/**
+ * Read-only dedupe probe: has this webhook payload digest already been
+ * processed? A read cannot poison a failed delivery's retry the way an
+ * upfront INSERT could.
+ */
+async function hasLicenseEvent(db: LicensingD1, payloadDigest: string): Promise<boolean> {
+  try {
+    const result = await db
+      .prepare(`SELECT id FROM license_events WHERE payload_digest = ?1`)
+      .bind(payloadDigest)
+      .all<Record<string, unknown>>();
+    return (result?.results?.length ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Service operations
 // ---------------------------------------------------------------------------
@@ -446,13 +531,15 @@ export interface ValidateInput {
  * Shared resolve step for validate/activate: hash lookup first, provider
  * fallback registration when the row is unknown, best-effort provider
  * status refresh when it is known. Never returns raw key material.
+ * `remoteStatus` carries the provider's last reported status so callers can
+ * fail closed on states the local row cannot represent (e.g. "inactive").
  */
 async function resolveLicense(
   db: LicensingD1,
   provider: LicenseProvider | null,
   licenseKey: string,
   now: number,
-): Promise<{ record: LicenseRecord | null }> {
+): Promise<{ record: LicenseRecord | null; remoteStatus?: ProviderLicenseStatus }> {
   const keyHash = await hashLicenseKey(licenseKey);
   if (!keyHash) return { record: null };
   let record = await findLicenseByKeyHash(db, keyHash);
@@ -466,12 +553,13 @@ async function resolveLicense(
         keyHash,
         provider: provider.name,
         providerResourceId: remote.providerResourceId,
+        providerSubscriptionId: null,
         plan: remote.plan || DEFAULT_LICENSE_PLAN,
         expiresAt: remote.expiresAt ?? null,
         now,
       });
     }
-    return { record };
+    return { record, remoteStatus: remote.status };
   }
 
   if (record && record.status === "active" && provider) {
@@ -487,6 +575,10 @@ async function resolveLicense(
       await updateLicenseStatus(db, record.id, remote.status, now);
       record = { ...record, status: remote.status, revoked_at: now };
     }
+    // "inactive" is NOT persisted: the provider may reactivate the key on a
+    // fresh activation. The caller fails this request without an
+    // entitlement; the row stays active so a later "active" refresh heals.
+    return { record, remoteStatus: remote.status };
   }
 
   return { record };
@@ -536,8 +628,15 @@ export async function validateLicense(
   if (!keyHash) return { ok: false, code: "license_key_format_invalid" };
 
   const provider = getLicenseProvider(env);
-  const { record } = await resolveLicense(db, provider, input.licenseKey, now);
+  const { record, remoteStatus } = await resolveLicense(db, provider, input.licenseKey, now);
   if (!record) return { ok: false, code: "license_invalid" };
+
+  // Provider says deactivated: fail with NO signed entitlement. Without
+  // this, a deactivated key with a local active row would validate forever.
+  if (remoteStatus === "inactive") {
+    await auditEvent(db, "validate:inactive", record.id, now);
+    return { ok: false, code: "license_inactive", status: "invalid" };
+  }
 
   const status = computeEffectiveStatus(record.status, record.expires_at, now);
   await auditEvent(db, `validate:${status}`, record.id, now);
@@ -570,8 +669,15 @@ export async function activateLicense(
   if (!isValidInstallId(installId)) return { ok: false, code: "install_id_format_invalid" };
 
   const provider = getLicenseProvider(env);
-  const { record } = await resolveLicense(db, provider, input.licenseKey, now);
+  const { record, remoteStatus } = await resolveLicense(db, provider, input.licenseKey, now);
   if (!record) return { ok: false, code: "license_invalid" };
+
+  // Provider says deactivated: no new activations either (same reasoning
+  // as the validate branch above).
+  if (remoteStatus === "inactive") {
+    await auditEvent(db, "activate:inactive", record.id, now);
+    return { ok: false, code: "license_inactive", status: "invalid" };
+  }
 
   const status = computeEffectiveStatus(record.status, record.expires_at, now);
   if (status === "expired" || status === "invalid") {
@@ -583,40 +689,42 @@ export async function activateLicense(
     };
   }
 
-  const existing = await db
-    .prepare(`SELECT install_id FROM activations WHERE license_id = ?1 AND install_id = ?2`)
-    .bind(record.id, installId)
-    .all<Record<string, unknown>>();
-  const alreadyActive = (existing?.results?.length ?? 0) > 0;
+  // Atomic cap enforcement: the count check lives inside the INSERT's
+  // SELECT, so two concurrent activations cannot both squeeze under the
+  // cap between a separate SELECT and INSERT (count-then-insert race).
+  // changes = 1: fresh activation. changes = 0: either the cap was full or
+  // the (license_id, install_id) pair already exists — distinguish below.
+  const insertResult = await db
+    .prepare(
+      `INSERT INTO activations (license_id, install_id, created_at, last_seen_at)
+       SELECT ?1, ?2, ?3, ?3
+       WHERE (SELECT COUNT(*) FROM activations WHERE license_id = ?1) < ?4
+       ON CONFLICT (license_id, install_id) DO NOTHING`,
+    )
+    .bind(record.id, installId, now, MAX_ACTIVATIONS_PER_LICENSE)
+    .run();
+  const inserted = typeof insertResult?.meta?.changes === "number"
+    ? insertResult.meta.changes > 0
+    : true;
 
-  if (!alreadyActive) {
-    const countResult = await db
-      .prepare(`SELECT COUNT(*) AS n FROM activations WHERE license_id = ?1`)
-      .bind(record.id)
+  if (!inserted) {
+    const existing = await db
+      .prepare(`SELECT install_id FROM activations WHERE license_id = ?1 AND install_id = ?2`)
+      .bind(record.id, installId)
       .all<Record<string, unknown>>();
-    const count = typeof countResult?.results?.[0]?.n === "number"
-      ? countResult.results[0].n as number
-      : 0;
-    if (count >= MAX_ACTIVATIONS_PER_LICENSE) {
+    if ((existing?.results?.length ?? 0) === 0) {
       await auditEvent(db, "activate:cap_reached", record.id, now);
       return { ok: false, code: "activation_limit_reached", status };
     }
     await db
-      .prepare(
-        `INSERT INTO activations (license_id, install_id, created_at, last_seen_at)
-         VALUES (?1, ?2, ?3, ?3)
-         ON CONFLICT (license_id, install_id) DO NOTHING`,
-      )
-      .bind(record.id, installId, now)
-      .run();
-  } else {
-    await db
       .prepare(`UPDATE activations SET last_seen_at = ?1 WHERE license_id = ?2 AND install_id = ?3`)
       .bind(now, record.id, installId)
       .run();
+    await auditEvent(db, "activate:refresh", record.id, now);
+  } else {
+    await auditEvent(db, "activate:new", record.id, now);
   }
 
-  await auditEvent(db, alreadyActive ? "activate:refresh" : "activate:new", record.id, now);
   return signedOutcome(env, db, record, status, now);
 }
 
@@ -667,6 +775,7 @@ export async function issueLicense(
     keyHash,
     provider: providerName,
     providerResourceId: input.providerResourceId?.trim() || null,
+    providerSubscriptionId: null,
     plan,
     expiresAt,
     now,
@@ -726,9 +835,9 @@ export async function listLicenses(
   const limit = Math.min(Math.max(Math.floor(input.limit ?? 100), 1), 500);
   const statusFilter = input.status?.trim().toLowerCase();
   const query = statusFilter
-    ? `SELECT id, status, provider, provider_resource_id, plan, issued_at, expires_at, revoked_at
+    ? `SELECT id, status, provider, provider_resource_id, provider_subscription_id, plan, issued_at, expires_at, revoked_at
        FROM licenses WHERE status = ?1 ORDER BY issued_at DESC LIMIT ?2`
-    : `SELECT id, status, provider, provider_resource_id, plan, issued_at, expires_at, revoked_at
+    : `SELECT id, status, provider, provider_resource_id, provider_subscription_id, plan, issued_at, expires_at, revoked_at
        FROM licenses ORDER BY issued_at DESC LIMIT ?1`;
 
   const statement = db.prepare(query);
@@ -771,89 +880,123 @@ export async function processLicenseWebhook(
     return { ok: false, code: "webhook_signature_invalid", httpStatus: 401 };
   }
 
-  // Idempotency: dedupe on the normalized provider event id digest.
-  const digest = await sha256Hex(`${provider.name}:${event.eventId}`);
-  const fresh = await recordLicenseEvent(db, {
-    licenseId: null,
-    type: `webhook:${event.eventName}`,
-    payloadDigest: digest,
-    now,
-  });
-  if (!fresh) {
+  // Idempotency digest: hash of the FULL raw payload, not name:id. LS sends
+  // no per-occurrence event id, so name:id would collide across distinct
+  // occurrences (e.g. two subscription_updated rounds for one subscription)
+  // and silently drop events. Content hashing keeps genuine replays
+  // (identical bytes) deduped while distinct payloads never collide.
+  const digest = await sha256Hex(`${provider.name}:${rawBody}`);
+  if (await hasLicenseEvent(db, digest)) {
     return { ok: true, code: "webhook_duplicate", httpStatus: 200 };
   }
 
   try {
-    const keyHash = event.licenseKey ? await hashLicenseKey(event.licenseKey) : null;
-
-    if (event.eventName === "order_created" || event.eventName === "order_processed") {
-      if (keyHash) {
-        const existing = await findLicenseByKeyHash(db, keyHash);
-        if (!existing) {
-          await insertLicense(db, {
-            keyHash,
-            provider: provider.name,
-            providerResourceId: event.orderId ?? null,
-            plan: event.plan || DEFAULT_LICENSE_PLAN,
-            expiresAt: event.expiresAt ?? null,
-            now,
-          });
-        }
-      }
-      return { ok: true, code: "webhook_handled", httpStatus: 200 };
-    }
-
-    // State-transition events target an existing license by key hash or
-    // provider resource id (order/subscription id).
-    let record: LicenseRecord | null = null;
-    if (keyHash) {
-      record = await findLicenseByKeyHash(db, keyHash);
-    }
-    if (!record && event.providerResourceId) {
-      const result = await db
-        .prepare(
-          `SELECT ${LICENSE_COLUMNS} FROM licenses
-           WHERE provider_resource_id = ?1 AND provider = ?2`,
-        )
-        .bind(event.providerResourceId, provider.name)
-        .all<Record<string, unknown>>();
-      record = result?.results?.[0] ? toRecord(result.results[0]) : null;
-    }
-
-    if (!record) {
-      // Unknown license: the event is acknowledged so the provider stops
-      // retrying; issuance self-binds later via first validate.
-      return { ok: true, code: "webhook_unmatched", httpStatus: 200 };
-    }
-
-    if (event.eventName === "order_refunded") {
-      await updateLicenseStatus(db, record.id, "refunded", now);
-      return { ok: true, code: "webhook_handled", httpStatus: 200 };
-    }
-    if (event.eventName === "subscription_created" || event.eventName === "subscription_updated") {
-      if (event.expiresAt !== undefined) {
-        await updateLicenseExpiry(db, record.id, event.expiresAt);
-      }
-      if (record.status !== "active") {
-        await updateLicenseStatus(db, record.id, "active", now);
-      }
-      return { ok: true, code: "webhook_handled", httpStatus: 200 };
-    }
-    if (event.eventName === "subscription_resumed") {
-      await updateLicenseStatus(db, record.id, "active", now);
-      return { ok: true, code: "webhook_handled", httpStatus: 200 };
-    }
-    if (event.eventName === "subscription_expired" || event.eventName === "subscription_cancelled") {
-      // No stored "expired" status: keep the row active and let the grace
-      // math invalidate it from expiresAt (webhook may carry ends_at).
-      await updateLicenseExpiry(db, record.id, event.expiresAt ?? now);
-      return { ok: true, code: "webhook_handled", httpStatus: 200 };
-    }
-
-    return { ok: true, code: "webhook_ignored", httpStatus: 200 };
+    const code = await applyWebhookEvent(db, provider, event, now);
+    // Dedupe write happens AFTER successful processing: a delivery that
+    // throws must not poison the provider's retry with a duplicate verdict
+    // (that would lose the event permanently). Processing itself is
+    // idempotent (ON CONFLICT DO NOTHING inserts, idempotent updates), so
+    // a rare re-run after a dedupe-write failure is safe.
+    await recordLicenseEvent(db, {
+      licenseId: null,
+      type: `webhook:${event.eventName}`,
+      payloadDigest: digest,
+      now,
+    });
+    return { ok: true, code, httpStatus: 200 };
   } catch {
     return { ok: false, code: "webhook_processing_failed", httpStatus: 500 };
   }
+}
+
+/**
+ * Apply one verified webhook event to D1. Pure state transition; returns
+ * the outcome code. Throws on storage failures (caller maps to 500 and
+ * leaves the dedupe digest unwritten).
+ */
+async function applyWebhookEvent(
+  db: LicensingD1,
+  provider: LicenseProvider,
+  event: ProviderWebhookEvent,
+  now: number,
+): Promise<string> {
+  const keyHash = event.licenseKey ? await hashLicenseKey(event.licenseKey) : null;
+
+  if (event.eventName === "order_created" || event.eventName === "order_processed") {
+    if (keyHash) {
+      const existing = await findLicenseByKeyHash(db, keyHash);
+      if (!existing) {
+        await insertLicense(db, {
+          keyHash,
+          provider: provider.name,
+          // Webhook-registered rows bind the ORDER id here; the
+          // subscription namespace is a separate column.
+          providerResourceId: event.orderId ?? null,
+          providerSubscriptionId: null,
+          plan: event.plan || DEFAULT_LICENSE_PLAN,
+          expiresAt: event.expiresAt ?? null,
+          now,
+        });
+      }
+    }
+    return "webhook_handled";
+  }
+
+  // State-transition events target an existing license by key hash first,
+  // then by the identifier namespace the event type actually carries:
+  // refunds name an ORDER id (provider_resource_id), subscription events
+  // name a SUBSCRIPTION id (provider_subscription_id).
+  let record: LicenseRecord | null = null;
+  if (keyHash) {
+    record = await findLicenseByKeyHash(db, keyHash);
+  }
+  if (!record && event.providerResourceId && event.resourceKind === "order") {
+    record = await findLicenseByProviderResource(db, provider.name, event.providerResourceId);
+  }
+  if (!record && event.providerResourceId && event.resourceKind === "subscription") {
+    record = await findLicenseByProviderSubscription(db, provider.name, event.providerResourceId);
+  }
+
+  if (!record) {
+    // Unknown license: the event is acknowledged so the provider stops
+    // retrying; issuance self-binds later via first validate.
+    return "webhook_unmatched";
+  }
+
+  // Bind the subscription namespace whenever this event names one, so
+  // later subscription events without a license key still reach the row.
+  if (event.resourceKind === "subscription" && event.providerResourceId) {
+    if (record.provider_subscription_id !== event.providerResourceId) {
+      await bindLicenseSubscription(db, record.id, event.providerResourceId);
+      record = { ...record, provider_subscription_id: event.providerResourceId };
+    }
+  }
+
+  if (event.eventName === "order_refunded") {
+    await updateLicenseStatus(db, record.id, "refunded", now);
+    return "webhook_handled";
+  }
+  if (event.eventName === "subscription_created" || event.eventName === "subscription_updated") {
+    if (event.expiresAt !== undefined) {
+      await updateLicenseExpiry(db, record.id, event.expiresAt);
+    }
+    if (record.status !== "active") {
+      await updateLicenseStatus(db, record.id, "active", now);
+    }
+    return "webhook_handled";
+  }
+  if (event.eventName === "subscription_resumed") {
+    await updateLicenseStatus(db, record.id, "active", now);
+    return "webhook_handled";
+  }
+  if (event.eventName === "subscription_expired" || event.eventName === "subscription_cancelled") {
+    // No stored "expired" status: keep the row active and let the grace
+    // math invalidate it from expiresAt (webhook may carry ends_at).
+    await updateLicenseExpiry(db, record.id, event.expiresAt ?? now);
+    return "webhook_handled";
+  }
+
+  return "webhook_ignored";
 }
 
 function trimError(prefix: string, error: unknown): string {

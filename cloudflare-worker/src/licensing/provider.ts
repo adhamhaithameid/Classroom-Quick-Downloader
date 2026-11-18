@@ -19,6 +19,7 @@ import { timingSafeStringEqual } from "../timing";
 /** Authoritative license status as the provider reports it. */
 export type ProviderLicenseStatus =
   | "active"
+  | "inactive"
   | "expired"
   | "revoked"
   | "refunded"
@@ -55,8 +56,15 @@ export interface ProviderRevokeResult {
 export interface ProviderWebhookEvent {
   /** Provider event name, e.g. "order_created" | "order_refunded". */
   eventName: string;
-  /** Stable event id used for idempotent handling (dedupe). */
+  /**
+   * Stable event id used for audit trails. Idempotency dedupe does NOT key
+   * on this: providers like LS send no per-occurrence id, so name:id would
+   * collide across distinct occurrences. The service hashes the full raw
+   * payload instead.
+   */
   eventId: string;
+  /** Which identifier namespace `providerResourceId` names. */
+  resourceKind?: "order" | "subscription";
   orderId?: string;
   /**
    * Raw license key when the provider payload carries one. The service
@@ -97,7 +105,11 @@ const LS_DEFAULT_API_BASE = "https://api.lemonsqueezy.com/v1";
 /** LS license-key object statuses mapped onto the provider status union. */
 function mapLsStatus(raw: unknown): ProviderLicenseStatus {
   const value = typeof raw === "string" ? raw.toLowerCase() : "";
-  if (value === "active" || value === "inactive") return "active";
+  // "inactive" is its own state (all instances deactivated by LS): mapping
+  // it onto "active" would let a deactivated key validate forever, because
+  // the service's refresh branch only acts on revoked/refunded.
+  if (value === "active") return "active";
+  if (value === "inactive") return "inactive";
   if (value === "expired") return "expired";
   if (value === "cancelled") return "revoked";
   if (value === "refunded") return "refunded";
@@ -255,6 +267,11 @@ export function createLemonSqueezyProvider(env: WorkerEnv): LicenseProvider {
       return {
         eventName,
         eventId: `${eventName}:${resourceId}`,
+        resourceKind: eventName.startsWith("subscription")
+          ? "subscription"
+          : eventName.startsWith("order")
+            ? "order"
+            : undefined,
         orderId: resourceId || undefined,
         licenseKey: rawLicenseKey,
         providerResourceId: resourceId || undefined,

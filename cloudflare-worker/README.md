@@ -231,7 +231,8 @@ values should be injected outside the committed file:
 - `POST /license/activate` — same response shape; body `{licenseKey, installId}`. Activations are
   capped per license (`MAX_ACTIVATIONS_PER_LICENSE` constant) and deduped per install.
 - `POST /license/webhook` — provider webhooks (`order_created`, `order_refunded`,
-  `subscription_*`); HMAC-verified over the raw body, idempotent per provider event id.
+  `subscription_*`); HMAC-verified over the raw body, idempotent per full-payload
+  digest (retries of a failed delivery are reprocessed, identical replays deduped).
 - `POST /admin/licenses/issue` / `POST /admin/licenses/revoke` / `GET /admin/licenses/list` —
   dashboard auth (`X-Admin-Secret` or session). The raw license key never appears in any
   response, log, or error; D1 stores only SHA-256 key hashes.

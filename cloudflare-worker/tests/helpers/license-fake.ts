@@ -43,6 +43,8 @@ export interface FakeLicenseD1 {
   activations: FakeRow[];
   licenseEvents: FakeRow[];
   schemaStatements: string[];
+  /** Throws on the next N statements whose SQL contains `pattern`. */
+  failNextMatch(pattern: string, times?: number): void;
 }
 
 export function makeLicenseFakeD1(): FakeLicenseD1 {
@@ -50,9 +52,20 @@ export function makeLicenseFakeD1(): FakeLicenseD1 {
   const activations: FakeRow[] = [];
   const licenseEvents: FakeRow[] = [];
   const schemaStatements: string[] = [];
+  const pendingFailures: Array<{ pattern: string; remaining: number }> = [];
+
+  function maybeFail(sql: string): void {
+    for (const entry of pendingFailures) {
+      if (entry.remaining > 0 && sql.includes(entry.pattern)) {
+        entry.remaining -= 1;
+        throw new Error(`fake-d1: injected failure for ${entry.pattern}`);
+      }
+    }
+  }
 
   function execute(sql: string, params: unknown[]): { success: boolean; meta?: { changes: number } } {
     const q = sql.replace(/\s+/g, " ").trim();
+    maybeFail(sql);
 
     if (/^CREATE TABLE/i.test(q) || /^CREATE INDEX/i.test(q)) {
       schemaStatements.push(q);
@@ -69,23 +82,29 @@ export function makeLicenseFakeD1(): FakeLicenseD1 {
         status: "active",
         provider: paramValue(params, "?3") as string,
         provider_resource_id: paramValue(params, "?4") as string | null,
-        plan: paramValue(params, "?5") as string,
-        issued_at: paramValue(params, "?6") as number,
-        expires_at: paramValue(params, "?7") as number | null,
+        provider_subscription_id: paramValue(params, "?5") as string | null,
+        plan: paramValue(params, "?6") as string,
+        issued_at: paramValue(params, "?7") as number,
+        expires_at: paramValue(params, "?8") as number | null,
         revoked_at: null,
-        created_at: paramValue(params, "?6") as number,
+        created_at: paramValue(params, "?7") as number,
       });
       return { success: true, meta: { changes: 1 } };
     }
 
     if (/^INSERT INTO activations/i.test(q)) {
+      // Mirrors the service's atomic conditional insert: the WHERE-clause
+      // cap check and the pair-conflict check both yield changes = 0.
       const licenseId = paramValue(params, "?1") as string;
       const installId = paramValue(params, "?2") as string;
       const now = paramValue(params, "?3") as number;
+      const cap = paramValue(params, "?4") as number;
       const existing = activations.find(
         (row) => row.license_id === licenseId && row.install_id === installId,
       );
       if (existing) return { success: true, meta: { changes: 0 } };
+      const count = activations.filter((row) => row.license_id === licenseId).length;
+      if (count >= cap) return { success: true, meta: { changes: 0 } };
       activations.push({ license_id: licenseId, install_id: installId, created_at: now, last_seen_at: now });
       return { success: true, meta: { changes: 1 } };
     }
@@ -120,6 +139,15 @@ export function makeLicenseFakeD1(): FakeLicenseD1 {
       const row = licenses.find((r) => r.id === id);
       if (!row) return { success: true, meta: { changes: 0 } };
       row.expires_at = expiresAt;
+      return { success: true, meta: { changes: 1 } };
+    }
+
+    if (/^UPDATE licenses SET provider_subscription_id/i.test(q)) {
+      const subscriptionId = paramValue(params, "?1") as string;
+      const id = paramValue(params, "?2") as string;
+      const row = licenses.find((r) => r.id === id);
+      if (!row) return { success: true, meta: { changes: 0 } };
+      row.provider_subscription_id = subscriptionId;
       return { success: true, meta: { changes: 1 } };
     }
 
@@ -165,11 +193,20 @@ export function makeLicenseFakeD1(): FakeLicenseD1 {
         .sort((a, b) => (b.issued_at as number) - (a.issued_at as number))
         .slice(0, limit as number);
     }
-    if (q.includes("from licenses") && q.includes("provider_resource_id")) {
+    // WHERE-clause keyed (the SELECT column list contains BOTH identifier
+    // names, so a loose includes() would misroute subscription lookups).
+    if (q.includes("where provider_resource_id")) {
       const resourceId = paramValue(params, "?1") as string;
       const provider = paramValue(params, "?2") as string;
       return licenses.filter(
         (row) => row.provider_resource_id === resourceId && row.provider === provider,
+      );
+    }
+    if (q.includes("where provider_subscription_id")) {
+      const subscriptionId = paramValue(params, "?1") as string;
+      const provider = paramValue(params, "?2") as string;
+      return licenses.filter(
+        (row) => row.provider_subscription_id === subscriptionId && row.provider === provider,
       );
     }
     if (q.includes("from activations where license_id") && q.includes("install_id")) {
@@ -182,6 +219,10 @@ export function makeLicenseFakeD1(): FakeLicenseD1 {
     if (q.includes("count(*) as n from activations")) {
       const licenseId = paramValue(params, "?1") as string;
       return [{ n: activations.filter((row) => row.license_id === licenseId).length }];
+    }
+    if (q.includes("from license_events where payload_digest")) {
+      const digest = paramValue(params, "?1") as string;
+      return licenseEvents.filter((row) => row.payload_digest === digest);
     }
     throw new Error(`fake-d1: unsupported select: ${q.slice(0, 120)}`);
   }
@@ -227,7 +268,16 @@ export function makeLicenseFakeD1(): FakeLicenseD1 {
     },
   };
 
-  return { db, licenses, activations, licenseEvents, schemaStatements };
+  return {
+    db,
+    licenses,
+    activations,
+    licenseEvents,
+    schemaStatements,
+    failNextMatch: (pattern: string, times = 1) => {
+      pendingFailures.push({ pattern, remaining: times });
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -235,7 +285,7 @@ export function makeLicenseFakeD1(): FakeLicenseD1 {
 // ---------------------------------------------------------------------------
 
 export interface FakeProviderLicenseState {
-  status: "active" | "revoked" | "refunded" | "expired";
+  status: "active" | "inactive" | "revoked" | "refunded" | "expired";
   plan: string;
   providerResourceId: string;
   expiresAt: number | null;

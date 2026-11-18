@@ -93,6 +93,7 @@ function publicErrorStatus(code: string): number {
       return 400;
     case "license_invalid":
     case "license_expired":
+    case "license_inactive":
       return 403;
     case "activation_limit_reached":
       return 409;
@@ -369,14 +370,19 @@ function makeLicenseAdminHandler(
       if (!body || !licenseKey || !plan) {
         return licenseErrorResponse(deps, request, env, 400, "license_issue_input_invalid");
       }
-      const outcome = await issueLicense(env, db, {
-        licenseKey,
-        plan,
-        provider: typeof body.provider === "string" ? body.provider : undefined,
-        providerResourceId:
-          typeof body.providerResourceId === "string" ? body.providerResourceId : undefined,
-        expiresAt: typeof body.expiresAt === "number" ? body.expiresAt : null,
-      });
+      let outcome: ServiceOutcome;
+      try {
+        outcome = await issueLicense(env, db, {
+          licenseKey,
+          plan,
+          provider: typeof body.provider === "string" ? body.provider : undefined,
+          providerResourceId:
+            typeof body.providerResourceId === "string" ? body.providerResourceId : undefined,
+          expiresAt: typeof body.expiresAt === "number" ? body.expiresAt : null,
+        });
+      } catch {
+        return licenseErrorResponse(deps, request, env, 500, "license_service_failed");
+      }
       return adminOutcomeResponse(deps, request, env, outcome);
     }
 
@@ -386,7 +392,12 @@ function makeLicenseAdminHandler(
       if (!body || !licenseRef) {
         return licenseErrorResponse(deps, request, env, 400, "license_ref_required");
       }
-      const outcome = await revokeLicense(env, db, { licenseRef });
+      let outcome: ServiceOutcome;
+      try {
+        outcome = await revokeLicense(env, db, { licenseRef });
+      } catch {
+        return licenseErrorResponse(deps, request, env, 500, "license_service_failed");
+      }
       return adminOutcomeResponse(deps, request, env, outcome);
     }
 
@@ -395,10 +406,15 @@ function makeLicenseAdminHandler(
       const status = url.searchParams.get("status") || undefined;
       const limitRaw = url.searchParams.get("limit");
       const limit = limitRaw ? Number(limitRaw) : undefined;
-      const outcome = await listLicenses(env, db, {
-        status,
-        limit: typeof limit === "number" && Number.isFinite(limit) ? limit : undefined,
-      });
+      let outcome: ServiceOutcome & { licenses?: Omit<LicenseRecord, "key_hash">[] };
+      try {
+        outcome = await listLicenses(env, db, {
+          status,
+          limit: typeof limit === "number" && Number.isFinite(limit) ? limit : undefined,
+        });
+      } catch {
+        return licenseErrorResponse(deps, request, env, 500, "license_service_failed");
+      }
       return adminOutcomeResponse(deps, request, env, outcome);
     }
 

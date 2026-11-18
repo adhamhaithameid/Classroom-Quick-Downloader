@@ -506,3 +506,241 @@ describe("webhook processing (fake provider, idempotency)", () => {
     expect(fakeProvider.issuedPlans).toContain(TEST_LICENSE_PLAN);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Review fix round 1 (findings 1-4 + activation-cap minor)
+// ---------------------------------------------------------------------------
+
+describe("review fix round 1", () => {
+  const webhookHeaders = () => new Headers({ "X-Test-Signature": "valid" });
+
+  function fakeWebhookBody(overrides: Record<string, unknown> = {}): string {
+    return JSON.stringify({
+      eventName: "order_created",
+      eventId: "evt-fix-1",
+      licenseKey: TEST_LICENSE_KEY,
+      ...overrides,
+    });
+  }
+
+  it("finding 1: provider reporting inactive fails validate with NO signed entitlement", async () => {
+    const { fakeDb, fakeProvider } = freshHarness();
+    const env = makeEnv();
+    await issueLicense(env, fakeDb.db as LicensingD1, {
+      licenseKey: TEST_LICENSE_KEY,
+      plan: TEST_LICENSE_PLAN,
+    });
+    // Deactivate on the provider side after the local row exists.
+    fakeProvider.seedLicense(TEST_LICENSE_KEY, { status: "inactive" });
+
+    const outcome = await validateLicense(env, fakeDb.db as LicensingD1, {
+      licenseKey: TEST_LICENSE_KEY,
+    });
+    expect(outcome.ok).toBe(false);
+    expect(outcome.code).toBe("license_inactive");
+    expect(outcome.status).toBe("invalid");
+    expect(outcome.entitlement).toBeUndefined();
+    const decoded = outcome.entitlement
+      ? await verifyEntitlement(TEST_ENTITLEMENT_SIGNING_KEY, outcome.entitlement)
+      : null;
+    expect(decoded).toBeNull();
+
+    // Activation is refused too.
+    const activated = await activateLicense(env, fakeDb.db as LicensingD1, {
+      licenseKey: TEST_LICENSE_KEY,
+      installId: TEST_INSTALL_ID,
+    });
+    expect(activated.ok).toBe(false);
+    expect(activated.code).toBe("license_inactive");
+
+    // Reactivation on the provider side heals the row (not persisted as revoked).
+    fakeProvider.seedLicense(TEST_LICENSE_KEY, { status: "active" });
+    const healed = await validateLicense(env, fakeDb.db as LicensingD1, {
+      licenseKey: TEST_LICENSE_KEY,
+    });
+    expect(healed.ok).toBe(true);
+    expect(healed.status).toBe("active");
+  });
+
+  it("finding 2: a webhook delivery that throws mid-processing is retried, not deduped", async () => {
+    const { fakeDb, fakeProvider } = freshHarness();
+    const db = fakeDb.db as LicensingD1;
+    const body = fakeWebhookBody();
+    const env = makeEnv();
+
+    // First delivery dies inside processing (license INSERT fails).
+    fakeDb.failNextMatch("INSERT INTO licenses", 1);
+    const first = await processLicenseWebhook(env, db, fakeProvider.provider, body, webhookHeaders());
+    expect(first).toMatchObject({ ok: false, code: "webhook_processing_failed", httpStatus: 500 });
+    // No dedupe digest was persisted by the failed delivery.
+    expect(fakeDb.licenseEvents).toHaveLength(0);
+    expect(fakeDb.licenses).toHaveLength(0);
+
+    // Provider retry is processed (not told "duplicate").
+    const retry = await processLicenseWebhook(env, db, fakeProvider.provider, body, webhookHeaders());
+    expect(retry).toMatchObject({ ok: true, code: "webhook_handled", httpStatus: 200 });
+    expect(fakeDb.licenses).toHaveLength(1);
+    expect(fakeDb.licenseEvents).toHaveLength(1);
+
+    // Only a third identical delivery is a true replay.
+    const replay = await processLicenseWebhook(env, db, fakeProvider.provider, body, webhookHeaders());
+    expect(replay).toMatchObject({ ok: true, code: "webhook_duplicate", httpStatus: 200 });
+    expect(fakeDb.licenses).toHaveLength(1);
+  });
+
+  it("finding 3: distinct payloads with the same provider event id are both processed", async () => {
+    const { fakeDb, fakeProvider } = freshHarness();
+    const db = fakeDb.db as LicensingD1;
+    const env = makeEnv();
+    const headers = webhookHeaders();
+
+    await processLicenseWebhook(
+      env,
+      db,
+      fakeProvider.provider,
+      fakeWebhookBody({ licenseKey: TEST_LICENSE_KEY }),
+      headers,
+    );
+
+    // Same event name + same subscription id, different content: the first
+    // subscription_updated must NOT be swallowed as a duplicate.
+    const secondExpiry = Date.now() + 20 * 24 * 60 * 60 * 1000;
+    const firstUpdate = fakeWebhookBody({
+      eventName: "subscription_updated",
+      eventId: "sub-collision",
+      resourceKind: "subscription",
+      providerResourceId: "sub-777",
+      expiresAt: Date.now() + 10 * 24 * 60 * 60 * 1000,
+    });
+    const secondUpdate = fakeWebhookBody({
+      eventName: "subscription_updated",
+      eventId: "sub-collision",
+      resourceKind: "subscription",
+      providerResourceId: "sub-777",
+      expiresAt: secondExpiry,
+    });
+    const one = await processLicenseWebhook(env, db, fakeProvider.provider, firstUpdate, headers);
+    const two = await processLicenseWebhook(env, db, fakeProvider.provider, secondUpdate, headers);
+    expect(one).toMatchObject({ ok: true, code: "webhook_handled" });
+    expect(two).toMatchObject({ ok: true, code: "webhook_handled" });
+
+    // The second payload's expiry won: no event was dropped.
+    expect(fakeDb.licenses[0].expires_at).toBe(secondExpiry);
+    // An identical resend of the second payload is a true replay.
+    const replay = await processLicenseWebhook(env, db, fakeProvider.provider, secondUpdate, headers);
+    expect(replay).toMatchObject({ ok: true, code: "webhook_duplicate" });
+  });
+
+  it("finding 4: a subscription event reaches a self-registered row and binds its id", async () => {
+    const { fakeDb, fakeProvider } = freshHarness();
+    const db = fakeDb.db as LicensingD1;
+    const env = makeEnv();
+
+    // Self-registration: unknown key, provider vouches -> row with the
+    // license-key id in provider_resource_id and no subscription binding.
+    fakeProvider.seedLicense(TEST_LICENSE_KEY);
+    const resolved = await validateLicense(env, db, { licenseKey: TEST_LICENSE_KEY });
+    expect(resolved.ok).toBe(true);
+    expect(fakeDb.licenses[0].provider_resource_id).toContain("fake-resource");
+    expect(fakeDb.licenses[0].provider_subscription_id).toBeNull();
+
+    // Subscription event carrying the license key reaches the row and
+    // backfills the subscription namespace.
+    const futureExpiry = Date.now() + 60 * 24 * 60 * 60 * 1000;
+    const bound = await processLicenseWebhook(
+      env,
+      db,
+      fakeProvider.provider,
+      fakeWebhookBody({
+        eventName: "subscription_updated",
+        eventId: "sub-bind-1",
+        resourceKind: "subscription",
+        providerResourceId: "sub-self-1",
+        expiresAt: futureExpiry,
+      }),
+      webhookHeaders(),
+    );
+    expect(bound).toMatchObject({ ok: true, code: "webhook_handled" });
+    expect(fakeDb.licenses[0].provider_subscription_id).toBe("sub-self-1");
+    expect(fakeDb.licenses[0].expires_at).toBe(futureExpiry);
+
+    // A later subscription event WITHOUT the key still reaches the row via
+    // the bound subscription id.
+    const renewal = Date.now() + 120 * 24 * 60 * 60 * 1000;
+    const reached = await processLicenseWebhook(
+      env,
+      db,
+      fakeProvider.provider,
+      fakeWebhookBody({
+        eventName: "subscription_updated",
+        eventId: "sub-bind-2",
+        resourceKind: "subscription",
+        providerResourceId: "sub-self-1",
+        expiresAt: renewal,
+      }),
+      webhookHeaders(),
+    );
+    expect(reached).toMatchObject({ ok: true, code: "webhook_handled" });
+    expect(fakeDb.licenses[0].expires_at).toBe(renewal);
+  });
+
+  it("finding 4: a refund without a license key reaches its webhook-registered row by order id", async () => {
+    const { fakeDb, fakeProvider } = freshHarness();
+    const db = fakeDb.db as LicensingD1;
+    const env = makeEnv();
+    const headers = webhookHeaders();
+
+    // Webhook-registered row: provider_resource_id = order id.
+    await processLicenseWebhook(
+      env,
+      db,
+      fakeProvider.provider,
+      fakeWebhookBody({ eventId: "order-42", orderId: "order-42" }),
+      headers,
+    );
+    expect(fakeDb.licenses[0].provider_resource_id).toBe("order-42");
+
+    const refunded = await processLicenseWebhook(
+      env,
+      db,
+      fakeProvider.provider,
+      fakeWebhookBody({
+        eventName: "order_refunded",
+        eventId: "order-42",
+        resourceKind: "order",
+        providerResourceId: "order-42",
+        licenseKey: undefined,
+      }),
+      headers,
+    );
+    expect(refunded).toMatchObject({ ok: true, code: "webhook_handled" });
+    expect(fakeDb.licenses[0].status).toBe("refunded");
+
+    const validated = await validateLicense(env, db, { licenseKey: TEST_LICENSE_KEY });
+    expect(validated.ok).toBe(false);
+    expect(validated.status).toBe("invalid");
+  });
+
+  it("minor: the activation cap is enforced by the conditional insert, not a pre-count", async () => {
+    const { fakeDb } = freshHarness();
+    const env = makeEnv();
+    await issueLicense(env, fakeDb.db as LicensingD1, {
+      licenseKey: TEST_LICENSE_KEY,
+      plan: TEST_LICENSE_PLAN,
+    });
+
+    for (let i = 0; i < MAX_ACTIVATIONS_PER_LICENSE; i += 1) {
+      const outcome = await activateLicense(env, fakeDb.db as LicensingD1, {
+        licenseKey: TEST_LICENSE_KEY,
+        installId: `${TEST_INSTALL_ID}-cap-${i}`,
+      });
+      expect(outcome.ok).toBe(true);
+    }
+    const overCap = await activateLicense(env, fakeDb.db as LicensingD1, {
+      licenseKey: TEST_LICENSE_KEY,
+      installId: `${TEST_INSTALL_ID}-cap-over`,
+    });
+    expect(overCap).toMatchObject({ ok: false, code: "activation_limit_reached" });
+    expect(fakeDb.activations).toHaveLength(MAX_ACTIVATIONS_PER_LICENSE);
+  });
+});
