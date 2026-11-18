@@ -9,6 +9,7 @@
   import SeoMeta from '#lib/components/SeoMeta.svelte';
   import { AGGREGATE_RATING } from '#lib/seo/aggregate-rating.ts';
   import { detectBrowserFromNavigator, type BrowserKey } from '#lib/browser/detect.ts';
+  import { resolvePath } from '#lib/navigation/resolvePath.ts';
   import { refreshWebsiteSnapshotStore, websiteSnapshotStore } from '#lib/stores/websiteSnapshot.ts';
   import type { MapResponse, OverviewResponse } from '#lib/types/public.ts';
   import { trackWebsiteEvent } from '#lib/analytics/websiteEvents.ts';
@@ -1737,6 +1738,28 @@
       </div>
 
       <p class="l2-compat">Also works on Brave, Opera, Vivaldi, Arc & all Chromium browsers</p>
+
+      <!-- ━━━━ Trust row ━━━━
+           Quiet reinforcement under the install CTAs: five glass chips that
+           restate what the product already promises, each linking to the
+           page that backs the claim. No new claims, no marketing copy. -->
+      <nav class="l2-trust-row" aria-label="Product assurances">
+        <ul class="l2-trust-list">
+          <li><a class="l2-trust-item" href={resolvePath('faq')}>FREE</a></li>
+          <li><a class="l2-trust-item" href={resolvePath('privacy')}>NO ACCOUNT</a></li>
+          <li><a class="l2-trust-item" href={resolvePath('privacy')}>PRIVATE</a></li>
+          <li>
+            <a
+              class="l2-trust-item"
+              href={STORE_LINKS.github}
+              target="_blank"
+              rel="noopener noreferrer"
+            >SOURCE-AVAILABLE</a>
+          </li>
+          <li><a class="l2-trust-item" href={resolvePath('security')}>NO FILE UPLOADS</a></li>
+        </ul>
+      </nav>
+
       <!--
       <p class="l2-video-links">
         Video demos:
@@ -2844,6 +2867,58 @@
   .l2-compat {
     font-size: 13px; color: var(--text-secondary); margin-top: 16px;
     font-weight: 500; letter-spacing: 0.01em;
+  }
+
+  /* ── Trust row ─────────────────────── */
+  /* Quiet glass chips under the hero CTAs. Surface and blur reuse the
+     l2-cta-other vocabulary; type reuses the l2-label scale. Chips wrap
+     instead of overflowing on narrow screens, and links stay 28px tall
+     so the row keeps the footer's 24px minimum target height. */
+  .l2-trust-row { margin-top: 28px; }
+
+  .l2-trust-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px 12px;
+  }
+
+  .l2-trust-item {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 6px 16px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid var(--border-subtle);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-decoration: none;
+    transition: color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+  }
+
+  .l2-trust-item:hover {
+    color: var(--green);
+    border-color: var(--green-border);
+    transform: translateY(-1px);
+  }
+
+  .l2-trust-item:focus-visible {
+    outline: 2px solid var(--green);
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .l2-trust-item { transition: none; }
+    .l2-trust-item:hover { transform: none; }
   }
   .l2-students-section {
     padding-top: 24px;
