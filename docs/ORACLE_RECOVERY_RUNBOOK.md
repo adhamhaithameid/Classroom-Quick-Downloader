@@ -1,14 +1,5 @@
 # Oracle Recovery Runbook
 
-> **Status 2026-11-18 — cold archive only (decision 0h4d.9, bead 0h4d.2.7).**
-> The production data path is Cloudflare-only; the oracle-backend VM is
-> retired and NOT scheduled for recovery. This runbook is kept for the
-> historical incident record and for the one designed revival vector: the
-> optional `ORACLE_ENDPOINT` best-effort mirror (worker README, "Data
-> pipeline (Oracle-free)"). Reviving the VM would be a deliberate product
-> decision, not an ops fix. CI carries `oracle-severance.guard.test.ts` so a
-> hard-coded Oracle endpoint cannot silently return to live source.
-
 Consolidated from the INFRA-1 scans, `bd` issue `Classroom-Quick-Downloader-4h1`,
 and fresh read-only probes (2026-09-12 ~23:00 local). Human-only steps are
 marked **[CONSOLE]** — they need Oracle Cloud dashboard access that agents do
