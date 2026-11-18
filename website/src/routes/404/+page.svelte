@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { resolvePath } from '#lib/navigation/resolvePath.ts';
   import { resolve } from '$app/paths';
   import SeoMeta from '#lib/components/SeoMeta.svelte';
   import { magnetic } from '#lib/actions/magnetic.ts';
@@ -21,7 +22,7 @@
       <div class="nf-actions">
         <a
           class="nf-btn nf-btn-primary"
-          href="{resolve('')}/"
+          href={resolvePath('')}
           use:magnetic
         >
           <svg
@@ -43,7 +44,7 @@
 
         <a
           class="nf-btn nf-btn-secondary"
-          href="{resolve('')}/faq"
+          href={resolvePath('faq')}
         >Browse FAQ</a>
       </div>
     </div>
@@ -55,7 +56,7 @@
       <div class="nf-links-grid">
         <a
           class="nf-link-card glass-panel glass-hover"
-          href="{resolve('')}/"
+          href={resolvePath('')}
         >
           <span class="nf-link-icon glass-icon">🏠</span>
           <div>
@@ -66,7 +67,7 @@
 
         <a
           class="nf-link-card glass-panel glass-hover"
-          href="{resolve('')}/faq"
+          href={resolvePath('faq')}
         >
           <span class="nf-link-icon glass-icon">❓</span>
           <div>
@@ -77,7 +78,7 @@
 
         <a
           class="nf-link-card glass-panel glass-hover"
-          href="{resolve('')}/changelog"
+          href={resolvePath('changelog')}
         >
           <span class="nf-link-icon glass-icon">📋</span>
           <div>
