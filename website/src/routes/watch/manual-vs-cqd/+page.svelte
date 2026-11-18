@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { resolvePath } from '#lib/navigation/resolvePath.ts';
   import { resolve } from '$app/paths';
   import { SITE_URL } from '#lib/config.ts';
   import SeoMeta from '#lib/components/SeoMeta.svelte';
@@ -85,7 +86,7 @@
       poster="{resolve('')}/images/problem-flags.webp"
     >
       <source
-        src="{resolve('')}/videos/problem.mp4"
+        src={resolvePath('videos/problem.mp4')}
         type="video/mp4"
       />
     </video>
@@ -121,27 +122,27 @@
   <p class="watch-links">
     <a
       class="glass-panel glass-hover"
-      href="{resolve('')}/install/chrome"
+      href={resolvePath('install/chrome')}
     >Install for Chrome</a>
 
     <a
       class="glass-panel glass-hover"
-      href="{resolve('')}/bulk-download-google-classroom-assignments"
+      href={resolvePath('bulk-download-google-classroom-assignments')}
     >Bulk download guide</a>
 
     <a
       class="glass-panel glass-hover"
-      href="{resolve('')}/faq"
+      href={resolvePath('faq')}
     >FAQ</a>
 
     <a
       class="glass-panel glass-hover"
-      href="{resolve('')}/watch/cqd-demo"
+      href={resolvePath('watch/cqd-demo')}
     >Watch the CQD demo video</a>
 
     <a
       class="glass-panel glass-hover"
-      href="{resolve('')}/"
+      href={resolvePath('')}
     >Back to homepage</a>
   </p>
 </article>

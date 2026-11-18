@@ -705,7 +705,7 @@
           on:pointermove={handleBarPointerMove}
         >
           <div class="l2-nav-inner">
-            <a href="{resolve('')}/" class="l2-nav-brand">
+            <a href={resolvePath('')} class="l2-nav-brand">
               <img
                 src={logo}
                 alt="Classroom Quick Downloader"
@@ -724,7 +724,7 @@
                 <a
                   class="l2-nav-link"
                   data-menu-key={menu.key}
-                  href="{resolve('')}{menu.href}"
+                  href={resolveMenuHref(menu.href)}
                   class:active={isActive(menu.href, data.pathname)}
                   class:open={openMenu === menu.key}
                   aria-current={isActive(menu.href, data.pathname) ? 'page' : undefined}
@@ -1115,7 +1115,7 @@
           <nav class="l2-nav-mobile-links" aria-label="Mobile Primary">
               {#each navMenus as menu (menu.key)}
                 <a
-                  href="{resolve('')}{menu.href}"
+                  href={resolveMenuHref(menu.href)}
                   class:active={isActive(menu.href, data.pathname)}
                   aria-current={isActive(menu.href, data.pathname) ? 'page' : undefined}
                   on:click={(event) => handleSiteLinkClick(event, menu.href)}

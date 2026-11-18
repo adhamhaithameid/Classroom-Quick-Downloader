@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { resolvePath } from '#lib/navigation/resolvePath.ts';
   import { onMount, type ComponentType } from 'svelte';
   import { fade, fly, scale } from 'svelte/transition';
   import { quintOut } from 'svelte/easing';
@@ -1722,7 +1723,7 @@
             on:click={() => trackInstallClick('hero_install')}
           >
             <img
-              src="{resolve('')}/images/{b}.svg"
+              src={resolvePath('images/{b}.svg')}
               alt=""
               class="l2-cta-icon"
             />
@@ -1908,7 +1909,7 @@
             <div class="l2-ps-media-wrap">
               <MediaLoader
                 type="video"
-                src="{resolve('')}/videos/problem.mp4"
+                src={resolvePath('videos/problem.mp4')}
                 class="l2-ps-video"
                 autoplay
                 loop
@@ -1970,7 +1971,7 @@
             <div class="l2-ps-media-wrap">
               <MediaLoader
                 type="video"
-                src="{resolve('')}/videos/solution.mp4"
+                src={resolvePath('videos/solution.mp4')}
                 class="l2-ps-video"
                 autoplay
                 loop
@@ -2037,7 +2038,7 @@
             <div class="l2-ps-media-wrap">
               <MediaLoader
                 type="image"
-                src="{resolve('')}/images/problem-flags.webp"
+                src={resolvePath('images/problem-flags.webp')}
                 class="l2-ps-img"
                 alt="Classroom posts without edit/comment flags"
                 loading="lazy"
@@ -2094,7 +2095,7 @@
             <div class="l2-ps-media-wrap">
               <MediaLoader
                 type="image"
-                src="{resolve('')}/images/solution-flags.webp"
+                src={resolvePath('images/solution-flags.webp')}
                 class="l2-ps-img"
                 alt="CQD flags showing edited and commented posts"
                 loading="lazy"
@@ -2205,7 +2206,7 @@
             {#if mediaExpanded === 'problem-video'}
               <MediaLoader
                 type="video"
-                src="{resolve('')}/videos/problem.mp4"
+                src={resolvePath('videos/problem.mp4')}
                 class="l2-media-modal-content"
                 autoplay
                 loop
@@ -2217,7 +2218,7 @@
             {:else if mediaExpanded === 'solution-video'}
               <MediaLoader
                 type="video"
-                src="{resolve('')}/videos/solution.mp4"
+                src={resolvePath('videos/solution.mp4')}
                 class="l2-media-modal-content"
                 autoplay
                 loop
@@ -2229,7 +2230,7 @@
             {:else if mediaExpanded === 'problem-flags'}
               <MediaLoader
                 type="image"
-                src="{resolve('')}/images/problem-flags.webp"
+                src={resolvePath('images/problem-flags.webp')}
                 class="l2-media-modal-content"
                 alt="Expanded view"
                 eager
@@ -2237,7 +2238,7 @@
             {:else if mediaExpanded === 'solution-flags'}
               <MediaLoader
                 type="image"
-                src="{resolve('')}/images/solution-flags.webp"
+                src={resolvePath('images/solution-flags.webp')}
                 class="l2-media-modal-content"
                 alt="Expanded view"
                 eager
@@ -2443,7 +2444,7 @@
                           on:click={() => trackInstallClick('map_prompt_install')}
                         >
                           <img
-                            src="{resolve('')}/images/{detectedBrowser}.svg"
+                            src={resolvePath('images/{detectedBrowser}.svg')}
                             alt=""
                             class="l2-cta-icon"
                           />

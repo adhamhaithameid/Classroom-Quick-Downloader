@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { resolvePath } from '#lib/navigation/resolvePath.ts';
   import { resolve } from '$app/paths';
   import SeoMeta from '#lib/components/SeoMeta.svelte';
   import { magnetic } from '#lib/actions/magnetic.ts';
@@ -41,7 +42,7 @@
       <div class="err-actions">
         <a
           class="err-btn err-btn-primary"
-          href="{resolve('')}/"
+          href={resolvePath('')}
           use:magnetic
         >
           <svg
@@ -63,7 +64,7 @@
 
         <a
           class="err-btn err-btn-secondary"
-          href="{resolve('')}/faq"
+          href={resolvePath('faq')}
         >Browse FAQ</a>
       </div>
 

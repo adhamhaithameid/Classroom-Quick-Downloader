@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { resolvePath } from '#lib/navigation/resolvePath.ts';
   import { resolve } from '$app/paths';
   import { SITE_URL } from '#lib/config.ts';
   import SeoMeta from '#lib/components/SeoMeta.svelte';
@@ -85,7 +86,7 @@
       poster="{resolve('')}/images/solution-flags.webp"
     >
       <source
-        src="{resolve('')}/videos/solution.mp4"
+        src={resolvePath('videos/solution.mp4')}
         type="video/mp4"
       />
     </video>
@@ -116,22 +117,22 @@
   <p class="watch-links">
     <a
       class="glass-panel glass-hover"
-      href="{resolve('')}/install/chrome"
+      href={resolvePath('install/chrome')}
     >Install for Chrome</a>
 
     <a
       class="glass-panel glass-hover"
-      href="{resolve('')}/download-all-attachments-google-classroom"
+      href={resolvePath('download-all-attachments-google-classroom')}
     >Step-by-step guide</a>
 
     <a
       class="glass-panel glass-hover"
-      href="{resolve('')}/watch/manual-vs-cqd"
+      href={resolvePath('watch/manual-vs-cqd')}
     >Watch the manual vs CQD comparison video</a>
 
     <a
       class="glass-panel glass-hover"
-      href="{resolve('')}/"
+      href={resolvePath('')}
     >Back to homepage</a>
   </p>
 </article>

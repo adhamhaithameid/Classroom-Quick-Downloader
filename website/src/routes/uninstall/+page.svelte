@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { resolvePath } from '#lib/navigation/resolvePath.ts';
   import { onMount } from 'svelte';
   import { resolve } from '$app/paths';
   import { submitUninstallFeedback } from '#lib/api/publicSite.ts';
@@ -368,7 +369,7 @@
               on:click={() => trackReinstallClick(browser)}
             >
               <img
-                src="{resolve('')}/images/{browser}.svg"
+                src={resolvePath('images/{browser}.svg')}
                 alt=""
                 class="un-browser-icon"
               />

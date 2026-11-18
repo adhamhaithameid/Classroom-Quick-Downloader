@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { resolvePath } from '#lib/navigation/resolvePath.ts';
   import { onMount } from 'svelte';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
@@ -651,7 +652,7 @@
               on:click={() => trackFooterInstall(b)}
             >
               <img
-                src="{resolve('')}/images/{b}.svg"
+                src={resolvePath('images/{b}.svg')}
                 alt=""
                 width="18"
                 height="18"
@@ -688,10 +689,10 @@
         <nav class="ft-col ft-col-product" data-ft aria-label="Product">
           <h2 class="ft-label">Product</h2>
           <ul class="ft-links">
-            <li><a href="{resolve('')}/">Overview</a></li>
-            <li><a href="{resolve('')}/#how-it-works">How it works</a></li>
-            <li><a href="{resolve('')}/changelog">Changelog</a></li>
-            <li><a href="{resolve('')}/featured">Featured</a></li>
+            <li><a href={resolvePath('')}>Overview</a></li>
+            <li><a href={resolvePath('') + '#how-it-works'}>How it works</a></li>
+            <li><a href={resolvePath('changelog')}>Changelog</a></li>
+            <li><a href={resolvePath('featured')}>Featured</a></li>
           </ul>
         </nav>
 
@@ -700,19 +701,19 @@
           <ul class="ft-links">
             <li>
               <a
-                href="{resolve('')}/compare/classroom-quick-downloader-vs-classfetch"
+                href={resolvePath('compare/classroom-quick-downloader-vs-classfetch')}
               >vs ClassFetch</a>
             </li>
 
             <li>
               <a
-                href="{resolve('')}/compare/classroom-quick-downloader-vs-classmate"
+                href={resolvePath('compare/classroom-quick-downloader-vs-classmate')}
               >vs Classmate</a>
             </li>
 
             <li>
               <a
-                href="{resolve('')}/compare/classroom-quick-downloader-vs-classroom-one-click-downloader"
+                href={resolvePath('compare/classroom-quick-downloader-vs-classroom-one-click-downloader')}
               >vs One-Click</a>
             </li>
           </ul>
@@ -736,20 +737,20 @@
                 Edge <span class="ft-arrow" aria-hidden="true">↗</span>
               </a>
             </li>
-            <li><a href="{resolve('')}/install/chrome">Chrome guide</a></li>
-            <li><a href="{resolve('')}/install/firefox">Firefox guide</a></li>
-            <li><a href="{resolve('')}/install/edge">Edge guide</a></li>
+            <li><a href={resolvePath('install/chrome')}>Chrome guide</a></li>
+            <li><a href={resolvePath('install/firefox')}>Firefox guide</a></li>
+            <li><a href={resolvePath('install/edge')}>Edge guide</a></li>
           </ul>
         </nav>
 
         <nav class="ft-col ft-col-resources" data-ft aria-label="Resources">
           <h2 class="ft-label">Resources</h2>
           <ul class="ft-links">
-            <li><a href="{resolve('')}/faq">FAQ</a></li>
-            <li><a href="{resolve('')}/privacy">Privacy</a></li>
-            <li><a href="{resolve('')}/security">Security</a></li>
-            <li><a href="{resolve('')}/brand">Brand kit</a></li>
-            <li><a href="{resolve('')}/site-map">Site map</a></li>
+            <li><a href={resolvePath('faq')}>FAQ</a></li>
+            <li><a href={resolvePath('privacy')}>Privacy</a></li>
+            <li><a href={resolvePath('security')}>Security</a></li>
+            <li><a href={resolvePath('brand')}>Brand kit</a></li>
+            <li><a href={resolvePath('site-map')}>Site map</a></li>
           </ul>
         </nav>
 
@@ -765,8 +766,8 @@
             <li>
               <a href={reportIssueUrl} target="_blank" rel="noopener noreferrer">Report issue</a>
             </li>
-            <li><a href="{resolve('')}/support">Support</a></li>
-            <li><a href="{resolve('')}/watch/cqd-demo">Watch demo</a></li>
+            <li><a href={resolvePath('support')}>Support</a></li>
+            <li><a href={resolvePath('watch/cqd-demo')}>Watch demo</a></li>
           </ul>
         </nav>
       </div>
