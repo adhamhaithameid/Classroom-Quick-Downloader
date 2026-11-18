@@ -373,9 +373,11 @@ function startDriveFlow(pending: PendingDownload, respondOnce?: (payload: any) =
       firstUrl,
       pending,
       (id, hadError) => {
-        // Race condition check
+        // Race condition check. A cancel that lands while the browser decides
+        // is settled in startDownloadWithTimeout (D4), which also kills the
+        // late download; only the synchronous-throw path reaches here, with
+        // no download id to cancel.
         if (pending.isCancelled) {
-          if (id) chrome.downloads.cancel(id, () => { const _ = chrome.runtime.lastError; });
           cleanup(pending, id);
           return;
         }
