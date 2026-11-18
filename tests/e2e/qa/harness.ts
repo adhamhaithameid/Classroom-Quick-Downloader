@@ -238,7 +238,14 @@ export async function launchQaContext(
             `--load-extension=${CHROMIUM_EXTENSION_PATH}`,
             "--disable-blink-features=AutomationControlled",
             "--no-first-run",
+            "--no-default-browser-check",
             "--disable-default-apps",
+            // Edge (channel 'msedge') runs its own first-run/welcome flow on a
+            // fresh profile even under --no-first-run; an extra welcome tab
+            // during a journey would trip the no-dead-ends tab-count
+            // invariant. These switches keep the profile quiet.
+            "--disable-features=msFirstRunExperience,msSecondaryTilingRecommendation,EdgeWelcomePage",
+            "--disable-edge-search-on-first-prompt",
             // The download manager verifies certificates outside Playwright's
             // ignoreHTTPSErrors reach; the simulator's test-only CA must be
             // accepted there or chrome.downloads fails with a cert error.

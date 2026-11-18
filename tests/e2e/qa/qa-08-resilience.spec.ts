@@ -154,7 +154,11 @@ test.describe("qa-08 resilience", () => {
 
       // Zero dead ends: no window or tab was ever opened.
       const pagesAfter = context.pages().length;
-      check.assert("zero dead ends — no window opened across all failures", pagesAfter === pagesBefore);
+      check.assert(
+        "zero dead ends — no window opened across all failures",
+        pagesAfter === pagesBefore,
+        `pages=${context.pages().map((pg) => pg.url().slice(0, 120)).join(" | ")}`,
+      );
       await check.screenshot("resilience-terminals");
     });
   });
