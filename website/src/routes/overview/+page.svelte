@@ -70,6 +70,12 @@
 
   export let seoPath = '/';
 
+  // QA F1 (2026-11-18): /overview serves the same bytes as /. The component
+  // is also mounted at / by routes/+page.svelte, which passes noindex={false}
+  // explicitly — so the duplicate route is noindex while the canonical home
+  // stays indexable.
+  export let noindex = true;
+
   function buildCanonicalUrl(path: string): string {
     const normalizedPath = path === '/' ? '/' : path.replace(/\/+$/, '');
     return normalizedPath === '/' ? `${SITE_URL}/` : `${SITE_URL}${normalizedPath}`;
@@ -1618,6 +1624,7 @@
   title="Classroom Quick Downloader — Google Classroom Files"
   description="Bulk download all Google Classroom attachments in one click. Free browser extension for Chrome, Firefox, and Edge, built for students and teachers."
   path={seoPath}
+  noindex={noindex}
   keywords="download all google classroom files, bulk download google classroom attachments, google classroom extension"
   structuredData={homeStructuredData}
 />
@@ -1723,7 +1730,7 @@
             on:click={() => trackInstallClick('hero_install')}
           >
             <img
-              src={resolvePath('images/{b}.svg')}
+              src={resolvePath(`images/${b}.svg`)}
               alt=""
               class="l2-cta-icon"
             />

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import RootRedirectPage from './+page.svelte';
 import Landing2RedirectPage from './landing2/+page.svelte';
+import EmailsRedirectPage from './emails/+page.svelte';
 import OverviewPage from './overview/+page.svelte';
 import OverviewEditorPage from './overview-editor/+page.svelte';
 import ChangelogPage from './changelog/+page.svelte';
@@ -59,13 +60,35 @@ describe('route render smoke coverage', () => {
     expect(html).toContain('Download all Google Classroom files in one click for every assignment.');
   });
 
+  it('renders /emails as a no-JS-safe redirect page (QA F3)', () => {
+    // QA F3 (2026-11-18): the server redirect prerenders to a 94-byte stub
+    // (`<script>location.href…` + meta refresh). On static hosts that have
+    // no edge worker in front, a no-JS visitor gets a blank page. The page
+    // itself must carry the meta refresh AND a visible link; production
+    // keeps its 308 via the Pages _worker.js edge redirect.
+    const { body, head } = render(EmailsRedirectPage);
+    const html = squish(body);
+
+    expect(head).toContain('http-equiv="refresh"');
+    expect(head).toContain('/emails2');
+    expect(head).toContain('noindex, nofollow');
+    expect(html).toContain('href="/emails2"');
+    expect(plainText(body)).toContain('Redirecting');
+  });
+
   it('renders landing2 redirect fallback and metadata', () => {
     const { body, head } = render(Landing2RedirectPage);
     const html = squish(body);
+    const expectedBaseUrl = SITE_URL.replace(/\/+$/, '');
 
     expect(html).toContain('Redirecting…');
     expect(head).toContain('Classroom Quick Downloader — Redirecting To Overview');
     expect(head).toContain('noindex, nofollow');
+    // QA F2 (2026-11-18): the canonical must point straight at '/' — the old
+    // value ('/overview') formed a chain /landing2 → /overview → /, which
+    // Google discounts.
+    expect(head).toContain(`<link rel="canonical" href="${expectedBaseUrl}/"`);
+    expect(head).not.toContain(`href="${expectedBaseUrl}/overview"`);
   });
 
   it('renders overview page shell, hero copy, and CTA sections', () => {
@@ -112,6 +135,17 @@ describe('route render smoke coverage', () => {
     expect(html).toContain('l2-page-floats');
     expect(head).toContain('Plus+Jakarta+Sans');
     expect(head).not.toContain('family=Inter');
+  });
+
+  it('keeps the duplicate /overview route out of indexing (QA F1)', () => {
+    // /overview serves the same bytes as / (the component's seoPath defaults
+    // to '/'). Rendered with no props — exactly how the route serves it — it
+    // must ship noindex so crawlers see one indexable home page. The '/'
+    // route passes noindex={false} explicitly (asserted in the homepage test
+    // above via 'not noindex').
+    const { head } = render(OverviewPage);
+    expect(head).toContain('noindex, nofollow');
+    expect(head).toContain('Classroom Quick Downloader — Google Classroom Files');
   });
 
   it('server-renders final AnimatedNumber values for crawlers and no-JS visitors', () => {

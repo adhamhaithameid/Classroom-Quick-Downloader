@@ -12,7 +12,7 @@
 <SeoMeta
   title="Classroom Quick Downloader — Redirecting To Overview"
   description="Redirecting to the Classroom Quick Downloader overview."
-  path="/overview"
+  path="/"
   noindex={true}
 />
 

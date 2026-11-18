@@ -83,7 +83,7 @@
     <video
       controls
       preload="metadata"
-      poster="{resolve('')}/images/problem-flags.webp"
+      poster={resolvePath('images/problem-flags.webp')}
     >
       <source
         src={resolvePath('videos/problem.mp4')}

@@ -2,4 +2,4 @@
   import OverviewPage from './overview/+page.svelte';
 </script>
 
-<OverviewPage seoPath="/" />
+<OverviewPage seoPath="/" noindex={false} />
