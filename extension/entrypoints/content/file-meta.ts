@@ -21,6 +21,26 @@ export const cleanAttachmentName = sanitizeFileName;
 /**
  * Extract file metadata from container element.
  */
+/**
+ * 0h3.1 course-folder support: the Classroom page title carries the course
+ * name ("<Course> - Home" shape). Split on the LAST " - " separator and keep
+ * the first part; anything unexpected (no separator, service pages) degrades
+ * to "" so the {course} template token collapses and the flat name survives.
+ * Selector-free on purpose — Classroom DOM classes churn; the title shape
+ * has been stable for years.
+ */
+export function extractCourseTitle(doc: Document = document): string {
+  try {
+    const raw = (doc.title || '').trim();
+    if (!raw) return '';
+    const cut = raw.lastIndexOf(' - ');
+    if (cut <= 0) return '';
+    return raw.slice(0, cut).trim();
+  } catch {
+    return '';
+  }
+}
+
 export function extractFileMeta(container: HTMLElement, url: string, lang?: string): FileMeta {
   const pageLang = lang ?? (typeof document !== 'undefined' ? document.documentElement?.lang || '' : '');
 
@@ -55,5 +75,5 @@ export function extractFileMeta(container: HTMLElement, url: string, lang?: stri
     ext = fileNameExtension(name) ?? undefined;
   }
 
-  return { name, ext, kind: 'other' };
+  return { name, ext, kind: 'other', courseTitle: extractCourseTitle() };
 }

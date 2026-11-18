@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
-import defaultPlacementsSeed from '$lib/svgCatalog/defaultPlacements.v2.json';
+import defaultPlacementsSeed from '#lib/svgCatalog/defaultPlacements.v2.json';
 import OverviewPage from './overview/+page.svelte';
 
 function squish(html: string): string {
@@ -102,6 +102,45 @@ describe('overview visual guardrails', () => {
     expect(html).toContain('addons.mozilla.org/en-US/firefox/addon/classroom-quick-downloader');
     expect(html).toContain('target="_blank"');
     expect(html).toContain('rel="noopener noreferrer"');
+  });
+
+  it('renders the quiet glass trust row with five linked assurances', () => {
+    const { body } = render(OverviewPage);
+    const html = squish(body);
+
+    const rowStart = html.indexOf('class="l2-trust-row');
+    expect(rowStart, 'trust row nav must render').toBeGreaterThan(-1);
+    const row = html.slice(rowStart, html.indexOf('</nav>', rowStart));
+
+    // Five assurances, in the bead's fixed order — reinforcement, not
+    // marketing. The row adds no claims the product does not already make.
+    const items = ['FREE', 'NO ACCOUNT', 'PRIVATE', 'SOURCE-AVAILABLE', 'NO FILE UPLOADS'];
+    let cursor = 0;
+    for (const item of items) {
+      const at = row.indexOf(item, cursor);
+      expect(at, `${item} must appear in the trust row, in order`).toBeGreaterThan(-1);
+      cursor = at + item.length;
+    }
+
+    // Each chip links to the page that backs the claim; only real routes.
+    expect(row).toContain('href="/faq"');
+    expect(row).toContain('href="/privacy"');
+    expect(row).toContain('href="/security"');
+    expect(row).toContain('href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader"');
+    expect(row).toContain('target="_blank"');
+    expect(row).toContain('rel="noopener noreferrer"');
+  });
+
+  it('keeps the trust row quiet glass that wraps instead of overflowing', () => {
+    const source = readFileSync(new URL('./overview/+page.svelte', import.meta.url), 'utf8');
+
+    // The chip list wraps, so five chips can never force a horizontal
+    // scrollbar at 375px, and hover motion is disabled under
+    // prefers-reduced-motion.
+    const list = source.match(/\.l2-trust-list\s*\{[^{}]*\}/);
+    expect(list).not.toBeNull();
+    expect(list![0]).toContain('flex-wrap: wrap');
+    expect(source).toContain('.l2-trust-item { transition: none; }');
   });
 
   it('keeps global font token, metric fallback face, and ambient background rules in app.css', () => {

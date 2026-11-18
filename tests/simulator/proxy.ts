@@ -10,7 +10,8 @@
  * `proxy: { server: <this proxy> }` + `ignoreHTTPSErrors`, and every request
  * — including the download manager's — flows through here.
  *
- * TLS: a committed test-only CA/server cert (tests/simulator/certs) with SANs
+ * TLS: test-only CA/server certs (tests/simulator/certs; the .crt halves
+ * are committed, the keys generate on demand) with SANs
  * for the simulated origins. The private key protects nothing — it exists so
  * the QA run is deterministic and offline. Connections to any other host die
  * immediately: the browser can never reach the real internet through this
@@ -21,6 +22,7 @@ import http from "node:http";
 import tls from "node:tls";
 import net from "node:net";
 import fs from "node:fs";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import type { Scenario } from "./scenario";
 import { collectDriveFiles, resolveSimulatedResponse, type SimulatedResponse } from "./origins";
@@ -138,7 +140,29 @@ function serveMitmSocket(clientSocket: net.Socket, firstChunk: Buffer, resolve: 
  * Start the MITM proxy for a scenario. Pass the returned URL to Playwright's
  * `proxy: { server }` launch option together with `ignoreHTTPSErrors: true`.
  */
+/**
+ * i6bf: private key material is NOT committed (gitignored; the repo ships
+ * only the public cert halves). Generate on demand via the self-sufficient
+ * generator (fresh clones get a throwaway test CA); a failed generation is a
+ * hard, named error — the MITM side cannot stand up without keys.
+ */
+function ensureSimulatorCerts(): void {
+  const keyPath = path.join(CERTS_DIR, "server.key");
+  const caKeyPath = path.join(CERTS_DIR, "ca.key");
+  if (fs.existsSync(keyPath) && fs.existsSync(caKeyPath)) return;
+  try {
+    execFileSync("node", [path.join(CERTS_DIR, "generate.mjs")], { stdio: "pipe" });
+  } catch (error) {
+    throw new Error(
+      `[simulator] TLS keys missing and generate.mjs failed: ${
+        error instanceof Error ? error.message : String(error)
+      } — run 'node tests/simulator/certs/generate.mjs' and inspect the error.`,
+    );
+  }
+}
+
 export async function startSimulatorProxy(scenario: Scenario): Promise<SimulatorProxy> {
+  ensureSimulatorCerts();
   const appDocument = buildAppDocument(scenario);
   const files = collectDriveFiles(scenario);
   const servedDownloads: ServedDownload[] = [];

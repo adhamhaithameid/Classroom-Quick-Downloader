@@ -38,6 +38,7 @@ import { createUpdateDotController, ensureUpdateCheckAlarm } from './update-dot'
 import { createIconUpdaters, isClassroomUrl, setActionIcon, GRAY_ICON_PATHS } from './icon-manager';
 import { extractDriveFileId } from './auth-utils';
 import { composeSuggestedFilename, getFilenameExt, buildUrlWithAuthUser } from './url-helpers';
+import { applyNamingTemplate, getNamingTemplateSync, startNameTemplateWatcher } from './name-template';
 import { cleanup, cleanupOrphanedPendingDownloads } from './cleanup';
 import { ensureAnalyticsAlarm, checkAndCloseFileTab } from './analytics-alarm';
 import { sendStatusToTab } from './message-sender';
@@ -55,6 +56,7 @@ import { buildUninstallUrl } from '../utils/analytics/flush';
 import { loadStats } from '../utils/analytics/storage';
 import { createWorkerRuntimeBridge } from '../../src/adapters/bridge/runtime-bridge';
 import { startBridgeDownloadService } from './bridge-download-service';
+import { handleApiTokenRequest } from './api-token';
 import { UNINSTALL_SITE_URL } from '../utils/analytics/constants';
 import { t } from '../content/i18n';
 import { canRetry, delayForMs, DEFAULT_RETRY_POLICY } from '../../src/retry/backoff';
@@ -74,6 +76,7 @@ import {
   CQD_STATS_CLAIM_CELEBRATION,
 } from '../../src/history/download-stats';
 import { reportDownloadCount } from '../utils/analytics/count-reporter';
+import { runStartupEntitlementCheck } from './entitlement';
 import {
   STUDENT_WORK_RESOLVE_PUBLISH_TYPE,
   STUDENT_WORK_RESOLVE_RELAY_TYPE,
@@ -160,6 +163,12 @@ export default defineBackground(() => {
   // a valid record makes it a no-op read.
   setLegacyLifetimeCountProvider(async () => (await loadStats()).success ?? 0);
   void ensureDownloadStatsSeeded().catch(() => undefined);
+  // Entitlement check (0h4d.2.3): cache-first and offline-tolerant; a
+  // locked state never disables a free feature — it only flips isPro().
+  void runStartupEntitlementCheck();
+  // Naming templates (0h4d.3.1): keep the settings cache warm so the
+  // onDeterminingFilename listener can suggest synchronously.
+  startNameTemplateWatcher();
   // Report unhandled background errors as runtime_error analytics events
   // (rate-capped, signature-only; see utils/analytics/runtime-errors.ts).
   installRuntimeErrorReporting();
@@ -455,12 +464,25 @@ export default defineBackground(() => {
       // Survey #821: a Classroom title without an extension used to land on
       // disk without one. Compose with the wire-known extension or the
       // response MIME before suggesting.
+      // 0h4d.3.1: the flat base name stays byte-identical; an active
+      // template only adds the folder shape around it. Template-off users
+      // (the default, and every free user until they pick one) see zero
+      // change.
+      const baseName = composeSuggestedFilename({
+        name: pending.fileMeta?.name,
+        knownExt: pending.finalExtension || pending.fileMeta?.ext,
+        mime: actualMime,
+      });
+      const template = getNamingTemplateSync();
       suggest({
-        filename: composeSuggestedFilename({
-          name: pending.fileMeta?.name,
-          knownExt: pending.finalExtension || pending.fileMeta?.ext,
-          mime: actualMime,
-        }),
+        filename: applyNamingTemplate(
+          {
+            baseName,
+            courseTitle: pending.fileMeta?.courseTitle,
+            kind: pending.fileMeta?.kind,
+          },
+          template,
+        ),
         conflictAction: 'uniquify',
       });
     });
@@ -893,6 +915,14 @@ export default defineBackground(() => {
     }
 
     return false;
+  });
+
+  // 7) API token relay (csaa.7): chrome.identity does not exist in content
+  // scripts, and the v3 engine runs in one. handleApiTokenRequest answers
+  // only a classroom.google.com sender; see ./api-token.ts for the contract.
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (sender.id !== chrome.runtime.id) return false;
+    return handleApiTokenRequest(message, sender, sendResponse);
   });
 
   // 0h4d.1.9: keyboard shortcut (Alt+Shift+D) — route to the active tab's

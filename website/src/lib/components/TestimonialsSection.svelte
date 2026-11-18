@@ -12,14 +12,14 @@
    * slide counter (user decisions, 2026-09-20).
    */
   import { onMount } from 'svelte';
-  import { magnetic } from '$lib/actions/magnetic';
-  import { websiteSnapshotStore } from '$lib/stores/websiteSnapshot';
+  import { magnetic } from '#lib/actions/magnetic.ts';
+  import { websiteSnapshotStore } from '#lib/stores/websiteSnapshot.ts';
   import {
     TESTIMONIALS,
     TESTIMONIAL_AGGREGATE,
     mergeLiveTestimonials,
     type Testimonial
-  } from '$lib/testimonials/data';
+  } from '#lib/testimonials/data.ts';
 
   const AUTOPLAY_MS = 6000;
 
@@ -172,7 +172,7 @@
 
     <div class="ts-viewport">
       <div class="ts-track" bind:this={trackEl}>
-        {#each allReviews as r, i (r.name + r.date)}
+        {#each allReviews as r, i (i)}
           <div class="ts-slide" role="group" aria-roledescription="slide" aria-label="{i + 1} of {allReviews.length}">
             <a class="tcard" href={r.href} target="_blank" rel="noopener noreferrer">
               <span class="sheen" aria-hidden="true"></span>

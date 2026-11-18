@@ -63,8 +63,12 @@ Classroom-API assist on top (`engine-v3.ts:18-36,115`):
    `src/v2/context/route-classifier.ts:179-212`).
 2. **Install gate**: `isApiConfigured()` — true only with BOTH the `identity`
    permission and a non-empty `oauth2.client_id` in the manifest
-   (`src/engines/v3/api/config.ts:42-54`; both landed in `wxt.config.ts:52-56`,
-   scope `classroom.readonly`). True means *capable*, not *consented*.
+   (`src/engines/v3/api/config.ts`; both landed in `wxt.config.ts`,
+   scope list the three fine-grained read-only Classroom scopes per csaa.7 —
+   coursework.me, coursework.students, courseworkmaterials, all `.readonly`).
+   In a content script the probe reads the manifest permission + client id +
+   Google Chrome brand, and token requests relay to the background
+   (`CQD_API_TOKEN`). True means *capable*, not *consented*.
 3. **Consent gate**: the user must select `v3` in the popup (issue #398);
    enforced structurally by the registry (`engine-registry.ts:178-192`) and a
    disabled popup option on unconfigured installs (`App.tsx:1806-1811`).

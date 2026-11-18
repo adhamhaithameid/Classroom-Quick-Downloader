@@ -215,7 +215,29 @@ values should be injected outside the committed file:
 | `SESSION_BINDING_MODE`| `[vars]` (optional)            | Session replay hardening mode: `off`, `optional`, or `strict` (coarse IP-prefix + UA fingerprint). | `strict`                     |
 | `CORS_ALLOWED_ORIGINS`| `[vars]` (optional)            | Comma-separated allowed origins for non-admin protected routes (`/stats`, `/auth/verify-danger`) and website ingest writes (`/api/public/website/events`). Include your active website domains. | `https://classroom-quick-downloader-website.pages.dev,https://your-root-domain` |
 | `ADMIN_CORS_ALLOWED_ORIGINS`| `[vars]` (optional)     | Comma-separated allowed origins for admin/debug routes only (`/admin/*`, `/debug/*`). No fallback to `CORS_ALLOWED_ORIGINS`. | `https://admin.example.com` |
+| `ENTITLEMENT_SIGNING_KEY` | **Secret**                 | HMAC-SHA256 key that signs the entitlement payload returned by `/license/validate` and `/license/activate`. Without it those endpoints fail closed (503). | — |
+| `LICENSE_WEBHOOK_SECRET`  | **Secret**                 | Provider webhook signing secret. `/license/webhook` verifies the provider's `X-Signature` hex HMAC-SHA256 over the raw body; unsigned or tampered posts get 401. | — |
+| `LICENSE_PROVIDER`        | `[vars]` (optional)        | License vendor selector for the `LicenseProvider` interface. `lemonsqueezy` is the only production value; unknown names fail closed. | `lemonsqueezy` |
+| `LS_LICENSE_API_BASE`     | `[vars]` (optional)        | Lemon Squeezy license API base URL. Defaults to `https://api.lemonsqueezy.com/v1`; override only for tests/proxies. | `https://api.lemonsqueezy.com/v1` |
 | `DOWNLOADS_DO`        | `[[durable_objects.bindings]]` | The binding name for the Durable Object.                                                            | `DOWNLOADS_DO`                |
+
+### Licensing endpoints (bead 0h4d.2.2)
+
+- `POST /license/validate` — license-key authenticated; body `{licenseKey, installId?}`. Returns
+  `{ok, status: "active"|"grace", entitlement}` where `entitlement` is
+  `"<base64url payload>.<base64url HMAC-SHA256>"`. The payload decodes to
+  `{license_ref, plan, expiresAt, graceUntil, issuedAt}`; `license_ref` is an opaque id, never
+  the raw key. Expired-but-within-grace (30 days) validates with `status: "grace"`.
+- `POST /license/activate` — same response shape; body `{licenseKey, installId}`. Activations are
+  capped per license (`MAX_ACTIVATIONS_PER_LICENSE` constant) and deduped per install.
+- `POST /license/webhook` — provider webhooks (`order_created`, `order_refunded`,
+  `subscription_*`); HMAC-verified over the raw body, idempotent per full-payload
+  digest (retries of a failed delivery are reprocessed, identical replays deduped).
+- `POST /admin/licenses/issue` / `POST /admin/licenses/revoke` / `GET /admin/licenses/list` —
+  dashboard auth (`X-Admin-Secret` or session). The raw license key never appears in any
+  response, log, or error; D1 stores only SHA-256 key hashes.
+- Rate limiting reuses the DO's shared per-IP per-minute limiter via `POST /license/rate-check`
+  (10/min validate, 5/min activate).
 
 ### 🔐 Setting `DO_SHARED_SECRET` Securely
 

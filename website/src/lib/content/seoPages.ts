@@ -1,4 +1,4 @@
-import { STORE_LINKS } from '$lib/config';
+import { STORE_LINKS } from '#lib/config.ts';
 
 export type SeoCta = {
   label: string;

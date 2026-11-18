@@ -167,7 +167,7 @@
         <source src={src} type="video/mp4" />
       </video>
     {/key}
-  {:else}
+  {:else if type !== 'video'}
     {#key retryKey}
       <img
         bind:this={imgEl}

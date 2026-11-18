@@ -1,33 +1,30 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
-  import { browser } from '$app/environment';
-  import logo from '$lib/assets/cqd-logo.svg';
+  import { onDestroy } from 'svelte';
+  import { afterNavigate, beforeNavigate } from '$app/navigation';
+  import logo from '#lib/assets/cqd-logo.svg';
 
   let visible = false;
   let fadeOut = false;
   let showTimeout: ReturnType<typeof setTimeout> | null = null;
   let hideTimeout: ReturnType<typeof setTimeout> | null = null;
-  let unsubscribe: (() => void) | null = null;
 
-  onMount(async () => {
-    const { navigating } = await import('$app/stores');
-    unsubscribe = navigating.subscribe((nav) => {
-      if (nav) {
-        fadeOut = false;
-        if (hideTimeout) { clearTimeout(hideTimeout); hideTimeout = null; }
-        showTimeout = setTimeout(() => { visible = true; }, 150);
-      } else {
-        if (showTimeout) { clearTimeout(showTimeout); showTimeout = null; }
-        if (visible) {
-          fadeOut = true;
-          hideTimeout = setTimeout(() => { visible = false; fadeOut = false; }, 320);
-        }
-      }
-    });
+  /* kit 3: $app/stores is gone — the same navigating true/false edges arrive
+     through beforeNavigate/afterNavigate callbacks. */
+  beforeNavigate(() => {
+    fadeOut = false;
+    if (hideTimeout) { clearTimeout(hideTimeout); hideTimeout = null; }
+    showTimeout = setTimeout(() => { visible = true; }, 150);
+  });
+
+  afterNavigate(() => {
+    if (showTimeout) { clearTimeout(showTimeout); showTimeout = null; }
+    if (visible) {
+      fadeOut = true;
+      hideTimeout = setTimeout(() => { visible = false; fadeOut = false; }, 320);
+    }
   });
 
   onDestroy(() => {
-    if (unsubscribe) unsubscribe();
     if (showTimeout) clearTimeout(showTimeout);
     if (hideTimeout) clearTimeout(hideTimeout);
   });
@@ -40,12 +37,29 @@
       <div class="ld-logo-ring">
         <img src={logo} alt="CQD" class="ld-logo" width="28" height="28" loading="eager" decoding="async" />
         <svg class="ld-spinner" viewBox="0 0 56 56" fill="none">
-          <circle cx="28" cy="28" r="26" stroke="rgba(26,139,85,0.12)" stroke-width="3" />
-          <circle cx="28" cy="28" r="26" stroke="url(#ld-grad)" stroke-width="3" stroke-linecap="round" stroke-dasharray="120 200" class="ld-arc" />
+          <circle
+            cx="28"
+            cy="28"
+            r="26"
+            stroke="rgba(26,139,85,0.12)"
+            stroke-width="3"
+          ></circle>
+
+          <circle
+            cx="28"
+            cy="28"
+            r="26"
+            stroke="url(#ld-grad)"
+            stroke-width="3"
+            stroke-linecap="round"
+            stroke-dasharray="120 200"
+            class="ld-arc"
+          ></circle>
+
           <defs>
             <linearGradient id="ld-grad" x1="0" y1="0" x2="56" y2="56">
-              <stop offset="0%" stop-color="#1a8b55" />
-              <stop offset="100%" stop-color="#22c55e" />
+              <stop offset="0%" stop-color="#1a8b55"></stop>
+              <stop offset="100%" stop-color="#22c55e"></stop>
             </linearGradient>
           </defs>
         </svg>

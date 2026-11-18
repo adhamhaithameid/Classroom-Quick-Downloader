@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { get } from 'svelte/store';
-import type { WebsiteSnapshot, WebsiteSnapshotFetchResult } from '$lib/types/public';
+import type { WebsiteSnapshot, WebsiteSnapshotFetchResult } from '#lib/types/public.ts';
 
-vi.mock('$lib/api/publicSite', () => ({
+vi.mock('#lib/api/publicSite.ts', () => ({
   ORACLE_SNAPSHOT_REFRESH_MS: 6 * 60 * 60 * 1000,
   fetchWebsiteSnapshotResult: vi.fn()
 }));
 
-import { ORACLE_SNAPSHOT_REFRESH_MS, fetchWebsiteSnapshotResult } from '$lib/api/publicSite';
+import { ORACLE_SNAPSHOT_REFRESH_MS, fetchWebsiteSnapshotResult } from '#lib/api/publicSite.ts';
 import {
   refreshWebsiteSnapshotStore,
   resetWebsiteSnapshotStoreForTests,
@@ -137,7 +137,7 @@ describe('websiteSnapshotStore', () => {
   });
 
   it('pins the production ORACLE_SNAPSHOT_REFRESH_MS to 6 hours', async () => {
-    const actual = await vi.importActual<typeof import('$lib/api/publicSite')>('$lib/api/publicSite');
+    const actual = await vi.importActual<typeof import('#lib/api/publicSite.ts')>('#lib/api/publicSite.ts');
     expect(actual.ORACLE_SNAPSHOT_REFRESH_MS).toBe(6 * 60 * 60 * 1000);
   });
 

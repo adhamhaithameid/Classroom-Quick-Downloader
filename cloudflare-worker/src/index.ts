@@ -27,6 +27,12 @@ import {
   sanitizeNotificationId,
 } from "./notifications";
 import { readAmoUsersCache, refreshAmoUsersKv } from "./store-stats";
+import {
+  createLicenseRoutes,
+  isLicenseAdminRoute,
+  isLicensePublicRoute,
+  isLicenseWebhookRoute,
+} from "./licensing/routes";
 import type { Env as WorkerEnv, StatsResponse } from "./types";
 
 type WorkerLogLevel = "info" | "warn" | "error";
@@ -646,6 +652,7 @@ function isPublicCorsRoute(pathname: string): boolean {
     pathname === "/track" ||
     pathname === "/api/site/v1/snapshot" ||
     pathname === "/api/site/v1/privacy" ||
+    isLicensePublicRoute(pathname) ||
     isPublicWebsiteDataRoute(pathname)
   );
 }
@@ -3321,6 +3328,16 @@ async function flushWebsiteTelemetryViaDo(env: WorkerEnv): Promise<void> {
   }
 }
 
+// Licensing routes (bead 0h4d.2.2): wired with the worker's shared helpers
+// so CORS, admin auth, and CSRF behavior stay single-sourced in this file.
+const licenseRoutes = createLicenseRoutes({
+  withCors,
+  resolveAuthContext,
+  unauthorized: unauthorizedResponse,
+  csrfAllowed: isAdminMutationCsrfAllowed,
+  getDownloadsStub,
+});
+
 export default {
   async fetch(request: Request, env: WorkerEnv, _ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
@@ -3511,6 +3528,23 @@ export default {
     if (pathname === "/public/site-metrics" && request.method === "GET") {
       // Quota shield: edge-cached 300s — this is the website's hottest poll.
       return withEdgeCache(request, 300, () => proxyToDO(request, env));
+    }
+
+    // Licensing endpoints (bead 0h4d.2.2): public validate/activate are
+    // license-key authenticated and rate-limited via the DO limiter; the
+    // webhook is HMAC-verified server-to-server; admin ops reuse the
+    // dashboard auth context.
+    if (pathname === "/license/validate") {
+      return licenseRoutes.handleValidate(request, env);
+    }
+    if (pathname === "/license/activate") {
+      return licenseRoutes.handleActivate(request, env);
+    }
+    if (isLicenseWebhookRoute(pathname)) {
+      return licenseRoutes.handleWebhook(request, env);
+    }
+    if (isLicenseAdminRoute(pathname)) {
+      return licenseRoutes.handleAdmin(request, env);
     }
 
     // Admin endpoints (require session OR X-Admin-Secret - session injects secret for DO)

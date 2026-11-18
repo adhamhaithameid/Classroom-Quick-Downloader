@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { base } from '$app/paths';
-  import { SITE_URL } from '$lib/config';
-  import SeoMeta from '$lib/components/SeoMeta.svelte';
+  import { resolvePath } from '#lib/navigation/resolvePath.ts';
+  import { resolve } from '$app/paths';
+  import { SITE_URL } from '#lib/config.ts';
+  import SeoMeta from '#lib/components/SeoMeta.svelte';
 
   const pagePath = '/watch/manual-vs-cqd';
   const canonicalUrl = `${SITE_URL}${pagePath}`;
@@ -79,8 +80,15 @@
   </p>
 
   <div class="watch-frame">
-    <video controls preload="metadata" poster="{base}/images/problem-flags.webp">
-      <source src="{base}/videos/problem.mp4" type="video/mp4" />
+    <video
+      controls
+      preload="metadata"
+      poster="{resolve('')}/images/problem-flags.webp"
+    >
+      <source
+        src={resolvePath('videos/problem.mp4')}
+        type="video/mp4"
+      />
     </video>
   </div>
 
@@ -112,11 +120,30 @@
   </p>
 
   <p class="watch-links">
-    <a class="glass-panel glass-hover" href="{base}/install/chrome">Install for Chrome</a>
-    <a class="glass-panel glass-hover" href="{base}/bulk-download-google-classroom-assignments">Bulk download guide</a>
-    <a class="glass-panel glass-hover" href="{base}/faq">FAQ</a>
-    <a class="glass-panel glass-hover" href="{base}/watch/cqd-demo">Watch the CQD demo video</a>
-    <a class="glass-panel glass-hover" href="{base}/">Back to homepage</a>
+    <a
+      class="glass-panel glass-hover"
+      href={resolvePath('install/chrome')}
+    >Install for Chrome</a>
+
+    <a
+      class="glass-panel glass-hover"
+      href={resolvePath('bulk-download-google-classroom-assignments')}
+    >Bulk download guide</a>
+
+    <a
+      class="glass-panel glass-hover"
+      href={resolvePath('faq')}
+    >FAQ</a>
+
+    <a
+      class="glass-panel glass-hover"
+      href={resolvePath('watch/cqd-demo')}
+    >Watch the CQD demo video</a>
+
+    <a
+      class="glass-panel glass-hover"
+      href={resolvePath('')}
+    >Back to homepage</a>
   </p>
 </article>
 
@@ -189,7 +216,6 @@
   }
 
   /* K4: step/check lists cascade in once per page load. */
-  .watch-steps li,
   .watch-checklist li {
     animation: watch-li-rise 0.5s var(--glass-ease) backwards;
     animation-delay: calc(0.1s + var(--li, 0) * 0.07s);
@@ -231,7 +257,6 @@
       transition: none;
     }
 
-    .watch-steps li,
     .watch-checklist li {
       animation: none;
     }

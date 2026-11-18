@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fetchUserChangelog } from './publicSite';
-import { WEBSITE_MANUAL_CHANGELOG } from '$lib/content/changelog.manual.generated';
+import { WEBSITE_MANUAL_CHANGELOG } from '#lib/content/changelog.manual.generated.ts';
 
 afterEach(() => {
   vi.restoreAllMocks();

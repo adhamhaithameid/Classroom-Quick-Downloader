@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const submitWebsiteEventsMock = vi.hoisted(() => vi.fn());
-vi.mock('$lib/api/publicSite', () => ({
+vi.mock('#lib/api/publicSite.ts', () => ({
   submitWebsiteEvents: submitWebsiteEventsMock
 }));
 

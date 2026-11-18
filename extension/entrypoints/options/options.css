@@ -341,3 +341,67 @@ body {
   font-weight: 600;
   color: var(--cqd-text-main);
 }
+
+/* ── Naming templates (0h4d.3.1) ─────────────────────────────────── */
+.cqd-options-folder-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+}
+.cqd-options-pro-lock {
+  font-size: var(--cqd-fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--cqd-border, rgba(0, 0, 0, 0.14));
+  color: var(--cqd-text-2, #64748b);
+}
+.cqd-options-template-input {
+  flex: 1;
+  font: inherit;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--cqd-fs-body);
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--cqd-border, rgba(0, 0, 0, 0.14));
+  background: var(--cqd-surface, #fff);
+  color: inherit;
+}
+.cqd-options-template-input:focus-visible {
+  outline: 2px solid var(--cqd-accent, #1a8b55);
+  outline-offset: 1px;
+}
+.cqd-options-template-preview {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--cqd-fs-caption);
+  color: var(--cqd-text-2, #64748b);
+  white-space: nowrap;
+}
+.cqd-options-template-presets {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.cqd-options-template-preset {
+  font: inherit;
+  font-size: var(--cqd-fs-body);
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--cqd-border, rgba(0, 0, 0, 0.14));
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.cqd-options-template-preset:hover {
+  border-color: var(--cqd-accent, #1a8b55);
+  color: var(--cqd-accent, #1a8b55);
+}
+.cqd-options-template-saved {
+  font-size: var(--cqd-fs-caption);
+  color: var(--cqd-accent, #1a8b55);
+}

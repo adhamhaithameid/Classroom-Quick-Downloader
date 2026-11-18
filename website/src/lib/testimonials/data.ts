@@ -62,9 +62,10 @@ export function mergeLiveTestimonials(
   }> | undefined
 ): Testimonial[] {
   if (!live || live.length === 0) return baseline;
-  const known = new Set(
-    baseline.map((r) => `${r.store}:${r.name}:${r.text.toLowerCase().slice(0, 60)}`)
-  );
+  // Whitespace-normalised: store text keeps "\n", live text uses spaces.
+  const dedupeKey = (store: string, name: string, text: string) =>
+    `${store}:${name}:${text.replace(/\s+/g, ' ').toLowerCase().slice(0, 60)}`;
+  const known = new Set(baseline.map((r) => dedupeKey(r.store, r.name, r.text)));
   const developerPattern = /adham\s+haitham/i;
   const merged = [...baseline];
   for (const item of live) {
@@ -77,7 +78,7 @@ export function mergeLiveTestimonials(
     const store = (item.store && ['chrome', 'edge', 'firefox'].includes(item.store)
       ? item.store
       : 'chrome') as Testimonial['store'];
-    const key = `${store}:${reviewer}:${text.toLowerCase().slice(0, 60)}`;
+    const key = dedupeKey(store, reviewer, text);
     if (known.has(key)) continue;
     known.add(key);
     merged.push({

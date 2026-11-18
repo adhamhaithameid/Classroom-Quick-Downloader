@@ -1,5 +1,5 @@
-import { SITE_URL } from '$lib/config';
-import { seoPages } from '$lib/content/seoPages';
+import { SITE_URL } from '#lib/config.ts';
+import { seoPages } from '#lib/content/seoPages.ts';
 
 const CORE_INDEXABLE_PATHS = ['/', '/privacy', '/faq', '/changelog', '/site-map', '/gamification', '/brand'] as const;
 const VIDEO_INDEXABLE_PATHS = ['/watch/cqd-demo', '/watch/manual-vs-cqd'] as const;

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import SeoMeta from '$lib/components/SeoMeta.svelte';
-  import { sanitizeEmailBodyHtml, sanitizeEmailCss } from '$lib/emails/sanitize';
+  import SeoMeta from '#lib/components/SeoMeta.svelte';
+  import { sanitizeEmailBodyHtml, sanitizeEmailCss } from '#lib/emails/sanitize.ts';
 
   export let data: {
     emailHeadStyles: string;

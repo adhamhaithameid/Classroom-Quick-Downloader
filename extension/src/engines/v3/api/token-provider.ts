@@ -1,8 +1,26 @@
 import type { ClassroomApiTokenProvider } from './types';
 
+/**
+ * Message type for the content-script → background token relay (csaa.7).
+ * chrome.identity does not exist in content scripts and the whole v3 engine
+ * runs in one, so the provider relays token requests to the background over
+ * this message; handleApiTokenRequest (entrypoints/background/api-token.ts)
+ * answers them. See extension/tests/v3-api-token-relay.test.ts.
+ */
+export const API_TOKEN_MESSAGE_TYPE = 'CQD_API_TOKEN';
+
+/** Shape of the relay reply the background sends back. */
+interface ApiTokenReply {
+  token?: string | null;
+}
+
 export class ChromeIdentityTokenProvider implements ClassroomApiTokenProvider {
   async getAccessToken(interactive = false): Promise<string | null> {
-    if (typeof chrome === 'undefined' || !chrome.identity?.getAuthToken) return null;
+    if (typeof chrome === 'undefined') return null;
+
+    // Content scripts never see chrome.identity — relay to the background,
+    // which holds the real getAuthToken (csaa.7).
+    if (!chrome.identity?.getAuthToken) return relayTokenRequest(interactive);
 
     return new Promise((resolve) => {
       try {
@@ -24,6 +42,30 @@ export class ChromeIdentityTokenProvider implements ClassroomApiTokenProvider {
       }
     });
   }
+}
+
+/**
+ * One-shot relay to the background token handler. Never throws and never
+ * prompts from the content script: a missing answer, a lastError, a null
+ * token, or an invalidated extension context all resolve null.
+ */
+function relayTokenRequest(interactive: boolean): Promise<string | null> {
+  return new Promise((resolve) => {
+    try {
+      chrome.runtime.sendMessage(
+        { type: API_TOKEN_MESSAGE_TYPE, interactive },
+        (reply?: ApiTokenReply) => {
+          if (chrome.runtime.lastError) {
+            resolve(null);
+            return;
+          }
+          resolve(reply?.token ?? null);
+        },
+      );
+    } catch {
+      resolve(null);
+    }
+  });
 }
 
 /**

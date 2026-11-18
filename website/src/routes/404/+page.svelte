@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { base } from '$app/paths';
-  import SeoMeta from '$lib/components/SeoMeta.svelte';
-  import { magnetic } from '$lib/actions/magnetic';
+  import { resolvePath } from '#lib/navigation/resolvePath.ts';
+  import { resolve } from '$app/paths';
+  import SeoMeta from '#lib/components/SeoMeta.svelte';
+  import { magnetic } from '#lib/actions/magnetic.ts';
 </script>
 
 <SeoMeta
@@ -19,13 +20,32 @@
       <p class="nf-sub">The page you're looking for doesn't exist or has been moved.</p>
 
       <div class="nf-actions">
-        <a class="nf-btn nf-btn-primary" href="{base}/" use:magnetic>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <a
+          class="nf-btn nf-btn-primary"
+          href={resolvePath('')}
+          use:magnetic
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            width="18"
+            height="18"
+          >
+            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+          </svg>
+
           Go home
         </a>
-        <a class="nf-btn nf-btn-secondary" href="{base}/faq">
-          Browse FAQ
-        </a>
+
+        <a
+          class="nf-btn nf-btn-secondary"
+          href={resolvePath('faq')}
+        >Browse FAQ</a>
       </div>
     </div>
   </section>
@@ -34,21 +54,32 @@
   <section class="nf-links-section">
     <div class="nf-wrap">
       <div class="nf-links-grid">
-        <a class="nf-link-card glass-panel glass-hover" href="{base}/">
+        <a
+          class="nf-link-card glass-panel glass-hover"
+          href={resolvePath('')}
+        >
           <span class="nf-link-icon glass-icon">🏠</span>
           <div>
             <strong>Overview</strong>
             <p>Learn what Classroom Quick Downloader does and how it works.</p>
           </div>
         </a>
-        <a class="nf-link-card glass-panel glass-hover" href="{base}/faq">
+
+        <a
+          class="nf-link-card glass-panel glass-hover"
+          href={resolvePath('faq')}
+        >
           <span class="nf-link-icon glass-icon">❓</span>
           <div>
             <strong>FAQ</strong>
             <p>Find answers to commonly asked questions about the extension.</p>
           </div>
         </a>
-        <a class="nf-link-card glass-panel glass-hover" href="{base}/changelog">
+
+        <a
+          class="nf-link-card glass-panel glass-hover"
+          href={resolvePath('changelog')}
+        >
           <span class="nf-link-icon glass-icon">📋</span>
           <div>
             <strong>Changelog</strong>
@@ -187,9 +218,17 @@
     animation: nf-rise 0.5s var(--glass-ease) backwards;
   }
 
-  .nf-link-card:nth-child(1) { animation-delay: 0.05s; }
-  .nf-link-card:nth-child(2) { animation-delay: 0.1s; }
-  .nf-link-card:nth-child(3) { animation-delay: 0.15s; }
+  .nf-link-card:nth-child(1) {
+    animation-delay: 0.05s;
+  }
+
+  .nf-link-card:nth-child(2) {
+    animation-delay: 0.1s;
+  }
+
+  .nf-link-card:nth-child(3) {
+    animation-delay: 0.15s;
+  }
 
   .nf-link-icon {
     font-size: 28px;

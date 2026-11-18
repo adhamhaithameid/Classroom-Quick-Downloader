@@ -1,13 +1,14 @@
 <script lang="ts">
+  import { resolvePath } from '#lib/navigation/resolvePath.ts';
   import { onMount } from 'svelte';
-  import { base } from '$app/paths';
-  import { page } from '$app/stores';
-  import { APP_VERSION, STORE_LINKS } from '$lib/config';
-  import { trackWebsiteEvent } from '$lib/analytics/websiteEvents';
-  import { websiteSnapshotStore } from '$lib/stores/websiteSnapshot';
-  import { browserDisplayName, detectBrowserFromNavigator, type BrowserKey } from '$lib/browser/detect';
-  import type { OverviewResponse } from '$lib/types/public';
-  import logo from '$lib/assets/cqd-logo.svg';
+  import { resolve } from '$app/paths';
+  import { page } from '$app/state';
+  import { APP_VERSION, STORE_LINKS } from '#lib/config.ts';
+  import { trackWebsiteEvent } from '#lib/analytics/websiteEvents.ts';
+  import { websiteSnapshotStore } from '#lib/stores/websiteSnapshot.ts';
+  import { browserDisplayName, detectBrowserFromNavigator, type BrowserKey } from '#lib/browser/detect.ts';
+  import type { OverviewResponse } from '#lib/types/public.ts';
+  import logo from '#lib/assets/cqd-logo.svg';
 
   type SnapshotLinks = OverviewResponse['links'];
 
@@ -42,7 +43,7 @@
       eventType: 'cta',
       action: 'install_click',
       placement: `footer_install_${browser}`,
-      pagePath: $page.url.pathname
+      pagePath: page.url.pathname
     });
   }
 
@@ -297,18 +298,55 @@
       const ENABLE_WATER_DROP_RIPPLE = true;
       const ENABLE_CURSOR_CIRCLE = true;
 
-      function drawAll(): void {
-        if (!ctx) return;
-        ctx.clearRect(0, 0, cw, ch);
-        ctx.fillStyle = '#1a8b55';
+      /* One pre-rendered dot, blitted per particle. Tessellating thousands
+         of arcs into a fresh Path2D every frame was the hover lag. */
+      let sprite: HTMLCanvasElement | null = null;
+      /* The whole wordmark at rest, rendered once. Each frame blits it in a
+         single call and repaints only the dots that have left home. */
+      let rest: HTMLCanvasElement | null = null;
+
+      function buildSprite(): void {
         const r = gridSize * 0.45;
-        const path = new Path2D();
+        const side = Math.max(2, Math.ceil(r * 2 * dpr));
+        const s = document.createElement('canvas');
+        s.width = side;
+        s.height = side;
+        const sctx = s.getContext('2d');
+        if (!sctx) return;
+        sctx.fillStyle = '#1a8b55';
+        sctx.beginPath();
+        sctx.arc(side / 2, side / 2, side / 2, 0, 6.2832);
+        sctx.fill();
+        sprite = s;
+
+        const base = document.createElement('canvas');
+        base.width = cv.width;
+        base.height = cv.height;
+        const bctx = base.getContext('2d');
+        if (!bctx) return;
+        bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        bctx.globalAlpha = 0.82;
+        const d = r * 2;
+        for (const p of dots) bctx.drawImage(s, p.hx - r, p.hy - r, d, d);
+        rest = base;
+      }
+
+      function drawAll(): void {
+        if (!ctx || !sprite || !rest) return;
+        const r = gridSize * 0.45;
+        const d = r * 2;
+        ctx.clearRect(0, 0, cw, ch);
+        ctx.drawImage(rest, 0, 0, cw, ch);
+        /* Erase the rest-frame dot of every particle that moved, then paint
+           it at its live position. Clears are exact dot boxes (grid gap
+           keeps neighbours untouched). */
+        const moved: Dot[] = [];
         for (const p of dots) {
-          path.moveTo(p.x + r, p.y);
-          path.arc(p.x, p.y, r, 0, 6.2832);
+          if (Math.abs(p.x - p.hx) > 0.25 || Math.abs(p.y - p.hy) > 0.25) moved.push(p);
         }
+        for (const p of moved) ctx.clearRect(p.hx - r, p.hy - r, d, d);
         ctx.globalAlpha = 0.82;
-        ctx.fill(path);
+        for (const p of moved) ctx.drawImage(sprite, p.x - r, p.y - r, d, d);
         ctx.globalAlpha = 1;
       }
 
@@ -336,13 +374,22 @@
         const cursorLive = pointerInside && now - lastPointerMoveAt < CURSOR_LIVE_MS;
         const maxFront = Math.hypot(cw, ch) + PULSE_BAND;
         pulses = pulses.filter((pulse) => (now - pulse.t0) * PULSE_SPEED < maxFront);
+        /* Per-frame wavefront bounds, squared, so the dot loop rejects dots
+           outside the band without a square root. */
+        const fronts = pulses.map((pulse) => {
+          const front = (now - pulse.t0) * PULSE_SPEED;
+          const lo = Math.max(0, front - PULSE_BAND);
+          const hi = front + PULSE_BAND;
+          return { pulse, front, lo2: lo * lo, hi2: hi * hi };
+        });
         let energy = false;
         for (const p of dots) {
           if (cursorLive && ENABLE_CURSOR_CIRCLE) {
             const dx = p.x - px;
             const dy = p.y - py;
-            const d = Math.hypot(dx, dy);
-            if (d > 0.001 && d < REPEL_RADIUS) {
+            const d2 = dx * dx + dy * dy;
+            if (d2 > 0.000001 && d2 < REPEL_RADIUS * REPEL_RADIUS) {
+              const d = Math.sqrt(d2);
               const fall = 1 - d / REPEL_RADIUS;
               const f = REPEL_FORCE * fall * fall * df;
               const inv = 1 / d;
@@ -350,26 +397,27 @@
               p.vy += (dy * inv + dx * inv * p.spin * REPEL_SPIN) * f;
             }
           }
-          for (const pulse of pulses) {
+          for (const { pulse, front, lo2, hi2 } of fronts) {
             const dx = p.x - pulse.x;
             const dy = p.y - pulse.y;
-            const d = Math.hypot(dx, dy);
-            if (d < 0.001) continue;
-            const front = (now - pulse.t0) * PULSE_SPEED;
+            const d2 = dx * dx + dy * dy;
+            if (d2 < 0.000001 || d2 <= lo2 || d2 >= hi2) continue;
+            const d = Math.sqrt(d2);
             const band = d - front;
             if (band > -PULSE_BAND && band < PULSE_BAND) {
               /* Amplitude falls off with distance traveled, so the wave
                  dies out toward the far edge instead of churning there. */
-              const w =
-                (1 - Math.abs(band) / PULSE_BAND) * Math.pow(1 - front / maxFront, 1.5);
-              p.vx += (dx / d) * PULSE_KICK * w * df;
-              p.vy += (dy / d) * PULSE_KICK * w * df;
+              const w = (1 - Math.abs(band) / PULSE_BAND) * Math.pow(1 - front / maxFront, 1.5);
+
+              p.vx += dx / d * PULSE_KICK * w * df;
+              p.vy += dy / d * PULSE_KICK * w * df;
             }
           }
           p.vx *= DRAG;
           p.vy *= DRAG;
-          const sp = Math.hypot(p.vx, p.vy);
-          if (sp > MAX_SPEED) {
+          const sp2 = p.vx * p.vx + p.vy * p.vy;
+          if (sp2 > MAX_SPEED * MAX_SPEED) {
+            const sp = Math.sqrt(sp2);
             p.vx = (p.vx / sp) * MAX_SPEED;
             p.vy = (p.vy / sp) * MAX_SPEED;
           }
@@ -427,7 +475,7 @@
            of shrinking one long line to fit. */
         const lines = innerW < 640 ? ['CLASSROOM', 'QUICK', 'DOWNLOADER'] : [LINE_1, LINE_2];
         const widest = Math.max(...lines.map((l) => pctx.measureText(l).width)) || 900;
-        const fontSize = Math.max(30, (innerW / widest) * 100);
+        const fontSize = Math.max(30, innerW / widest * 100);
         const lineStep = fontSize * 0.94;
         const baselines = lines.map((_, i) => fontSize * 0.82 + i * lineStep);
         const height = Math.ceil(baselines[baselines.length - 1] + fontSize * 0.2);
@@ -450,7 +498,7 @@
         /* Density scales with canvas area: ~5k dots on a full-size desktop
            canvas, proportionally fewer on small screens, always dense
            enough that letterforms read as solid halftone. */
-        let grid = Math.max(3, Math.min(8, Math.round(Math.sqrt((innerW * height) / 16000))));
+        let grid = Math.max(3, Math.min(8, Math.round(Math.sqrt(innerW * height / 16000))));
         const collect = (): Dot[] => {
           const out: Dot[] = [];
           for (let y = 0; y < height; y += grid) {
@@ -479,6 +527,7 @@
         cv.style.height = `${height}px`;
         ctx = cv.getContext('2d');
         if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        buildSprite();
         drawAll();
       }
 
@@ -578,6 +627,9 @@
   });
 </script>
 
+<!-- kit 3: page comes from $app/state; this component reads it only inside
+     click handlers, so no runes conversion is needed. -->
+
 <footer class="cqd-footer" bind:this={footerEl}>
   <!-- Layer 1 — final installation CTA. data-ft-zone marks a cascade zone;
        data-ft marks its steps, which run in DOM order on reveal. -->
@@ -599,8 +651,20 @@
               rel="noopener noreferrer"
               on:click={() => trackFooterInstall(b)}
             >
-              <img src="{base}/images/{b}.svg" alt="" width="18" height="18" loading="lazy" decoding="async" />
-              {#if b === detectedBrowser}Install for {browserDisplayName(b)}{:else}{browserDisplayName(b)}{/if}
+              <img
+                src={resolvePath('images/{b}.svg')}
+                alt=""
+                width="18"
+                height="18"
+                loading="lazy"
+                decoding="async"
+              />
+
+              {#if b === detectedBrowser}
+                Install for {browserDisplayName(b)}
+              {:else}
+                {browserDisplayName(b)}
+              {/if}
             </a>
           </span>
         {/each}
@@ -625,19 +689,33 @@
         <nav class="ft-col ft-col-product" data-ft aria-label="Product">
           <h2 class="ft-label">Product</h2>
           <ul class="ft-links">
-            <li><a href="{base}/">Overview</a></li>
-            <li><a href="{base}/#how-it-works">How it works</a></li>
-            <li><a href="{base}/changelog">Changelog</a></li>
-            <li><a href="{base}/featured">Featured</a></li>
+            <li><a href={resolvePath('')}>Overview</a></li>
+            <li><a href={resolvePath('') + '#how-it-works'}>How it works</a></li>
+            <li><a href={resolvePath('changelog')}>Changelog</a></li>
+            <li><a href={resolvePath('featured')}>Featured</a></li>
           </ul>
         </nav>
 
         <nav class="ft-col ft-col-compare" data-ft aria-label="Compare">
           <h2 class="ft-label">Compare</h2>
           <ul class="ft-links">
-            <li><a href="{base}/compare/classroom-quick-downloader-vs-classfetch">vs ClassFetch</a></li>
-            <li><a href="{base}/compare/classroom-quick-downloader-vs-classmate">vs Classmate</a></li>
-            <li><a href="{base}/compare/classroom-quick-downloader-vs-classroom-one-click-downloader">vs One-Click</a></li>
+            <li>
+              <a
+                href={resolvePath('compare/classroom-quick-downloader-vs-classfetch')}
+              >vs ClassFetch</a>
+            </li>
+
+            <li>
+              <a
+                href={resolvePath('compare/classroom-quick-downloader-vs-classmate')}
+              >vs Classmate</a>
+            </li>
+
+            <li>
+              <a
+                href={resolvePath('compare/classroom-quick-downloader-vs-classroom-one-click-downloader')}
+              >vs One-Click</a>
+            </li>
           </ul>
         </nav>
 
@@ -659,20 +737,20 @@
                 Edge <span class="ft-arrow" aria-hidden="true">↗</span>
               </a>
             </li>
-            <li><a href="{base}/install/chrome">Chrome guide</a></li>
-            <li><a href="{base}/install/firefox">Firefox guide</a></li>
-            <li><a href="{base}/install/edge">Edge guide</a></li>
+            <li><a href={resolvePath('install/chrome')}>Chrome guide</a></li>
+            <li><a href={resolvePath('install/firefox')}>Firefox guide</a></li>
+            <li><a href={resolvePath('install/edge')}>Edge guide</a></li>
           </ul>
         </nav>
 
         <nav class="ft-col ft-col-resources" data-ft aria-label="Resources">
           <h2 class="ft-label">Resources</h2>
           <ul class="ft-links">
-            <li><a href="{base}/faq">FAQ</a></li>
-            <li><a href="{base}/privacy">Privacy</a></li>
-            <li><a href="{base}/security">Security</a></li>
-            <li><a href="{base}/brand">Brand kit</a></li>
-            <li><a href="{base}/site-map">Site map</a></li>
+            <li><a href={resolvePath('faq')}>FAQ</a></li>
+            <li><a href={resolvePath('privacy')}>Privacy</a></li>
+            <li><a href={resolvePath('security')}>Security</a></li>
+            <li><a href={resolvePath('brand')}>Brand kit</a></li>
+            <li><a href={resolvePath('site-map')}>Site map</a></li>
           </ul>
         </nav>
 
@@ -688,8 +766,8 @@
             <li>
               <a href={reportIssueUrl} target="_blank" rel="noopener noreferrer">Report issue</a>
             </li>
-            <li><a href="{base}/support">Support</a></li>
-            <li><a href="{base}/watch/cqd-demo">Watch demo</a></li>
+            <li><a href={resolvePath('support')}>Support</a></li>
+            <li><a href={resolvePath('watch/cqd-demo')}>Watch demo</a></li>
           </ul>
         </nav>
       </div>
@@ -1070,6 +1148,8 @@
   .ft-credit {
     display: inline-flex;
     align-items: center;
+    /* WCAG 2.2 AA 2.5.8: minimum 24px target height. */
+    min-height: 24px;
     gap: 4px;
     color: var(--ft-text-2);
     font-size: 11.5px;
@@ -1219,10 +1299,6 @@
 
     .ft-col-product {
       order: 3;
-    }
-
-    .ft-col-support {
-      order: 4;
     }
 
     .ft-links a {

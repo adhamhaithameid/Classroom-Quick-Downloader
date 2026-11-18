@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { privacyContent as privacy } from '$lib/content/privacy';
-  import SeoMeta from '$lib/components/SeoMeta.svelte';
-  import { magnetic } from '$lib/actions/magnetic';
+  import { privacyContent as privacy } from '#lib/content/privacy.ts';
+  import SeoMeta from '#lib/components/SeoMeta.svelte';
+  import { magnetic } from '#lib/actions/magnetic.ts';
 
   const sectionIcons = ['🔒', '🚫', '💡', '⚡', '🗓️', '🧩', '⚖️', '👶', '🔑', '📬'];
 

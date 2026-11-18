@@ -99,6 +99,7 @@ test.describe("qa-09 update dot", () => {
   let extensionBase = "";
 
   test.beforeAll(async ({}, testInfo) => {
+    test.setTimeout(180_000); // cold browser start can exceed the 60s default (bead 3qxp)
     browser = projectBrowser(testInfo.project.name);
     const session = await launchQaContext(
       browser,
@@ -115,6 +116,7 @@ test.describe("qa-09 update dot", () => {
           },
         ],
       }),
+      { project: testInfo.project.name },
     );
     context = session.context;
     closeQa = session.close;
@@ -127,7 +129,7 @@ test.describe("qa-09 update dot", () => {
   });
 
   test.afterAll(async () => {
-    await closeQa();
+    await closeQa?.();
   });
 
   test("pill pulses when a newer live release is available", async ({}, testInfo) => {

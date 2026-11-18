@@ -1,10 +1,12 @@
 <script lang="ts">
-  import { page } from '$app/stores';
-  import { base } from '$app/paths';
-  import SeoMeta from '$lib/components/SeoMeta.svelte';
-  import { magnetic } from '$lib/actions/magnetic';
+  import { resolvePath } from '#lib/navigation/resolvePath.ts';
+  import { resolve } from '$app/paths';
+  import SeoMeta from '#lib/components/SeoMeta.svelte';
+  import { magnetic } from '#lib/actions/magnetic.ts';
 
-  $: statusCode = $page.status;
+  // kit 3: +error receives { error: App.Error } (error.status is always set).
+  export let error: App.Error;
+  $: statusCode = error.status;
   $: errorTitle = statusCode === 404 ? 'Page not found' : statusCode === 403 ? 'Access restricted' : 'Something went wrong';
   $: errorDescription = (() => {
     if (statusCode === 404) {
@@ -13,7 +15,7 @@
     if (statusCode === 403) {
       return "You don't have permission to access this page right now.";
     }
-    return $page.error?.message ?? 'An unexpected error occurred.';
+    return error?.message ?? 'An unexpected error occurred.';
   })();
   $: hintText =
     statusCode === 403
@@ -21,8 +23,10 @@
       : 'Try checking the URL for typos, or use the navigation above.';
 </script>
 
+<!-- kit 3: status/error arrive as props (ErrorProps), no store needed. -->
+
 <SeoMeta
-  title={`${$page.status} — Classroom Quick Downloader`}
+  title={`${statusCode} — Classroom Quick Downloader`}
   description="Error page for Classroom Quick Downloader."
   path="/404"
   noindex={true}
@@ -31,24 +35,40 @@
 <div class="err">
   <section class="err-hero">
     <div class="err-wrap">
-      <div class="err-glitch-code" aria-hidden="true">{$page.status}</div>
+      <div class="err-glitch-code" aria-hidden="true">{statusCode}</div>
       <h1 class="err-mega">{errorTitle}</h1>
       <p class="err-sub">{errorDescription}</p>
 
       <div class="err-actions">
-        <a class="err-btn err-btn-primary" href="{base}/" use:magnetic>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <a
+          class="err-btn err-btn-primary"
+          href={resolvePath('')}
+          use:magnetic
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            width="18"
+            height="18"
+          >
+            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+          </svg>
+
           Go home
         </a>
-        <a class="err-btn err-btn-secondary" href="{base}/faq">
-          Browse FAQ
-        </a>
+
+        <a
+          class="err-btn err-btn-secondary"
+          href={resolvePath('faq')}
+        >Browse FAQ</a>
       </div>
 
-      <div class="err-hint">
-        <span class="err-hint-icon">💡</span>
-        {hintText}
-      </div>
+      <div class="err-hint"><span class="err-hint-icon">💡</span> {hintText}</div>
     </div>
   </section>
 </div>

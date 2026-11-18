@@ -1,4 +1,5 @@
-import { redirect, type Handle } from '@sveltejs/kit';
+import { redirect } from '@sveltejs/kit';
+import type { Handle } from '@sveltejs/kit/hooks';
 
 const LEGACY_HOST = 'classroom-quick-downloader-website.pages.dev';
 const PRIMARY_ORIGIN = 'https://classroom-quick-downloader.adhamhaithameid.is-a.dev';

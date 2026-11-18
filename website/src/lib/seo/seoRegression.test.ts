@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
-import { seoPages } from '$lib/content/seoPages';
-import { privacyContent } from '$lib/content/privacy';
-import { APP_VERSION, SITE_URL } from '$lib/config';
+import { seoPages } from '#lib/content/seoPages.ts';
+import { privacyContent } from '#lib/content/privacy.ts';
+import { APP_VERSION, SITE_URL } from '#lib/config.ts';
 import { INDEXABLE_SITE_PATHS, lastModForPath, SITE_PATH_LASTMOD } from './site';
-import SeoContentPage from '$lib/components/SeoContentPage.svelte';
+import SeoContentPage from '#lib/components/SeoContentPage.svelte';
 
 /* SEO regression guard: codifies the audits from the 2026 organic-growth
    overhaul. If one of these fails, a page's metadata, trust claims, or

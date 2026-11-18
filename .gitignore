@@ -101,8 +101,15 @@ website/prototype-*.html
 !website/prototype-magnetic.html
 
 # Simulator private key material: regenerable via tests/simulator/certs/generate.mjs
+# i6bf: the whole certs tree is generated state — the proxy regenerates
+# keys AND certs on boot via generate.mjs (fresh clones get a throwaway
+# test CA), so committing any of it only invites mismatched pairs.
 tests/simulator/certs/*.key
 tests/simulator/certs/*.csr
+tests/simulator/certs/*.crt
+tests/simulator/certs/ca.srl
+# Mimosa hook session state: never commit scanner bookkeeping.
+tests/simulator/certs/.mimosa/
 tests/simulator/certs/*.srl
 
 # opencode tool state

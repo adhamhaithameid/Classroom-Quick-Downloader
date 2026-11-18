@@ -1,7 +1,7 @@
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 import { get, writable } from 'svelte/store';
-import { fetchWebsiteSnapshotResult } from '$lib/api/publicSite';
-import type { WebsiteSnapshotStoreState } from '$lib/types/public';
+import { fetchWebsiteSnapshotResult } from '#lib/api/publicSite.ts';
+import type { WebsiteSnapshotStoreState } from '#lib/types/public.ts';
 
 const initialState: WebsiteSnapshotStoreState = {
   status: 'idle',
@@ -61,7 +61,7 @@ export async function refreshWebsiteSnapshotStore(options: {
     status: startingStatus,
     isRefreshing: true,
     errorMessage: current.status === 'degraded' ? current.errorMessage : null,
-    ...(options.userInitiated ? { lastUserRefreshAtUtc: nowUtc() } : {})
+    ...options.userInitiated ? { lastUserRefreshAtUtc: nowUtc() } : {}
   });
 
   const runner = (async () => {
@@ -79,7 +79,7 @@ export async function refreshWebsiteSnapshotStore(options: {
         isRefreshing: false,
         errorMessage: result.errorMessage,
         lastUpdatedAtUtc: nowUtc(),
-        ...(result.degraded ? { lastFailureAtUtc: nowUtc() } : {})
+        ...result.degraded ? { lastFailureAtUtc: nowUtc() } : {}
       });
     } catch (error) {
       const message = toErrorMessage(error);
@@ -126,17 +126,12 @@ export function initializeWebsiteSnapshotStore(): () => void {
     void refreshWebsiteSnapshotStore({ force: false }).then((state) => {
       const snapshotAgeMs =
         typeof state.snapshot?.generatedAt === 'number' && state.snapshot.generatedAt > 0
-          ? nowUtc() - state.snapshot.generatedAt
-          : Number.POSITIVE_INFINITY;
-      const applyFreshNow =
-        !state.snapshot ||
-        state.source === 'bootstrap-cache' ||
-        snapshotAgeMs >= SNAPSHOT_FORCE_APPLY_MAX_AGE_MS;
+        ? nowUtc() - state.snapshot.generatedAt
+        : Number.POSITIVE_INFINITY;
 
-      void refreshWebsiteSnapshotStore({
-        force: true,
-        applyToCurrentSession: applyFreshNow
-      });
+      const applyFreshNow = !state.snapshot || state.source === 'bootstrap-cache' || snapshotAgeMs >= SNAPSHOT_FORCE_APPLY_MAX_AGE_MS;
+
+      void refreshWebsiteSnapshotStore({ force: true, applyToCurrentSession: applyFreshNow });
     });
 
     // Keep long-lived tabs fresh: poll for expiry; fetchWebsiteSnapshotResult
