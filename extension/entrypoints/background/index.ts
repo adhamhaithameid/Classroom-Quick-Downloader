@@ -55,6 +55,7 @@ import { buildUninstallUrl } from '../utils/analytics/flush';
 import { loadStats } from '../utils/analytics/storage';
 import { createWorkerRuntimeBridge } from '../../src/adapters/bridge/runtime-bridge';
 import { startBridgeDownloadService } from './bridge-download-service';
+import { handleApiTokenRequest } from './api-token';
 import { UNINSTALL_SITE_URL } from '../utils/analytics/constants';
 import { t } from '../content/i18n';
 import { canRetry, delayForMs, DEFAULT_RETRY_POLICY } from '../../src/retry/backoff';
@@ -893,6 +894,14 @@ export default defineBackground(() => {
     }
 
     return false;
+  });
+
+  // 7) API token relay (csaa.7): chrome.identity does not exist in content
+  // scripts, and the v3 engine runs in one. handleApiTokenRequest answers
+  // only a classroom.google.com sender; see ./api-token.ts for the contract.
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (sender.id !== chrome.runtime.id) return false;
+    return handleApiTokenRequest(message, sender, sendResponse);
   });
 
   // 0h4d.1.9: keyboard shortcut (Alt+Shift+D) — route to the active tab's

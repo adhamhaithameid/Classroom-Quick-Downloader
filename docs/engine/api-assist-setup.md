@@ -23,6 +23,17 @@ verified end-to-end, and the privacy model.
 > different extension id unless the manifest pins a `key`, so a dev-build
 > consent prompt may show an origin-mismatch error. Store builds match.
 
+> **Status 2026-11-18 (csaa.7): FINE-GRAINED SCOPES.** The manifest now
+> requests EXACTLY three fine-grained read-only Classroom scopes instead of
+> the broad `classroom.readonly`:
+> `classroom.coursework.me.readonly`,
+> `classroom.coursework.students.readonly`, and
+> `classroom.courseworkmaterials.readonly`. They cover the three API calls
+> the client makes today (section 2b). A scope change triggers a Chrome
+> consent RE-PROMPT: Chrome shows the consent dialog again on the first
+> token request after the update. The live consent re-test on an updated
+> install is still pending (human-in-the-loop).
+
 ---
 
 ## 1. What the setup gate is
@@ -37,6 +48,12 @@ Everything keys off one probe: `isApiConfigured()`
 Until both hold, the probe reads false and the feature is fully inert — the
 registry refuses to activate `engine-v3`, and the popup renders the API
 option disabled.
+
+Content-script nuance (csaa.7): the engines run in a content script, and
+`chrome.identity` does not exist there. In that context the probe instead
+checks the manifest `identity` permission, the client id, and the Google
+Chrome brand (getAuthToken works on Chrome only). The token request itself
+relays to the background over `CQD_API_TOKEN`.
 
 ## 2. Owner steps
 
@@ -77,7 +94,10 @@ permissions: [
 oauth2: {                           // ← add (new top-level manifest key)
   client_id: '<CLIENT_ID>.apps.googleusercontent.com',
   scopes: [
-    'https://www.googleapis.com/auth/classroom.student-submissions.me.readonly',
+    // csaa.7: exactly the three the v3 client needs. No broader scope.
+    'https://www.googleapis.com/auth/classroom.coursework.me.readonly',
+    'https://www.googleapis.com/auth/classroom.coursework.students.readonly',
+    'https://www.googleapis.com/auth/classroom.courseworkmaterials.readonly',
   ],
 },
 ```
@@ -85,12 +105,20 @@ oauth2: {                           // ← add (new top-level manifest key)
 Notes:
 
 - The `scopes` list is what `chrome.identity.getAuthToken` requests when the
-  scopes argument is empty (which is how the v3 stack calls it). The
-  `classroom.student-submissions.me.readonly` scope is the minimum that
-  covers the one call the assist makes:
-  `GET classroom.googleapis.com/v1/courses/{id}/courseWork/{id}/studentSubmissions`.
-  Add `https://www.googleapis.com/auth/classroom.courses.readonly` only if a
-  future phase needs course metadata.
+  scopes argument is empty (which is how the v3 stack calls it). The three
+  scopes cover the three calls the client makes today
+  (`extension/src/engines/v3/api/classroom-api-client.ts`):
+
+  | Endpoint | Scope |
+  | --- | --- |
+  | `GET /v1/courses/{id}/courseWork` (list) | `classroom.coursework.me.readonly` |
+  | `GET /v1/courses/{id}/courseWorkMaterials` (list) | `classroom.courseworkmaterials.readonly` |
+  | `GET /v1/courses/{id}/courseWork/{id}/studentSubmissions` | `classroom.coursework.students.readonly` |
+
+  Do not widen this list silently. Add a scope only with an endpoint→scope
+  table like the one above.
+- Changing the scope list triggers a Chrome consent re-prompt on the next
+  token request. Re-test the consent flow live after shipping (HITL).
 - No CSP change is required: `connect-src` already allows
   `https://*.googleapis.com`.
 - Firefox: `identity` + oauth2 is Chrome-specific; the Firefox adapter path
@@ -143,11 +171,14 @@ only (D12 precedent): never creates, lowers, or rewrites a finding.
 - **Explicit consent:** the assist runs only when the user selects API
   (beta) — an explicit Engine Mode choice persisted as `cqdV2Mode: 'v3'`.
   It is never a default and never implied by another mode.
-- **No background token acquisition:** tokens are requested non-interactively
-  (`chrome.identity.getAuthToken({ interactive: false })`) and ONLY while v3
-  is active AND the current view is a student-work view
+- **No proactive token acquisition:** token requests stay non-interactive
+  (`getAuthToken({ interactive: false })`) and ONLY fire while v3 is active
+  AND the current view is a student-work view
   (`STUDENT_WORK_TEACHER` / `STUDENT_SUBMISSIONS`). Any other view, any other
-  mode: zero identity calls.
+  mode: zero identity calls. Since csaa.7 the call itself runs in the
+  background (content scripts have no `chrome.identity`); the content script
+  relays through `CQD_API_TOKEN`, and the background handler answers only a
+  sender whose own frame URL is a `classroom.google.com` page.
 - **Scope of data:** the single studentSubmissions read for the route the
   user is already looking at. No comment text, no edited-history facts, and
   no page text ever leave the page; the API snapshot contains submission ids,

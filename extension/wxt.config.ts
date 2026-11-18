@@ -53,7 +53,15 @@ export default defineConfig({
     ],
     oauth2: {
       client_id: "1002516920728-9lsgcjbbk2rvheeibaktfoigm0t02goi.apps.googleusercontent.com",
-      scopes: ["https://www.googleapis.com/auth/classroom.readonly"],
+      // csaa.7: fine-grained least-privilege scopes. Exactly the three the v3
+      // API client needs (classroom-api-client.ts): courseWork.list,
+      // courseWorkMaterials.list, and studentSubmissions.list. A scope change
+      // triggers a Chrome consent re-prompt on update.
+      scopes: [
+        "https://www.googleapis.com/auth/classroom.coursework.me.readonly",
+        "https://www.googleapis.com/auth/classroom.coursework.students.readonly",
+        "https://www.googleapis.com/auth/classroom.courseworkmaterials.readonly",
+      ],
     },
     host_permissions: [
       'https://drive.google.com/*',
