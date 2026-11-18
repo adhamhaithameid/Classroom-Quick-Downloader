@@ -11,7 +11,7 @@ import {
   buildDiagnostics,
   type DiagnosticsReport,
 } from '../../src/diagnostics/build';
-import { loadSettings } from '../../src/ui/settings/store';
+import { BOOLEAN_SETTINGS_KEYS, loadSettings } from '../../src/ui/settings/store';
 
 type QueueSnapshot = { rows: Array<{ queued: boolean }>; paused: boolean };
 type HistoryRow = { status: string; errorCode?: string };
@@ -59,7 +59,9 @@ export function DiagnosticsApp() {
       userAgent: navigator.userAgent,
       locale,
       engineMode: (settings as { engineMode?: string }).engineMode ?? 'legacy',
-      flags: settings,
+      flags: Object.fromEntries(
+        BOOLEAN_SETTINGS_KEYS.map((k) => [k, settings[k] === true]),
+      ),
       queue: {
         active: rows.filter((r) => !r.queued).length,
         queued: rows.filter((r) => r.queued).length,

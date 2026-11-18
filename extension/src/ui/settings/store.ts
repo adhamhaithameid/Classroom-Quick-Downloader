@@ -18,7 +18,7 @@
  * live (the popup's existing behavior, now shared).
  */
 
-export type SettingsKey =
+export type BooleanSettingsKey =
   | 'extensionEnabled'
   | 'downloadAllEnabled'
   | 'commentsFlagEnabled'
@@ -35,9 +35,18 @@ export type SettingsKey =
   | 'apiBetaConfirmed'
   | 'copyrightReminderAcknowledged';
 
-export type Settings = Record<SettingsKey, boolean>;
+/**
+ * 0h4d.3.1: the user's naming template ('' = off — files keep today's flat
+ * names). String key, still FLAT in storage like every other setting; the
+ * migration back-fills it from the default like the boolean keys.
+ */
+export type StringSettingsKey = 'namingTemplate';
 
-export const SETTINGS_KEYS: readonly SettingsKey[] = [
+export type SettingsKey = BooleanSettingsKey | StringSettingsKey;
+
+export type Settings = Record<BooleanSettingsKey, boolean> & Record<StringSettingsKey, string>;
+
+export const BOOLEAN_SETTINGS_KEYS: readonly BooleanSettingsKey[] = [
   'extensionEnabled',
   'downloadAllEnabled',
   'commentsFlagEnabled',
@@ -46,6 +55,11 @@ export const SETTINGS_KEYS: readonly SettingsKey[] = [
   'reducedMotionPreferred',
   'apiBetaConfirmed',
   'copyrightReminderAcknowledged',
+];
+export const STRING_SETTINGS_KEYS: readonly StringSettingsKey[] = ['namingTemplate'];
+export const SETTINGS_KEYS: readonly SettingsKey[] = [
+  ...BOOLEAN_SETTINGS_KEYS,
+  ...STRING_SETTINGS_KEYS,
 ];
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -61,7 +75,10 @@ export const DEFAULT_SETTINGS: Settings = {
   // dialog show until the user acts (legal round 2, surfaces 03 T2 / 04 T1).
   apiBetaConfirmed: false,
   copyrightReminderAcknowledged: false,
-};
+  // Template OFF by default: files keep today's flat names until the user
+  // picks one (Pro-gated in the options UI).
+  namingTemplate: '',
+} as Settings;
 
 export const SETTINGS_SCHEMA_VERSION = 2;
 export const SETTINGS_SCHEMA_KEY = 'cqdSettingsSchemaVersion';
@@ -73,7 +90,10 @@ export const SETTINGS_SCHEMA_KEY = 'cqdSettingsSchemaVersion';
  * semantics, and reducedMotionPreferred (default false) cannot coerce a
  * missing value into ON.
  */
-function coerce(key: SettingsKey, value: unknown): boolean {
+function coerce(key: SettingsKey, value: unknown): boolean | string {
+  if (key === 'namingTemplate') {
+    return typeof value === 'string' ? value : DEFAULT_SETTINGS.namingTemplate;
+  }
   if (typeof value === 'boolean') return value;
   return DEFAULT_SETTINGS[key];
 }
@@ -90,9 +110,17 @@ export interface MigrationResult {
  * to the versioned shape.
  */
 export function migrateRawSettings(raw: Record<string, unknown>): MigrationResult {
-  const missing = SETTINGS_KEYS.filter((k) => typeof raw[k] !== 'boolean');
+  const missing = SETTINGS_KEYS.filter(
+    (k) =>
+      typeof raw[k] !== (k === 'namingTemplate' ? 'string' : 'boolean'),
+  );
   const settings = {} as Settings;
-  for (const k of SETTINGS_KEYS) settings[k] = coerce(k, raw[k]);
+  for (const k of BOOLEAN_SETTINGS_KEYS) {
+    settings[k] = coerce(k, raw[k]) as boolean;
+  }
+  for (const k of STRING_SETTINGS_KEYS) {
+    settings[k] = coerce(k, raw[k]) as string;
+  }
   if (missing.length > 0 || raw[SETTINGS_SCHEMA_KEY] !== SETTINGS_SCHEMA_VERSION) {
     const writes: Record<string, unknown> = {};
     for (const k of missing) writes[k] = settings[k];
@@ -140,7 +168,7 @@ export async function loadSettings(): Promise<Settings> {
 }
 
 /** Write one flat key (the popup's optimistic toggle path). */
-export async function saveSetting(key: SettingsKey, value: boolean): Promise<void> {
+export async function saveSetting(key: SettingsKey, value: boolean | string): Promise<void> {
   const s = storage();
   if (!s) return;
   await new Promise<void>((resolve) => {

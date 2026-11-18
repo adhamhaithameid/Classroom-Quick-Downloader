@@ -38,6 +38,7 @@ import { createUpdateDotController, ensureUpdateCheckAlarm } from './update-dot'
 import { createIconUpdaters, isClassroomUrl, setActionIcon, GRAY_ICON_PATHS } from './icon-manager';
 import { extractDriveFileId } from './auth-utils';
 import { composeSuggestedFilename, getFilenameExt, buildUrlWithAuthUser } from './url-helpers';
+import { applyNamingTemplate, getNamingTemplateSync, startNameTemplateWatcher } from './name-template';
 import { cleanup, cleanupOrphanedPendingDownloads } from './cleanup';
 import { ensureAnalyticsAlarm, checkAndCloseFileTab } from './analytics-alarm';
 import { sendStatusToTab } from './message-sender';
@@ -165,6 +166,9 @@ export default defineBackground(() => {
   // Entitlement check (0h4d.2.3): cache-first and offline-tolerant; a
   // locked state never disables a free feature — it only flips isPro().
   void runStartupEntitlementCheck();
+  // Naming templates (0h4d.3.1): keep the settings cache warm so the
+  // onDeterminingFilename listener can suggest synchronously.
+  startNameTemplateWatcher();
   // Report unhandled background errors as runtime_error analytics events
   // (rate-capped, signature-only; see utils/analytics/runtime-errors.ts).
   installRuntimeErrorReporting();
@@ -460,12 +464,25 @@ export default defineBackground(() => {
       // Survey #821: a Classroom title without an extension used to land on
       // disk without one. Compose with the wire-known extension or the
       // response MIME before suggesting.
+      // 0h4d.3.1: the flat base name stays byte-identical; an active
+      // template only adds the folder shape around it. Template-off users
+      // (the default, and every free user until they pick one) see zero
+      // change.
+      const baseName = composeSuggestedFilename({
+        name: pending.fileMeta?.name,
+        knownExt: pending.finalExtension || pending.fileMeta?.ext,
+        mime: actualMime,
+      });
+      const template = getNamingTemplateSync();
       suggest({
-        filename: composeSuggestedFilename({
-          name: pending.fileMeta?.name,
-          knownExt: pending.finalExtension || pending.fileMeta?.ext,
-          mime: actualMime,
-        }),
+        filename: applyNamingTemplate(
+          {
+            baseName,
+            courseTitle: pending.fileMeta?.courseTitle,
+            kind: pending.fileMeta?.kind,
+          },
+          template,
+        ),
         conflictAction: 'uniquify',
       });
     });
