@@ -61,11 +61,12 @@ subscription events bind `provider_subscription_id` so renewals and key-less
 refunds reach the right row across the two LS identifier namespaces (order id
 vs license-key id).
 
-Known gaps, tracked in bead `wt5f` (deferred by design in the 2.2 review
-loop): activate-rate-limit route test, a guard so subscription events cannot
-resurrect refunded/revoked rows, `license_events.license_id` binding for
-webhook rows, a TTL cache on provider fan-out, and a truly key-less
-subscription-event test.
+The review-loop follow-ups (bead `wt5f`, PR #925) are merged: subscription
+events can no longer resurrect refunded/revoked rows, webhook audit rows
+bind the matched license id, the provider refresh is TTL-cached (5 minutes,
+per-isolate, successful answers only, dropped on revoke/refund), and the
+activate rate-limit trip plus the truly key-less subscription event are
+route-tested.
 
 ## 3. Secret governance [SHIPPED surface; PLANNED operations]
 
