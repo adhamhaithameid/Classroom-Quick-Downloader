@@ -285,6 +285,34 @@ describe("public license routes", () => {
     expect(activated.status).toBe(200);
   });
 
+  it("wt5f: trips the DO rate limiter after the activate allowance", async () => {
+    const fakeDb = makeLicenseFakeD1();
+    registerLicenseProviderForTests("fake", createFakeLicenseProvider().provider);
+    await seedLicense(fakeDb.db as LicensingD1);
+    const env = makeEnv(fakeDb.db as LicensingD1);
+
+    let lastStatus = 0;
+    for (let i = 0; i < 5; i += 1) {
+      const res = await worker.fetch(
+        post("/license/activate", { licenseKey: TEST_LICENSE_KEY, installId: `${TEST_INSTALL_ID}-rl-${i}` }),
+        env,
+        {} as ExecutionContext,
+      );
+      lastStatus = res.status;
+      expect(res.status).toBe(200);
+    }
+    expect(lastStatus).toBe(200);
+
+    const blocked = await worker.fetch(
+      post("/license/activate", { licenseKey: TEST_LICENSE_KEY, installId: `${TEST_INSTALL_ID}-rl-over` }),
+      env,
+      {} as ExecutionContext,
+    );
+    expect(blocked.status).toBe(429);
+    const body = (await blocked.json()) as { error: string };
+    expect(body.error).toBe("rate_limited");
+  });
+
   it("never emits the raw license key in responses or logs", async () => {
     const fakeDb = makeLicenseFakeD1();
     const fakeProvider = createFakeLicenseProvider();
