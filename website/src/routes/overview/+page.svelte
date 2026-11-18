@@ -10,7 +10,6 @@
   import SeoMeta from '#lib/components/SeoMeta.svelte';
   import { AGGREGATE_RATING } from '#lib/seo/aggregate-rating.ts';
   import { detectBrowserFromNavigator, type BrowserKey } from '#lib/browser/detect.ts';
-  import { resolvePath } from '#lib/navigation/resolvePath.ts';
   import { refreshWebsiteSnapshotStore, websiteSnapshotStore } from '#lib/stores/websiteSnapshot.ts';
   import type { MapResponse, OverviewResponse } from '#lib/types/public.ts';
   import { trackWebsiteEvent } from '#lib/analytics/websiteEvents.ts';
