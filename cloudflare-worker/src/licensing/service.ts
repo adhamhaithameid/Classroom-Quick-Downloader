@@ -15,6 +15,7 @@ import {
   type LicenseProvider,
   type ProviderLicenseStatus,
   type ProviderWebhookEvent,
+  type ProviderValidateResult,
 } from "./provider";
 
 // ---------------------------------------------------------------------------
@@ -534,6 +535,59 @@ export interface ValidateInput {
  * `remoteStatus` carries the provider's last reported status so callers can
  * fail closed on states the local row cannot represent (e.g. "inactive").
  */
+/**
+ * Per-isolate TTL cache over the known-row provider refresh (wt5f.4: the
+ * 10/min/IP limiter bounds per-client fan-out, not global fan-out across
+ * clients). Only successful answers cache; network failures retry on the
+ * next request. Revocation safety: webhook-driven revocations mutate the D1
+ * row immediately, and the refresh branch only runs for rows still active —
+ * so a cached answer can only delay (by <= TTL) a provider-side change that
+ * never arrived as a webhook. Entries are dropped on any revoke/refund
+ * mutation and when the map grows past its bound.
+ */
+const PROVIDER_CACHE_TTL_MS = 5 * 60 * 1000;
+const PROVIDER_CACHE_MAX_ENTRIES = 500;
+const providerRefreshCache = new Map<
+  string,
+  { until: number; remote: ProviderValidateResult }
+>();
+
+function cachedProviderRefresh(
+  providerName: string,
+  keyHash: string,
+  now: number,
+): ProviderValidateResult | null {
+  const hit = providerRefreshCache.get(`${providerName}:${keyHash}`);
+  if (!hit) return null;
+  if (hit.until <= now) {
+    providerRefreshCache.delete(`${providerName}:${keyHash}`);
+    return null;
+  }
+  return hit.remote;
+}
+
+function storeProviderRefresh(
+  providerName: string,
+  keyHash: string,
+  remote: ProviderValidateResult,
+  now: number,
+): void {
+  if (providerRefreshCache.size >= PROVIDER_CACHE_MAX_ENTRIES) {
+    providerRefreshCache.clear();
+  }
+  providerRefreshCache.set(`${providerName}:${keyHash}`, {
+    until: now + PROVIDER_CACHE_TTL_MS,
+    remote,
+  });
+}
+
+function dropProviderCacheForStatusChange(): void {
+  // A webhook just flipped a row to revoked/refunded: the cached "active"
+  // answers for OTHER keys are still per-key, so dropping everything is
+  // unnecessary — but revocations are rare and correctness beats cleverness.
+  providerRefreshCache.clear();
+}
+
 async function resolveLicense(
   db: LicensingD1,
   provider: LicenseProvider | null,
@@ -565,7 +619,9 @@ async function resolveLicense(
   if (record && record.status === "active" && provider) {
     // Known row: best-effort authoritative refresh. Unreachable provider
     // keeps local state (grace math still applies from expiresAt).
-    const remote = await provider.validate(licenseKey);
+    const cached = cachedProviderRefresh(provider.name, keyHash, now);
+    const remote = cached ?? (await provider.validate(licenseKey));
+    if (!cached && remote.ok) storeProviderRefresh(provider.name, keyHash, remote, now);
     if (remote.ok) {
       if (remote.expiresAt !== undefined && remote.expiresAt !== record.expires_at) {
         await updateLicenseExpiry(db, record.id, remote.expiresAt ?? null);
@@ -811,6 +867,7 @@ export async function revokeLicense(
 
   await updateLicenseStatus(db, record.id, "revoked", now);
   await auditEvent(db, "revoke", record.id, now);
+  dropProviderCacheForStatusChange();
   return {
     ok: true,
     code: "license_revoked",
@@ -891,14 +948,14 @@ export async function processLicenseWebhook(
   }
 
   try {
-    const code = await applyWebhookEvent(db, provider, event, now);
+    const { code, licenseId } = await applyWebhookEvent(db, provider, event, now);
     // Dedupe write happens AFTER successful processing: a delivery that
     // throws must not poison the provider's retry with a duplicate verdict
     // (that would lose the event permanently). Processing itself is
     // idempotent (ON CONFLICT DO NOTHING inserts, idempotent updates), so
     // a rare re-run after a dedupe-write failure is safe.
     await recordLicenseEvent(db, {
-      licenseId: null,
+      licenseId,
       type: `webhook:${event.eventName}`,
       payloadDigest: digest,
       now,
@@ -919,7 +976,7 @@ async function applyWebhookEvent(
   provider: LicenseProvider,
   event: ProviderWebhookEvent,
   now: number,
-): Promise<string> {
+): Promise<{ code: string; licenseId: string | null }> {
   const keyHash = event.licenseKey ? await hashLicenseKey(event.licenseKey) : null;
 
   if (event.eventName === "order_created" || event.eventName === "order_processed") {
@@ -939,7 +996,7 @@ async function applyWebhookEvent(
         });
       }
     }
-    return "webhook_handled";
+    return { code: "webhook_handled", licenseId: null };
   }
 
   // State-transition events target an existing license by key hash first,
@@ -960,7 +1017,7 @@ async function applyWebhookEvent(
   if (!record) {
     // Unknown license: the event is acknowledged so the provider stops
     // retrying; issuance self-binds later via first validate.
-    return "webhook_unmatched";
+    return { code: "webhook_unmatched", licenseId: null };
   }
 
   // Bind the subscription namespace whenever this event names one, so
@@ -974,7 +1031,15 @@ async function applyWebhookEvent(
 
   if (event.eventName === "order_refunded") {
     await updateLicenseStatus(db, record.id, "refunded", now);
-    return "webhook_handled";
+    dropProviderCacheForStatusChange();
+    return { code: "webhook_handled", licenseId: record.id };
+  }
+  // Resurrect guard (wt5f.2): refunded/revoked are terminal statuses set by
+  // a refund webhook or an admin revoke. A later subscription renewal event
+  // must not silently reactivate them — a fresh PURCHASE issues a new key
+  // and a deliberate un-revoke goes through admin re-issue.
+  if (record.status === "refunded" || record.status === "revoked") {
+    return { code: "webhook_handled", licenseId: record.id };
   }
   if (event.eventName === "subscription_created" || event.eventName === "subscription_updated") {
     if (event.expiresAt !== undefined) {
@@ -983,20 +1048,20 @@ async function applyWebhookEvent(
     if (record.status !== "active") {
       await updateLicenseStatus(db, record.id, "active", now);
     }
-    return "webhook_handled";
+    return { code: "webhook_handled", licenseId: record.id };
   }
   if (event.eventName === "subscription_resumed") {
     await updateLicenseStatus(db, record.id, "active", now);
-    return "webhook_handled";
+    return { code: "webhook_handled", licenseId: record.id };
   }
   if (event.eventName === "subscription_expired" || event.eventName === "subscription_cancelled") {
     // No stored "expired" status: keep the row active and let the grace
     // math invalidate it from expiresAt (webhook may carry ends_at).
     await updateLicenseExpiry(db, record.id, event.expiresAt ?? now);
-    return "webhook_handled";
+    return { code: "webhook_handled", licenseId: record.id };
   }
 
-  return "webhook_ignored";
+  return { code: "webhook_ignored", licenseId: record.id };
 }
 
 function trimError(prefix: string, error: unknown): string {

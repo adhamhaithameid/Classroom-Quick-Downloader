@@ -743,4 +743,129 @@ describe("review fix round 1", () => {
     expect(overCap).toMatchObject({ ok: false, code: "activation_limit_reached" });
     expect(fakeDb.activations).toHaveLength(MAX_ACTIVATIONS_PER_LICENSE);
   });
+  // wt5f.2: refunded/revoked are terminal — subscription events must not
+  // resurrect them.
+  it("wt5f: subscription events never resurrect a refunded or revoked row", async () => {
+    const { fakeDb, fakeProvider } = freshHarness();
+    const db = fakeDb.db as LicensingD1;
+    const env = makeEnv();
+    const headers = webhookHeaders();
+
+    await processLicenseWebhook(
+      env, db, fakeProvider.provider,
+      fakeWebhookBody({ eventId: "order-rf", orderId: "order-rf" }),
+      headers,
+    );
+    await processLicenseWebhook(
+      env, db, fakeProvider.provider,
+      fakeWebhookBody({
+        eventName: "order_refunded", eventId: "order-rf",
+        resourceKind: "order", providerResourceId: "order-rf",
+        licenseKey: undefined,
+      }),
+      headers,
+    );
+    expect(fakeDb.licenses[0].status).toBe("refunded");
+
+    const resurrect = await processLicenseWebhook(
+      env, db, fakeProvider.provider,
+      fakeWebhookBody({
+        eventName: "subscription_resumed", eventId: "sub-rf",
+        resourceKind: "subscription", providerResourceId: "sub-rf",
+      }),
+      headers,
+    );
+    expect(resurrect).toMatchObject({ ok: true, code: "webhook_handled" });
+    expect(fakeDb.licenses[0].status).toBe("refunded");
+
+    // Admin revoke: same terminal rule.
+    await processLicenseWebhook(
+      env, db, fakeProvider.provider,
+      fakeWebhookBody({ eventId: "order-rv", orderId: "order-rv2" }),
+      headers,
+    );
+    const issued = await issueLicense(env, db, {
+      licenseKey: TEST_LICENSE_KEY, plan: TEST_LICENSE_PLAN,
+    });
+    expect(issued.ok).toBe(true);
+    const revoked = await revokeLicense(env, db, { licenseRef: issued.record!.id });
+    expect(revoked.ok).toBe(true);
+
+    const resumed = await processLicenseWebhook(
+      env, db, fakeProvider.provider,
+      fakeWebhookBody({
+        eventName: "subscription_created", eventId: "sub-rv",
+        resourceKind: "subscription", providerResourceId: "sub-rv",
+      }),
+      headers,
+    );
+    expect(resumed).toMatchObject({ ok: true, code: "webhook_handled" });
+    expect(fakeDb.licenses.find((l) => l.id === issued.record!.id)?.status).toBe("revoked");
+  });
+
+  // wt5f.5: a subscription event that carries NO license key reaches the row
+  // through the bound subscription id (findLicenseByProviderSubscription).
+  it("wt5f: a key-less subscription event reaches its row via the subscription binding", async () => {
+    const { fakeDb, fakeProvider } = freshHarness();
+    const db = fakeDb.db as LicensingD1;
+    const env = makeEnv();
+    const headers = webhookHeaders();
+
+    fakeProvider.seedLicense(TEST_LICENSE_KEY);
+    const first = await validateLicense(env, db, { licenseKey: TEST_LICENSE_KEY });
+    expect(first.ok).toBe(true);
+
+    // Bind the subscription namespace with a key-carrying event.
+    await processLicenseWebhook(
+      env, db, fakeProvider.provider,
+      fakeWebhookBody({
+        eventName: "subscription_updated", eventId: "sub-bind",
+        resourceKind: "subscription", providerResourceId: "sub-kb",
+      }),
+      headers,
+    );
+    expect(fakeDb.licenses[0].provider_subscription_id).toBe("sub-kb");
+
+    // Key-less renewal: the row is found by subscription id alone.
+    const renewal = Date.now() + 90 * 24 * 60 * 60 * 1000;
+    const reached = await processLicenseWebhook(
+      env, db, fakeProvider.provider,
+      fakeWebhookBody({
+        eventName: "subscription_updated", eventId: "sub-kb-2",
+        resourceKind: "subscription", providerResourceId: "sub-kb",
+        expiresAt: renewal, licenseKey: undefined,
+      }),
+      headers,
+    );
+    expect(reached).toMatchObject({ ok: true, code: "webhook_handled" });
+    expect(fakeDb.licenses[0].expires_at).toBe(renewal);
+  });
+
+  // wt5f.4: the known-row provider refresh is TTL-cached, so global
+  // validate fan-out cannot hammer the provider.
+  it("wt5f: repeated validates within the TTL hit the provider once", async () => {
+    const { fakeDb, fakeProvider } = freshHarness();
+    const db = fakeDb.db as LicensingD1;
+    const env = makeEnv();
+
+    fakeProvider.seedLicense(TEST_LICENSE_KEY);
+    // Call 1: unknown row -> the provider-bind path (deliberately uncached:
+    // first-use binding must be fresh).
+    await validateLicense(env, db, { licenseKey: TEST_LICENSE_KEY });
+    expect(fakeProvider.validateCalls).toHaveLength(1);
+
+    // Call 2: known row -> refresh populates the cache.
+    await validateLicense(env, db, { licenseKey: TEST_LICENSE_KEY });
+    expect(fakeProvider.validateCalls).toHaveLength(2);
+
+    // Call 3: inside the TTL -> served from the cache.
+    await validateLicense(env, db, { licenseKey: TEST_LICENSE_KEY });
+    expect(fakeProvider.validateCalls).toHaveLength(2);
+
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.now() + 6 * 60 * 1000); // past the 5-minute TTL
+    await validateLicense(env, db, { licenseKey: TEST_LICENSE_KEY });
+    expect(fakeProvider.validateCalls).toHaveLength(3);
+    vi.useRealTimers();
+  });
 });
