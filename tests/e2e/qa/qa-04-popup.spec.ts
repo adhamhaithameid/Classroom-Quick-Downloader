@@ -57,6 +57,7 @@ test.describe("qa-04 popup", () => {
   let extensionBase: string;
 
   test.beforeAll(async ({}, testInfo) => {
+    test.setTimeout(180_000); // cold browser start can exceed the 60s default (bead 3qxp)
     browser = projectBrowser(testInfo.project.name);
     const session = await launchQaContext(
       browser,
@@ -73,6 +74,7 @@ test.describe("qa-04 popup", () => {
           },
         ],
       }),
+      { project: testInfo.project.name },
     );
     context = session.context;
     closeQa = session.close;
@@ -91,7 +93,7 @@ test.describe("qa-04 popup", () => {
   });
 
   test.afterAll(async () => {
-    await closeQa();
+    await closeQa?.();
   });
 
   test("popup renders seeded analytics and toggles write through real storage", async () => {

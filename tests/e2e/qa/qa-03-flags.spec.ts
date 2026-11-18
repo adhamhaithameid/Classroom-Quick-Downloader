@@ -73,6 +73,7 @@ test.describe("qa-03 flags", () => {
   let closeQa: () => Promise<void>;
 
   test.beforeAll(async ({}, testInfo) => {
+    test.setTimeout(180_000); // cold browser start can exceed the 60s default (bead 3qxp)
     browser = projectBrowser(testInfo.project.name);
     const session = await launchQaContext(browser, scenario("en", "ltr", "light"), { project: testInfo.project.name });
     context = session.context;
@@ -89,7 +90,7 @@ test.describe("qa-03 flags", () => {
   });
 
   test.afterAll(async () => {
-    await closeQa();
+    await closeQa?.();
   });
 
   test("badges render with counts, tooltips, one-card ownership, live toggles", async () => {

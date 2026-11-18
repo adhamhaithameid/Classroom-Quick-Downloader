@@ -160,12 +160,13 @@ test.describe("qa-perf fast-pass budget", () => {
   }
 
   test.beforeAll(async ({}, testInfo) => {
+    test.setTimeout(180_000); // cold browser start can exceed the 60s default (bead 3qxp)
     const browser = projectBrowser(testInfo.project.name);
     // Firefox: the probe reads the extension's isolated world over CDP —
     // Chromium-only; the checks classify-skip via check.skip below.
     chromiumOnlyProbes = browser !== "chromium";
     if (chromiumOnlyProbes) return;
-    const session = await launchQaContext(browser, scenario());
+    const session = await launchQaContext(browser, scenario(), { project: testInfo.project.name });
     context = session.context;
     closeQa = session.close;
     // Firefox cannot host the extension in Playwright's build; runCheck
