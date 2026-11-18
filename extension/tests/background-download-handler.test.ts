@@ -77,6 +77,9 @@ async function loadDownloadHandler(options: LoadOptions = {}): Promise<TestConte
   };
   const stateModule = {
     setPendingExpiredHook: vi.fn(),
+    rearmDeadline: vi.fn(),
+    cancelledByUs: new Set<number>(),
+    isRegistered: (requestId: string) => pendingByRequestId.has(requestId),
     pendingByRequestId,
     pendingByDownloadId,
     pendingByUrl,

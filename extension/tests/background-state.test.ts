@@ -336,13 +336,15 @@ describe('D11 pending registry', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────
-// Stall deadline (no-dead-ends): every registered pending gets a hard
-// deadline; the injected hook must fire only for pendings the authoritative
-// registry still tracks.
+// Stall deadline (no-dead-ends / ADR-0010): the deadline is a TRANSFER-STALL
+// deadline. It arms at first bind (bindDownloadId), re-arms on every activity
+// heartbeat (rearmDeadline), and never measures queue wait or total lifetime.
+// The injected hook must fire only for pendings the authoritative registry
+// still tracks.
 // ─────────────────────────────────────────────────────────────────────────
 
 describe('pending expiry deadline hook', () => {
-  it('fires the injected hook when a pending is still registered at its deadline', async () => {
+  it('fires the injected hook when a bound pending stays silent past its deadline', async () => {
     vi.useFakeTimers();
     try {
       const state = await loadStateModuleWithNavigator('Chrome/120');
@@ -350,10 +352,53 @@ describe('pending expiry deadline hook', () => {
       state.setPendingExpiredHook((p) => expired.push(p.requestId));
       const p = makePending({ requestId: 'deadline-hit' });
       state.registerPending(p);
+      state.bindDownloadId(p, 1);
       vi.advanceTimersByTime(state.PENDING_DEADLINE_MS);
       expect(expired).toEqual(['deadline-hit']);
       // The hook decides the outcome; the registry itself is untouched.
       expect(state.isRegistered('deadline-hit')).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not arm the deadline before the first bind — queue wait never expires', async () => {
+    vi.useFakeTimers();
+    try {
+      const state = await loadStateModuleWithNavigator('Chrome/120');
+      const expired: string[] = [];
+      state.setPendingExpiredHook((p) => expired.push(p.requestId));
+      const p = makePending({ requestId: 'deadline-queued' });
+      state.registerPending(p);
+      vi.advanceTimersByTime(state.PENDING_DEADLINE_MS * 4);
+      expect(expired).toEqual([]);
+      // Binding later starts the stall clock from that moment.
+      state.bindDownloadId(p, 1);
+      vi.advanceTimersByTime(state.PENDING_DEADLINE_MS);
+      expect(expired).toEqual(['deadline-queued']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('re-arms on every activity heartbeat, so a progressing transfer never expires', async () => {
+    vi.useFakeTimers();
+    try {
+      const state = await loadStateModuleWithNavigator('Chrome/120');
+      const expired: string[] = [];
+      state.setPendingExpiredHook((p) => expired.push(p.requestId));
+      const p = makePending({ requestId: 'deadline-heartbeat' });
+      state.registerPending(p);
+      state.bindDownloadId(p, 1);
+      // Heartbeat every 100 s: silence never reaches the 150 s threshold.
+      for (let i = 0; i < 5; i++) {
+        vi.advanceTimersByTime(100_000);
+        state.rearmDeadline(p);
+      }
+      expect(expired).toEqual([]);
+      // Stop the heartbeats: the stall settles 150 s after the last one.
+      vi.advanceTimersByTime(state.PENDING_DEADLINE_MS);
+      expect(expired).toEqual(['deadline-heartbeat']);
     } finally {
       vi.useRealTimers();
     }

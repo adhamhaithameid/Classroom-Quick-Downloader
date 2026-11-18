@@ -16,9 +16,13 @@
 import type { PendingDownload } from './types';
 
 // --- STALL DEADLINE (no-dead-ends) -------------------------------------
-// Every registered pending gets a hard deadline: if nothing has settled it
-// by then, the user's button must NOT sit in "trying" until the silent TTL
-// reap. The hook is injected by index.ts (registry stays dependency-free).
+// Every pending gets a TRANSFER-STALL deadline (ADR-0010): the timer arms
+// when the pending first binds to a browser download id and re-arms on every
+// activity heartbeat (any onChanged delta, the filename event). It never
+// measures total lifetime: a healthy long transfer and a queued item must
+// not be cancelled for taking longer than the deadline. Start stalls have
+// their own 15 s timer (download-handler.ts); orphans have the TTL sweep.
+// The hook is injected by index.ts (registry stays dependency-free).
 export const PENDING_DEADLINE_MS = 150_000;
 type PendingExpiredHook = (pending: PendingDownload) => void;
 let pendingExpiredHook: PendingExpiredHook | null = null;
@@ -36,6 +40,15 @@ function scheduleDeadline(pending: PendingDownload): void {
     pendingExpiredHook?.(pending);
   }, PENDING_DEADLINE_MS);
   deadlineTimers.set(pending.requestId, timer);
+}
+
+/**
+ * Arm or re-arm the transfer-stall deadline. Called at first bind and on
+ * every activity heartbeat, so the deadline measures silence, not duration.
+ */
+export function rearmDeadline(pending: PendingDownload): void {
+  clearDeadline(pending.requestId);
+  scheduleDeadline(pending);
 }
 
 function clearDeadline(requestId: string): void {
@@ -95,7 +108,8 @@ function notify(event: 'onRegister' | 'onUnregister' | 'onBind', arg: PendingDow
 export function registerPending(pending: PendingDownload): void {
   pendingByRequestId.set(pending.requestId, pending);
   indexUrl(pending.baseUrl, pending);
-  scheduleDeadline(pending);
+  // ADR-0010: no deadline at register — queue wait and start stalls are not
+  // transfer stalls. The timer arms at first bind (bindDownloadId).
   notify('onRegister', pending);
 }
 
@@ -128,6 +142,9 @@ export function bindDownloadId(pending: PendingDownload, downloadId: number): bo
 
   pending.currentDownloadId = downloadId;
   pendingByDownloadId.set(downloadId, pending);
+  // ADR-0010: the transfer has begun — its stall clock starts now. The next
+  // activity heartbeat re-arms; silence for PENDING_DEADLINE_MS settles it.
+  rearmDeadline(pending);
   notify('onBind', pending);
   return true;
 }
@@ -139,6 +156,10 @@ export function bindDownloadId(pending: PendingDownload, downloadId: number): bo
 export function unbindDownloadId(downloadId: number): void {
   const pending = pendingByDownloadId.get(downloadId);
   pendingByDownloadId.delete(downloadId);
+  // ADR-0010: the transfer this timer watched has ended; a retry backoff or
+  // account sweep must not be killed by the old transfer's stall clock. The
+  // next bind re-arms.
+  if (pending) clearDeadline(pending.requestId);
   // #878 (oso5): a stale currentDownloadId keeps the pending "claimed", so
   // getUnclaimedPendingByUrl skips it during the next attempt's bind race
   // and the filename suggestion misses. Unbind means the pending holds no

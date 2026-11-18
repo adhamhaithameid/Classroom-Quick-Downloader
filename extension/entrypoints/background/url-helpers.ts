@@ -100,14 +100,23 @@ export function extForMime(mime?: string): string | undefined {
  * Compose the filename the download pipeline suggests. Order of trust for
  * the extension: an extension present in the name itself, then the
  * wire-known extension, then the response MIME type. The name keeps the
- * Classroom title when one exists and falls back to a fixed base.
+ * Classroom title when one exists, then the browser's own suggested
+ * filename (D8: history re-downloads have no title — the wire name is the
+ * honest one), and falls back to a fixed base.
  */
 export function composeSuggestedFilename(opts: {
   name?: string;
+  /** Browser-determined filename, used only when no title is known. */
+  fallbackName?: string;
   knownExt?: string;
   mime?: string;
 }): string {
-  const base = opts.name?.trim() ? opts.name.trim() : 'classroom_download';
+  const base =
+    opts.name?.trim()
+      ? opts.name.trim()
+      : opts.fallbackName?.trim()
+        ? opts.fallbackName.trim()
+        : 'classroom_download';
   if (getFilenameExt(base)) return base;
   const ext = opts.knownExt?.toLowerCase() || extForMime(opts.mime);
   return ext ? `${base}.${ext}` : base;
