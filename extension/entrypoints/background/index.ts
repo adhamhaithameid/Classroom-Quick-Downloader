@@ -75,6 +75,7 @@ import {
   CQD_STATS_CLAIM_CELEBRATION,
 } from '../../src/history/download-stats';
 import { reportDownloadCount } from '../utils/analytics/count-reporter';
+import { runStartupEntitlementCheck } from './entitlement';
 import {
   STUDENT_WORK_RESOLVE_PUBLISH_TYPE,
   STUDENT_WORK_RESOLVE_RELAY_TYPE,
@@ -161,6 +162,9 @@ export default defineBackground(() => {
   // a valid record makes it a no-op read.
   setLegacyLifetimeCountProvider(async () => (await loadStats()).success ?? 0);
   void ensureDownloadStatsSeeded().catch(() => undefined);
+  // Entitlement check (0h4d.2.3): cache-first and offline-tolerant; a
+  // locked state never disables a free feature — it only flips isPro().
+  void runStartupEntitlementCheck();
   // Report unhandled background errors as runtime_error analytics events
   // (rate-capped, signature-only; see utils/analytics/runtime-errors.ts).
   installRuntimeErrorReporting();
