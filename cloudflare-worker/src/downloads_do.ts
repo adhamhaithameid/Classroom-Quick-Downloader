@@ -149,6 +149,8 @@ const BACKUP_REDACTED_CORE_KEYS: readonly string[] = [
   "trackRates",
   "websiteEventRates",
   "uninstallRates",
+  "licenseValidateRates",
+  "licenseActivateRates",
   "ipCounts",
 ];
 
@@ -351,6 +353,11 @@ type DurableStateShape = {
   // Public website write endpoints (per-IP, per-minute)
   websiteEventRates: Record<string, { count: number; minute: number }>;
   uninstallRates: Record<string, { count: number; minute: number }>;
+
+  // Licensing endpoints (per-IP, per-minute; checked by the worker via
+  // /license/rate-check before it serves validate/activate)
+  licenseValidateRates: Record<string, { count: number; minute: number }>;
+  licenseActivateRates: Record<string, { count: number; minute: number }>;
 
   // =========================================================================
   // CHANGELOG & CONFIG
@@ -760,6 +767,11 @@ const TRACK_RATE_LIMIT_PER_MIN = 120;
 // stay far above human traffic while bounding scripted abuse.
 const WEBSITE_EVENTS_RATE_LIMIT_PER_MIN = 30;
 const UNINSTALL_RATE_LIMIT_PER_MIN = 3;
+// Licensing endpoints (per IP per minute). Validation is a periodic check;
+// activation is a rare user action. Checked by the worker through
+// /license/rate-check (same shared limiter machinery as the buckets above).
+const LICENSE_VALIDATE_RATE_LIMIT_PER_MIN = 10;
+const LICENSE_ACTIVATE_RATE_LIMIT_PER_MIN = 5;
 const PUBLIC_IP_RATE_PRUNE_AFTER_MIN = 10;
 const PUBLIC_IP_RATE_MAX_KEYS = 5000;
 const REQUEST_HISTORY_DAYS = 400;
@@ -2300,6 +2312,8 @@ export class DownloadsDurable {
       trackRates: {},
       websiteEventRates: {},
       uninstallRates: {},
+      licenseValidateRates: {},
+      licenseActivateRates: {},
 
       // Remote config defaults
       configVersion: CONFIG_VERSION,
@@ -2574,6 +2588,14 @@ export class DownloadsDurable {
         stored.uninstallRates && typeof stored.uninstallRates === "object"
           ? stored.uninstallRates
           : base.uninstallRates,
+      licenseValidateRates:
+        stored.licenseValidateRates && typeof stored.licenseValidateRates === "object"
+          ? stored.licenseValidateRates
+          : base.licenseValidateRates,
+      licenseActivateRates:
+        stored.licenseActivateRates && typeof stored.licenseActivateRates === "object"
+          ? stored.licenseActivateRates
+          : base.licenseActivateRates,
 
       // Remote config - preserve stored values or use defaults
       configVersion: stored.configVersion ?? base.configVersion,
@@ -3268,6 +3290,8 @@ export class DownloadsDurable {
       this.d.trackRates = {};
       this.d.websiteEventRates = {};
       this.d.uninstallRates = {};
+      this.d.licenseValidateRates = {};
+      this.d.licenseActivateRates = {};
       
       // hardRemoteOff is NOT reset automatically here.
     }
@@ -3379,6 +3403,14 @@ export class DownloadsDurable {
 
   private checkUninstallRateLimit(ip: string, nowMs: number): { allowed: boolean; retryAfterSec?: number } {
     return this.checkIpMinuteRateLimit(this.d.uninstallRates, ip, nowMs, UNINSTALL_RATE_LIMIT_PER_MIN);
+  }
+
+  private checkLicenseValidateRateLimit(ip: string, nowMs: number): { allowed: boolean; retryAfterSec?: number } {
+    return this.checkIpMinuteRateLimit(this.d.licenseValidateRates, ip, nowMs, LICENSE_VALIDATE_RATE_LIMIT_PER_MIN);
+  }
+
+  private checkLicenseActivateRateLimit(ip: string, nowMs: number): { allowed: boolean; retryAfterSec?: number } {
+    return this.checkIpMinuteRateLimit(this.d.licenseActivateRates, ip, nowMs, LICENSE_ACTIVATE_RATE_LIMIT_PER_MIN);
   }
 
   /**
@@ -3609,6 +3641,11 @@ export class DownloadsDurable {
     }
     if (pathname === "/auth/session-binding-mismatch" && request.method === "POST") {
       return this.handleSessionBindingMismatch(request);
+    }
+
+    // License rate limiting - used by worker before serving validate/activate
+    if (pathname === "/license/rate-check" && request.method === "POST") {
+      return this.handleLicenseRateCheck(request);
     }
 
     // IP Allowlist check - used by worker before login
@@ -5987,6 +6024,8 @@ export class DownloadsDurable {
       trackRates: {},
       websiteEventRates: {},
       uninstallRates: {},
+      licenseValidateRates: {},
+      licenseActivateRates: {},
       uninstallSubmissions: [],
       uninstallSubmissionsTotal: 0,
       uninstallSeq: 0,
@@ -8268,6 +8307,53 @@ export class DownloadsDurable {
       count: this.d.sessionBindingMismatchCount,
       lastMismatchAt: this.d.sessionBindingLastMismatchAt,
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // License rate limiting (worker -> DO; same shared limiter as public writes)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Rate-limit check for the licensing validate/activate endpoints.
+   * POST /license/rate-check
+   * Body: { kind: "validate" | "activate", ip: string }
+   *
+   * The worker calls this before serving a public license request, so the
+   * DO's shared per-IP per-minute limiter stays the single rate-limiting
+   * mechanism. Admin-authenticated like the other worker->DO endpoints.
+   * Returns: { ok: true, allowed: boolean, retryAfterSec?: number }
+   */
+  private async handleLicenseRateCheck(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+
+    let body: { kind?: string; ip?: string };
+    try {
+      body = await request.json();
+    } catch {
+      return json({ ok: false, error: "invalid_json" }, { status: 400 });
+    }
+
+    const kind = body.kind === "activate" ? "activate" : body.kind === "validate" ? "validate" : null;
+    if (!kind) {
+      return json({ ok: false, error: "invalid_kind" }, { status: 400 });
+    }
+
+    const ip = body.ip || request.headers.get("CF-Connecting-IP") || "unknown";
+    const now = Date.now();
+    const rate = kind === "activate"
+      ? this.checkLicenseActivateRateLimit(ip, now)
+      : this.checkLicenseValidateRateLimit(ip, now);
+
+    if (!rate.allowed) {
+      return json({
+        ok: true,
+        allowed: false,
+        retryAfterSec: rate.retryAfterSec ?? 60,
+      });
+    }
+    return json({ ok: true, allowed: true });
   }
 
   // ---------------------------------------------------------------------------

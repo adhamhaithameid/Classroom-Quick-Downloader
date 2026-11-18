@@ -455,6 +455,28 @@ export interface Env {
    * If configured, access identity email must match one of these entries.
    */
   CLOUDFLARE_ACCESS_EMAIL_ALLOWLIST?: string;
+  /**
+   * Licensing (bead 0h4d.2.2): HMAC-SHA256 signing key for entitlement
+   * payloads. Required for validate/activate; without it those endpoints
+   * fail closed with 503 signing_key_unconfigured.
+   */
+  ENTITLEMENT_SIGNING_KEY?: string;
+  /**
+   * Licensing: provider webhook signing secret (Lemon Squeezy signs the raw
+   * body with HMAC-SHA256, sent as the X-Signature hex digest). Required
+   * for the webhook receiver; without it webhook verification fails closed.
+   */
+  LICENSE_WEBHOOK_SECRET?: string;
+  /**
+   * Licensing: provider selector ("lemonsqueezy"). Unknown names fail
+   * closed; the LicenseProvider interface keeps the vendor swappable.
+   */
+  LICENSE_PROVIDER?: string;
+  /**
+   * Licensing: Lemon Squeezy license API base URL. Defaults to
+   * https://api.lemonsqueezy.com/v1; override only for tests/proxies.
+   */
+  LS_LICENSE_API_BASE?: string;
 }
 
 export interface WebsiteConsoleSummaryResponse {
