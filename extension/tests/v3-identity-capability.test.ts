@@ -16,7 +16,7 @@
  * 'none' means the engine stays on the V2 DOM path with no error shown.
  */
 import { describe, expect, it } from 'vitest';
-import { probeIdentityCapability } from '../src/engines/v3/api/capability';
+import { isPlainChromeUserAgent, probeIdentityCapability } from '../src/engines/v3/api/capability';
 
 const CHROME_UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
@@ -150,5 +150,29 @@ describe('probeIdentityCapability', () => {
         brands: ['Chromium'],
       }),
     ).toEqual({ identity: 'webAuthFlow' });
+  });
+});
+
+// Review round 3, finding 2: Chromium forks that are not Google Chrome but send
+// a plain Chrome UA with their own marker token. Brave has NO UA token, so it
+// cannot be rejected here (ADR-0010: the fallback serves only contexts with no
+// userAgentData at all).
+describe('isPlainChromeUserAgent — other Chromium forks (review round 3, finding 2)', () => {
+  it.each([
+    ['HeadlessChrome/', 'HeadlessChrome/131.0.0.0'],
+    ['SamsungBrowser/', 'SamsungBrowser/26.0'],
+    ['YaBrowser/', 'YaBrowser/24.12.0'],
+    ['Whale/', 'Whale/3.28.0.0'],
+  ])('%s is not plain Chrome', (_name, token) => {
+    const ua = CHROME_UA.replace('Chrome/131.0.0.0', `Chrome/131.0.0.0 ${token}`);
+    expect(isPlainChromeUserAgent(ua)).toBe(false);
+  });
+
+  it('HeadlessChrome without a separate Chrome/ token is not plain Chrome', () => {
+    expect(isPlainChromeUserAgent('Mozilla/5.0 HeadlessChrome/131.0.0.0 Safari/537.36')).toBe(false);
+  });
+
+  it('a plain Chrome UA still passes', () => {
+    expect(isPlainChromeUserAgent(CHROME_UA)).toBe(true);
   });
 });

@@ -27,6 +27,7 @@ function stubChrome(chromeShape: unknown) {
 describe('isApiConfigured (S13 consent gate)', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    setEngineBase('v2');
   });
 
   it('is false when chrome is unavailable (tests, non-extension contexts)', () => {
@@ -118,7 +119,8 @@ describe('isApiConfigured (S13 consent gate)', () => {
     });
   });
 
-  it('is false on a non-Chrome brand that exposes getAuthToken (review #1)', () => {
+  it('is false on a non-Chrome brand that exposes getAuthToken (review #1, flag ON)', () => {
+    setEngineBase('v3');
     for (const brand of ['Microsoft Edge', 'Brave', 'Opera']) {
       vi.stubGlobal('navigator', { userAgentData: { brands: [{ brand: 'Chromium' }, { brand }] } });
       stubChrome({
@@ -153,19 +155,22 @@ describe('isApiConfigured (S13 consent gate)', () => {
       });
     };
 
-    it('stays true on a plain Chrome UA with no userAgentData', () => {
+    it('stays true on a plain Chrome UA with no userAgentData (flag ON)', () => {
+      setEngineBase('v3');
       stubBackground(CHROME_UA);
       expect(isApiConfigured()).toBe(true);
     });
 
-    it('stays false on Edge, Opera and Brave UAs with no userAgentData', () => {
+    it('stays false on Edge, Opera and Brave UAs with no userAgentData (flag ON)', () => {
+      setEngineBase('v3');
       for (const marker of ['Edg/131.0.2903.86', 'OPR/115.0.0.0', 'Brave/1.70']) {
         stubBackground(`${CHROME_UA} ${marker}`);
         expect(isApiConfigured()).toBe(false);
       }
     });
 
-    it('stays false when userAgentData EXISTS but lists no Google Chrome brand', () => {
+    it('stays false when userAgentData EXISTS but lists no Google Chrome brand (flag ON)', () => {
+      setEngineBase('v3');
       stubBackground(CHROME_UA, { brands: [] });
       expect(isApiConfigured()).toBe(false);
       stubBackground(CHROME_UA, { brands: [{ brand: 'Chromium' }] });
@@ -173,7 +178,8 @@ describe('isApiConfigured (S13 consent gate)', () => {
     });
   });
 
-  it('is false on an unbranded host that exposes getAuthToken (no userAgentData)', () => {
+  it('is false on an unbranded host that exposes getAuthToken (no userAgentData, flag ON)', () => {
+    setEngineBase('v3');
     vi.stubGlobal('navigator', {});
     stubChrome({
       identity: { getAuthToken: () => {} },
@@ -185,6 +191,78 @@ describe('isApiConfigured (S13 consent gate)', () => {
       },
     });
     expect(isApiConfigured()).toBe(false);
+  });
+
+  // Review round 3, finding 1: flag OFF ('v2') must answer EXACTLY what
+  // origin/fix/api-engine-token-relay answered. The brand/UA gate is new and
+  // applies only when engineBase is 'v3'. BASE_ORACLE is a verbatim copy of the
+  // base implementation's decision logic.
+  describe('flag OFF parity with the pre-ADR-0010 base (review round 3, finding 1)', () => {
+    const CHROME_UA =
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+    const manifest = {
+      permissions: ['identity'],
+      oauth2: { client_id: 'cqd-extension.apps.googleusercontent.com' },
+    };
+
+    function baseOracle(): boolean {
+      const c = (globalThis as unknown as { chrome: any }).chrome;
+      const m = c.runtime.getManifest();
+      const id = m.oauth2?.client_id;
+      const hasClientId = typeof id === 'string' && id.trim().length > 0;
+      if (typeof c.identity?.getAuthToken === 'function') return hasClientId;
+      if (!(Array.isArray(m.permissions) && m.permissions.includes('identity'))) return false;
+      if (!hasClientId) return false;
+      const uaData = (navigator as any)?.userAgentData;
+      return Array.isArray(uaData?.brands) &&
+        uaData.brands.some((b: any) => b?.brand === 'Google Chrome');
+    }
+
+    const navigators: Array<[string, unknown]> = [
+      ['Chrome brand', { userAgent: CHROME_UA, userAgentData: { brands: [{ brand: 'Chromium' }, { brand: 'Google Chrome' }] } }],
+      ['Edge brand', { userAgent: `${CHROME_UA} Edg/131.0`, userAgentData: { brands: [{ brand: 'Chromium' }, { brand: 'Microsoft Edge' }] } }],
+      ['Brave brand', { userAgent: CHROME_UA, userAgentData: { brands: [{ brand: 'Chromium' }, { brand: 'Brave' }] } }],
+      ['Opera brand', { userAgent: `${CHROME_UA} OPR/115.0`, userAgentData: { brands: [{ brand: 'Chromium' }, { brand: 'Opera' }] } }],
+      ['Chrome UA, no userAgentData', { userAgent: CHROME_UA }],
+      ['Edge UA, no userAgentData', { userAgent: `${CHROME_UA} Edg/131.0` }],
+      ['empty navigator', {}],
+    ];
+    const shapes: Array<[string, () => unknown]> = [
+      ['background (getAuthToken)', () => ({
+        identity: { getAuthToken: () => {} },
+        runtime: { getManifest: () => manifest },
+      })],
+      ['content script (no identity)', () => ({ runtime: { getManifest: () => manifest } })],
+    ];
+
+    afterEach(() => setEngineBase('v2'));
+
+    for (const [shapeName, makeChrome] of shapes) {
+      for (const [navName, nav] of navigators) {
+        it(`${shapeName} / ${navName}: flag OFF equals the base answer`, () => {
+          setEngineBase('v2');
+          stubChrome(makeChrome());
+          vi.stubGlobal('navigator', nav);
+          expect(isApiConfigured()).toBe(baseOracle());
+        });
+      }
+    }
+
+    it('flag OFF: Edge/Brave/Opera backgrounds with getAuthToken stay TRUE (base)', () => {
+      setEngineBase('v2');
+      stubChrome({ identity: { getAuthToken: () => {} }, runtime: { getManifest: () => manifest } });
+      for (const [name, nav] of navigators.slice(0, 4)) {
+        vi.stubGlobal('navigator', nav);
+        expect(isApiConfigured(), name).toBe(true);
+      }
+    });
+
+    it('flag OFF: a Chrome UA without userAgentData in a content script stays FALSE (base)', () => {
+      setEngineBase('v2');
+      stubChrome({ runtime: { getManifest: () => manifest } });
+      vi.stubGlobal('navigator', { userAgent: CHROME_UA });
+      expect(isApiConfigured()).toBe(false);
+    });
   });
 
   it('survives a throwing getManifest (never breaks a caller)', () => {

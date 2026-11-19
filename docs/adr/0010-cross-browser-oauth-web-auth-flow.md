@@ -184,23 +184,40 @@ provider needs to interact with the user, the flow will just fail."
   keeps the explicit-brand rule. Only a context with NO `navigator.userAgentData`
   object (Chrome older than 90, an insecure context) falls back to a plain
   Chrome UA (`isPlainChromeUserAgent`: `Chrome/` and no Edg, OPR, Opera, Brave,
-  Chromium or Firefox marker), so real Google Chrome keeps its pre-ADR answer
-  there. Present-but-empty or present-without-Google-Chrome brands stay false.
+  Chromium, Firefox, HeadlessChrome, SamsungBrowser, YaBrowser or Whale marker),
+  so real Google Chrome keeps its pre-ADR answer there. Brave sends no UA token:
+  without `userAgentData` brands it cannot be told apart from Chrome, so the
+  fallback exists only for contexts with no `userAgentData` object at all (all
+  Chromium forks that ship brands are told apart by the explicit brand rule). Present-but-empty or present-without-Google-Chrome brands stay false.
   MDN: "`WorkerNavigator.userAgentData` ... only available in Web Workers" and
   in secure contexts, so the MV3 background normally has brands; that the
   extension service worker specifically exposes them is UNVERIFIED by an explicit
   Chrome statement.
-- **Behavior change for Brave, Edge, Opera (flag OFF, mode `'v3'`):** the base
-  returned `configured` whenever `chrome.identity.getAuthToken` existed. These
-  brands expose the function but cannot answer it, so `isApiConfigured()` is now
-  false there and the registry (engine-registry.ts `case 'v3'`) falls back to the
-  V2 DOM engine instead of an engine that can never fetch. Google Chrome is
-  unchanged.
-- **Token source behavior (review round 2):** an interactive request (user
-  click) bypasses the silent-retry cooldown and always opens the auth window,
-  also after expiry; a silent flow in flight does not swallow the click (the
-  click runs after it). The auth window is raced against a timeout (30 s
-  silent, 5 min interactive) so an idle window cannot pin the in-flight slot.
+- **Flag OFF is unchanged (review round 3, finding 1):** with `engineBase`
+  `'v2'` (the default) `isApiConfigured()` returns EXACTLY what the base
+  (origin/fix/api-engine-token-relay) returned: true whenever
+  `chrome.identity.getAuthToken` exists and a client id is set; in a content
+  script, identity permission + client id + explicit `'Google Chrome'` brand. A
+  parity test compares flag OFF for Chrome, Edge, Brave, Opera and contexts with
+  no `userAgentData`.
+- **Behavior change for Brave, Edge, Opera (flag ON, `engineBase` `'v3'` only):**
+  these brands expose `getAuthToken` but cannot answer it, so with the flag ON
+  `isApiConfigured()` is false on the getAuthToken path there (unless the web
+  client id path applies) and the registry falls back to the V2 DOM engine
+  instead of an engine that can never fetch. Google Chrome is unchanged.
+- **Token source behavior (review rounds 2 and 3):** an interactive request
+  (user click) bypasses the silent-retry cooldown and always opens the auth
+  window, also after expiry; a silent flow in flight does not swallow the click
+  (the click runs after it). Every failed silent attempt, the first included,
+  starts the cooldown. The auth window is raced against a timeout (10 s silent,
+  5 min interactive; the silent value is short because a queued click waits for
+  the silent flow: worst case 10 s launch + 15 s exchange). `launchWebAuthFlow`
+  has no cancel, so a launch gate stays closed until the underlying launch
+  settles; while it is closed a new flow resolves null (no second window). The
+  token exchange is raced against a timer (a fetch that ignores its abort signal
+  cannot hang the flow; late results are not cached). An error redirect resolves
+  null even without `state`; a state mismatch on a success redirect still
+  rejects. The cached token is keyed by client id.
 - **Rollback:** flip the flag default back to `'v2'` and remove the config
   key — the V2 DOM path is byte-identical to today.
 

@@ -524,10 +524,11 @@ describe('WebAuthFlowTokenSource — review round 2', () => {
 
   it('finding 4: a hung auth window times out and frees the in-flight slot', async () => {
     let calls = 0;
+    let settleHung: (value: string | undefined) => void = () => {};
     const deps = makeDeps({
       launchWebAuthFlow: vi.fn(async (details: { url: string; interactive: boolean }) => {
         calls += 1;
-        if (calls === 1) return new Promise<string>(() => {}); // idle window, never settles
+        if (calls === 1) return new Promise<string | undefined>((resolve) => (settleHung = resolve));
         return redirectEchoingState(details.url, { code: 'c' });
       }),
     });
@@ -536,6 +537,12 @@ describe('WebAuthFlowTokenSource — review round 2', () => {
     await vi.waitFor(() => expect(calls).toBe(1));
     await vi.advanceTimersByTimeAsync(60);
     await expect(first).resolves.toBeNull();
+    // Round 3 (finding 4): the hung window may still be open, so the launch
+    // gate refuses a second window until the old launch settles.
+    await expect(source.getToken(true)).resolves.toBeNull();
+    expect(calls).toBe(1);
+    settleHung(undefined);
+    await vi.advanceTimersByTimeAsync(0);
     await expect(source.getToken(true)).resolves.toBe('at-1'); // not the hung promise
   });
 

@@ -55,6 +55,8 @@ interface DepsOverrides {
   ) => Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>;
   now?: () => number;
   log?: (message: string) => void;
+  launchTimeoutMs?: number;
+  fetchTimeoutMs?: number;
 }
 
 function makeDeps(overrides: DepsOverrides = {}) {
@@ -265,5 +267,155 @@ describe('ChromeRelayTokenSource', () => {
     await expect(source.getToken(false)).resolves.toBe('tok-s');
     expect(provider.getAccessToken).toHaveBeenCalledWith(true);
     expect(provider.getAccessToken).toHaveBeenCalledWith(false);
+  });
+});
+
+// Review round 3 (findings 3-8): cooldown on every silent failure, a launch
+// gate while an old window may be open, an exchange timer that does not trust
+// the signal, error-before-state, clientId-keyed cache, shorter silent launch.
+describe('WebAuthFlowTokenSource — review round 3', () => {
+  const settle = (promise: Promise<unknown>) => {
+    const box = { done: false };
+    void promise.then(
+      () => (box.done = true),
+      () => (box.done = true),
+    );
+    return box;
+  };
+
+  it('finding 3: the FIRST silent attempt failing starts the cooldown', async () => {
+    let now = T0;
+    const deps = makeDeps({ now: () => now, launchWebAuthFlow: vi.fn(async () => '') });
+    const source = new WebAuthFlowTokenSource(deps);
+    await expect(source.getToken(false)).resolves.toBeNull();
+    await expect(source.getToken(false)).resolves.toBeNull();
+    await expect(source.getToken(false)).resolves.toBeNull();
+    expect(deps.launchWebAuthFlow).toHaveBeenCalledTimes(1);
+    now = T0 + 60_001; // cooldown over: exactly one more silent attempt
+    await expect(source.getToken(false)).resolves.toBeNull();
+    expect(deps.launchWebAuthFlow).toHaveBeenCalledTimes(2);
+  });
+
+  it('finding 4: a timed-out launch keeps the gate closed until the old launch settles', async () => {
+    let release: (value: string | undefined) => void = () => {};
+    const launch = vi.fn(
+      () => new Promise<string | undefined>((resolve) => (release = resolve)),
+    );
+    const deps = makeDeps({ launchWebAuthFlow: launch, launchTimeoutMs: 1000 });
+    const source = new WebAuthFlowTokenSource(deps);
+    const first = source.getToken(true);
+    await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(1)); // timer armed after PKCE
+    await vi.advanceTimersByTimeAsync(1000);
+    await expect(first).resolves.toBeNull();
+    // The old window may still be open: no second window.
+    await expect(source.getToken(true)).resolves.toBeNull();
+    expect(launch).toHaveBeenCalledTimes(1);
+    // The old launch settles: the gate opens and a click gets a window again.
+    release(undefined);
+    await vi.advanceTimersByTimeAsync(0);
+    const retry = source.getToken(true);
+    await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(2));
+    await vi.advanceTimersByTimeAsync(1000);
+    await retry;
+    expect(launch).toHaveBeenCalledTimes(2);
+  });
+
+  it('finding 5: an exchange that ignores the abort signal still times out and clears inflight', async () => {
+    const fetchImpl = vi.fn(() => new Promise<never>(() => {})); // ignores signal
+    const deps = makeDeps({ fetchImpl, fetchTimeoutMs: 500 });
+    const source = new WebAuthFlowTokenSource(deps);
+    const first = source.getToken(false);
+    const box = settle(first);
+    await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1)); // timer armed
+    await vi.advanceTimersByTimeAsync(400);
+    expect(box.done).toBe(false);
+    await vi.advanceTimersByTimeAsync(200);
+    await expect(first).resolves.toBeNull();
+    // inflight cleared: an interactive click starts a NEW flow, not the dead one.
+    const second = source.getToken(true);
+    await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(2));
+    await vi.advanceTimersByTimeAsync(600);
+    await expect(second).resolves.toBeNull();
+    expect(deps.launchWebAuthFlow).toHaveBeenCalledTimes(2);
+  });
+
+  it('finding 5: a late exchange result after the timeout is never cached', async () => {
+    let lateResolve: (value: { ok: boolean; status: number; json(): Promise<unknown> }) => void =
+      () => {};
+    let call = 0;
+    const fetchImpl = vi.fn(() => {
+      call += 1;
+      if (call === 1) {
+        return new Promise<{ ok: boolean; status: number; json(): Promise<unknown> }>(
+          (resolve) => (lateResolve = resolve),
+        );
+      }
+      return Promise.resolve({ ok: false, status: 400, json: async () => ({}) });
+    });
+    const source = new WebAuthFlowTokenSource(makeDeps({ fetchImpl, fetchTimeoutMs: 500 }));
+    const first = source.getToken(false);
+    await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1));
+    await vi.advanceTimersByTimeAsync(600);
+    await expect(first).resolves.toBeNull();
+    lateResolve({ ok: true, status: 200, json: async () => ({ access_token: 'late-token' }) });
+    await vi.advanceTimersByTimeAsync(0);
+    await expect(source.getToken(true)).resolves.toBeNull(); // new flow, not the late token
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('finding 6: an error redirect WITHOUT state resolves null (denial), no exchange', async () => {
+    const deps = makeDeps({
+      launchWebAuthFlow: vi.fn(async () => `${REDIRECT_URL}?error=access_denied`),
+    });
+    await expect(new WebAuthFlowTokenSource(deps).getToken(false)).resolves.toBeNull();
+    expect(deps.fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('finding 6: a SUCCESS redirect with a wrong state still rejects', async () => {
+    const deps = makeDeps({
+      launchWebAuthFlow: vi.fn(async () => `${REDIRECT_URL}?code=c&state=wrong`),
+    });
+    await expect(new WebAuthFlowTokenSource(deps).getToken(false)).rejects.toThrow(/state/i);
+  });
+
+  it('finding 7: the cached token is keyed by client id', async () => {
+    let clientId = CLIENT_ID;
+    const deps = makeDeps({ getClientId: () => clientId });
+    const source = new WebAuthFlowTokenSource(deps);
+    await expect(source.getToken(false)).resolves.toBe('at-1');
+    clientId = 'other-web-client.apps.googleusercontent.com';
+    await expect(source.getToken(false)).resolves.toBe('at-2');
+    expect(deps.launchWebAuthFlow).toHaveBeenCalledTimes(2);
+    const body = vi.mocked(deps.fetchImpl).mock.calls[1][1]?.body;
+    expect(body?.get('client_id')).toBe('other-web-client.apps.googleusercontent.com');
+    // switching back does not resurrect the first client's token
+    clientId = CLIENT_ID;
+    await expect(source.getToken(false)).resolves.toBe('at-3');
+  });
+
+  it('finding 8: the default SILENT launch timeout is 10 s, interactive stays 5 min', async () => {
+    const never = () => new Promise<string | undefined>(() => {});
+    const silentLaunch = vi.fn(never);
+    const silentSource = new WebAuthFlowTokenSource(makeDeps({ launchWebAuthFlow: silentLaunch }));
+    const silent = silentSource.getToken(false);
+    await vi.waitFor(() => expect(silentLaunch).toHaveBeenCalledTimes(1));
+    const silentBox = settle(silent);
+    // vi.waitFor may nudge fake time, so keep a margin around the 10 s default.
+    await vi.advanceTimersByTimeAsync(9_000);
+    expect(silentBox.done).toBe(false);
+    await vi.advanceTimersByTimeAsync(1_500);
+    await expect(silent).resolves.toBeNull();
+
+    const interactiveLaunch = vi.fn(never);
+    const interactiveSource = new WebAuthFlowTokenSource(
+      makeDeps({ launchWebAuthFlow: interactiveLaunch }),
+    );
+    const interactive = interactiveSource.getToken(true);
+    await vi.waitFor(() => expect(interactiveLaunch).toHaveBeenCalledTimes(1));
+    const interactiveBox = settle(interactive);
+    await vi.advanceTimersByTimeAsync(290_000);
+    expect(interactiveBox.done).toBe(false);
+    await vi.advanceTimersByTimeAsync(10_500);
+    await expect(interactive).resolves.toBeNull();
   });
 });

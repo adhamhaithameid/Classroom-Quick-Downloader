@@ -20,6 +20,10 @@
  * the registry falls back to the V1+V2 shadow pair and the popup shows the
  * option disabled.
  *
+ * FLAG OFF (engineBase 'v2', the shipped default) returns EXACTLY what the
+ * pre-ADR-0010 base returned (pinned by a parity test). Everything below about
+ * brand gating and the web-auth-flow applies only when engineBase is 'v3'.
+ *
  * ADR-0010 adds ONE branch: on non-Chrome browsers the API assist configures
  * ONLY when the manifest also carries a web client id (`oauth2.web_client_id`
  * — owner prerequisite) AND the engineBase flag is ON AND the identity
@@ -138,7 +142,19 @@ export function isApiConfigured(): boolean {
   const clientId = manifest.oauth2?.client_id;
   const hasClientId = typeof clientId === 'string' && clientId.trim().length > 0;
 
-  // Background path: chrome.identity works here — check it directly, but only
+  // Flag OFF ('v2'): answer EXACTLY what the pre-ADR-0010 base answered. Any
+  // context exposing getAuthToken is configured on the client id alone; the
+  // content-script path needs the identity permission, a client id and an
+  // explicit 'Google Chrome' brand. No UA fallback, no brand gate on getAuthToken.
+  if (getEngineBase() !== 'v3') {
+    if (typeof chrome.identity?.getAuthToken === 'function') return hasClientId;
+    const legacyPermission = Array.isArray(manifest.permissions) &&
+      manifest.permissions.includes('identity');
+    if (!legacyPermission || !hasClientId) return false;
+    return isGoogleChromeBrand(readBrandNames());
+  }
+
+  // Flag ON ('v3'). Background path: chrome.identity works here — check it directly, but only
   // on an explicit Google Chrome brand. Edge/Brave/Opera expose the function
   // yet never answer it, so they fall through to the web gate below.
   const brandNames = readBrandNames();
@@ -165,7 +181,6 @@ export function isApiConfigured(): boolean {
   const webClientId = manifest.oauth2?.web_client_id;
   const hasWebClientId = typeof webClientId === 'string' && webClientId.trim().length > 0;
   if (!hasWebClientId) return false;
-  if (getEngineBase() !== 'v3') return false;
   const identity = chrome.identity as { launchWebAuthFlow?: unknown } | undefined;
   const probe = probeIdentityCapability({
     userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',

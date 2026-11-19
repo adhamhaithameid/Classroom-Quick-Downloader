@@ -173,20 +173,27 @@ describe('token-source.ts killers (round 3, interactivity and in-flight)', () =>
     return { source, calls, clock };
   }
 
-  // mutants 243, 284: hadSession init true / `!this.hadSession` -> false
-  it('a failed FIRST silent flow is not cooldown-gated: the next silent call launches again (mutants 243, 284)', async () => {
-    const { source, calls } = ctl();
+  // mutants 243, 284 (hadSession, removed in review round 3 finding 3): the
+  // cooldown now covers the FIRST silent failure too, so the next silent call
+  // answers null with no launch until the cooldown passes.
+  it('a failed FIRST silent flow IS cooldown-gated: no relaunch until the cooldown passes (finding 3)', async () => {
+    const { source, calls, clock } = ctl();
     const p1 = source.getToken(false);
     await flush();
     expect(calls).toHaveLength(1);
     calls[0].settle(false);
     expect(await p1).toBeNull();
 
-    const p2 = source.getToken(false);
+    expect(await source.getToken(false)).toBeNull();
     await flush();
-    expect(calls).toHaveLength(2); // a cooldown stamp would answer null with no launch
+    expect(calls).toHaveLength(1); // cooldown answered null with no launch
+
+    clock.t = 60_000; // exactly the cooldown: allowed again
+    const p3 = source.getToken(false);
+    await flush();
+    expect(calls).toHaveLength(2);
     calls[1].settle(false);
-    expect(await p2).toBeNull();
+    expect(await p3).toBeNull();
   });
 
   // mutants 270, 271 (silent + silent)
