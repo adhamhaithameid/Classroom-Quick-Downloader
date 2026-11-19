@@ -409,3 +409,101 @@ describe('EngineV2 targeted rescan syncs the Download All count', () => {
     expect(post.querySelectorAll('button.cqd-download-btn')).toHaveLength(1);
   });
 });
+
+// ============================================================================
+// DETAILS-PAGE DEDUPE — flag parity (fifth review, finding 1 and 5)
+// ============================================================================
+
+describe('EngineV2 details-page dedupe: flag parity and stale posts', () => {
+  let engine: EngineV2;
+
+  const Y = 'twinYYYYPad20Chars000000';
+  const X = 'ownXXXXXPad20Chars000000';
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    engine = new EngineV2();
+    engineRegistry.setMode('v2');
+  });
+
+  afterEach(async () => {
+    engine.destroy();
+    engineRegistry.setMode('shadow');
+    const { setEngineBase } = await import('../src/engines/engine-base');
+    setEngineBase('v2');
+  });
+
+  async function startDetails(): Promise<void> {
+    const controller = new AbortController();
+    controller.abort();
+    await engine.init('assignment_details' as ViewKind, controller.signal);
+    engine.fullScan();
+  }
+
+  /** A real post whose anchor has data-drive-id X but links to Drive file Y,
+   *  so its canonicalId is drive-X while its download URL names Y. */
+  function seedPostNamingY(): void {
+    const post = document.createElement('article');
+    post.setAttribute('data-stream-item-id', 'post-1');
+    const a = document.createElement('a');
+    a.setAttribute('data-drive-id', X);
+    a.href = `https://drive.google.com/open?id=${Y}`;
+    a.textContent = 'own.pdf';
+    post.appendChild(a);
+    document.body.appendChild(post);
+    const body = document.createElement('a');
+    body.setAttribute('data-drive-id', Y);
+    body.href = `https://drive.google.com/file/d/${Y}/view`;
+    body.textContent = 'twin.pdf';
+    document.body.appendChild(body);
+  }
+
+  it('flag OFF: a body anchor sharing only a Drive id with a post is still synthesized (base behavior)', async () => {
+    seedPostNamingY();
+    await startDetails();
+    const ids = engine.getTrackedPosts().map((p) => p.id);
+    expect(ids.some((id) => id.startsWith('details:'))).toBe(true);
+  });
+
+  it('flag ON: the same scenario treats the twin as covered', async () => {
+    const { setEngineBase } = await import('../src/engines/engine-base');
+    setEngineBase('v3');
+    seedPostNamingY();
+    await startDetails();
+    const ids = engine.getTrackedPosts().map((p) => p.id);
+    expect(ids.some((id) => id.startsWith('details:'))).toBe(false);
+  });
+
+  it('flag ON: a stale post removed from the page does not hide its body button', async () => {
+    const { setEngineBase } = await import('../src/engines/engine-base');
+    setEngineBase('v3');
+    const post = document.createElement('article');
+    post.setAttribute('data-stream-item-id', 'post-gone');
+    const a = document.createElement('a');
+    a.setAttribute('data-drive-id', Y);
+    a.href = `https://drive.google.com/file/d/${Y}/view`;
+    a.textContent = 'twin.pdf';
+    post.appendChild(a);
+    document.body.appendChild(post);
+    await startDetails();
+    expect(engine.getTrackedPosts().map((p) => p.id)).toEqual(['post-gone']);
+
+    post.remove();
+    const body = document.createElement('a');
+    body.setAttribute('data-drive-id', Y);
+    body.href = `https://drive.google.com/file/d/${Y}/view`;
+    body.textContent = 'twin.pdf';
+    document.body.appendChild(body);
+    engine.fullScan();
+
+    const details = engine.getTrackedPosts().find((p) => p.id.startsWith('details:'));
+    expect(details?.files.map((f) => f.canonicalId)).toEqual([`drive-${Y}`]);
+  });
+
+  it('init without destroy clears the download-all API file map', async () => {
+    const ctl = await import('../src/v2/render/download-all-controller');
+    const spy = vi.spyOn(ctl, 'resetDownloadAllController');
+    await startDetails();
+    expect(spy).toHaveBeenCalled();
+  });
+});

@@ -63,6 +63,18 @@ function extensionFromTitle(title: string): string {
   return match ? match[1].toLowerCase() : '';
 }
 
+/** The URL without its authuser query param (unparsable input unchanged). */
+function withoutAuthUser(rawUrl: string): string {
+  try {
+    const parsed = new URL(rawUrl);
+    if (!parsed.searchParams.has('authuser')) return rawUrl;
+    parsed.searchParams.delete('authuser');
+    return parsed.toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
 /**
  * Reconcile the snapshot's mapped submission attachments against a post's
  * tracked files.
@@ -94,8 +106,10 @@ export function reconcileApiFiles(
   const tracked = new Set(post.files.flatMap((file) => driveFileKeys(file)));
   // Multi-account index: passed through like the DOM path (getPageAuthUser →
   // resolveDownloadUrl), so a URL-safe non-numeric value (an account email)
-  // keeps its account. A malformed one (trips the validator's '..'/'%25' rule)
-  // is retried below without authuser instead of dropping the file.
+  // keeps its account. The API URL already embeds the raw authuser, so it is
+  // stripped from the incoming URL first (see withoutAuthUser) and re-applied
+  // through the same helper; a malformed value (trips the validator's
+  // '..'/'%25' rule) is retried without authuser instead of dropping the file.
   const authUser = snapshot.context.authUser;
   const fresh: FileNode[] = [];
 
@@ -105,7 +119,10 @@ export function reconcileApiFiles(
     if (attachment.source !== 'driveFile') continue;
     // Security gate: the API URL reaches download:requested like a DOM URL,
     // so it must pass the same validator (https + Google hosts); drop failures.
-    if (!validateDownloadUrl(attachment.downloadUrl).valid) continue;
+    // Checked on the authuser-free URL: the authuser is the snapshot's
+    // account index, re-applied (and re-validated) below.
+    const apiUrl = withoutAuthUser(attachment.downloadUrl);
+    if (!validateDownloadUrl(apiUrl).valid) continue;
     // Idempotent union: compare on the canonical form (drive-<id>) only. The
     // API side ALWAYS prefixes (an API id that already starts with 'drive-'
     // is a different file than the DOM's drive-<id>); only the DOM-side ids
@@ -115,9 +132,9 @@ export function reconcileApiFiles(
     // Same conversion the DOM path applies (engine-v2 extractFileNode →
     // resolveDownloadUrl), so native Docs/Sheets/Slides ids take the same
     // byte-serving endpoint as their DOM anchors. The API gives no mimeType.
-    let downloadUrl = toDownloadUrlFrom(attachment.downloadUrl, authUser);
+    let downloadUrl = toDownloadUrlFrom(apiUrl, authUser);
     if (!validateDownloadUrl(downloadUrl).valid && authUser) {
-      downloadUrl = toDownloadUrlFrom(attachment.downloadUrl, null);
+      downloadUrl = toDownloadUrlFrom(apiUrl, null);
     }
     if (!validateDownloadUrl(downloadUrl).valid) continue;
     tracked.add(canonicalId);
@@ -129,7 +146,7 @@ export function reconcileApiFiles(
       // Untitled fallback is pinned by union-3 #1.)
       name: sanitizeFileName(attachment.title) || 'Untitled',
       // DOM scan reads the name, or the href when the name is empty.
-      ext: extensionFromTitle(attachment.title || attachment.downloadUrl),
+      ext: extensionFromTitle(attachment.title || apiUrl),
       downloadUrl,
       element: post.element,
       idSource: 'api-snapshot',

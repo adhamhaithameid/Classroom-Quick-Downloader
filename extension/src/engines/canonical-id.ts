@@ -34,13 +34,14 @@ const FILE_ID_RE = /^\/file\/d\/([^/]+)/;
 /**
  * The Drive id of a URL, only for the shapes core/acquire/download-url.ts
  * (toDownloadUrlFrom) converts as Drive files:
- *   drive.google.com            /file/d/<id>, /open?id=, /uc?id=
+ *   drive.google.com            /file/d/<id>, /open?id=, /uc?id=,
+ *                               /auth_warmup?continue=<url of these shapes>
  *   drive.usercontent.google.com /download?id=   (its own output endpoint)
  *   docs.google.com             /<kind>/d/<id>
  *   classroom.google.com        /drive?id|resourceId|fileId=
  * Any other URL (even on google.com) returns null.
  */
-function googleDriveIdFromUrl(rawUrl: string): string | null {
+function googleDriveIdFromUrl(rawUrl: string, depth = 0): string | null {
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
@@ -51,6 +52,13 @@ function googleDriveIdFromUrl(rawUrl: string): string | null {
   const query = (key: string): string | null => parsed.searchParams.get(key) || null;
   switch (parsed.hostname) {
     case 'drive.google.com':
+      // auth_warmup?continue=<url> is followed by toDownloadUrlFrom; mirror it
+      // one level deep (a non-Drive continue yields no key), else its id=.
+      if (path.startsWith('/auth_warmup')) {
+        const cont = query('continue');
+        if (cont) return depth < 1 ? googleDriveIdFromUrl(cont, depth + 1) : null;
+        return query('id');
+      }
       return FILE_ID_RE.exec(path)?.[1] ?? (path === '/open' || path === '/uc' ? query('id') : null);
     case 'drive.usercontent.google.com':
       return path === '/download' ? query('id') : null;

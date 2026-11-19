@@ -83,6 +83,7 @@ import { getRecipe } from '../../v2/decision/placement-recipes';
 import { resolveDownloadUrl } from '../../v2/decision/download-url';
 import { sanitizeFileName } from '../../core/name/sanitize';
 import { driveFileKeys } from '../canonical-id';
+import { getEngineBase } from '../engine-base';
 import { injectV2Styles, removeV2Styles } from '../../v2/render/button-styles';
 import { renderFlagBadge, removeAllV2Badges } from '../../v2/render/flag-renderer';
 import { removeFlagStyles } from '../../v2/render/flag-styles';
@@ -224,6 +225,8 @@ export class EngineV2 implements CQDEngine {
     // Clear previous state
     this.postMap.clear();
     this.postsWithApiFiles.clear();
+    // Module-level API file map: init may run without a prior destroy.
+    resetDownloadAllController();
     this.flagDecisions.clear();
     this.placementDecisions = [];
     this.decisionTraces.clear();
@@ -636,12 +639,26 @@ export class EngineV2 implements CQDEngine {
       this.currentView === 'material_details' ||
       this.currentView === 'announcement_detail'
     ) {
+      // Flag OFF (engineBase 'v2'): exactly the base-branch compare on the raw
+      // canonicalId. Flag ON ('v3'): Drive-id keys (so a url-/dataid- DOM file
+      // matches its API twin), and posts that step 3 will delete are not
+      // counted as covering anything (a stale post must not hide a body button).
+      const v3Keys = getEngineBase() === 'v3';
+      const keysOf = (f: FileNode): string[] =>
+        v3Keys ? driveFileKeys(f) : [f.canonicalId];
       const covered = new Set<string>();
       for (const p of this.postMap.values()) {
-        for (const f of p.files) for (const k of driveFileKeys(f)) covered.add(k);
+        if (
+          v3Keys &&
+          !p.id.startsWith('details:') &&
+          (!seenPostIds.has(p.id) || !p.element.isConnected)
+        ) {
+          continue;
+        }
+        for (const f of p.files) for (const k of keysOf(f)) covered.add(k);
       }
       const bodyFiles = this.discoverFiles(document.body);
-      const uncovered = bodyFiles.filter((f) => !driveFileKeys(f).some((k) => covered.has(k)));
+      const uncovered = bodyFiles.filter((f) => !keysOf(f).some((k) => covered.has(k)));
       if (uncovered.length > 0) {
         // The synthetic post OWNS the details page ("the post is the entire
         // page content"). Drop the empty leftover SPA posts: their per-post

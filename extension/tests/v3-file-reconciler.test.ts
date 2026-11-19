@@ -26,6 +26,7 @@ import {
 } from '../src/engines/v3/file-reconciler';
 import { driveFileKeys } from '../src/engines/canonical-id';
 import { sanitizeFileName } from '../src/core/name/sanitize';
+import { buildDriveDownloadUrl } from '../src/student_work/url-classifier';
 import { ViewKind } from '../src/engines/types';
 import type { FileNode, PostNode } from '../src/engines/types';
 import type { ClassroomApiSnapshot } from '../src/engines/v3/api/types';
@@ -478,5 +479,79 @@ describe('review-fixes-union-4 (reconciler + canonical keys)', () => {
     const files = reconcileApiFiles(snapshot, makePost(), NOW);
     // Title present but extensionless → '' exactly like the DOM path (name wins over href).
     expect(files.map((f) => f.ext)).toEqual(['pdf', '']);
+  });
+});
+
+
+describe('review-fixes-union-5 (reconciler)', () => {
+  const snapWith = (authUser: string, title: string): ClassroomApiSnapshot => {
+    const snap = makeSnapshot({
+      submissions: [
+        {
+          id: 'SUB_1',
+          state: 'TURNED_IN',
+          attachments: [
+            {
+              id: 'FILE_1',
+              title,
+              // Exactly what classroom-api-client builds: authuser is embedded.
+              downloadUrl: buildDriveDownloadUrl('FILE_1', authUser),
+              source: 'driveFile',
+            },
+          ],
+        },
+      ],
+    });
+    snap.context.authUser = authUser;
+    return snap;
+  };
+
+  it('#2 an API URL that embeds a malformed authuser is kept, without authuser', () => {
+    const files = reconcileApiFiles(snapWith('../x%25', 'report.pdf'), makePost(), NOW);
+    expect(files).toHaveLength(1);
+    expect(files[0].downloadUrl).toBe(
+      'https://drive.usercontent.google.com/download?id=FILE_1&export=download&confirm=t',
+    );
+  });
+
+  it('#2 an API URL that embeds a valid authuser keeps it exactly once', () => {
+    const files = reconcileApiFiles(snapWith('2', 'report.pdf'), makePost(), NOW);
+    expect(files[0].downloadUrl).toBe(
+      'https://drive.usercontent.google.com/download?id=FILE_1&export=download&confirm=t&authuser=2',
+    );
+  });
+
+  it('#3 an empty title never takes its extension from the authuser query', () => {
+    const files = reconcileApiFiles(snapWith('u@x.com', ''), makePost(), NOW);
+    expect(files).toHaveLength(1);
+    expect(files[0].ext).toBe('');
+  });
+});
+
+describe('review-fixes-union-5 (canonical keys)', () => {
+  const keysOf = (downloadUrl: string): string[] => driveFileKeys({ canonicalId: 'url-z', downloadUrl });
+
+  it('#4 auth_warmup continue naming a Drive file yields its key', () => {
+    const cont = encodeURIComponent('https://drive.google.com/file/d/WARM/view');
+    expect(keysOf(`https://drive.google.com/auth_warmup?continue=${cont}`)).toEqual([
+      'drive-url-z',
+      'drive-WARM',
+    ]);
+  });
+
+  it('#4 auth_warmup continue to a non-Drive page yields no key', () => {
+    const cont = encodeURIComponent('https://sites.google.com/view/x?id=WARM');
+    expect(keysOf(`https://drive.google.com/auth_warmup?continue=${cont}`)).toEqual(['drive-url-z']);
+  });
+
+  it('#4 nested auth_warmup chains stop after one level', () => {
+    const inner = encodeURIComponent('https://drive.google.com/file/d/DEEP/view');
+    const mid = encodeURIComponent(`https://drive.google.com/auth_warmup?continue=${inner}`);
+    expect(keysOf(`https://drive.google.com/auth_warmup?continue=${mid}`)).toEqual(['drive-url-z']);
+  });
+
+  it('#4 auth_warmup on a non-Drive host is not followed', () => {
+    const cont = encodeURIComponent('https://drive.google.com/file/d/WARM/view');
+    expect(keysOf(`https://docs.google.com/auth_warmup?continue=${cont}`)).toEqual(['drive-url-z']);
   });
 });
