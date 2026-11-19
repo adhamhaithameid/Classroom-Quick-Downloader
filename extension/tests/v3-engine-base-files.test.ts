@@ -57,6 +57,10 @@ const API_ATTACHMENT = {
   source: 'driveFile' as const,
 };
 
+/** API_ATTACHMENT's url after the reconciler's DOM-parity conversion. */
+const API_DIRECT_URL =
+  'https://drive.usercontent.google.com/download?id=APIFILEccccPad20Chars0000&export=download&confirm=t';
+
 /** Submission list the mock client answers with (the discovery service wraps
  *  it into a snapshot with fetchedAt = Date.now()). */
 function makeSubmissions(): ClassroomApiSnapshot_Submissions {
@@ -215,7 +219,8 @@ describe('EngineV3 v3-base file wiring (flag engineBase)', () => {
     expect(apiFile).toBeDefined();
     expect(apiFile!.canonicalId).toBe('drive-APIFILEccccPad20Chars0000');
     expect(apiFile!.name).toBe('hidden.pdf');
-    expect(apiFile!.downloadUrl).toBe(API_ATTACHMENT.downloadUrl);
+    // Converted to the DOM path's byte-serving endpoint (union-3 #3).
+    expect(apiFile!.downloadUrl).toBe(API_DIRECT_URL);
     expect(apiFile!.element).toBe(post!.element);
 
     // Count contract: the download-all button's group count + label surfaces
@@ -507,7 +512,7 @@ describe('EngineV3 phase 2: download-all over the API union', () => {
     expect(requests).toHaveLength(3);
     const api = requests.find((r) => r.fileId === 'drive-APIFILEccccPad20Chars0000');
     expect(api).toBeDefined();
-    expect(api!.url).toBe(API_ATTACHMENT.downloadUrl);
+    expect(api!.url).toBe(API_DIRECT_URL);
   });
 
   it('(correction) flag ON: the inject-button correction keeps the union and the count', async () => {
@@ -646,6 +651,27 @@ describe('EngineV3 v3-base review fixes: union retention and canonical ids', () 
 
     const files = engine.getTrackedPosts()[0].files;
     expect(files.filter((f) => f.canonicalId === `drive-${SHARED_ID}`)).toHaveLength(1);
+    expect(files).toHaveLength(3);
+    expect(groupButtonOf('post-1')!.getAttribute('data-cqd-group-count')).toBe('3');
+  });
+
+  it('(2 open?id=) a DOM anchor with no /d/<id> and no data-drive-id is still deduped against the API file (union-3 #2)', async () => {
+    const setup = await loadEngineWithApiMocks({ enableFlag: true, client: sharedClient() });
+    seedStudentWorkPage(['post-1']);
+    const anchor = document.createElement('a');
+    anchor.href = `https://drive.google.com/open?id=${SHARED_ID}`;
+    anchor.textContent = 'shared.pdf';
+    document.querySelector('[data-stream-item-id="post-1"]')!.appendChild(anchor);
+
+    engine = new setup.EngineV3();
+    await engine.init(ViewKind.STUDENT_WORK_TEACHER, new AbortController().signal);
+    await flushAsync();
+
+    const files = engine.getTrackedPosts()[0].files;
+    // The DOM file keeps its url- canonical (flag-OFF output unchanged) and the
+    // API twin is NOT added: one Drive file, one entry.
+    expect(files.some((f) => f.canonicalId.startsWith('url-'))).toBe(true);
+    expect(files.some((f) => f.canonicalId === `drive-${SHARED_ID}`)).toBe(false);
     expect(files).toHaveLength(3);
     expect(groupButtonOf('post-1')!.getAttribute('data-cqd-group-count')).toBe('3');
   });

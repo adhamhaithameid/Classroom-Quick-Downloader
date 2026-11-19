@@ -46,8 +46,9 @@
 
 import type { ClassroomApiSnapshot } from './api/types';
 import type { FileNode, PostNode } from '../types';
-import { toCanonicalDriveId } from '../canonical-id';
+import { driveFileKeys, toCanonicalDriveId } from '../canonical-id';
 import { sanitizeFileName } from '../../core/name/sanitize';
+import { toDownloadUrlFrom } from '../../core/acquire/download-url';
 import { validateDownloadUrl } from '../../v2/decision/download-validator';
 
 /** A snapshot older than this is stale — mirrors api-detector.ts:93. */
@@ -88,7 +89,12 @@ export function reconcileApiFiles(
   );
   if (!submission) return [];
 
-  const tracked = new Set(post.files.map((file) => toCanonicalDriveId(file.canonicalId)));
+  // Keys include the Drive id named by each file's download URL, so a DOM
+  // file canonicalized as url-…/dataid- still matches the same Drive file.
+  const tracked = new Set(post.files.flatMap((file) => driveFileKeys(file)));
+  // Multi-account index: digits only (it is a query value from the page URL;
+  // a malformed one would trip the validator's '..'/'%25' rule and drop the file).
+  const authUser = /^\d+$/.test(snapshot.context.authUser ?? '') ? snapshot.context.authUser : null;
   const fresh: FileNode[] = [];
 
   for (const attachment of submission.attachments) {
@@ -104,13 +110,19 @@ export function reconcileApiFiles(
     // above go through the idempotent toCanonicalDriveId.
     const canonicalId = `drive-${attachment.id}`;
     if (tracked.has(canonicalId)) continue;
+    // Same conversion the DOM path applies (engine-v2 extractFileNode →
+    // resolveDownloadUrl), so native Docs/Sheets/Slides ids take the same
+    // byte-serving endpoint as their DOM anchors. The API gives no mimeType.
+    const downloadUrl = toDownloadUrlFrom(attachment.downloadUrl, authUser);
+    if (!validateDownloadUrl(downloadUrl).valid) continue;
     tracked.add(canonicalId);
 
     fresh.push({
       canonicalId,
-      name: sanitizeFileName(attachment.title),
+      // '...' or '/' sanitize to '' — fall back like the DOM path (engine-v2).
+      name: sanitizeFileName(attachment.title) || 'Untitled',
       ext: extensionFromTitle(attachment.title),
-      downloadUrl: attachment.downloadUrl,
+      downloadUrl,
       element: post.element,
       idSource: 'api-snapshot',
     });

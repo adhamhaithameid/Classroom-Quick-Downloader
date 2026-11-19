@@ -82,7 +82,7 @@ import { resetDownloadAllController, isGroupRunBusy, setGroupApiFiles } from '..
 import { getRecipe } from '../../v2/decision/placement-recipes';
 import { resolveDownloadUrl } from '../../v2/decision/download-url';
 import { sanitizeFileName } from '../../core/name/sanitize';
-import { toCanonicalDriveId } from '../canonical-id';
+import { driveFileKeys } from '../canonical-id';
 import { injectV2Styles, removeV2Styles } from '../../v2/render/button-styles';
 import { renderFlagBadge, removeAllV2Badges } from '../../v2/render/flag-renderer';
 import { removeFlagStyles } from '../../v2/render/flag-styles';
@@ -855,10 +855,10 @@ export class EngineV2 implements CQDEngine {
     // canonicalId: DOM wins, no double count). Flag OFF: kept is always [].
     const kept = splitApiFiles(post.files).apiFiles;
     const rediscovered = this.discoverFiles(postEl);
-    const known = new Set(rediscovered.map((f) => toCanonicalDriveId(f.canonicalId)));
+    const known = new Set(rediscovered.flatMap((f) => driveFileKeys(f)));
     post.files = [
       ...rediscovered,
-      ...kept.filter((f) => !known.has(toCanonicalDriveId(f.canonicalId))),
+      ...kept.filter((f) => !driveFileKeys(f).some((k) => known.has(k))),
     ];
 
     // DETECT FLAGS for this post
@@ -1190,10 +1190,10 @@ export class EngineV2 implements CQDEngine {
           // silently wipe them (label and run both shrink).
           const kept = splitApiFiles(post.files).apiFiles;
           const rediscovered = this.discoverFiles(post.element);
-          const known = new Set(rediscovered.map((f) => toCanonicalDriveId(f.canonicalId)));
+          const known = new Set(rediscovered.flatMap((f) => driveFileKeys(f)));
           post.files = [
             ...rediscovered,
-            ...kept.filter((f) => !known.has(toCanonicalDriveId(f.canonicalId))),
+            ...kept.filter((f) => !driveFileKeys(f).some((k) => known.has(k))),
           ];
           return true;
         }
@@ -1496,12 +1496,12 @@ export class EngineV2 implements CQDEngine {
     const post = this.postMap.get(postId);
     if (!post) return 0;
 
-    const known = new Set(post.files.map((f) => toCanonicalDriveId(f.canonicalId)));
+    const known = new Set(post.files.flatMap((f) => driveFileKeys(f)));
     const added: FileNode[] = [];
     for (const file of files) {
-      const key = toCanonicalDriveId(file.canonicalId);
-      if (known.has(key)) continue;
-      known.add(key);
+      const keys = driveFileKeys(file);
+      if (keys.some((k) => known.has(k))) continue;
+      for (const k of keys) known.add(k);
       added.push(file);
     }
     if (added.length === 0) return 0;

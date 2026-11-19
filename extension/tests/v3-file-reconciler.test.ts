@@ -120,7 +120,10 @@ describe('reconcileApiFiles (v3-base)', () => {
     expect(file.canonicalId).toBe('drive-FILE_1');
     expect(file.name).toBe('report.pdf');
     expect(file.ext).toBe('pdf');
-    expect(file.downloadUrl).toBe('https://drive.google.com/uc?export=download&id=FILE_1');
+    // Converted to the DOM path's byte-serving endpoint (union-3 #3).
+    expect(file.downloadUrl).toBe(
+      'https://drive.usercontent.google.com/download?id=FILE_1&export=download&confirm=t',
+    );
     expect(file.idSource).toBe('api-snapshot');
     // Synthetic file: rides the post's download-all flow, anchored to the post.
     expect(file.element).toBe(post.element);
@@ -332,5 +335,66 @@ describe('reconcileApiFiles (v3-base)', () => {
     ]);
     const files = reconcileApiFiles(snapshot, post, NOW);
     expect(files.map((f) => f.canonicalId)).toEqual(['drive-drive-X1234567890']);
+  });
+  // ---- review-fixes-union-3 (findings 1, 2, 3, 5) ----
+
+  it('falls back to Untitled when the title sanitizes to empty, like the DOM path (union-3 #1)', () => {
+    const snapshot = snapshotWith([
+      { id: 'DOTS_1', title: '...', downloadUrl: 'https://drive.google.com/uc?export=download&id=DOTS_1' },
+      { id: 'SLASH_1', title: '/', downloadUrl: 'https://drive.google.com/uc?export=download&id=SLASH_1' },
+    ]);
+    const files = reconcileApiFiles(snapshot, makePost(), NOW);
+    expect(files.map((f) => f.name)).toEqual(['Untitled', 'Untitled']);
+  });
+
+  it('dedupes against a DOM file whose canonical is url-/dataid- but whose download URL carries the Drive id (union-3 #2)', () => {
+    const usercontent = 'https://drive.usercontent.google.com/download?id=FILE_1&export=download&confirm=t';
+    const urlShaped: FileNode = {
+      canonicalId: 'url-https://drive.google.com/open?id=FILE_1',
+      name: 'report.pdf',
+      ext: 'pdf',
+      downloadUrl: usercontent,
+      element: document.createElement('a'),
+      idSource: 'url-hash',
+    };
+    const dataidShaped: FileNode = { ...urlShaped, canonicalId: 'dataid-9-3', idSource: 'data-id-combo' };
+    expect(reconcileApiFiles(makeSnapshot(), makePost([urlShaped]), NOW)).toEqual([]);
+    expect(reconcileApiFiles(makeSnapshot(), makePost([dataidShaped]), NOW)).toEqual([]);
+  });
+
+  it('a non-Google DOM url with the same id= query does NOT suppress the API file (union-3 #2)', () => {
+    const foreign: FileNode = {
+      canonicalId: 'url-https://example.com/x?id=FILE_1',
+      name: 'x',
+      ext: '',
+      downloadUrl: 'https://example.com/x?id=FILE_1',
+      element: document.createElement('a'),
+      idSource: 'url-hash',
+    };
+    expect(reconcileApiFiles(makeSnapshot(), makePost([foreign]), NOW)).toHaveLength(1);
+  });
+
+  it('converts the API url to the same byte-serving endpoint the DOM path uses (union-3 #3)', () => {
+    const [file] = reconcileApiFiles(makeSnapshot(), makePost(), NOW);
+    expect(file.downloadUrl).toBe(
+      'https://drive.usercontent.google.com/download?id=FILE_1&export=download&confirm=t',
+    );
+  });
+
+  it('carries a numeric authuser into the converted url, drops a non-numeric one (union-3 #3, #5)', () => {
+    const withAuth = (authUser: string | null) => {
+      const snap = makeSnapshot();
+      snap.context.authUser = authUser;
+      return reconcileApiFiles(snap, makePost(), NOW);
+    };
+    expect(withAuth('1')[0].downloadUrl).toBe(
+      'https://drive.usercontent.google.com/download?id=FILE_1&export=download&confirm=t&authuser=1',
+    );
+    // '..' or '%25' in the query authuser must not make the validator drop the file.
+    const bad = withAuth('../x%25');
+    expect(bad).toHaveLength(1);
+    expect(bad[0].downloadUrl).toBe(
+      'https://drive.usercontent.google.com/download?id=FILE_1&export=download&confirm=t',
+    );
   });
 });
