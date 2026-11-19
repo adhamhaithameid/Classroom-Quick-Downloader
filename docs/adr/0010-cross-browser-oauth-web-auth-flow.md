@@ -163,6 +163,21 @@ provider needs to interact with the user, the flow will just fail."
   flipped; QA companion installs first; real login HITL pass.
 - **Step 4 (stores):** submit AMO + Edge + Opera updates. Chrome can adopt
   the same source later for a single code path; not required.
+- **Gate (review fix #4):** `isApiConfigured()` returns false on non-Chrome
+  until `NON_CHROME_TOKEN_SOURCE_WIRED` (v3/api/config.ts) is flipped to
+  `true`. Flip it in the PR that wires `WebAuthFlowTokenSource` into
+  engine-v3 and the background relay; its pinning test flips with it.
+- **Checklist (review fix #9):** every JS context (background, content
+  scripts, popup, options) must read the same persisted `engineBase` value
+  from chrome.storage before the flag is enabled. `engine-base.ts` is
+  per-context module state today and nothing sets it.
+- **Google Chrome brand rule (review fixes #1-#3):** `getAuthToken` is chosen
+  only on an explicit `'Google Chrome'` entry in `navigator.userAgentData`
+  brands, through one shared function (`isGoogleChromeBrand`, capability.ts).
+  Tradeoff: a real Chrome without `userAgentData` (Chrome older than 90, or
+  an insecure context) is classed webAuthFlow, not getAuthToken. That is the
+  safe direction: it never calls a function Brave, Edge or a fork cannot
+  answer. Edge tokens match `Edg[A-Za-z]*/` (desktop, EdgA, EdgiOS).
 - **Rollback:** flip the flag default back to `'v2'` and remove the config
   key — the V2 DOM path is byte-identical to today.
 

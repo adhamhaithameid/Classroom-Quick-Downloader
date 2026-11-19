@@ -56,6 +56,8 @@ function stubUnconfiguredChrome(): void {
 
 /** Chrome stub WITH identity + oauth2 client_id → isApiConfigured() true. */
 function stubConfiguredChrome(): void {
+  // getAuthToken counts only on an explicit Google Chrome brand (ADR-0010).
+  vi.stubGlobal('navigator', { userAgentData: { brands: [{ brand: 'Google Chrome' }] } });
   vi.stubGlobal('chrome', {
     identity: { getAuthToken: () => {} },
     runtime: {

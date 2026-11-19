@@ -20,6 +20,15 @@
  * docs/audit/2026-11-18-v3-base-design.md, Rollout). setEngineBase() exists
  * as a test seam and the future wiring point, not as a user setting.
  *
+ * WARNING — per-context state: `engineBase` below is plain module state, so
+ * the background worker, every content script, the popup and the options page
+ * each hold their OWN copy, and nothing sets it yet. Before the flag is ever
+ * enabled, every context must read the SAME persisted value (chrome.storage)
+ * at startup; otherwise the registry, mode gate and isApiConfigured() would
+ * disagree across contexts. Tracked as a rollout checklist line in
+ * docs/adr/0010-cross-browser-oauth-web-auth-flow.md. Deliberately NOT wired
+ * here.
+ *
  * This module imports nothing from the v3 stack — like v3/api/config.ts,
  * both the engine registry and the content-script mode gate can depend on
  * it without dragging the v3 stack (or any browser API) into their bundles.

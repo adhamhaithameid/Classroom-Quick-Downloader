@@ -297,3 +297,120 @@ describe('WebAuthFlowTokenSource — mutation hardening (chat 7)', () => {
     expect(deps.launchWebAuthFlow).toHaveBeenCalledTimes(1);
   });
 });
+
+// Fresh-eyes review fixes (2026-11-19): dedupe, backoff, redirect check, timeout.
+describe('WebAuthFlowTokenSource — review fixes', () => {
+  it('concurrent getToken(true) calls share ONE auth window (review #5)', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const deps = makeDeps({
+      launchWebAuthFlow: vi.fn(async (details: { url: string; interactive: boolean }) => {
+        await gate;
+        return redirectEchoingState(details.url, { code: 'auth-code-1' });
+      }),
+    });
+    const source = new WebAuthFlowTokenSource(deps);
+    const a = source.getToken(true);
+    const b = source.getToken(true);
+    release();
+    await expect(Promise.all([a, b])).resolves.toEqual(['at-1', 'at-1']);
+    expect(deps.launchWebAuthFlow).toHaveBeenCalledTimes(1);
+    expect(deps.fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('a failed flow clears the in-flight slot so a later call can retry (review #5)', async () => {
+    let calls = 0;
+    const deps = makeDeps({
+      launchWebAuthFlow: vi.fn(async (details: { url: string; interactive: boolean }) => {
+        calls += 1;
+        return calls === 1 ? '' : redirectEchoingState(details.url, { code: 'auth-code-1' });
+      }),
+    });
+    const source = new WebAuthFlowTokenSource(deps);
+    await expect(source.getToken(true)).resolves.toBeNull();
+    await expect(source.getToken(true)).resolves.toBe('at-1');
+  });
+
+  it('after expiry a failed silent re-auth is NOT retried inside the cooldown (review #6)', async () => {
+    let now = T0;
+    let calls = 0;
+    const deps = makeDeps({
+      now: () => now,
+      launchWebAuthFlow: vi.fn(async (details: { url: string; interactive: boolean }) => {
+        calls += 1;
+        return calls === 1 ? redirectEchoingState(details.url, { code: 'c' }) : '';
+      }),
+    });
+    const source = new WebAuthFlowTokenSource(deps);
+    await expect(source.getToken(false)).resolves.toBe('at-1');
+    now = T0 + 3600_000 + 1;
+    await expect(source.getToken(true)).resolves.toBeNull(); // silent attempt #1
+    await expect(source.getToken(true)).resolves.toBeNull(); // cooldown: no flow
+    await expect(source.getToken(false)).resolves.toBeNull(); // cooldown: no flow
+    expect(deps.launchWebAuthFlow).toHaveBeenCalledTimes(2); // first login + ONE silent
+    now += 60_001; // cooldown over -> one more silent attempt is allowed
+    await expect(source.getToken(true)).resolves.toBeNull();
+    expect(deps.launchWebAuthFlow).toHaveBeenCalledTimes(3);
+  });
+
+  it('rejects a redirect that is not the expected redirect URI (review #7)', async () => {
+    const deps = makeDeps({
+      launchWebAuthFlow: vi.fn(async (details: { url: string; interactive: boolean }) => {
+        const state = new URL(details.url).searchParams.get('state') ?? '';
+        return `https://evil.example/?state=${state}&code=stolen`;
+      }),
+    });
+    const source = new WebAuthFlowTokenSource(deps);
+    await expect(source.getToken(true)).resolves.toBeNull();
+    expect(deps.fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('a malformed redirect resolves null instead of throwing (review #7)', async () => {
+    const deps = makeDeps({ launchWebAuthFlow: vi.fn(async () => 'http://[bad') });
+    const source = new WebAuthFlowTokenSource(deps);
+    await expect(source.getToken(true)).resolves.toBeNull();
+    expect(deps.fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('a state mismatch on the expected redirect still rejects (review #7)', async () => {
+    const deps = makeDeps({
+      launchWebAuthFlow: vi.fn(async () => `${REDIRECT_URL}?state=forged&code=c`),
+    });
+    const source = new WebAuthFlowTokenSource(deps);
+    await expect(source.getToken(true)).rejects.toThrow(/state mismatch/);
+  });
+
+  it('aborts a hung token exchange after the timeout and resolves null (review #8)', async () => {
+    let sawSignal: AbortSignal | undefined;
+    const deps = makeDeps({
+      fetchImpl: ((_url: string, init?: { signal?: AbortSignal }) => {
+        sawSignal = init?.signal;
+        return new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+        });
+      }) as never,
+    });
+    const source = new WebAuthFlowTokenSource({ ...deps, fetchTimeoutMs: 20 });
+    const pending = source.getToken(true);
+    await vi.waitFor(() => expect(sawSignal).toBeDefined()); // PKCE hashing is real async
+    await vi.advanceTimersByTimeAsync(25); // global fake timers (tests/setup.ts)
+    await expect(pending).resolves.toBeNull();
+    expect(sawSignal?.aborted).toBe(true);
+  });
+
+  it('a fast exchange is not aborted and the timer does not leak (review #8)', async () => {
+    let sawSignal: AbortSignal | undefined;
+    const deps = makeDeps({
+      fetchImpl: (async (_url: string, init?: { signal?: AbortSignal }) => {
+        sawSignal = init?.signal;
+        return { ok: true, status: 200, json: async () => ({ access_token: 'fast', expires_in: 3600 }) };
+      }) as never,
+    });
+    const source = new WebAuthFlowTokenSource({ ...deps, fetchTimeoutMs: 20 });
+    await expect(source.getToken(true)).resolves.toBe('fast');
+    await vi.advanceTimersByTimeAsync(40);
+    expect(sawSignal?.aborted).toBe(false);
+  });
+});

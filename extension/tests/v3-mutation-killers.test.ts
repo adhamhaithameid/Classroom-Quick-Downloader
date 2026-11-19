@@ -5,9 +5,9 @@
  * Targets: capability.ts, config.ts, token-source.ts, file-reconciler.ts.
  */
 import { webcrypto } from 'node:crypto';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { probeIdentityCapability } from '../src/engines/v3/api/capability';
-import { isApiConfigured } from '../src/engines/v3/api/config';
+import { isApiConfigured, setNonChromeTokenSourceWired } from '../src/engines/v3/api/config';
 import { setEngineBase } from '../src/engines/engine-base';
 import { WebAuthFlowTokenSource } from '../src/engines/v3/api/token-source';
 import {
@@ -63,9 +63,14 @@ describe('config.ts killers (isApiConfigured)', () => {
     ...extra,
   });
 
+  beforeEach(() => {
+    setNonChromeTokenSourceWired(true); // web-path mutants need the gate open
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
     setEngineBase('v2');
+    setNonChromeTokenSourceWired(false);
   });
 
   it('a throwing userAgentData getter reads as not Chrome (mutant 102)', () => {

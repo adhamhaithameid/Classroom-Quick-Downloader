@@ -590,6 +590,8 @@ describe('Orchestrator classroom sync path (route-context wiring)', () => {
         }),
       },
     });
+    // getAuthToken counts only on an explicit Google Chrome brand (ADR-0010).
+    vi.stubGlobal('navigator', { userAgentData: { brands: [{ brand: 'Google Chrome' }] } });
     registryState.primary = {
       name: 'engine-v2',
       version: '0.0.0-test',

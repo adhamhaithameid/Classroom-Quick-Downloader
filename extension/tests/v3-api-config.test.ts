@@ -12,8 +12,12 @@
  * The helper reads only the chrome globals — no browser-specific imports — so
  * the unit tests stub `chrome` wholesale.
  */
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { isApiConfigured } from '../src/engines/v3/api/config';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  NON_CHROME_TOKEN_SOURCE_WIRED,
+  isApiConfigured,
+  setNonChromeTokenSourceWired,
+} from '../src/engines/v3/api/config';
 import { setEngineBase } from '../src/engines/engine-base';
 
 function stubChrome(chromeShape: unknown) {
@@ -65,6 +69,7 @@ describe('isApiConfigured (S13 consent gate)', () => {
   });
 
   it('is true only when identity exists AND oauth2.client_id is configured', () => {
+    vi.stubGlobal('navigator', { userAgentData: { brands: [{ brand: 'Google Chrome' }] } });
     stubChrome({
       identity: { getAuthToken: () => {} },
       runtime: {
@@ -113,6 +118,36 @@ describe('isApiConfigured (S13 consent gate)', () => {
     });
   });
 
+  it('is false on a non-Chrome brand that exposes getAuthToken (review #1)', () => {
+    for (const brand of ['Microsoft Edge', 'Brave', 'Opera']) {
+      vi.stubGlobal('navigator', { userAgentData: { brands: [{ brand: 'Chromium' }, { brand }] } });
+      stubChrome({
+        identity: { getAuthToken: () => {} },
+        runtime: {
+          getManifest: () => ({
+            permissions: ['identity'],
+            oauth2: { client_id: 'cqd-extension.apps.googleusercontent.com' },
+          }),
+        },
+      });
+      expect(isApiConfigured()).toBe(false);
+    }
+  });
+
+  it('is false on an unbranded host that exposes getAuthToken (no userAgentData)', () => {
+    vi.stubGlobal('navigator', {});
+    stubChrome({
+      identity: { getAuthToken: () => {} },
+      runtime: {
+        getManifest: () => ({
+          permissions: ['identity'],
+          oauth2: { client_id: 'cqd-extension.apps.googleusercontent.com' },
+        }),
+      },
+    });
+    expect(isApiConfigured()).toBe(false);
+  });
+
   it('survives a throwing getManifest (never breaks a caller)', () => {
     stubChrome({
       identity: { getAuthToken: () => {} },
@@ -151,8 +186,23 @@ describe('isApiConfigured (S13 consent gate)', () => {
       vi.stubGlobal('navigator', { userAgent, userAgentData: undefined });
     };
 
+    beforeEach(() => {
+      setNonChromeTokenSourceWired(true); // the rollout PR flips the default
+    });
+
     afterEach(() => {
       setEngineBase('v2'); // never leak the flag into other tests
+      setNonChromeTokenSourceWired(false);
+    });
+
+    it('ships with NO non-Chrome token source wired: configured stays false (review #4)', () => {
+      expect(NON_CHROME_TOKEN_SOURCE_WIRED).toBe(false);
+      setNonChromeTokenSourceWired(false);
+      stubNonChrome(EDGE_UA, webManifest('test-web-client.apps.googleusercontent.com'), {
+        sendMessage: true,
+      });
+      setEngineBase('v3');
+      expect(isApiConfigured()).toBe(false);
     });
 
     const EDGE_UA =

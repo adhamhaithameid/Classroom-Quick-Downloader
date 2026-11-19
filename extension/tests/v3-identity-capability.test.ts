@@ -44,10 +44,32 @@ describe('probeIdentityCapability', () => {
     ).toEqual({ identity: 'getAuthToken' });
   });
 
-  it('reports getAuthToken on a Chrome UA with no brands info (approximation)', () => {
+  it('never reports getAuthToken without an explicit Google Chrome brand (review #3)', () => {
+    // Brave, Chromium and forks ship a Chrome-like UA; only brands can tell.
     expect(probeIdentityCapability({ userAgent: CHROME_UA, apis: bothApis })).toEqual({
-      identity: 'getAuthToken',
+      identity: 'webAuthFlow',
     });
+    expect(
+      probeIdentityCapability({
+        userAgent: CHROME_UA,
+        apis: { getAuthToken: () => {} },
+        relayAvailable: true,
+      }),
+    ).toEqual({ identity: 'webAuthFlow' });
+  });
+
+  it('classifies Edge Android (EdgA/) as webAuthFlow, never getAuthToken (review #2)', () => {
+    const edgeAndroid =
+      'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36 EdgA/131.0.2903.87';
+    expect(
+      probeIdentityCapability({ userAgent: edgeAndroid, apis: bothApis }),
+    ).toEqual({ identity: 'webAuthFlow' });
+    expect(
+      probeIdentityCapability({
+        userAgent: edgeAndroid,
+        apis: { getAuthToken: () => {} },
+      }),
+    ).toEqual({ identity: 'none' });
   });
 
   it('reports webAuthFlow on Edge (getAuthToken unsupported per Microsoft docs)', () => {

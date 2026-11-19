@@ -10,7 +10,8 @@
  * context can relay token requests to the background (chrome.runtime exists)
  * decide the answer:
  *
- *   'getAuthToken' — Google Chrome: getAuthToken answers there (Chrome docs).
+ *   'getAuthToken' — Google Chrome (explicit userAgentData brand only): getAuthToken
+ *                    answers there (Chrome docs).
  *   'webAuthFlow'  — Edge (getAuthToken documented unsupported; MS docs name
  *                    launchWebAuthFlow the alternate), Brave, Opera (Chromium
  *                    brands without Google sign-in; Brave's only marker is in
@@ -56,13 +57,15 @@ function isSafari(ua: string): boolean {
 }
 
 /**
- * Google Chrome brand: userAgentData says so when present; otherwise a
- * Chrome UA without a Chromium token stands in (Edge/Opera/Brave UAs carry
- * their own markers and are classified above this heuristic).
+ * THE one Google Chrome test, shared with v3/api/config.ts. Only an explicit
+ * 'Google Chrome' entry in navigator.userAgentData.brands counts. A Chrome-like
+ * UA proves nothing: Brave, Chromium and forks all send one. Real Chrome 90+
+ * always exposes userAgentData in secure contexts (service worker, https
+ * content script), so the safe default costs nothing there; a host without it
+ * is served by webAuthFlow (ADR-0010, "Google Chrome brand rule").
  */
-function isGoogleChromeBrand(ua: string, brands: readonly string[]): boolean {
-  if (brands.length > 0) return brands.includes('Google Chrome');
-  return /Chrome\//.test(ua) && !/Chromium\//.test(ua);
+export function isGoogleChromeBrand(brands: readonly string[]): boolean {
+  return Array.isArray(brands) && brands.includes('Google Chrome');
 }
 
 export function probeIdentityCapability(input: IdentityCapabilityInput): IdentityCapabilityResult {
@@ -80,15 +83,17 @@ export function probeIdentityCapability(input: IdentityCapabilityInput): Identit
   if (isSafari(ua)) return { identity: 'none' };
 
   // Chromium brands without Google sign-in, plus Firefox: webAuthFlow or
-  // nothing. Edge is pinned by Microsoft's supported-APIs table.
-  if (/Edg\//.test(ua) || /OPR\/|Opera[\s/]/.test(ua) || brands.includes('Brave') ||
+  // nothing. Edge is pinned by Microsoft's supported-APIs table; the token
+  // covers desktop (Edg/), Android (EdgA/) and iOS (EdgiOS/) builds.
+  if (/Edg[A-Za-z]*\//.test(ua) || /OPR\/|Opera[\s/]/.test(ua) || brands.includes('Brave') ||
     /Brave\//.test(ua) || isFirefox(ua)) {
     return { identity: webFlowReachable ? 'webAuthFlow' : 'none' };
   }
 
-  // Chrome family: getAuthToken when the brand (or a Chrome-only UA) says so.
+  // Chrome family: getAuthToken ONLY on an explicit Google Chrome brand; any
+  // other Chromium UA (unbranded, Brave-like, forks) is webAuthFlow or none.
   if (/Chrome\/|Chromium\//.test(ua)) {
-    if (hasGetAuthToken && isGoogleChromeBrand(ua, brands)) {
+    if (hasGetAuthToken && isGoogleChromeBrand(brands)) {
       return { identity: 'getAuthToken' };
     }
     return { identity: webFlowReachable ? 'webAuthFlow' : 'none' };

@@ -24,8 +24,10 @@
  * ONLY when the manifest also carries a web client id (`oauth2.web_client_id`
  * — owner prerequisite) AND the engineBase flag is ON AND the identity
  * capability probe answers something other than 'none' (Safari and unknown
- * hosts stay on the V2 DOM path). The shipped defaults — no web client id,
- * flag 'v2' — keep every browser false, so flipping this on is a rollout
+ * hosts stay on the V2 DOM path) AND NON_CHROME_TOKEN_SOURCE_WIRED is true.
+ * getAuthToken counts ONLY on an explicit 'Google Chrome' userAgentData brand
+ * (one shared test, capability.ts). The shipped defaults — no web client id,
+ * flag 'v2', token source unwired — keep every non-Chrome browser false, so flipping this on is a rollout
  * decision, not a code surprise (docs/adr/0010-cross-browser-oauth-web-auth-flow.md).
  *
  * This module imports nothing from the v3 engine stack — only the pure
@@ -39,7 +41,7 @@
  * while v3 is active.
  */
 import { getEngineBase } from '../../engine-base';
-import { probeIdentityCapability } from './capability';
+import { isGoogleChromeBrand, probeIdentityCapability } from './capability';
 
 /** What the oauth2 manifest section looks like when present. */
 interface ManifestOauth2 {
@@ -63,21 +65,6 @@ interface UserAgentData {
   brands?: UserAgentBrand[];
 }
 
-/**
- * Google Chrome only: Edge/Brave/Opera ship the identity permission surface
- * in the manifest, but getAuthToken is Chrome-specific (it never answers on
- * the other Chromium brands).
- */
-function isGoogleChromeBrand(): boolean {
-  try {
-    const uaData = (navigator as Navigator & { userAgentData?: UserAgentData })?.userAgentData;
-    return Array.isArray(uaData?.brands) &&
-      uaData.brands.some((brand) => brand?.brand === 'Google Chrome');
-  } catch {
-    return false;
-  }
-}
-
 /** navigator.userAgentData brand names, plain strings for the probe. */
 function readBrandNames(): string[] {
   try {
@@ -86,6 +73,22 @@ function readBrandNames(): string[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * ADR-0010 rollout switch: TRUE only once a non-Chrome token source is wired
+ * into the engine (engine-v3 still builds ChromeIdentityTokenProvider; the
+ * WebAuthFlowTokenSource has no caller). Until then non-Chrome browsers stay
+ * "not configured" so the registry and popup never offer an API mode that can
+ * never fetch. The rollout PR flips this default and its pinning test.
+ */
+export const NON_CHROME_TOKEN_SOURCE_WIRED = false;
+
+let nonChromeTokenSourceWired: boolean = NON_CHROME_TOKEN_SOURCE_WIRED;
+
+/** Test seam: open the non-Chrome gate (module-scoped, like engineBase). */
+export function setNonChromeTokenSourceWired(wired: boolean): void {
+  nonChromeTokenSourceWired = wired;
 }
 
 /**
@@ -106,8 +109,13 @@ export function isApiConfigured(): boolean {
   const clientId = manifest.oauth2?.client_id;
   const hasClientId = typeof clientId === 'string' && clientId.trim().length > 0;
 
-  // Background path: chrome.identity works here — check it directly.
-  if (typeof chrome.identity?.getAuthToken === 'function') return hasClientId;
+  // Background path: chrome.identity works here — check it directly, but only
+  // on an explicit Google Chrome brand. Edge/Brave/Opera expose the function
+  // yet never answer it, so they fall through to the web gate below.
+  const brandNames = readBrandNames();
+  if (typeof chrome.identity?.getAuthToken === 'function' && isGoogleChromeBrand(brandNames)) {
+    return hasClientId;
+  }
 
   // Content-script path (csaa.7): chrome.identity does not exist there and
   // the whole v3 engine runs in one. The manifest identity permission, the
@@ -116,13 +124,14 @@ export function isApiConfigured(): boolean {
   const hasIdentityPermission = Array.isArray(manifest.permissions) &&
     manifest.permissions.includes('identity');
   if (!hasIdentityPermission) return false;
-  if (isGoogleChromeBrand()) return hasClientId;
+  if (isGoogleChromeBrand(brandNames)) return hasClientId;
 
   // ADR-0010 — non-Chrome browsers: the web-auth-flow path. Configured ONLY
   // when a web client id is present AND the engineBase flag is ON AND the
   // capability probe says this browser can reach a launchWebAuthFlow source
   // (directly or through the background relay). Shipped defaults — no
   // web_client_id in the manifest, flag 'v2' — keep every browser false.
+  if (!nonChromeTokenSourceWired) return false;
   const webClientId = manifest.oauth2?.web_client_id;
   const hasWebClientId = typeof webClientId === 'string' && webClientId.trim().length > 0;
   if (!hasWebClientId) return false;
@@ -134,7 +143,7 @@ export function isApiConfigured(): boolean {
       getAuthToken: chrome.identity?.getAuthToken,
       launchWebAuthFlow: identity?.launchWebAuthFlow,
     },
-    brands: readBrandNames(),
+    brands: brandNames,
     relayAvailable: typeof chrome.runtime?.sendMessage === 'function',
   });
   return probe.identity !== 'none';
