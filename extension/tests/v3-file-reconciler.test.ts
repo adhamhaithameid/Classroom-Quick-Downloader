@@ -116,7 +116,7 @@ describe('reconcileApiFiles (v3-base)', () => {
     // link/form attachments are not Drive downloads — only driveFile rows.
     expect(files).toHaveLength(1);
     const file = files[0];
-    expect(file.canonicalId).toBe('FILE_1');
+    expect(file.canonicalId).toBe('drive-FILE_1');
     expect(file.name).toBe('report.pdf');
     expect(file.ext).toBe('pdf');
     expect(file.downloadUrl).toBe('https://drive.google.com/uc?export=download&id=FILE_1');
@@ -257,7 +257,20 @@ describe('reconcileApiFiles (v3-base)', () => {
     });
 
     const files = reconcileApiFiles(snapshot, post, NOW);
-    expect(files.map((f) => f.canonicalId)).toEqual(['FILE_2']);
+    expect(files.map((f) => f.canonicalId)).toEqual(['drive-FILE_2']);
     expect(files[0].idSource).toBe('api-snapshot');
+  });
+
+  it('canonical form: DOM-then-API order — a DOM drive-<id> file is never re-added', () => {
+    const post = makePost([domFile('FILE_1')]);
+    expect(reconcileApiFiles(makeSnapshot(), post, NOW)).toEqual([]);
+  });
+
+  it('canonical form: API-then-DOM order — the API file carries the SAME id the DOM scan would produce', () => {
+    // API first: the synthetic file joins under drive-<id>. The DOM scan that
+    // finds the same Drive anchor later produces canonicalId drive-<id> too,
+    // so engine-side dedup on canonicalId collapses them to one file.
+    const [api] = reconcileApiFiles(makeSnapshot(), makePost(), NOW);
+    expect(api.canonicalId).toBe(domFile('FILE_1').canonicalId);
   });
 });

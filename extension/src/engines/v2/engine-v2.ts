@@ -666,7 +666,15 @@ export class EngineV2 implements CQDEngine {
         }
         post.element = document.body;
         post.lastScannedAt = Date.now();
-        post.files = uncovered;
+        // v3-base: carry the post's API-only files (no DOM anchor, so the
+        // body scan never sees them); canonical ids make the covered/known
+        // comparison match DOM drive-<id> files. Flag OFF: kept is [].
+        const keptApi = splitApiFiles(post.files).apiFiles;
+        const uncoveredIds = new Set(uncovered.map((f) => f.canonicalId));
+        post.files = [
+          ...uncovered,
+          ...keptApi.filter((f) => !uncoveredIds.has(f.canonicalId)),
+        ];
         post.flags = this.detectFlags(document.body, detailsId);
         seenPostIds.add(detailsId);
       }
@@ -833,8 +841,14 @@ export class EngineV2 implements CQDEngine {
     post.element = postEl;
     post.lastScannedAt = Date.now();
 
-    // EXTRACT FILES from this post
-    post.files = this.discoverFiles(postEl);
+    // EXTRACT FILES from this post. v3-base: the API union has no DOM anchor,
+    // so re-discovery cannot see it — carry the synthetic files over (the
+    // union never removes), dropping any the DOM now also found (same
+    // canonicalId: DOM wins, no double count). Flag OFF: kept is always [].
+    const kept = splitApiFiles(post.files).apiFiles;
+    const rediscovered = this.discoverFiles(postEl);
+    const known = new Set(rediscovered.map((f) => f.canonicalId));
+    post.files = [...rediscovered, ...kept.filter((f) => !known.has(f.canonicalId))];
 
     // DETECT FLAGS for this post
     post.flags = this.detectFlags(postEl, postId);

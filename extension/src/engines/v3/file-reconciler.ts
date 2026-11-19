@@ -34,6 +34,10 @@
  *                                canonical form count as "already appears in
  *                                post.files".
  *
+ * Staleness gates only NEW adds. Retention of files already merged is the
+ * engine's job (engine-v2 ingestPost carries 'api-snapshot' files across a
+ * re-scan), so a snapshot aging out never makes merged files vanish.
+ *
  * Synthetic FileNodes carry idSource 'api-snapshot' and the POST's element as
  * their anchor: they have no DOM of their own. The engine filters them out of
  * the placement pass (no floating single-file button); they join post.files,
@@ -45,6 +49,16 @@ import type { FileNode, PostNode } from '../types';
 
 /** A snapshot older than this is stale — mirrors api-detector.ts:93. */
 export const MAX_RECONCILE_SNAPSHOT_AGE_MS = 120_000;
+
+/**
+ * Canonical file id — the SAME form engine-v2's extractFileNode gives a DOM
+ * Drive anchor (`drive-<id>`). Idempotent: an id already in that form is
+ * returned unchanged. API files use it so the engine's canonicalId dedup and
+ * the download-all run's fileId dedup see one identity per Drive file.
+ */
+export function toCanonicalDriveId(id: string): string {
+  return id.startsWith('drive-') ? id : `drive-${id}`;
+}
 
 /** Lowercase extension from a Drive title ('' when the title has none) —
  *  same shape as engine-v2's ext scan (name-anchored, query-tolerant). */
@@ -79,20 +93,20 @@ export function reconcileApiFiles(
   );
   if (!submission) return [];
 
-  const tracked = new Set(post.files.map((file) => file.canonicalId));
+  const tracked = new Set(post.files.map((file) => toCanonicalDriveId(file.canonicalId)));
   const fresh: FileNode[] = [];
 
   for (const attachment of submission.attachments) {
     // Scope: only driveFile rows reconcile — 'link'/'form' attachments are
     // not Drive downloads, so they cannot ride the download-all flow.
     if (attachment.source !== 'driveFile') continue;
-    // Idempotent union: skip anything already tracked, under either the raw
-    // Drive id or the DOM canonical form (drive-<id>).
-    if (tracked.has(attachment.id) || tracked.has(`drive-${attachment.id}`)) continue;
-    tracked.add(attachment.id);
+    // Idempotent union: compare on the canonical form (drive-<id>) only.
+    const canonicalId = toCanonicalDriveId(attachment.id);
+    if (tracked.has(canonicalId)) continue;
+    tracked.add(canonicalId);
 
     fresh.push({
-      canonicalId: attachment.id,
+      canonicalId,
       name: attachment.title,
       ext: extensionFromTitle(attachment.title),
       downloadUrl: attachment.downloadUrl,

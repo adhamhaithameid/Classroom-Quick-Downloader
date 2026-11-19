@@ -213,7 +213,7 @@ describe('EngineV3 v3-base file wiring (flag engineBase)', () => {
     expect(post!.files).toHaveLength(3);
     const apiFile = post!.files.find((f) => f.idSource === 'api-snapshot');
     expect(apiFile).toBeDefined();
-    expect(apiFile!.canonicalId).toBe('APIFILEccccPad20Chars0000');
+    expect(apiFile!.canonicalId).toBe('drive-APIFILEccccPad20Chars0000');
     expect(apiFile!.name).toBe('hidden.pdf');
     expect(apiFile!.downloadUrl).toBe(API_ATTACHMENT.downloadUrl);
     expect(apiFile!.element).toBe(post!.element);
@@ -280,7 +280,7 @@ describe('EngineV3 v3-base file wiring (flag engineBase)', () => {
     expect(reingested!.files).toHaveLength(3);
     expect(
       reingested!.files.some(
-        (f) => f.idSource === 'api-snapshot' && f.canonicalId === 'APIFILEccccPad20Chars0000',
+        (f) => f.idSource === 'api-snapshot' && f.canonicalId === 'drive-APIFILEccccPad20Chars0000',
       ),
     ).toBe(true);
 
@@ -466,7 +466,7 @@ describe('EngineV3 phase 2: download-all over the API union', () => {
 
     // Label said 3, the run does 3: nothing overstated.
     expect(requests).toHaveLength(3);
-    const api = requests.find((r) => r.fileId === 'APIFILEccccPad20Chars0000');
+    const api = requests.find((r) => r.fileId === 'drive-APIFILEccccPad20Chars0000');
     expect(api).toBeDefined();
     expect(api!.url).toBe(API_ATTACHMENT.downloadUrl);
   });
@@ -499,3 +499,158 @@ describe('EngineV3 phase 2: download-all over the API union', () => {
     expect(post!.files.some((f) => f.idSource === 'api-snapshot')).toBe(true);
   });
 });
+
+describe('EngineV3 v3-base review fixes: union retention and canonical ids', () => {
+  let engine: import('../src/engines/v3/engine-v3').EngineV3 | null = null;
+
+  beforeEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.resetModules();
+    document.body.innerHTML = '';
+    engine = null;
+    vi.stubGlobal(
+      'location',
+      new URL('https://classroom.google.com/c/C/a/A/submissions/SUB_1'),
+    );
+  });
+
+  afterEach(() => {
+    engine?.destroy();
+    engine = null;
+  });
+
+  it('(1 stale-retention) a targeted re-scan AFTER the snapshot went stale keeps the API union', async () => {
+    const setup = await loadEngineWithApiMocks({ enableFlag: true });
+    seedStudentWorkPage(['post-1']);
+
+    engine = new setup.EngineV3();
+    await engine.init(ViewKind.STUDENT_WORK_TEACHER, new AbortController().signal);
+    expect(engine.getTrackedPosts()[0].files).toHaveLength(3);
+
+    // 200 s later the snapshot is past the 120 s bound: reconcileApiFiles
+    // returns [] (no NEW adds), but already-merged files must be RETAINED.
+    const later = Date.now() + 200_000;
+    vi.spyOn(Date, 'now').mockReturnValue(later);
+    const anchor = document.querySelector<HTMLElement>('[data-stream-item-id="post-1"] a');
+    engine.handleMutations([attributeMutation(anchor!, 'aria-label')]);
+
+    const post = engine.getTrackedPosts().find((p) => p.id === 'post-1');
+    expect(post!.files).toHaveLength(3);
+    expect(post!.files.some((f) => f.idSource === 'api-snapshot')).toBe(true);
+    expect(
+      groupButtonOf('post-1')!.getAttribute('data-cqd-group-count'),
+    ).toBe('3');
+  });
+
+  const SHARED_ID = 'SHAREDidPad20Chars000000';
+  const sharedClient = (): ClassroomApiClient => ({
+    fetchStudentSubmissions: vi.fn(async () => [
+      {
+        id: 'SUB_1',
+        state: 'TURNED_IN',
+        attachments: [
+          {
+            id: SHARED_ID,
+            title: 'shared.pdf',
+            downloadUrl: `https://drive.google.com/uc?export=download&id=${SHARED_ID}`,
+            source: 'driveFile' as const,
+          },
+        ],
+      },
+    ]),
+    fetchCourseDriveFiles: vi.fn(async () => []),
+  });
+
+  function addSharedAnchor(): void {
+    const anchor = document.createElement('a');
+    anchor.setAttribute('data-drive-id', SHARED_ID);
+    anchor.href = `https://drive.google.com/file/d/${SHARED_ID}/view`;
+    anchor.textContent = 'shared.pdf';
+    document.querySelector('[data-stream-item-id="post-1"]')!.appendChild(anchor);
+  }
+
+  it('(2 DOM-then-API) a Drive id the DOM already tracked is not double counted', async () => {
+    const setup = await loadEngineWithApiMocks({ enableFlag: true, client: sharedClient() });
+    seedStudentWorkPage(['post-1']);
+    addSharedAnchor();
+
+    engine = new setup.EngineV3();
+    await engine.init(ViewKind.STUDENT_WORK_TEACHER, new AbortController().signal);
+    await flushAsync();
+
+    const files = engine.getTrackedPosts()[0].files;
+    expect(files.filter((f) => f.canonicalId === `drive-${SHARED_ID}`)).toHaveLength(1);
+    expect(files).toHaveLength(3);
+    expect(groupButtonOf('post-1')!.getAttribute('data-cqd-group-count')).toBe('3');
+  });
+
+  it('(2 API-then-DOM) a DOM anchor that appears AFTER the API file is not double counted', async () => {
+    const setup = await loadEngineWithApiMocks({ enableFlag: true, client: sharedClient() });
+    seedStudentWorkPage(['post-1']);
+
+    engine = new setup.EngineV3();
+    await engine.init(ViewKind.STUDENT_WORK_TEACHER, new AbortController().signal);
+    expect(engine.getTrackedPosts()[0].files).toHaveLength(3);
+
+    addSharedAnchor();
+    const anchor = document.querySelector<HTMLElement>('[data-stream-item-id="post-1"] a');
+    engine.handleMutations([attributeMutation(anchor!, 'aria-label')]);
+    // The inject-button correction re-discovers the DOM (now holding the
+    // shared id) and merges the carried API files: one id, one file.
+    const postEl = document.querySelector<HTMLElement>('[data-stream-item-id="post-1"]')!;
+    (engine as unknown as { v2: { handleCorrection(item: unknown): boolean } }).v2
+      .handleCorrection({
+        id: 'c2', op: 'inject-button', priority: 'HIGH', postId: 'post-1',
+        element: postEl, reason: 'test',
+      });
+
+    const files = engine.getTrackedPosts()[0].files;
+    expect(files.filter((f) => f.canonicalId === `drive-${SHARED_ID}`)).toHaveLength(1);
+    expect(files).toHaveLength(3);
+    expect(groupButtonOf('post-1')!.getAttribute('data-cqd-group-count')).toBe('3');
+  });
+
+  it('(3 details) a details-view re-scan keeps API-only files and does not duplicate covered ids', async () => {
+    const setup = await loadEngineWithApiMocks({ enableFlag: true });
+    vi.stubGlobal('location', new URL('https://classroom.google.com/c/C/a/A/details'));
+    const addAnchor = (id: string): void => {
+      const a = document.createElement('a');
+      a.setAttribute('data-drive-id', id);
+      a.href = `https://drive.google.com/file/d/${id}/view`;
+      a.textContent = `${id}.pdf`;
+      document.body.appendChild(a);
+    };
+    addAnchor('DETAILSaaaaPad20Chars0000');
+
+    engine = new setup.EngineV3();
+    await engine.init(ViewKind.ASSIGNMENT_DETAILS, new AbortController().signal);
+    const v2 = (engine as unknown as {
+      v2: {
+        applyExternalFiles(id: string, files: unknown[]): number;
+        fullScan(): void;
+      };
+    }).v2;
+    const detailsId = 'details:/c/C/a/A/details';
+    expect(engine.getTrackedPosts().some((p) => p.id === detailsId)).toBe(true);
+
+    const apiFile = {
+      canonicalId: `drive-APIONLYPad20Chars000000`,
+      name: 'api.pdf',
+      ext: 'pdf',
+      downloadUrl: 'https://drive.google.com/uc?export=download&id=APIONLYPad20Chars000000',
+      element: document.body,
+      idSource: 'api-snapshot' as const,
+    };
+    expect(v2.applyExternalFiles(detailsId, [apiFile])).toBe(1);
+
+    addAnchor('DETAILSbbbbPad20Chars0000');
+    v2.fullScan();
+
+    const details = engine.getTrackedPosts().find((p) => p.id === detailsId);
+    expect(details!.files.map((f) => f.canonicalId)).toContain('drive-APIONLYPad20Chars000000');
+    const ids = details!.files.map((f) => f.canonicalId);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
