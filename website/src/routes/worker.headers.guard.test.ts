@@ -75,6 +75,18 @@ describe('Cloudflare worker security headers', () => {
     expect(scriptSrc).not.toContain("unsafe-eval");
   });
 
+  it('allows the Cloudflare Web Analytics beacon in script-src', async () => {
+    // Cloudflare injects <script src="https://static.cloudflareinsights.com/…">
+    // into every HTML response at the edge. A script-src without that host
+    // makes the browser block the beacon on every route (found by the
+    // 2026-11-18 website smoke crawl: 23/23 routes logged the block).
+    const { buildContentSecurityPolicy } = await loadWorkerModule();
+    const csp = await buildContentSecurityPolicy('<html><body>x</body></html>');
+
+    const scriptSrc = csp.split(';').find((directive: string) => directive.includes('script-src'));
+    expect(scriptSrc).toContain('https://static.cloudflareinsights.com');
+  });
+
   it('keeps strict baseline directives in every generated policy', async () => {
     const { buildContentSecurityPolicy } = await loadWorkerModule();
     const csp = await buildContentSecurityPolicy('<html><body>no scripts</body></html>');

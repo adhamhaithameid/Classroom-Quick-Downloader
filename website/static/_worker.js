@@ -58,7 +58,13 @@ export async function buildContentSecurityPolicy(html) {
     // sha256-… tokens parse as (invalid) host expressions.
     sources.add(`'sha256-${await sha256Source(match[2])}'`);
   }
-  return [...CSP_BASE_DIRECTIVES, `script-src 'self' ${[...sources].sort().join(' ')}`].join('; ');
+  // Cloudflare injects its Web Analytics beacon script into every HTML
+  // response at the edge. Without this host in script-src the browser
+  // blocks the beacon on every route (2026-11-18 crawl finding).
+  return [
+    ...CSP_BASE_DIRECTIVES,
+    `script-src 'self' https://static.cloudflareinsights.com ${[...sources].sort().join(' ')}`
+  ].join('; ');
 }
 
 const SECURITY_HEADERS = {

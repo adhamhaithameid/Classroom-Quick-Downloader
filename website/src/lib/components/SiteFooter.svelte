@@ -652,7 +652,7 @@
               on:click={() => trackFooterInstall(b)}
             >
               <img
-                src={resolvePath('images/{b}.svg')}
+                src={resolvePath(`images/${b}.svg`)}
                 alt=""
                 width="18"
                 height="18"

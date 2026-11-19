@@ -1496,7 +1496,7 @@
             on:click={() => trackInstallClick('hero_install')}
           >
             <img
-              src={resolvePath('images/{b}.svg')}
+              src={resolvePath(`images/${b}.svg`)}
               alt=""
               class="l2-cta-icon"
             />
@@ -2277,7 +2277,7 @@
             on:click={() => trackInstallClick('final_install')}
           >
             <img
-              src={resolvePath('images/{b}.svg')}
+              src={resolvePath(`images/${b}.svg`)}
               alt=""
               class="l2-cta-icon"
             />
