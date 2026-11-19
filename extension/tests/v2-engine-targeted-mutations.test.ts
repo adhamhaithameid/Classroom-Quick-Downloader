@@ -500,10 +500,56 @@ describe('EngineV2 details-page dedupe: flag parity and stale posts', () => {
     expect(details?.files.map((f) => f.canonicalId)).toEqual([`drive-${Y}`]);
   });
 
-  it('init without destroy clears the download-all API file map', async () => {
+  it('init without destroy clears the download-all API file map (flag ON)', async () => {
+    const { setEngineBase } = await import('../src/engines/engine-base');
+    setEngineBase('v3');
     const ctl = await import('../src/v2/render/download-all-controller');
     const spy = vi.spyOn(ctl, 'resetDownloadAllController');
+    spy.mockClear(); // the spy persists across tests: count only this init
     await startDetails();
     expect(spy).toHaveBeenCalled();
+  });
+
+  it('review 6 #1: flag OFF init never calls the download-all reset (base parity)', async () => {
+    const { setEngineBase } = await import('../src/engines/engine-base');
+    setEngineBase('v2');
+    const ctl = await import('../src/v2/render/download-all-controller');
+    const spy = vi.spyOn(ctl, 'resetDownloadAllController');
+    spy.mockClear(); // the spy persists across tests: count only this init
+    await startDetails();
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('review 6 #2: flag ON an API-only twin does not cover (and so hide) its DOM anchor', async () => {
+    const { setEngineBase } = await import('../src/engines/engine-base');
+    setEngineBase('v3');
+    // A real post whose only file is API-only (idSource api-snapshot) for Drive id Y.
+    const post = document.createElement('article');
+    post.setAttribute('data-stream-item-id', 'post-api');
+    const own = document.createElement('a');
+    own.setAttribute('data-drive-id', X);
+    own.href = `https://drive.google.com/file/d/${X}/view`;
+    own.textContent = 'own.pdf';
+    post.appendChild(own);
+    document.body.appendChild(post);
+    const body = document.createElement('a');
+    body.setAttribute('data-drive-id', Y);
+    body.href = `https://drive.google.com/file/d/${Y}/view`;
+    body.textContent = 'twin.pdf';
+    document.body.appendChild(body);
+    await startDetails();
+    // Drop the first-scan details post so the rescan decides coverage afresh
+    // (a surviving details post would itself cover the body anchor: inherited, flag OFF too).
+    (engine as unknown as { postMap: Map<string, unknown> }).postMap.delete('details:/');
+    const tracked = engine.getTrackedPosts().find((p) => p.id === 'post-api')!;
+    tracked.files.push({
+      ...tracked.files[0],
+      canonicalId: `drive-${Y}`,
+      downloadUrl: `https://drive.usercontent.google.com/download?id=${Y}&export=download&confirm=t`,
+      idSource: 'api-snapshot',
+    } as never);
+    engine.fullScan();
+    const details = engine.getTrackedPosts().find((p) => p.id.startsWith('details:'));
+    expect(details?.files.some((f) => f.canonicalId === `drive-${Y}` && f.idSource !== 'api-snapshot')).toBe(true);
   });
 });

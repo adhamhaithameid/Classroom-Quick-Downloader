@@ -20,6 +20,7 @@
  * The engine-side wiring is pinned in tests/v3-engine-base-files.test.ts.
  */
 import { describe, expect, it } from 'vitest';
+import { MAX_AUTH_WARMUP_DEPTH, toDownloadUrlFrom } from '../src/core/acquire/download-url';
 import {
   MAX_RECONCILE_SNAPSHOT_AGE_MS,
   reconcileApiFiles,
@@ -544,10 +545,22 @@ describe('review-fixes-union-5 (canonical keys)', () => {
     expect(keysOf(`https://drive.google.com/auth_warmup?continue=${cont}`)).toEqual(['drive-url-z']);
   });
 
-  it('#4 nested auth_warmup chains stop after one level', () => {
-    const inner = encodeURIComponent('https://drive.google.com/file/d/DEEP/view');
-    const mid = encodeURIComponent(`https://drive.google.com/auth_warmup?continue=${inner}`);
-    expect(keysOf(`https://drive.google.com/auth_warmup?continue=${mid}`)).toEqual(['drive-url-z']);
+  const warmup = (inner: string): string =>
+    `https://drive.google.com/auth_warmup?continue=${encodeURIComponent(inner)}`;
+
+  it('review 6 #5: a 2-level auth_warmup chain yields the key the converter downloads', () => {
+    const chain = warmup(warmup('https://drive.google.com/file/d/DEEP/view'));
+    expect(keysOf(chain)).toEqual(['drive-url-z', 'drive-DEEP']);
+  });
+
+  it('review 6 #5: the key mirror and the converter share one depth cap', () => {
+    let url = 'https://drive.google.com/file/d/DEEP/view';
+    for (let i = 0; i < MAX_AUTH_WARMUP_DEPTH; i++) url = warmup(url);
+    expect(toDownloadUrlFrom(url, null)).toContain('drive.usercontent.google.com/download?id=DEEP');
+    expect(keysOf(url)).toEqual(['drive-url-z', 'drive-DEEP']);
+    const tooDeep = warmup(url);
+    expect(toDownloadUrlFrom(tooDeep, null)).not.toContain('drive.usercontent.google.com');
+    expect(keysOf(tooDeep)).toEqual(['drive-url-z']);
   });
 
   it('#4 auth_warmup on a non-Drive host is not followed', () => {

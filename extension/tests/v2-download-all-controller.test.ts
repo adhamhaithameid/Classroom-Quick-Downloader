@@ -16,6 +16,7 @@ import { engineRegistry } from '../src/engines/engine-registry';
 import type { ViewKind } from '../src/engines/types';
 import {
   wireDownloadPath,
+  ensurePostClickWiring,
   resetDownloadController,
   type DownloadRuntime,
 } from '../src/v2/render/download-controller';
@@ -562,5 +563,51 @@ describe('CQD_RUN_DOWNLOAD_ALL shortcut (v3 mode parity)', () => {
     handleDownloadAllClickV2('post-1', group);
     vi.advanceTimersByTime(PER_FILE_STAGGER_MS * 3);
     expect(requested).toHaveLength(2);
+  });
+
+  const API_ONE = {
+    fileId: 'API_ONLY_0000000000009',
+    url: 'https://drive.google.com/uc?export=download&id=API_ONLY_0000000000009',
+    name: 'a.pdf',
+    ext: 'pdf',
+  };
+
+  it('review 6 #3: a reset while an API-only request is in flight does not let a re-click re-request it', () => {
+    const { group } = makePost(2);
+    setGroupApiFiles('post-1', [API_ONE]);
+    handleDownloadAllClickV2('post-1', group);
+    vi.advanceTimersByTime(PER_FILE_STAGGER_MS * 3);
+    expect(requested).toHaveLength(3);
+
+    resetDownloadAllController(); // destroy/init drops the live run
+    setGroupApiFiles('post-1', [API_ONE]);
+    handleDownloadAllClickV2('post-1', group);
+    vi.advanceTimersByTime(PER_FILE_STAGGER_MS * 3);
+    expect(requested).toHaveLength(3); // API file NOT requested again
+  });
+
+  it('review 6 #3: once the API request settles it can be requested again', () => {
+    const { group } = makePost(0);
+    group.dataset.cqdGroupCount = '1';
+    setGroupApiFiles('post-1', [API_ONE]);
+    handleDownloadAllClickV2('post-1', group);
+    expect(requested).toHaveLength(1);
+    bus.publish('download:settled', {
+      requestId: requested[0]!.requestId,
+      outcome: { status: 'saved' },
+    });
+    vi.advanceTimersByTime(GROUP_FEEDBACK_MS + 100);
+    handleDownloadAllClickV2('post-1', group);
+    expect(requested).toHaveLength(2);
+  });
+
+  it('review 6 #4: an untrusted (script-made) click does not download API-only files', () => {
+    const { group } = makePost(2);
+    setGroupApiFiles('post-1', [API_ONE]);
+    ensurePostClickWiring(group.closest<HTMLElement>('[data-stream-item-id]')!);
+    group.click(); // element.click() from script: isTrusted === false
+    vi.advanceTimersByTime(PER_FILE_STAGGER_MS * 3);
+    expect(requested.map((r) => r.file.fileId)).not.toContain(API_ONE.fileId);
+    expect(requested).toHaveLength(2); // DOM files only
   });
 });

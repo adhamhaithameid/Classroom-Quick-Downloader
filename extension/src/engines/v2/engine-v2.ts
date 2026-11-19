@@ -226,7 +226,8 @@ export class EngineV2 implements CQDEngine {
     this.postMap.clear();
     this.postsWithApiFiles.clear();
     // Module-level API file map: init may run without a prior destroy.
-    resetDownloadAllController();
+    // Flag OFF: the base init never reset it (byte-identical output).
+    if (getEngineBase() === 'v3') resetDownloadAllController();
     this.flagDecisions.clear();
     this.placementDecisions = [];
     this.decisionTraces.clear();
@@ -655,7 +656,12 @@ export class EngineV2 implements CQDEngine {
         ) {
           continue;
         }
-        for (const f of p.files) for (const k of keysOf(f)) covered.add(k);
+        for (const f of p.files) {
+          // An API-only twin has no anchor of its own: it must not hide the
+          // DOM anchor it duplicates (that anchor is the file's single button).
+          if (v3Keys && f.idSource === 'api-snapshot') continue;
+          for (const k of keysOf(f)) covered.add(k);
+        }
       }
       const bodyFiles = this.discoverFiles(document.body);
       const uncovered = bodyFiles.filter((f) => !keysOf(f).some((k) => covered.has(k)));

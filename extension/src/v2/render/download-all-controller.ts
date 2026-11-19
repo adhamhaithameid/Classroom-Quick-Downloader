@@ -105,6 +105,25 @@ export function setGroupApiFiles(postId: string, files: GroupApiFile[]): void {
   }
   apiFilesByPost.set(postId, files);
 }
+
+/**
+ * Drive ids of API-only files whose request is in flight. Their state carrier
+ * is a detached button recreated per run, so (unlike DOM buttons, which hold
+ * 'loading') nothing else stops a re-click, or a re-run after a reset dropped
+ * the live run, from requesting the same file again. Entries leave on settle.
+ */
+const apiInFlight = new Map<RequestId, string>();
+
+/**
+ * The most recent click seen in the capture phase. The delegated handler does
+ * not pass the event on, so this is how a group start learns whether a human
+ * made the click: a page script can forge a group button and call .click().
+ */
+let lastClick: Event | null = null;
+const trackClick = (e: Event): void => {
+  lastClick = e;
+};
+
 const decoratedButtons = new WeakSet<HTMLButtonElement>();
 
 /** Minimal runtime surface, injectable for tests. */
@@ -125,6 +144,7 @@ export function installDownloadAllController(injectRuntime?: GroupRuntime | null
   if (injectRuntime !== undefined) runtime = injectRuntime;
   setDownloadAllHandler(handleDownloadAllClickV2);
   offSettled = onSettled(handleFileSettled);
+  document.addEventListener('click', trackClick, true);
   return uninstallDownloadAllController;
 }
 
@@ -132,12 +152,20 @@ export function uninstallDownloadAllController(): void {
   setDownloadAllHandler(() => {});
   offSettled?.();
   offSettled = null;
+  document.removeEventListener('click', trackClick, true);
+  lastClick = null;
   for (const run of runs.values()) teardownRun(run);
   runs.clear();
   apiFilesByPost.clear();
+  // The settled listener is gone, so no entry could ever leave: drop them.
+  apiInFlight.clear();
 }
 
-/** Test/destroy hook: drop every run (buttons die with the page anyway). */
+/**
+ * Test/destroy hook: drop every run (buttons die with the page anyway).
+ * apiInFlight survives on purpose: those requests are still running and the
+ * settled listener removes each entry when its request ends.
+ */
 export function resetDownloadAllController(): void {
   for (const run of runs.values()) teardownRun(run);
   runs.clear();
@@ -194,6 +222,7 @@ export function handleDownloadAllClickV2(postId: string, groupButton: HTMLButton
  *   message with { ok: true }); false when no group was eligible.
  */
 export function handleRunDownloadAllRequest(): boolean {
+  lastClick = null; // the hotkey is not a click: forget any earlier one
   const buttons = Array.from(
     document.querySelectorAll<HTMLButtonElement>('.cqd-download-all-btn'),
   );
@@ -252,6 +281,7 @@ function startRun(postId: string, groupButton: HTMLButtonElement): boolean {
   // no engine coupling), deduped by canonical file id.
   const seen = new Set<string>();
   const files: GroupFile[] = [];
+  const apiFileIds = new Set<string>();
   for (const btn of root.querySelectorAll<HTMLButtonElement>('.cqd-download-btn')) {
     const fileId = btn.getAttribute('data-cqd-file-id') || '';
     if (!fileId || seen.has(fileId)) continue;
@@ -269,7 +299,13 @@ function startRun(postId: string, groupButton: HTMLButtonElement): boolean {
   // v3-base phase 2: API-only files join the run. They have no DOM button,
   // so each gets a DETACHED button as its state carrier (never inserted into
   // the page — no UI is created). Dedup by file id against the DOM set.
-  const apiList = apiFilesByPost.get(postId) ?? [];
+  // A script-made click (isTrusted false) on this button never pulls in the
+  // API-only files: only DOM files run. Files already in flight are skipped.
+  const click = lastClick;
+  lastClick = null;
+  const forged =
+    click !== null && !click.isTrusted && click.target instanceof Node && groupButton.contains(click.target);
+  const apiList = forged ? [] : (apiFilesByPost.get(postId) ?? []);
   // Count/run guard: a collapsed post emits NO single buttons, so the label's
   // count (anchored + API) can exceed what this run could download. With API
   // files but zero DOM buttons, the label count minus the API files is the
@@ -280,7 +316,9 @@ function startRun(postId: string, groupButton: HTMLButtonElement): boolean {
   }
   for (const api of apiList) {
     if (!api.fileId || !api.url || seen.has(api.fileId)) continue;
+    if ([...apiInFlight.values()].includes(api.fileId)) continue;
     seen.add(api.fileId);
+    apiFileIds.add(api.fileId);
     files.push({
       fileId: api.fileId,
       button: document.createElement('button'),
@@ -327,6 +365,7 @@ function startRun(postId: string, groupButton: HTMLButtonElement): boolean {
     if (requestId) {
       file.requestId = requestId;
       file.state = 'loading';
+      if (apiFileIds.has(file.fileId)) apiInFlight.set(requestId, file.fileId);
     } else {
       file.state = stateOfButton(file.button);
     }
@@ -347,6 +386,7 @@ function startRun(postId: string, groupButton: HTMLButtonElement): boolean {
 
 /** One file's request settled — promote the group machine. */
 function handleFileSettled(requestId: RequestId, outcome: AcquireOutcome): void {
+  apiInFlight.delete(requestId);
   for (const run of runs.values()) {
     const file = run.files.find((f) => f.requestId === requestId);
     if (!file) continue;

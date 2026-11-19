@@ -492,7 +492,7 @@ describe('EngineV3 phase 2: download-all over the API union', () => {
 
     const { createEventBus } = await import('../src/bus/event-bus');
     const { wireDownloadPath } = await import('../src/v2/render/download-controller');
-    const { installDownloadAllController, PER_FILE_STAGGER_MS } = await import(
+    const { installDownloadAllController, handleDownloadAllClickV2, PER_FILE_STAGGER_MS } = await import(
       '../src/v2/render/download-all-controller'
     );
     const bus = createEventBus<import('../src/contracts/topics').PageTopicMap>();
@@ -505,7 +505,9 @@ describe('EngineV3 phase 2: download-all over the API union', () => {
     expect(groupBtn!.getAttribute('data-cqd-group-count')).toBe('3');
 
     vi.useFakeTimers();
-    groupBtn!.click();
+    // Direct call (the hotkey path): a script-made .click() is untrusted and
+    // is not allowed to pull in API-only files (review 6 #4).
+    handleDownloadAllClickV2('post-1', groupBtn!);
     vi.advanceTimersByTime(PER_FILE_STAGGER_MS * 3);
 
     // Label said 3, the run does 3: nothing overstated.

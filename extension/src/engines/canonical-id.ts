@@ -1,5 +1,7 @@
 // filepath: extension/src/engines/canonical-id.ts
 
+import { MAX_AUTH_WARMUP_DEPTH } from '../core/acquire/download-url';
+
 /**
  * Canonical Drive file id — the form engine-v2's extractFileNode gives a DOM
  * Drive anchor (`drive-<id>`). Idempotent: an id already in that form is
@@ -53,10 +55,10 @@ function googleDriveIdFromUrl(rawUrl: string, depth = 0): string | null {
   switch (parsed.hostname) {
     case 'drive.google.com':
       // auth_warmup?continue=<url> is followed by toDownloadUrlFrom; mirror it
-      // one level deep (a non-Drive continue yields no key), else its id=.
+      // to the same depth cap (a non-Drive continue yields no key), else its id=.
       if (path.startsWith('/auth_warmup')) {
         const cont = query('continue');
-        if (cont) return depth < 1 ? googleDriveIdFromUrl(cont, depth + 1) : null;
+        if (cont) return depth < MAX_AUTH_WARMUP_DEPTH ? googleDriveIdFromUrl(cont, depth + 1) : null;
         return query('id');
       }
       return FILE_ID_RE.exec(path)?.[1] ?? (path === '/open' || path === '/uc' ? query('id') : null);
