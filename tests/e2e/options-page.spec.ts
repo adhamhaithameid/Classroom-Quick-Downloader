@@ -85,14 +85,28 @@ test.describe('Options page', () => {
     const before = await toggle.getAttribute('aria-checked');
 
     await toggle.click();
-    const after = await toggle.getAttribute('aria-checked');
-    expect(after, 'click must flip aria-checked').not.toBe(before);
+    // Web-first assertion: retries until the click handler has re-rendered.
+    const after = before === 'true' ? 'false' : 'true';
+    await expect(toggle, 'click must flip aria-checked').toHaveAttribute('aria-checked', after);
+
+    // Flush the write: a storage read queues behind the page's pending set,
+    // so it settles only once the click has been persisted. Without this the
+    // reload can race the write (seen as a flake on Edge CI).
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          const c = (globalThis as any).chrome;
+          c.storage.local.get(null, () => c.storage.sync.get(null, () => resolve()));
+        }),
+    );
 
     await page.reload({ waitUntil: 'domcontentloaded' });
-    const persisted = await page
-      .locator(`${SWITCH}[aria-label="Comment flags"]`)
-      .getAttribute('aria-checked');
-    expect(persisted, `state after reload must equal post-click state (${after})`).toBe(after);
+    // The page renders defaults first and hydrates from storage after
+    // domcontentloaded; a one-shot read here sees the default. Retry instead.
+    await expect(
+      page.locator(`${SWITCH}[aria-label="Comment flags"]`),
+      `state after reload must equal post-click state (${after})`,
+    ).toHaveAttribute('aria-checked', after);
 
     // Leave the default state behind for the other tests and real users.
     await page.locator(`${SWITCH}[aria-label="Comment flags"]`).click();
