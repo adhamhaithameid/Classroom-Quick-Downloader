@@ -20,6 +20,7 @@ import {
   setPendingExpiredHook,
   setRegistryListener,
   isRegistered,
+  rearmDeadline,
   cancelledByUs,
   recentDownloads,
   CLEANUP_INTERVAL_MS,
@@ -38,6 +39,7 @@ import { createUpdateDotController, ensureUpdateCheckAlarm } from './update-dot'
 import { createIconUpdaters, isClassroomUrl, setActionIcon, GRAY_ICON_PATHS } from './icon-manager';
 import { extractDriveFileId } from './auth-utils';
 import { composeSuggestedFilename, getFilenameExt, buildUrlWithAuthUser } from './url-helpers';
+import { sanitizeFileName } from '../../src/core/name/sanitize';
 import { applyNamingTemplate, getNamingTemplateSync, startNameTemplateWatcher } from './name-template';
 import { cleanup, cleanupOrphanedPendingDownloads } from './cleanup';
 import { ensureAnalyticsAlarm, checkAndCloseFileTab } from './analytics-alarm';
@@ -48,6 +50,7 @@ import {
   startNextDriveAttempt,
   startSingleAttempt,
   startDownloadWithTimeout,
+  restartPending,
   eventContextFor,
 } from './download-handler';
 import { Analytics, recordDownloadEvent } from '../utils/analytics';
@@ -204,7 +207,14 @@ export default defineBackground(() => {
       queueSettled(requestId);
     },
   });
-  void reconcilePersistedJobs({ onRecovered: queueRecoverActive });
+  // D6: reconcile now settles what happened while the worker was dead —
+  // downloads that completed are reported (status + history + stats), and
+  // never-started (queued) records re-enter the queue instead of vanishing.
+  void reconcilePersistedJobs({
+    onRecovered: queueRecoverActive,
+    onComplete: settleReconciledComplete,
+    onRequeue: restartPending,
+  });
 
   // Create icon update closures
   const { updateTabIcon, updateGlobalIcon } = createIconUpdaters();
@@ -404,6 +414,59 @@ export default defineBackground(() => {
 
   type PendingDownloadLike = NonNullable<ReturnType<typeof getPendingByDownloadId>>;
 
+  /**
+   * D6: the one success settle, shared by the onChanged 'complete' path and
+   * the restart reconcile. One body means analytics, history, stats, the
+   * status message, and cleanup can never drift between the two entries.
+   */
+  function settleSuccess(pending: PendingDownloadLike, finalFilename?: string, downloadId?: number): void {
+    const duration = Date.now() - pending.startTime;
+    const ext =
+      pending.finalExtension ||
+      (finalFilename ? getFilenameExt(finalFilename) : undefined) ||
+      pending.fileMeta?.ext ||
+      'unknown';
+    sendStatusToTab(pending, 'success');
+    recordDownloadEvent({
+      ...eventContextFor(pending),
+      type: ext,
+      status: 'success',
+      duration_ms: duration,
+      bypass_used: false,
+      retries: pending.retryCount ?? 0,
+    });
+    if (pending.fileMeta?.name) recentDownloads.set(pending.fileMeta.name, Date.now());
+    // 0h4d.1.6: one history row per terminal settle.
+    void recordDownloadHistory(pending, 'success');
+    iconAnimation.notifySettled('success');
+    // 1.9.0 confetti: one lifetime increment per download id (idempotent,
+    // restart-safe); milestone detection rides the same transaction.
+    void countCompletedDownload(pending.requestId).then((settle) => {
+      if (!settle.changed) return;
+      // Dormant count reporting: milestone crossings plus a cheap
+      // every-100 drift beacon. REMOTE_COUNTS_ENABLED (false) keeps the
+      // fetch off the wire; the call site is wired and tested for the
+      // day the switch flips.
+      if (settle.crossed.length > 0 || settle.stats.lifetimeCount % 100 === 0) {
+        void reportDownloadCount({
+          installId: settle.stats.installId,
+          lifetimeCount: settle.stats.lifetimeCount,
+        });
+      }
+    });
+    cleanup(pending, downloadId);
+  }
+
+  /**
+   * D6: reconcile host for a download that completed while the worker was
+   * dead. The finalized guard is the double-settle fuse: if the completion
+   * event path already reported success, this is a no-op.
+   */
+  function settleReconciledComplete(pending: PendingDownloadLike): void {
+    if (pending.finalized) return;
+    settleSuccess(pending, pending.finalExtension);
+  }
+
   // 0) Bridge download service (S6/G2): serves CQD_BRIDGE_REQUEST messages
   //    from the page bus over the worker runtime bridge. Inert until the page
   //    side sends one; the legacy message flow is untouched.
@@ -423,6 +486,8 @@ export default defineBackground(() => {
         suggest();
         return;
       }
+      // ADR-0010: the filename handshake is transfer activity.
+      rearmDeadline(pending);
 
       const actualMime = (item.mime || '').toLowerCase();
       const actualExt = getFilenameExt(item.filename);
@@ -460,16 +525,24 @@ export default defineBackground(() => {
         return;
       }
 
-      sendStatusToTab(pending, 'success');
+      // D1 honesty fix: the filename handshake means only that response
+      // headers arrived — bytes are NOT on disk. Success is reported once,
+      // by the onChanged 'complete' path after item verification, exactly
+      // like the Firefox onCreated correlation path. A mid-transfer failure
+      // then reaches the transient-retry taxonomy instead of vanishing
+      // behind a premature 'success'.
       // Survey #821: a Classroom title without an extension used to land on
       // disk without one. Compose with the wire-known extension or the
-      // response MIME before suggesting.
+      // response MIME before suggesting. D8: with no title (history
+      // re-download), the browser's own suggested name is the honest stem —
+      // sanitized at the same S1 boundary as page-supplied names.
       // 0h4d.3.1: the flat base name stays byte-identical; an active
       // template only adds the folder shape around it. Template-off users
       // (the default, and every free user until they pick one) see zero
       // change.
       const baseName = composeSuggestedFilename({
         name: pending.fileMeta?.name,
+        fallbackName: item.filename ? sanitizeFileName(item.filename) : undefined,
         knownExt: pending.finalExtension || pending.fileMeta?.ext,
         mime: actualMime,
       });
@@ -579,6 +652,9 @@ export default defineBackground(() => {
   chrome.downloads.onChanged.addListener((delta) => {
     const pending = getPendingByDownloadId(delta.id);
     if (!pending) return;
+    // ADR-0010: any delta for a tracked download is transfer activity —
+    // progress bytes, state transitions — so the stall clock restarts.
+    rearmDeadline(pending);
 
     // 0h4d.1.2: byte-level progress relay (throttled; pill renders it).
     // bytesReceived rides every progress delta but is missing from the
@@ -609,41 +685,7 @@ export default defineBackground(() => {
       // erase it and walk the forbidden path instead of reporting a fake
       // success.
       const reportSuccess = (finalFilename?: string): void => {
-        const duration = Date.now() - pending.startTime;
-        const ext =
-          pending.finalExtension ||
-          (finalFilename ? getFilenameExt(finalFilename) : undefined) ||
-          pending.fileMeta?.ext ||
-          'unknown';
-        sendStatusToTab(pending, 'success');
-        recordDownloadEvent({
-          ...eventContextFor(pending),
-          type: ext,
-          status: 'success',
-          duration_ms: duration,
-          bypass_used: false,
-          retries: pending.retryCount ?? 0,
-        });
-        if (pending.fileMeta?.name) recentDownloads.set(pending.fileMeta.name, Date.now());
-        // 0h4d.1.6: one history row per terminal settle.
-        void recordDownloadHistory(pending, 'success');
-        iconAnimation.notifySettled('success');
-        // 1.9.0 confetti: one lifetime increment per download id (idempotent,
-        // restart-safe); milestone detection rides the same transaction.
-        void countCompletedDownload(pending.requestId).then((settle) => {
-          if (!settle.changed) return;
-          // Dormant count reporting: milestone crossings plus a cheap
-          // every-100 drift beacon. REMOTE_COUNTS_ENABLED (false) keeps the
-          // fetch off the wire; the call site is wired and tested for the
-          // day the switch flips.
-          if (settle.crossed.length > 0 || settle.stats.lifetimeCount % 100 === 0) {
-            void reportDownloadCount({
-              installId: settle.stats.installId,
-              lifetimeCount: settle.stats.lifetimeCount,
-            });
-          }
-        });
-        cleanup(pending, delta.id);
+        settleSuccess(pending, finalFilename, delta.id);
       };
       try {
         chrome.downloads.search({ id: delta.id }, (items) => {
@@ -804,6 +846,11 @@ export default defineBackground(() => {
     } else {
       // Cancelled before download ID assigned
     }
+
+    // D5: the page's button must hear the terminal. The cancel may come from
+    // the popup (no tab affinity) — the originating tab is pending.tabId;
+    // sendStatusToTab also settles bridge requesters via the status seam.
+    sendStatusToTab(pending, 'cancelled');
 
     recordDownloadEvent({
       ...eventContextFor(pending),

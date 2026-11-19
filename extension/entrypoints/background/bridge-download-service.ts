@@ -48,6 +48,10 @@ export function mapStatusToOutcome(
     case 'error':
       outcome = errorCode === 'AUTH_ALL_FAILED' ? 'auth-exhausted' : 'failed';
       break;
+    case 'cancelled':
+      // D9: a user cancellation is its own outcome, never a failure.
+      outcome = 'cancelled';
+      break;
     case 'interrupted':
       outcome = 'failed';
       break;
@@ -83,7 +87,10 @@ export function startBridgeDownloadService(worker: BridgePort): () => void {
   setDownloadStatusListener((pending, status, userMessage, errorCode) => {
     // Only statuses for requests the bridge originated.
     if (!accepted.has(pending.requestId)) return;
-    if (status === 'trying') return; // progress, not a settle
+    // D9: progress ticks (bytes or queue state) are not settles — settling
+    // on one permanently reports 'failed' for a transfer that may still
+    // succeed.
+    if (status === 'trying' || status === 'progress') return;
     settleOnce(pending.requestId, mapStatusToOutcome(status, userMessage, errorCode));
   });
 

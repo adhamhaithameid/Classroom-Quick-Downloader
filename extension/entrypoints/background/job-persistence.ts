@@ -113,6 +113,18 @@ export type ReconcileDeps = {
   search?: DownloadsLike['search'];
   /** Called per rebound record — the queue marks it active (0h4d.1.2). */
   onRecovered?: (requestId: string) => void;
+  /**
+   * D6: browser state is `complete` — the file landed while the worker was
+   * dead. The host settles the pending honestly (status, history, stats).
+   * Without it the record is dropped silently (the old defect).
+   */
+  onComplete?: (pending: PendingDownload) => void;
+  /**
+   * D6: the record never started (it was QUEUED when the worker died — the
+   * in-memory starters died with it). The host re-registers and re-queues.
+   * Without it the record is dropped silently (the old defect).
+   */
+  onRequeue?: (pending: PendingDownload) => void;
 };
 
 /**
@@ -142,9 +154,17 @@ export async function reconcilePersistedJobs(deps: ReconcileDeps = {}): Promise<
       continue;
     }
     if (pending.currentDownloadId == null) {
-      // Never started before the worker died; nothing to correlate.
-      delete jobs[requestId];
-      dropped += 1;
+      // Never started before the worker died — it was waiting in the queue
+      // whose starters are in-memory only. Re-enter the queue (D6) instead
+      // of dropping the request on the floor.
+      if (deps.onRequeue) {
+        delete jobs[requestId];
+        deps.onRequeue(pending);
+        rebound += 1;
+      } else {
+        delete jobs[requestId];
+        dropped += 1;
+      }
       continue;
     }
     const item = await new Promise<{ id: number; state?: string } | undefined>((resolve) => {
@@ -160,8 +180,14 @@ export async function reconcilePersistedJobs(deps: ReconcileDeps = {}): Promise<
       bindDownloadId(pending, pending.currentDownloadId);
       deps.onRecovered?.(requestId);
       rebound += 1;
+    } else if (item && item.state === 'complete' && deps.onComplete) {
+      // D6: the file landed while the worker was dead. Settle honestly —
+      // the host reports success and records history; the mirror row goes.
+      delete jobs[requestId];
+      deps.onComplete(pending);
+      dropped += 1;
     } else {
-      // interrupted/complete (settled while dead) or no longer known.
+      // interrupted, no longer known, or a complete with no settle host.
       delete jobs[requestId];
       dropped += 1;
     }

@@ -28,6 +28,7 @@ function makeStateModule(options: {
   return {
     setPendingExpiredHook: vi.fn(),
     setRegistryListener: vi.fn(),
+    rearmDeadline: vi.fn(),
     pendingByRequestId,
     pendingByDownloadId,
     pendingByUrl,
@@ -117,6 +118,7 @@ describe('background/index', () => {
     vi.doMock('../entrypoints/background/download-handler', () => ({
       handleDownloadRequest: vi.fn(() => true),
       startNextDriveAttempt: vi.fn(),
+      restartPending: vi.fn(),
       eventContextFor: (pending: unknown) => ({} as Record<string, unknown>),
 }));
     vi.doMock('../entrypoints/utils/analytics', () => ({
@@ -222,6 +224,7 @@ describe('background/index', () => {
     vi.doMock('../entrypoints/background/download-handler', () => ({
       handleDownloadRequest: vi.fn(() => true),
       startNextDriveAttempt: vi.fn(),
+      restartPending: vi.fn(),
       eventContextFor: (pending: unknown) => ({} as Record<string, unknown>),
 }));
     vi.doMock('../entrypoints/utils/analytics', () => ({
@@ -298,6 +301,7 @@ describe('background/index', () => {
     vi.doMock('../entrypoints/background/download-handler', () => ({
       handleDownloadRequest: vi.fn(() => true),
       startNextDriveAttempt: vi.fn(),
+      restartPending: vi.fn(),
       eventContextFor: (pending: unknown) => ({} as Record<string, unknown>),
 }));
     vi.doMock('../entrypoints/utils/analytics', () => ({
@@ -366,6 +370,7 @@ describe('background/index', () => {
     vi.doMock('../entrypoints/background/download-handler', () => ({
       handleDownloadRequest: vi.fn(() => true),
       startNextDriveAttempt: vi.fn(),
+      restartPending: vi.fn(),
       eventContextFor: (pending: unknown) => ({} as Record<string, unknown>),
 }));
     vi.doMock('../entrypoints/utils/analytics', () => ({
@@ -526,6 +531,7 @@ describe('background/index', () => {
     vi.doMock('../entrypoints/background/download-handler', () => ({
       handleDownloadRequest: vi.fn(() => true),
       startNextDriveAttempt,
+      restartPending: vi.fn(),
       eventContextFor: (pending: unknown) => ({} as Record<string, unknown>),
 }));
     vi.doMock('../entrypoints/utils/analytics', () => ({

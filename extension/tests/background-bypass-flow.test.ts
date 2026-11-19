@@ -41,6 +41,7 @@ function makeFlowState(options: FlowOptions = {}) {
   return {
     setPendingExpiredHook: vi.fn(),
     setRegistryListener: vi.fn(),
+    rearmDeadline: vi.fn(),
     pendingByRequestId,
     pendingByDownloadId,
     pendingByUrl,

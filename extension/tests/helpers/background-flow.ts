@@ -113,6 +113,9 @@ export function makeFlowState(options: FlowHarnessOptions = {}) {
     setPendingExpiredHook: (hook: ((p: PendingDownload) => void) | null) => {
       expiredHook = hook;
     },
+    // ADR-0010: the real module arms the stall timer at bind and re-arms on
+    // heartbeats; this harness triggers expiry manually via firePendingExpired.
+    rearmDeadline: vi.fn(),
     getPendingByRequestId: (id: string) => pendingByRequestId.get(id),
     getPendingByDownloadId: (id: number) => pendingByDownloadId.get(id),
     getUnclaimedPendingByUrl: (url: string) => {
