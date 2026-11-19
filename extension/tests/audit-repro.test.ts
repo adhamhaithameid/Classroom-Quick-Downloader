@@ -301,7 +301,7 @@ describe('AUDIT REPRO — bridge and API engine (pass = defect present)', () => 
     expect(worker.respond).toHaveBeenLastCalledWith('b9c', { status: 'cancelled' });
   });
 
-  it('D10: API client turns HTTP 401 into an empty course, and caps a course at 3 pages', async () => {
+  it('D10: API client reports HTTP 401 as failure (fixed); the page cap is now 20 pages per list (safety cap)', async () => {
     vi.resetModules();
     const { GoogleClassroomApiClient } = await import('../src/engines/v3/api/classroom-api-client');
     const { CourseInventoryService } = await import('../src/engines/v3/api/course-inventory');
@@ -311,10 +311,10 @@ describe('AUDIT REPRO — bridge and API engine (pass = defect present)', () => 
     vi.stubGlobal('fetch', fetch401);
     const inv = new CourseInventoryService(new GoogleClassroomApiClient(tokens as any));
     const snap = await inv.getInventory('course1', null);
-    expect(snap).not.toBeNull(); // not the "Couldn't list files" path
-    expect(snap!.files).toEqual([]); // user sees "No downloadable files found"
-    await inv.getInventory('course1', null);
-    expect(fetch401).toHaveBeenCalledTimes(2); // second call served from the 5-minute cache
+    // Fixed by the token-relay PR: a 401 is no longer an empty course. The
+    // inventory reports failure (null) so the UI shows "Couldn't list files".
+    expect(snap).toBeNull();
+    expect(fetch401).toHaveBeenCalled();
 
     let n = 0;
     const fetchPaged = vi.fn(async (url: string) => {
@@ -330,8 +330,8 @@ describe('AUDIT REPRO — bridge and API engine (pass = defect present)', () => 
     });
     vi.stubGlobal('fetch', fetchPaged);
     const files = await new GoogleClassroomApiClient(tokens as any).fetchCourseDriveFiles('course2', null);
-    expect(fetchPaged).toHaveBeenCalledTimes(6); // 3 pages x 2 collections, then stop
-    expect(files).toHaveLength(6); // remainder silently missing
+    expect(fetchPaged).toHaveBeenCalledTimes(40); // 20 pages x 2 collections (MAX_LIST_PAGES), then stop
+    expect(files).toHaveLength(40); // remainder past the safety cap is still missing
     vi.unstubAllGlobals();
   });
 });
