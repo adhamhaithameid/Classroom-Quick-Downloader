@@ -179,8 +179,10 @@ export interface FileModel {
   /** The DOM element containing this file (WeakRef for GC) */
   elementRef: WeakRef<HTMLElement>;
 
-  /** How the canonical ID was derived */
-  idSource: 'data-drive-id' | 'url-parse' | 'data-id-combo' | 'url-hash';
+  /** How the canonical ID was derived. Mirrors engines/types.ts FileNode:
+   *  'api-snapshot' is the v3-base synthetic source (no DOM anchor — 2026-11-18
+   *  design); FileNode['idSource'] projects onto this union via toScannedFile. */
+  idSource: 'data-drive-id' | 'url-parse' | 'data-id-combo' | 'url-hash' | 'api-snapshot';
 
   /** File size in bytes if available from DOM */
   sizeBytes: number | null;

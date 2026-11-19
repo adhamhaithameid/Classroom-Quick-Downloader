@@ -20,19 +20,44 @@
  * the registry falls back to the V1+V2 shadow pair and the popup shows the
  * option disabled.
  *
- * This module imports nothing — it only reads the chrome globals — so both
- * the engine registry and the popup entrypoint can depend on it without
- * dragging the v3 stack (or any browser abstraction) into their bundles.
+ * FLAG OFF (engineBase 'v2', the shipped default) returns EXACTLY what the
+ * pre-ADR-0010 base returned (pinned by a parity test). Everything below about
+ * brand gating and the web-auth-flow applies only when engineBase is 'v3'.
+ *
+ * ADR-0010 adds ONE branch: on non-Chrome browsers the API assist configures
+ * ONLY when the manifest also carries a web client id (`oauth2.web_client_id`
+ * — owner prerequisite) AND the engineBase flag is ON AND the identity
+ * capability probe answers something other than 'none' (Safari and unknown
+ * hosts stay on the V2 DOM path) AND NON_CHROME_TOKEN_SOURCE_WIRED is true.
+ * getAuthToken counts ONLY on an explicit 'Google Chrome' userAgentData brand
+ * (one shared test, capability.ts); a context with no userAgentData at all
+ * falls back to a plain Chrome UA so real Chrome never regresses; present but
+ * empty or missing brands do not. The shipped defaults — no web client id,
+ * flag 'v2', token source unwired — keep every non-Chrome browser false, so flipping this on is a rollout
+ * decision, not a code surprise (docs/adr/0010-cross-browser-oauth-web-auth-flow.md).
+ *
+ * This module imports nothing from the v3 engine stack — only the pure
+ * engine-base flag and the pure capability probe — so both the engine
+ * registry and the popup entrypoint can depend on it without dragging the
+ * v3 stack (or any browser API call) into their bundles.
  *
  * Note the semantics: TRUE means CONFIGURED (capable), not consented. Consent
  * is the user's explicit Engine Mode selection (cqdV2Mode 'v3', #398); token
  * acquisition stays non-interactive and happens only on student-work views
  * while v3 is active.
  */
+import { getEngineBase } from '../../engine-base';
+import {
+  isGoogleChromeBrand,
+  isPlainChromeUserAgent,
+  probeIdentityCapability,
+} from './capability';
 
 /** What the oauth2 manifest section looks like when present. */
 interface ManifestOauth2 {
   client_id?: string;
+  /** ADR-0010 owner prerequisite: the Web-application OAuth client id. */
+  web_client_id?: string;
 }
 
 interface ManifestWithOauth2 {
@@ -50,19 +75,66 @@ interface UserAgentData {
   brands?: UserAgentBrand[];
 }
 
-/**
- * Google Chrome only: Edge/Brave/Opera ship the identity permission surface
- * in the manifest, but getAuthToken is Chrome-specific (it never answers on
- * the other Chromium brands).
- */
-function isGoogleChromeBrand(): boolean {
+/** navigator.userAgentData brand names, plain strings for the probe. */
+function readBrandNames(): string[] {
   try {
     const uaData = (navigator as Navigator & { userAgentData?: UserAgentData })?.userAgentData;
-    return Array.isArray(uaData?.brands) &&
-      uaData.brands.some((brand) => brand?.brand === 'Google Chrome');
+    return Array.isArray(uaData?.brands) ? uaData.brands.map((brand) => brand?.brand ?? '') : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * True ONLY when the context has no navigator.userAgentData object at all. A
+ * present object with empty or missing brands is NOT unavailable: the browser
+ * answered, and a non-Google Chromium fork could be answering with a plain
+ * Chrome UA (round 5, finding 1). No source shows real Google Chrome returning
+ * empty brands; Chrome 90+ lists 'Google Chrome' (plus a GREASE brand).
+ */
+function userAgentBrandsUnavailable(): boolean {
+  try {
+    const uaData = (navigator as Navigator & { userAgentData?: UserAgentData })?.userAgentData;
+    return uaData === undefined || uaData === null;
   } catch {
     return false;
   }
+}
+
+/**
+ * Google Chrome test for this context. Explicit brands decide when present.
+ * Only a context with NO navigator.userAgentData object (Chrome older than 90,
+ * an insecure context) falls back to a plain Chrome UA, so a real Google Chrome
+ * keeps its pre-ADR-0010 answer there. Empty or missing brands do not. MDN: WorkerNavigator.userAgentData exists in Web
+ * Workers on secure contexts, and extension pages are secure contexts, so the
+ * MV3 background normally carries brands (extension service worker itself:
+ * UNVERIFIED by an explicit Chrome statement).
+ */
+function isGoogleChromeContext(brandNames: readonly string[]): boolean {
+  if (isGoogleChromeBrand(brandNames)) return true;
+  if (!userAgentBrandsUnavailable()) return false;
+  return typeof navigator !== 'undefined' && isPlainChromeUserAgent(navigator.userAgent);
+}
+
+/**
+ * ADR-0010 rollout switch: TRUE only once a non-Chrome token source is wired
+ * into the engine (engine-v3 still builds ChromeIdentityTokenProvider; the
+ * WebAuthFlowTokenSource has no caller). Until then non-Chrome browsers stay
+ * "not configured" so the registry and popup never offer an API mode that can
+ * never fetch. The rollout PR flips this default and its pinning test.
+ */
+export const NON_CHROME_TOKEN_SOURCE_WIRED = false;
+
+let nonChromeTokenSourceWired: boolean = NON_CHROME_TOKEN_SOURCE_WIRED;
+
+/**
+ * TEST-ONLY seam: open the non-Chrome gate (module-scoped, like engineBase).
+ * A no-op unless import.meta.env.MODE is 'test', so shipped code cannot flip
+ * the rollout gate; the real rollout changes NON_CHROME_TOKEN_SOURCE_WIRED.
+ */
+export function setNonChromeTokenSourceWired(wired: boolean): void {
+  if (import.meta.env.MODE !== 'test') return;
+  nonChromeTokenSourceWired = wired;
 }
 
 /**
@@ -83,8 +155,26 @@ export function isApiConfigured(): boolean {
   const clientId = manifest.oauth2?.client_id;
   const hasClientId = typeof clientId === 'string' && clientId.trim().length > 0;
 
-  // Background path: chrome.identity works here — check it directly.
-  if (typeof chrome.identity?.getAuthToken === 'function') return hasClientId;
+  // Flag OFF ('v2'): answer EXACTLY what the pre-ADR-0010 base answered. Any
+  // context exposing getAuthToken is configured on the client id alone; the
+  // content-script path needs the identity permission, a client id and an
+  // explicit 'Google Chrome' brand. No UA fallback, no brand gate on getAuthToken.
+  if (getEngineBase() !== 'v3') {
+    if (typeof chrome.identity?.getAuthToken === 'function') return hasClientId;
+    const legacyPermission = Array.isArray(manifest.permissions) &&
+      manifest.permissions.includes('identity');
+    if (!legacyPermission || !hasClientId) return false;
+    return isGoogleChromeBrand(readBrandNames());
+  }
+
+  // Flag ON ('v3'). Background path: chrome.identity works here — check it directly, but only
+  // on an explicit Google Chrome brand. Edge/Brave/Opera expose the function
+  // yet never answer it, so they fall through to the web gate below.
+  const brandNames = readBrandNames();
+  const isGoogleChrome = isGoogleChromeContext(brandNames);
+  if (typeof chrome.identity?.getAuthToken === 'function' && isGoogleChrome) {
+    return hasClientId;
+  }
 
   // Content-script path (csaa.7): chrome.identity does not exist there and
   // the whole v3 engine runs in one. The manifest identity permission, the
@@ -93,6 +183,31 @@ export function isApiConfigured(): boolean {
   const hasIdentityPermission = Array.isArray(manifest.permissions) &&
     manifest.permissions.includes('identity');
   if (!hasIdentityPermission) return false;
-  if (!hasClientId) return false;
-  return isGoogleChromeBrand();
+  if (isGoogleChrome) return hasClientId;
+
+  // ADR-0010 — non-Chrome browsers: the web-auth-flow path. Configured ONLY
+  // when a web client id is present AND the engineBase flag is ON AND the
+  // capability probe says this browser can reach a launchWebAuthFlow source
+  // (directly or through the background relay). Shipped defaults — no
+  // web_client_id in the manifest, flag 'v2' — keep every browser false.
+  if (!nonChromeTokenSourceWired) return false;
+  const webClientId = manifest.oauth2?.web_client_id;
+  const hasWebClientId = typeof webClientId === 'string' && webClientId.trim().length > 0;
+  if (!hasWebClientId) return false;
+  const identity = chrome.identity as { launchWebAuthFlow?: unknown } | undefined;
+  const probe = probeIdentityCapability({
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+    apis: {
+      getAuthToken: chrome.identity?.getAuthToken,
+      launchWebAuthFlow: identity?.launchWebAuthFlow,
+    },
+    brands: brandNames,
+    // NOT a handshake: sendMessage only says a runtime exists, not that a background
+    // listener answers. Safe today because this block is unreachable until the wired
+    // gate above is true (it returns false first), so the probe cannot over-promise
+    // yet. The rollout PR that flips the gate must replace this with a real
+    // background answer (ADR-0010 rollout checklist).
+    relayAvailable: typeof chrome.runtime?.sendMessage === 'function',
+  });
+  return probe.identity !== 'none';
 }

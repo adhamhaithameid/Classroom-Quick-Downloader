@@ -78,10 +78,12 @@ import { runComparison, installCompareGlobals } from '../../compare/compare-runn
 import type { ScannedPost, ScannedFile } from '../../v2/model/dom-scanner';
 import { renderBatch, removeStaleButtons, removeAllV2Buttons, syncDownloadAllCount } from '../../v2/render/button-renderer';
 import { ensurePostClickWiring, resetDownloadController } from '../../v2/render/download-controller';
-import { resetDownloadAllController, isGroupRunBusy } from '../../v2/render/download-all-controller';
+import { resetDownloadAllController, isGroupRunBusy, setGroupApiFiles } from '../../v2/render/download-all-controller';
 import { getRecipe } from '../../v2/decision/placement-recipes';
 import { resolveDownloadUrl } from '../../v2/decision/download-url';
 import { sanitizeFileName } from '../../core/name/sanitize';
+import { driveFileKeys } from '../canonical-id';
+import { getEngineBase } from '../engine-base';
 import { injectV2Styles, removeV2Styles } from '../../v2/render/button-styles';
 import { renderFlagBadge, removeAllV2Badges } from '../../v2/render/flag-renderer';
 import { removeFlagStyles } from '../../v2/render/flag-styles';
@@ -109,6 +111,17 @@ import type { PerformanceSummary, TimingPercentiles } from '../../v2/telemetry/p
  * exactly the cases where a full page scan is the efficient move anyway.
  */
 export const TARGETED_SCAN_MAX_POSTS = 8;
+
+/**
+ * Split a post's files into DOM-anchored files and the synthetic API-only
+ * files (idSource 'api-snapshot', v3-base). Flag OFF: apiFiles is always [].
+ */
+function splitApiFiles(files: FileNode[]): { anchored: FileNode[]; apiFiles: FileNode[] } {
+  const anchored: FileNode[] = [];
+  const apiFiles: FileNode[] = [];
+  for (const f of files) (f.idSource === 'api-snapshot' ? apiFiles : anchored).push(f);
+  return { anchored, apiFiles };
+}
 
 /**
  * Pure FileNode → ScannedFile projection — one shared mapping for every
@@ -144,6 +157,8 @@ export class EngineV2 implements CQDEngine {
   // This is something V1 never did — it just queried the DOM every time
   // which is why V1 sometimes showed stale data for removed posts
   private postMap: Map<string, PostNode> = new Map();
+  /** v3-base: posts that ever carried API-only files (marker-free label match). */
+  private postsWithApiFiles: Set<string> = new Set();
   private elementToPostId: WeakMap<HTMLElement, string> = new WeakMap();
 
   // -- Scorers (created fresh on each init to reset failure counts) --
@@ -209,6 +224,10 @@ export class EngineV2 implements CQDEngine {
 
     // Clear previous state
     this.postMap.clear();
+    this.postsWithApiFiles.clear();
+    // Module-level API file map: init may run without a prior destroy.
+    // Flag OFF: the base init never reset it (byte-identical output).
+    if (getEngineBase() === 'v3') resetDownloadAllController();
     this.flagDecisions.clear();
     this.placementDecisions = [];
     this.decisionTraces.clear();
@@ -266,6 +285,7 @@ export class EngineV2 implements CQDEngine {
 
     // Clear all state
     this.postMap.clear();
+    this.postsWithApiFiles.clear();
     this.flagDecisions.clear();
     this.placementDecisions = [];
     this.decisionTraces.clear();
@@ -478,6 +498,7 @@ export class EngineV2 implements CQDEngine {
       for (const [postId, post] of this.postMap.entries()) {
         if (!post.element.isConnected) {
           this.postMap.delete(postId);
+          this.dropApiFiles(postId);
           this.flagDecisions.delete(postId);
           this.decisionTraces.delete(postId);
         }
@@ -619,12 +640,31 @@ export class EngineV2 implements CQDEngine {
       this.currentView === 'material_details' ||
       this.currentView === 'announcement_detail'
     ) {
+      // Flag OFF (engineBase 'v2'): exactly the base-branch compare on the raw
+      // canonicalId. Flag ON ('v3'): Drive-id keys (so a url-/dataid- DOM file
+      // matches its API twin), and posts that step 3 will delete are not
+      // counted as covering anything (a stale post must not hide a body button).
+      const v3Keys = getEngineBase() === 'v3';
+      const keysOf = (f: FileNode): string[] =>
+        v3Keys ? driveFileKeys(f) : [f.canonicalId];
       const covered = new Set<string>();
       for (const p of this.postMap.values()) {
-        for (const f of p.files) covered.add(f.canonicalId);
+        if (
+          v3Keys &&
+          !p.id.startsWith('details:') &&
+          (!seenPostIds.has(p.id) || !p.element.isConnected)
+        ) {
+          continue;
+        }
+        for (const f of p.files) {
+          // An API-only twin has no anchor of its own: it must not hide the
+          // DOM anchor it duplicates (that anchor is the file's single button).
+          if (v3Keys && f.idSource === 'api-snapshot') continue;
+          for (const k of keysOf(f)) covered.add(k);
+        }
       }
       const bodyFiles = this.discoverFiles(document.body);
-      const uncovered = bodyFiles.filter((f) => !covered.has(f.canonicalId));
+      const uncovered = bodyFiles.filter((f) => !keysOf(f).some((k) => covered.has(k)));
       if (uncovered.length > 0) {
         // The synthetic post OWNS the details page ("the post is the entire
         // page content"). Drop the empty leftover SPA posts: their per-post
@@ -635,6 +675,7 @@ export class EngineV2 implements CQDEngine {
         for (const [pid, p] of this.postMap) {
           if (p.files.length === 0 && !pid.startsWith('details:')) {
             this.postMap.delete(pid);
+            this.dropApiFiles(pid);
             this.flagDecisions.delete(pid);
             this.decisionTraces.delete(pid);
           }
@@ -655,7 +696,15 @@ export class EngineV2 implements CQDEngine {
         }
         post.element = document.body;
         post.lastScannedAt = Date.now();
-        post.files = uncovered;
+        // v3-base: carry the post's API-only files (no DOM anchor, so the
+        // body scan never sees them); canonical ids make the covered/known
+        // comparison match DOM drive-<id> files. Flag OFF: kept is [].
+        const keptApi = splitApiFiles(post.files).apiFiles;
+        const uncoveredKeys = new Set(uncovered.flatMap((f) => driveFileKeys(f)));
+        post.files = [
+          ...uncovered,
+          ...keptApi.filter((f) => !driveFileKeys(f).some((k) => uncoveredKeys.has(k))),
+        ];
         post.flags = this.detectFlags(document.body, detailsId);
         seenPostIds.add(detailsId);
       }
@@ -677,6 +726,7 @@ export class EngineV2 implements CQDEngine {
       if (keepDetailsAcrossEmptyScan && postId.startsWith('details:')) continue;
       if (!seenPostIds.has(postId) || !post.element.isConnected) {
         this.postMap.delete(postId);
+        this.dropApiFiles(postId);
         this.flagDecisions.delete(postId);
         this.decisionTraces.delete(postId);
       }
@@ -822,8 +872,21 @@ export class EngineV2 implements CQDEngine {
     post.element = postEl;
     post.lastScannedAt = Date.now();
 
-    // EXTRACT FILES from this post
-    post.files = this.discoverFiles(postEl);
+    // EXTRACT FILES from this post. v3-base: the API union has no DOM anchor,
+    // so re-discovery cannot see it — carry the synthetic files over (the
+    // union never removes), dropping any the DOM now also found (same
+    // canonicalId: DOM wins, no double count). Flag OFF: kept is always [].
+    const kept = splitApiFiles(post.files).apiFiles;
+    const rediscovered = this.discoverFiles(postEl);
+    if (kept.length > 0) {
+      const known = new Set(rediscovered.flatMap((f) => driveFileKeys(f)));
+      post.files = [
+        ...rediscovered,
+        ...kept.filter((f) => !driveFileKeys(f).some((k) => known.has(k))),
+      ];
+    } else {
+      post.files = rediscovered;
+    }
 
     // DETECT FLAGS for this post
     post.flags = this.detectFlags(postEl, postId);
@@ -1149,7 +1212,20 @@ export class EngineV2 implements CQDEngine {
           // Re-run file discovery for this post
           const post = this.postMap.get(item.postId);
           if (!post) return false;
-          post.files = this.discoverFiles(post.element);
+          // v3-base: the API union has no DOM anchor, so re-discovery cannot
+          // see it — carry the synthetic files over or the correction would
+          // silently wipe them (label and run both shrink).
+          const kept = splitApiFiles(post.files).apiFiles;
+          const rediscovered = this.discoverFiles(post.element);
+          if (kept.length > 0) {
+            const known = new Set(rediscovered.flatMap((f) => driveFileKeys(f)));
+            post.files = [
+              ...rediscovered,
+              ...kept.filter((f) => !driveFileKeys(f).some((k) => known.has(k))),
+            ];
+          } else {
+            post.files = rediscovered;
+          }
           return true;
         }
 
@@ -1229,14 +1305,19 @@ export class EngineV2 implements CQDEngine {
   private planPlacementForPost(post: PostNode): PlacementDecision[] {
     if (!this.currentView) return [];
 
+    // v3-base: synthetic API files have no DOM anchor, so they never feed the
+    // single-button planner (a decision for one would hang a button off the
+    // post root). They only raise the group threshold/label (extra count).
+    const { anchored, apiFiles } = splitApiFiles(post.files);
+
     // Convert PostNode → ScannedPost for the placement engine
     // The placement engine uses ScannedPost/ScannedFile types from dom-scanner
     // which are structurally compatible with PostNode/FileNode
     const scannedPost: ScannedPost = {
       id: post.id,
       element: post.element,
-      fingerprint: `${post.id}-${post.files.length}-${post.lastScannedAt}`,
-      files: post.files.map(toScannedFile),
+      fingerprint: `${post.id}-${anchored.length}-${post.lastScannedAt}`,
+      files: anchored.map(toScannedFile),
       isExpanded: true, // Default to expanded — accordion check done by recipe
       isConnected: post.element.isConnected,
     };
@@ -1249,7 +1330,7 @@ export class EngineV2 implements CQDEngine {
     }
 
     // Compute placement decisions for this post
-    return computePlacement(scannedPost, this.currentView);
+    return computePlacement(scannedPost, this.currentView, apiFiles.length);
   }
 
   /**
@@ -1366,12 +1447,33 @@ export class EngineV2 implements CQDEngine {
       // fresh decision. Never creates a button — the no-duplicates
       // guarantee holds.
       if (recipe) {
+        // v3-base: label = single-button set + API-only files — exactly the
+        // set a group run downloads (setGroupApiFiles below). API-only files
+        // are none when engineBase is OFF, so the count is unchanged there.
+        const { anchored, apiFiles } = splitApiFiles(post.files);
+        if (apiFiles.length > 0) this.postsWithApiFiles.add(post.id);
         syncDownloadAllCount(
           post.element,
           post.id,
-          countSingleButtonEligibleFiles(post, recipe),
+          countSingleButtonEligibleFiles({ element: post.element, files: anchored }, recipe) +
+            apiFiles.length,
           recipe.downloadAll.minFilesForDownloadAll,
           isGroupRunBusy(post.id),
+          // The student-work sidecar strips data-cqd-injected, so the union
+          // label is matched by the file-id seam. Flag OFF: apiFiles is [] and
+          // the selector is unchanged.
+          // A post that EVER carried API files keeps the marker-free match,
+          // so a later loss of them still finds the stripped button.
+          apiFiles.length > 0 || this.postsWithApiFiles.has(post.id),
+        );
+        setGroupApiFiles(
+          post.id,
+          apiFiles.map((f) => ({
+            fileId: f.canonicalId,
+            url: f.downloadUrl,
+            name: f.name,
+            ext: f.ext,
+          })),
         );
       }
     }
@@ -1392,8 +1494,75 @@ export class EngineV2 implements CQDEngine {
   // DATA ACCESSORS (CQDEngine interface)
   // ========================================================================
 
+  /** A post left the page: forget its API-only files everywhere. */
+  private dropApiFiles(postId: string): void {
+    this.postsWithApiFiles.delete(postId);
+    setGroupApiFiles(postId, []);
+  }
+
   getTrackedPosts(): PostNode[] {
     return Array.from(this.postMap.values());
+  }
+
+  /**
+   * v3-base (2026-11-18 design): merge files an EXTERNAL source (EngineV3's
+   * API reconciler) discovered into one tracked post, then re-render just
+   * that post through the same render seam the S11 targeted path uses.
+   *
+   * Union semantics (design "Ruled decision"): the API adds, never removes —
+   * files already tracked under the same canonicalId are skipped and DOM
+   * files are never dropped. Nothing added → return 0 with NO re-render.
+   *
+   * Synthetic API files (idSource 'api-snapshot', element === post.element)
+   * have no DOM anchor, so they are FILTERED OUT of the placement pass — a
+   * placement decision for one would hang a single-file button off the post
+   * root. They still join post.files, so the Download All count includes
+   * them (countSingleButtonEligibleFiles reads post.files; the fresh count
+   * lands on the button via syncDownloadAllCount in cleanupAndWirePosts).
+   *
+   * @returns How many files were actually added (0 = no-op).
+   */
+  applyExternalFiles(postId: string, files: FileNode[]): number {
+    if (!this.isActive) return 0;
+    const post = this.postMap.get(postId);
+    if (!post) return 0;
+
+    const known = new Set(post.files.flatMap((f) => driveFileKeys(f)));
+    const added: FileNode[] = [];
+    for (const file of files) {
+      const keys = driveFileKeys(file);
+      if (keys.some((k) => known.has(k))) continue;
+      for (const k of keys) known.add(k);
+      added.push(file);
+    }
+    if (added.length === 0) return 0;
+
+    post.files.push(...added);
+
+    // PLAN — the per-post planner (same one fullScan/targetedScan use) feeds
+    // only anchored files to placement and counts API files toward the group.
+    const freshDecisions = this.planPlacementForPost(post);
+
+    // MERGE — drop this post's old decisions and any detached targets; keep
+    // every other live decision. Same filter shape as renderAffectedPosts;
+    // fullScan rebuilds this array wholesale instead.
+    const kept = this.placementDecisions.filter((d) => {
+      if (!d.targetElement.isConnected) return false;
+      return !post.element.contains(d.targetElement);
+    });
+    this.placementDecisions = [...kept, ...freshDecisions];
+
+    // RENDER buttons for the fresh decisions only (ungated, mirroring
+    // renderPlacedButtons), then scoped stale-button cleanup + Download All
+    // count sync + click wiring.
+    if (freshDecisions.length > 0) {
+      const fileMap = this.buildFileMap();
+      renderBatch(freshDecisions, fileMap, this.buildPostFilesMap());
+      this.recordRenderedButtons(freshDecisions);
+    }
+    this.cleanupAndWirePosts([post]);
+
+    return added.length;
   }
 
   getPlacementDecisions(): PlacementDecision[] {

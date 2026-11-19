@@ -222,6 +222,8 @@ describe('EngineRegistry: Active Engines', () => {
         }),
       },
     });
+    // getAuthToken counts only on an explicit Google Chrome brand (ADR-0010).
+    vi.stubGlobal('navigator', { userAgentData: { brands: [{ brand: 'Google Chrome' }] } });
     try {
       registry.setMode('v3');
       const active = registry.getActiveEngines();

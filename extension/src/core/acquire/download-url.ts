@@ -86,6 +86,9 @@ function appendAuth(url: string, authUser: string | null): string {
   }
 }
 
+/** How many auth_warmup continue links toDownloadUrlFrom follows (V1 parity). */
+export const MAX_AUTH_WARMUP_DEPTH = 3;
+
 /**
  * Convert a Google Drive/docs/classroom URL into the direct download URL.
  * `authUser` is the page's multi-account index (or null). Mirrors V1's
@@ -98,7 +101,7 @@ export function toDownloadUrlFrom(
   depth = 0,
 ): string {
   if (!originalUrl) return originalUrl;
-  if (depth > 3) return originalUrl;
+  if (depth > MAX_AUTH_WARMUP_DEPTH) return originalUrl;
 
   let parsed: URL;
   try {

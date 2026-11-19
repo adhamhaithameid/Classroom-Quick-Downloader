@@ -63,6 +63,8 @@ import type { DetectContext, PostObservation } from '../../contracts/detection';
 import { ApiDetector } from '../../strategies/detect/api-detector';
 import { keywordDetector } from '../../detect/keyword/keyword-detector';
 import { EngineV2 } from '../v2/engine-v2';
+import { getEngineBase } from '../engine-base';
+import { reconcileApiFiles } from './file-reconciler';
 import type { ClassroomApiSnapshot, ClassroomApiTokenProvider } from './api';
 import { ChromeIdentityTokenProvider } from './api/token-provider';
 import {
@@ -137,6 +139,10 @@ export class EngineV3 implements CQDEngine {
     // races) it is a no-op and fullScan picks the posts up instead.
     this.runApiCorroborationPass();
     this.rescanCorroboratedFlags();
+    // v3-base (2026-11-18 design): merge the snapshot's submission files into
+    // the tracked post AFTER the re-scan (the scan re-ingests posts and would
+    // otherwise wipe what an earlier pass merged).
+    this.applyApiFileReconciliation();
     // csaa.6 / bug 2.2: the whole-classroom button is driven by the
     // ORCHESTRATOR (orchestrator.syncClassroomButton, on the view-change
     // path) for every EngineV2-DOM mode — v2 and v3 alike. This engine no
@@ -169,6 +175,13 @@ export class EngineV3 implements CQDEngine {
 
   handleMutations(mutations: MutationRecord[]): void {
     this.v2.handleMutations(mutations);
+    // v3-base (2026-11-18 design): a targeted re-scan re-ingests touched posts
+    // and REPLACES their file list from the DOM (ingestPost), which would
+    // revert the API union until the next fullScan — the Download All count
+    // would flap (3 → 2 → 3). Re-apply right after; the flag/view/snapshot/
+    // single-post gates inside make this a no-op when OFF (and the known
+    // phase-2 edges — corrections path, details: post — stay out of scope).
+    this.applyApiFileReconciliation();
   }
 
   fullScan(): void {
@@ -181,6 +194,8 @@ export class EngineV3 implements CQDEngine {
       void this.refreshApiSnapshot().then(() => {
         this.runApiCorroborationPass();
         this.rescanCorroboratedFlags();
+        // v3-base: after the re-scan, same ordering reason as init().
+        this.applyApiFileReconciliation();
       });
     }
   }
@@ -268,6 +283,39 @@ export class EngineV3 implements CQDEngine {
    */
   private rescanCorroboratedFlags(): void {
     this.v2.fullScan();
+  }
+
+  /**
+   * v3-base (2026-11-18 design, "Target design" §1): merge the API snapshot's
+   * submission attachments into the tracked post's file list — API truth can
+   * ADD files the DOM misses. Runs ONLY when:
+   *   - the engineBase flag is ON ('v3'; the shipped default 'v2' returns
+   *     immediately — zero behavior change), and
+   *   - the current view is a student-work view (the only views the snapshot
+   *     covers), and
+   *   - a snapshot exists (every matrix failure row — 401/403/offline/quota —
+   *     leaves latestApiSnapshot null, so reconciliation silently degrades to
+   *     DOM verbatim).
+   * Mapping rule (design doc): reconciliation is per submission, and this
+   * phase maps ONE submission ONLY when the page is an UNAMBIGUOUS single-
+   * submission view — exactly one tracked post. Zero posts (nothing scanned)
+   * or 2+ posts (a list view with no post-to-student mapping) skip; DOM stays
+   * the source there (phase 2).
+   * Cache-first: reconcileApiFiles + applyExternalFiles add NO API calls —
+   * the snapshot comes from the existing discovery cache (pinned in
+   * tests/v3-engine-base-files.test.ts, (a-cache)).
+   */
+  private applyApiFileReconciliation(): void {
+    if (getEngineBase() !== 'v3') return;
+    if (!this.currentView || !isStudentWorkView(this.currentView)) return;
+    if (!this.latestApiSnapshot) return;
+
+    const posts = this.v2.getTrackedPosts();
+    if (posts.length !== 1) return;
+
+    const post = posts[0];
+    const added = reconcileApiFiles(this.latestApiSnapshot, post, Date.now());
+    if (added.length > 0) this.v2.applyExternalFiles(post.id, added);
   }
 
   private runApiCorroborationPass(): void {

@@ -406,6 +406,10 @@ export function renderDownloadAllButton(
  *   owned by the run machine (progress / cancel affordance), so only the
  *   dataset is updated — the post-run reset restores the idle label from
  *   it. aria-label and title are never run-owned and stay truthful.
+ * @param matchWithoutInjectedMarker - v3-base only. The student-work sidecar
+ *   (cleanupStudentWorkFlags) strips data-cqd-injected from every element on
+ *   each scan, so on those routes the button is found by its file-id seam
+ *   alone. The default (false) keeps the exact pre-v3-base selector.
  */
 export function syncDownloadAllCount(
   postEl: HTMLElement,
@@ -413,10 +417,13 @@ export function syncDownloadAllCount(
   count: number,
   minFilesForDownloadAll: number,
   deferVisuals: boolean = false,
+  matchWithoutInjectedMarker: boolean = false,
 ): void {
   const escapedId = safeCssEscape(`download-all:${postId}`);
   const btn = postEl.querySelector<HTMLButtonElement>(
-    `[${getInjectedAttr()}][${getFileIdAttr()}="${escapedId}"]`,
+    matchWithoutInjectedMarker
+      ? `[${getFileIdAttr()}="${escapedId}"]`
+      : `[${getInjectedAttr()}][${getFileIdAttr()}="${escapedId}"]`,
   );
   if (!btn) return;
 

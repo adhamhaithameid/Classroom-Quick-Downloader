@@ -88,6 +88,8 @@ function stubEngine(name: string): Record<string, unknown> {
 
 /** Configured install: identity permission + oauth2 client_id (config.ts). */
 function stubConfiguredChrome(): void {
+  // getAuthToken counts only on an explicit Google Chrome brand (ADR-0010).
+  vi.stubGlobal('navigator', { userAgentData: { brands: [{ brand: 'Google Chrome' }] } });
   vi.stubGlobal('chrome', {
     identity: { getAuthToken: () => {} },
     runtime: {

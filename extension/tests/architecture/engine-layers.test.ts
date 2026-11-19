@@ -51,16 +51,85 @@ function importsIn(file: string): string[] {
   return [...source.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((m) => m[1]!);
 }
 
+/**
+ * Comments AND string-literal contents stripped — a single-pass, escape-aware
+ * state machine (ported from tests/architecture/ui-single-source.test.ts).
+ * Sequential regexes cannot do this job: comments-first swallows live code
+ * when a template literal carries `/*`; strings-first swallows live code when
+ * a comment carries an apostrophe. Headers discuss globals at length and
+ * outcome strings like 'browser-fail' are data, so the rule targets
+ * identifier use only. Known limitation: regex literals are not modeled.
+ */
+function stripSource(source: string): string {
+  let out = '';
+  let state: 'code' | 'line' | 'block' | 'template' | 'single' | 'double' = 'code';
+  let i = 0;
+  const n = source.length;
+  while (i < n) {
+    const c = source[i]!;
+    const d = i + 1 < n ? source[i + 1]! : '';
+    if (state === 'code') {
+      if (c === '/' && d === '/') {
+        state = 'line';
+        i += 2;
+        continue;
+      }
+      if (c === '/' && d === '*') {
+        state = 'block';
+        i += 2;
+        continue;
+      }
+      if (c === '`' || c === "'" || c === '"') {
+        state = c === '`' ? 'template' : c === "'" ? 'single' : 'double';
+        out += '""';
+        i += 1;
+        continue;
+      }
+      out += c;
+      i += 1;
+      continue;
+    }
+    if (state === 'line') {
+      if (c === '\n') {
+        state = 'code';
+        out += c;
+      }
+      i += 1;
+      continue;
+    }
+    if (state === 'block') {
+      if (c === '*' && d === '/') {
+        state = 'code';
+        i += 2;
+        continue;
+      }
+      if (c === '\n') out += c;
+      i += 1;
+      continue;
+    }
+    // String-ish states: honor escapes, recover at end of line for
+    // unterminated quotes, close on the state's delimiter.
+    if (c === '\\' && i + 1 < n) {
+      i += 2;
+      continue;
+    }
+    const closer = state === 'template' ? '`' : state === 'single' ? "'" : '"';
+    if (c === closer) {
+      state = 'code';
+      i += 1;
+      continue;
+    }
+    if (c === '\n' && state !== 'template') {
+      state = 'code';
+      out += c;
+    }
+    i += 1;
+  }
+  return out;
+}
+
 function codeOf(file: string): string {
-  // Strip comments and string-literal contents before scanning for forbidden
-  // identifiers: headers discuss globals at length, and outcome strings like
-  // 'browser-fail' are data, not globals. The rule targets identifier use.
-  return readFileSync(file, 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\/\/.*$/gm, '')
-    .replace(/`(?:\\.|[^`\\])*`/g, '""')
-    .replace(/'(?:\\.|[^'\\])*'/g, '""')
-    .replace(/"(?:\\.|[^"\\])*"/g, '""');
+  return stripSource(readFileSync(file, 'utf8'));
 }
 
 function relToSrc(file: string): string {
@@ -125,6 +194,18 @@ describe('fitness: core purity (ADR-0007)', () => {
     expect(CORE_GLOBAL_FORBIDDEN.test('window.addEventListener("x", f);')).toBe(true);
     expect(CORE_GLOBAL_FORBIDDEN.test('const el = document.body;')).toBe(true);
     expect(CORE_GLOBAL_FORBIDDEN.test('pureReducer(1, 2);')).toBe(false);
+  });
+
+  it('the stripper keeps live code after a template literal that carries a comment opener (stripper canary)', () => {
+    // Real shape (comment_frame/edited_frame style CSS text): the `/*` sits
+    // INSIDE a template literal, so a comments-first regex swallows the code
+    // after it up to the next `*/` — a latent false negative for every scan.
+    const snippet = 'const css = `a /* b`;\nsetInterval(tick, 1);\nconst end = "*/";\n';
+    expect(stripSource(snippet)).toMatch(/setInterval/);
+    // Apostrophe inside a comment must not open a string either.
+    expect(stripSource("// don't\nsetInterval(tick, 1);")).toMatch(/setInterval/);
+    // Real comment and real string content are still erased.
+    expect(stripSource('/* setInterval */ const a = "setInterval";')).not.toMatch(/setInterval/);
   });
 
   it('core/** contains no browser, timer, or randomness globals', () => {

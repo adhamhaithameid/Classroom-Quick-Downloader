@@ -54,6 +54,8 @@ function installChromeMock(opts: { apiConfigured?: boolean } = {}): void {
   if (opts.apiConfigured) {
     chrome.runtime = { getManifest: () => ({ oauth2: { client_id: 'client-id' } }) };
     chrome.identity = { getAuthToken: () => {} };
+    // getAuthToken counts only on an explicit Google Chrome brand (ADR-0010).
+    vi.stubGlobal('navigator', { userAgentData: { brands: [{ brand: 'Google Chrome' }] } });
   }
   (globalThis as unknown as { chrome: unknown }).chrome = chrome;
 }

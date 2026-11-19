@@ -697,6 +697,32 @@ describe('Button Renderer: syncDownloadAllCount', () => {
     expect(post.querySelectorAll('.cqd-download-all-btn')).toHaveLength(0);
   });
 
+  it('marker stripped (student-work sidecar): default call leaves the button untouched (flag-OFF pin)', () => {
+    const post = document.createElement('article');
+    document.body.appendChild(post);
+    const btn = seedGroupButton(post, 2);
+    btn.removeAttribute('data-cqd-injected');
+
+    syncDownloadAllCount(post, 'post-sync', 3, MIN_FILES);
+
+    expect(btn.dataset.cqdGroupCount).toBe('2');
+    expect(btn.getAttribute('aria-label')).not.toBe('Download all 3 files');
+  });
+
+  it('marker stripped + matchWithoutInjectedMarker: the label is rewritten from the file-id seam', () => {
+    const post = document.createElement('article');
+    document.body.appendChild(post);
+    const btn = seedGroupButton(post, 2);
+    btn.removeAttribute('data-cqd-injected');
+
+    syncDownloadAllCount(post, 'post-sync', 3, MIN_FILES, false, true);
+
+    expect(btn.dataset.cqdGroupCount).toBe('3');
+    expect(btn.querySelector('.cqd-download-all-sub')?.textContent).toBe('3 files');
+    expect(btn.getAttribute('aria-label')).toBe('Download all 3 files');
+    expect(btn.title).toBe('Download All (3 files)');
+  });
+
   it('defers the visual rewrite while a run is busy but still records the count', () => {
     const post = document.createElement('article');
     document.body.appendChild(post);

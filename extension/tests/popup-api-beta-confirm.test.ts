@@ -28,6 +28,11 @@ type LocalArea = {
 
 function installChromeMock(initial: Record<string, unknown> = {}): { store: Record<string, unknown> } {
   const store: Record<string, unknown> = { ...initial };
+  // getAuthToken counts only on an explicit Google Chrome brand (ADR-0010).
+  Object.defineProperty(navigator, 'userAgentData', {
+    value: { brands: [{ brand: 'Google Chrome' }] },
+    configurable: true,
+  });
   (globalThis as unknown as { chrome: unknown }).chrome = {
     runtime: {
       getManifest: () => ({ version: '1.8.9', oauth2: { client_id: 'client-id' } }),
@@ -86,6 +91,7 @@ describe('popup API beta confirm card (legal round 2, surface 03 T2)', () => {
     container.remove();
     localStorage.clear();
     delete (globalThis as unknown as { chrome?: unknown }).chrome;
+    delete (navigator as unknown as { userAgentData?: unknown }).userAgentData;
     delete (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT;
     vi.restoreAllMocks();
   });
