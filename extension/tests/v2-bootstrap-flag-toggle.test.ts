@@ -69,6 +69,16 @@ async function loadBootstrap(): Promise<{
   vi.doMock('../src/v2/debug/debug-panel', () => ({
     initDebugPanel: vi.fn(async () => {}),
   }));
+  // The bootstrap loads these two with a fire-and-forget dynamic import (step 3e).
+  // Mock both so nothing is imported lazily after the test ends; otherwise the
+  // real chain (router-shadow, v3 config, analytics) races vitest's teardown
+  // and fails the run with EnvironmentTeardownError even though every test passes.
+  vi.doMock('../src/engines/router/router-shadow', () => ({
+    createShadowRouter: vi.fn(),
+  }));
+  vi.doMock('../entrypoints/utils/analytics', () => ({
+    Analytics: { track: vi.fn() },
+  }));
 
   const messageListeners: Array<(message: ToggleMessage) => void> = [];
   chrome.runtime.onMessage.addListener = vi.fn((cb: (message: ToggleMessage) => void) => {
