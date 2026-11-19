@@ -14,6 +14,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { isApiConfigured } from '../src/engines/v3/api/config';
+import { setEngineBase } from '../src/engines/engine-base';
 
 function stubChrome(chromeShape: unknown) {
   vi.stubGlobal('chrome', chromeShape);
@@ -122,5 +123,103 @@ describe('isApiConfigured (S13 consent gate)', () => {
       },
     });
     expect(isApiConfigured()).toBe(false);
+  });
+
+  // ADR-0010 — non-Chrome browsers configure ONLY through the web-auth-flow
+  // path: a web client id in the manifest AND the engineBase flag ON. The
+  // default (no web client id, flag OFF) stays false everywhere.
+  describe('web-auth-flow path (ADR-0010, non-Chrome browsers)', () => {
+    const webManifest = (webClientId?: string) => ({
+      permissions: ['downloads', 'identity'],
+      oauth2: {
+        client_id: 'cqd-extension.apps.googleusercontent.com',
+        ...(webClientId ? { web_client_id: webClientId } : {}),
+      },
+    });
+    const stubNonChrome = (
+      userAgent: string,
+      manifest: ReturnType<typeof webManifest>,
+      opts: { sendMessage?: boolean } = {},
+    ) => {
+      stubChrome({
+        runtime: {
+          getManifest: () => manifest,
+          ...(opts.sendMessage ? { sendMessage: () => {} } : {}),
+        },
+        identity: { launchWebAuthFlow: () => {} },
+      });
+      vi.stubGlobal('navigator', { userAgent, userAgentData: undefined });
+    };
+
+    afterEach(() => {
+      setEngineBase('v2'); // never leak the flag into other tests
+    });
+
+    const EDGE_UA =
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.2903.86';
+    const FIREFOX_UA =
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:133.0) Gecko/20100101 Firefox/133.0';
+    const SAFARI_UA =
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15';
+
+    it('is false by default — no web client id, flag OFF', () => {
+      stubNonChrome(EDGE_UA, webManifest());
+      expect(isApiConfigured()).toBe(false);
+    });
+
+    it('is false with the flag OFF even when a web client id exists', () => {
+      stubNonChrome(EDGE_UA, webManifest('test-web-client.apps.googleusercontent.com'));
+      expect(isApiConfigured()).toBe(false);
+    });
+
+    it('is false with the flag ON but no web client id', () => {
+      stubNonChrome(EDGE_UA, webManifest());
+      setEngineBase('v3');
+      expect(isApiConfigured()).toBe(false);
+    });
+
+    it('is false when the web client id is blank', () => {
+      stubNonChrome(EDGE_UA, webManifest('   '));
+      setEngineBase('v3');
+      expect(isApiConfigured()).toBe(false);
+    });
+
+    it('is true on Edge with web client id + flag ON (relay-capable context)', () => {
+      stubNonChrome(EDGE_UA, webManifest('test-web-client.apps.googleusercontent.com'), {
+        sendMessage: true,
+      });
+      setEngineBase('v3');
+      expect(isApiConfigured()).toBe(true);
+    });
+
+    it('is true on Firefox with web client id + flag ON (relay-capable context)', () => {
+      stubNonChrome(FIREFOX_UA, webManifest('test-web-client.apps.googleusercontent.com'), {
+        sendMessage: true,
+      });
+      setEngineBase('v3');
+      expect(isApiConfigured()).toBe(true);
+    });
+
+    it('is false on Safari even with web client id + flag ON (no identity host)', () => {
+      stubNonChrome(SAFARI_UA, webManifest('test-web-client.apps.googleusercontent.com'), {
+        sendMessage: true,
+      });
+      setEngineBase('v3');
+      expect(isApiConfigured()).toBe(false);
+    });
+
+    it('is false without the relay AND without a direct launchWebAuthFlow surface', () => {
+      // Content-script shape: no chrome.identity, no sendMessage — no token
+      // source is reachable, so the gate must stay false.
+      stubChrome({
+        runtime: {
+          getManifest: () =>
+            webManifest('test-web-client.apps.googleusercontent.com'),
+        },
+      });
+      vi.stubGlobal('navigator', { userAgent: EDGE_UA, userAgentData: undefined });
+      setEngineBase('v3');
+      expect(isApiConfigured()).toBe(false);
+    });
   });
 });

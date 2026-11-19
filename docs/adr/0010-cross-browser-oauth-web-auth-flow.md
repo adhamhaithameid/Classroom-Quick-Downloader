@@ -1,114 +1,186 @@
-# ADR-0010: A launchWebAuthFlow token path for browsers without getAuthToken
+# ADR-0010: Serve the API assist on non-Chrome browsers through launchWebAuthFlow with PKCE
 
-- **Status:** proposed (DRAFT — owner decision + OAuth web client required before build)
-- **Date:** 2026-11-18
+- **Status:** proposed (owner decision + OAuth web client required before the flag can turn ON)
+- **Date:** 2026-11-18. Rewritten 2026-11-19 (chat adr-browsers) with per-browser facts verified against official docs.
 - **Deciders:** none yet
-- **Scope:** DOC ONLY. Nothing in this ADR is implemented. `isApiConfigured()`
-  keeps returning false on these browsers, so the V1+V2 shadow fallback keeps
-  serving them exactly as today.
-
-## Context
-
-The v3 API assist runs on `chrome.identity.getAuthToken`. That call only works
-on Google Chrome:
-
-- **Firefox** has no `getAuthToken` at all (gecko `browser.identity` exposes
-  only `launchWebAuthFlow` / `getRedirectURL`).
-- **Edge, Brave, Opera** ship the `identity` permission surface, but
-  `getAuthToken` never answers there (Chromium brands without Google's
-  sign-in implementation) — pinned by `isGoogleChromeBrand()` in
-  `extension/src/engines/v3/api/config.ts`.
-
-Today those users get the V1+V2 DOM-scraping engines, which work. The API
-assist (course-wide enumeration, corroboration badges) is silently absent.
-The audit of 2026-11-18 asked whether a cross-browser path is worth
-designing. The 2026-11-15 bead 6s65 finding stands: Mozilla has no MV2
-phase-out, so the store stays MV2 and there is no Firefox-user deadline
-forcing this work.
+- **Scope:** the token source for the v3 API stack outside Google Chrome. The
+  code scaffold (TokenSource, WebAuthFlowTokenSource, capability probe) landed
+  behind the engineBase flag OFF in the same worktree; nothing ships changed.
 
 ## Decision
 
-WHEN the owner provides an OAuth **Web application** client_id (a second
-Google Cloud OAuth client, separate from the current installed-extension
-client), we add a token provider built on `identity.launchWebAuthFlow`:
+We will add a `browser.identity.launchWebAuthFlow` token source (Authorization
+Code + PKCE S256, no client secret, token in memory only) behind the existing
+`engineBase` flag, so Edge, Brave, Opera, and Firefox users can get the same
+API assist as Chrome, while Safari and non-extension hosts stay on the V2 DOM
+engine with no error shown.
 
-1. **Client type.** The current client is the "Chrome Extension / installed
-   app" type that `getAuthToken` requires. `launchWebAuthFlow` needs a Web
-   application client whose *Authorized redirect URIs* contain the exact
-   extension redirect URL. Owner prerequisite: create that client in the
-   same Google Cloud project (same org, same consent screen), enable only
-   the Classroom API.
+## Context
 
-2. **Flow.** Authorization Code with PKCE (S256). A client secret cannot
-   live in an extension, so PKCE is mandatory, not optional.
-   - `state`: random per-flow value, compared on return (CSRF).
-   - `redirect_uri`: `chrome.identity.getRedirectURL()` output, allowlisted
-     exactly in the Google Cloud console (no wildcards — Google rejects
-     them for web clients).
-   - Scopes: the same three read-only scopes the manifest already declares
-     (`classroom.coursework.me.readonly`,
-     `classroom.coursework.students.readonly`,
-     `classroom.courseworkmaterials.readonly`) plus `openid` so token
-     revocation stays simple. No write scopes, ever.
-   - Token exchange: one `fetch` to `https://oauth2.googleapis.com/token`
-     from the background service worker.
-   - Refresh token stored in `chrome.storage.local`, never synced
-     (`storage.local`, not `storage.sync`), cleared on
-     `identity.onAuthFlowExit`-equivalent sign-out and on token-revocation
-     401s (the new `ClassroomApiAuthError` surfaces these).
+The v3 API assist runs on `chrome.identity.getAuthToken`. That call works on
+Google Chrome only:
 
-3. **Wiring.** The provider implements the existing
-   `ClassroomApiTokenProvider` interface and is selected per browser: the
-   relay path (ADR: csaa.7, `CQD_API_TOKEN` → background `getAuthToken`)
-   stays for Chrome; the web-flow provider activates where
-   `isGoogleChromeBrand()` is false but `launchWebAuthFlow` exists. The
-   background half of the relay (`entrypoints/background/api-token.ts`)
-   gains a fallback: when `getAuthToken` is unavailable, it serves the
-   web-flow provider — the content-script contract is unchanged.
+- **Firefox** documents `browser.identity` with exactly two functions,
+  `getRedirectURL` and `launchWebAuthFlow`; no `getAuthToken` exists there.
+  Source: MDN, "identity API" page lists only the two functions and says
+  "This API is based on Chromium's chrome.identity API" — with no
+  `getAuthToken` anywhere on the page.
+- **Microsoft Edge** documents `identity.getAuthToken` under "Unsupported
+  APIs": "As an alternate, you can use `identity.launchWebAuthFlow` to fetch
+  an OAuth2 token to authenticate users."
+  Source: learn.microsoft.com "Supported APIs for Microsoft Edge extensions",
+  identity row and Unsupported APIs table (MV2, MV3; Windows, Linux, Mac,
+  Android).
+- **Brave**: "any extension found in the Chrome Web Store will also work in
+  Brave" (brave.com/learn). Brave publishes no identity-API statement; its
+  `getAuthToken` behavior is UNVERIFIED.
+- **Opera**: MDN browser-compat-data pins `identity.launchWebAuthFlow` at
+  Opera 60. Opera publishes no reachable identity statement (dev.opera.com
+  timed out during verification); its `getAuthToken` behavior is UNVERIFIED.
+- **Safari (macOS and iOS)**: MDN browser-compat-data lists
+  `identity.launchWebAuthFlow` and `identity.getRedirectURL` as
+  `safari: false` (iOS mirrors desktop). The identity API is not available;
+  Apple's own page is script-rendered and could not be quoted.
+- **Chrome on Android** is not an extension host. Google states no official
+  line we could quote; third-party reports agree the stable browser cannot
+  install extensions. UNVERIFIED as an official statement. Contrast: Edge
+  officially lists Android as a platform for its identity API, so an
+  Android-Chromium fork may appear later — the capability probe already
+  covers that case.
 
-4. **Gate.** `isApiConfigured()` grows one branch: brand lacks working
-   `getAuthToken` AND `launchWebAuthFlow` exists AND the web client_id is
-   configured AND a stored refresh token exists (or the user opts in).
-   Until every clause holds, the gate stays false and nothing changes.
+Chrome users keep the current path: `getAuthToken` "Gets an OAuth2 access
+token using the client ID and scopes specified in the `oauth2` section of
+manifest.json" (developer.chrome.com), with Chrome's own token cache. The
+2026-11-15 bead 6s65 finding stands: Mozilla has no MV2 phase-out, so no
+Firefox-user deadline forces this work — cost, not urgency, decides.
 
-5. **Firefox packaging note.** AMO review: the flow is user-initiated
-   (button click), the redirect stays inside the extension, and no
-   telemetry leaves the flow — the privacy model of
-   `docs/engine/api-assist-setup.md` carries over.
+## Options considered
 
-## Consequences
+1. **launchWebAuthFlow + a Web application OAuth client (chosen).** One
+   extra owner-maintained client; PKCE covers the missing secret. Works on
+   every Chromium fork plus Firefox per the facts above.
+2. **getAuthToken everywhere.** Rejected: Edge documents it unsupported;
+   Firefox does not implement it; Chromium forks without Google sign-in
+   cannot answer it. The current `isGoogleChromeBrand()` gate stays correct.
+3. **Worker-side OAuth proxy.** Rejected: it moves token custody to the
+   Worker and makes a local-only feature server-dependent, against the
+   severed-backend posture (ADR-0009 world). Revisit only with Pro-tier
+   licensing, which already needs server token custody.
+4. **No-auth DOM-only fallback (status quo).** Kept as the live default and
+   as the landing state whenever the capability probe answers `'none'`.
+   This is the decision if the owner declines the second client.
 
-- Firefox/Edge/Brave/Opera users could get the API assist (faster, more
-  accurate enumeration) without weakening the consent model.
-- The owner carries a second OAuth client forever: consent-screen
-  maintenance, verification renewals, and a redirect-URI allowlist that
-  must be updated if the extension ID ever changes (new ID = new redirect
-  URI = re-verification).
-- Refresh-token lifecycle is now ours: expiry handling, revocation on 401,
-  storage hygiene. `getAuthToken` gave Chrome's token cache for free; this
-  path does not.
-- AMO/Edge store review risk: `launchWebAuthFlow` usage draws scrutiny;
-  the ADR keeps scopes read-only and user-initiated to stay defensible.
-- Cost is real and the deadline is absent (no MV2 phase-out). Chrome users
-  — the large majority of installs — already have the assist. This is why
-  the ADR stays a draft: the owner should weigh the second-client
-  maintenance against actual Firefox-user demand before any build starts.
+## Flow (chosen option)
 
-## Alternatives Considered
+- Client type: a Google Cloud **Web application** OAuth client, separate
+  from the current Chrome-extension client. `getRedirectURL()` output feeds
+  its *Authorized redirect URIs* — no wildcards.
+- Authorization Code + PKCE S256. PKCE is mandatory, not optional: "A client
+  secret cannot live in an extension. Google lists `client_secret` as
+  "Optional" in the token request, which makes a secret-less exchange
+  possible." Source: developers.google.com "OAuth 2.0 for Web Server
+  Applications", token-request parameter table.
+- `state`: random per flow, compared on return; a mismatch rejects the flow.
+- Token exchange: one `fetch` to `https://oauth2.googleapis.com/token` with
+  `code`, `client_id`, `redirect_uri`, `grant_type=authorization_code`,
+  `code_verifier` (same source as above).
+- Scopes: the three read-only classroom scopes the manifest already declares
+  plus `openid`. No write scopes, ever.
+- Token lifetime: access token in memory with its expiry; ONE silent
+  re-auth (`interactive: false`) when expired; interactive consent only on a
+  user action. No refresh token is requested, stored, or synced.
+- Wiring: the new `WebAuthFlowTokenSource` implements the same `TokenSource`
+  seam as the Chrome relay. `isApiConfigured()` answers configured on a
+  non-Chrome browser ONLY when a web client id is present AND the `engineBase`
+  flag is ON. Default stays false everywhere; flag OFF is byte-identical.
 
-- **Do nothing (status quo).** Firefox/Edge/Brave/Opera keep V1+V2 only.
-  Zero cost, zero risk. This is the default if the owner declines the
-  second OAuth client. Revisit only if Firefox telemetry (AMO average
-  daily users, ~109 as of 2026-10) grows materially.
-- **Ship a client secret in the extension.** Rejected: extractable from
-  the package; an OAuth client secret in a public extension is a
-  credential leak waiting for the next store scrape.
-- **Ask users to paste a token from a script.** Rejected: phishing-shaped
-  UX, no expiry handling, and it trains users to approve token requests
-  outside the browser's consent surface.
-- **Hosted proxy OAuth (website handles the flow).** Rejected for now: it
-  moves token custody to the Worker and turns a local-only feature into a
-  server-dependent one, contradicting the severance posture of ADR-0009's
-  world (local gates, no required backend). Reconsider only with the
-  Pro-tier licensing work (0h4d phase 2), which already needs server
-  token custody.
+## Per-browser support table
+
+| Browser | Identity API available | Redirect URL form | Token storage | Refresh path | Store policy risk |
+|---|---|---|---|---|---|
+| Chrome | `getAuthToken` (existing relay) | `https://<app-id>.chromiumapp.org/*` (chrome.dev docs) | Chrome's token cache | Chrome-managed | none — unchanged path |
+| Edge | `launchWebAuthFlow` (`getAuthToken` unsupported — MS docs) | `https://<id>.chromiumapp.org/` | memory only (scaffold) | none — one silent re-auth | low — documented alternate API |
+| Brave | Chromium surface; specifics UNVERIFIED | `https://<id>.chromiumapp.org/` | memory only (scaffold) | none — one silent re-auth | UNVERIFIED review posture |
+| Opera | `launchWebAuthFlow` since 60 (MDN BCD) | `https://<id>.chromiumapp.org/` | memory only (scaffold) | none — one silent re-auth | low |
+| Firefox | `launchWebAuthFlow` + `getRedirectURL` only (MDN) | `getRedirectURL()` output — "fixed domain ... derived from the add-on's ID" (MDN); literal `https://<app-id>.extensions.allizom.org/` pattern UNVERIFIED | memory only (scaffold) | none — one silent re-auth | medium — AMO review scrutiny; keep flow user-initiated and telemetry-free |
+| Safari (macOS) | none — identity API `false` (MDN BCD) | n/a | n/a | n/a | none — feature absent by probe |
+| Safari (iOS) | none — mirrors desktop `false` | n/a | n/a | n/a | none — feature absent by probe |
+| Chrome on Android | not an extension host (UNVERIFIED official line) | n/a | n/a | n/a | none — feature absent |
+
+Firefox notes: since Firefox 75 the redirect must be the `getRedirectURL()`
+output; since Firefox 86 the loopback form
+`http://127.0.0.1/mozoauth2/<subdomain>` is also allowed (MDN). Set the
+add-on ID explicitly (`browser_specific_settings`) or every temporary
+install gets a new redirect URL (MDN). The silent re-auth window may need
+`interactive: true` on user action in Firefox — MDN: with `interactive`
+omitted or false "the flow is forced to conclude silently ... if the service
+provider needs to interact with the user, the flow will just fail."
+
+## What the OWNER must provide
+
+1. An OAuth **Web application** client_id (second client, same Google Cloud
+   project, same consent screen; Classroom API enabled).
+2. Authorized redirect URIs per browser: the exact `getRedirectURL()` output
+   for every shipped build (Chrome id, Edge id, Firefox AMO id + QA-companion
+   id). A new extension id = new redirect URI = re-verification.
+3. The Google OAuth verification status for the three classroom scopes:
+   Google says "If your public application uses scopes that permit access to
+   certain user data, it must complete a verification process" and sensitive
+   scopes carry an indicator on the consent-screen page. Whether the
+   classroom coursework scopes are classed sensitive or restricted is
+   UNVERIFIED — read the consent-screen indicator before filing.
+4. A privacy policy URL (the consent screen and all three stores require one
+   for this data).
+
+`NEEDS-OWNER: manifest change — a web client id config key (e.g.
+`oauth2.web_client_id`) read by the token source; no real value in-repo.`
+
+## Security
+
+- PKCE S256 always; the verifier is 43–128 base64url characters and the
+  challenge is `BASE64URL-ENCODE(SHA256(ASCII(code_verifier)))` (RFC 7636;
+  test vectors pinned from its Appendix B).
+- `state` random per flow; mismatch rejects before any token use.
+- No client secret in the package, ever. Nothing secret ships in-repo.
+- The access token lives in memory for the session; `storage.local` and
+  `storage.sync` never receive tokens (test-pinned). No refresh token exists.
+- Least scope: three classroom read-only scopes + `openid`. Revocation
+  stays a user side action; a revoked token fails as any 401 does today
+  (`ClassroomApiAuthError`), and the user repeats consent on the next click.
+- No telemetry leaves the flow; the consent model (#398) is unchanged —
+  API fetches run only after the user picks 'API (beta)'.
+
+## Rollout plan
+
+- **Step 0 (this worktree, flag OFF):** scaffold landed — `TokenSource`
+  seam, `WebAuthFlowTokenSource`, capability probe, `isApiConfigured()` web
+  branch. Zero shipped behavior change anywhere.
+- **Step 1 (owner):** mint the web client, register redirect URIs, confirm
+  scope verification status, publish the privacy policy.
+- **Step 2 (owner PR):** add the web-client-id config to the manifest
+  (NEEDS-OWNER above). Gate still false until the flag flips.
+- **Step 3 (flag ON canary):** Firefox + Edge builds with `engineBase`
+  flipped; QA companion installs first; real login HITL pass.
+- **Step 4 (stores):** submit AMO + Edge + Opera updates. Chrome can adopt
+  the same source later for a single code path; not required.
+- **Rollback:** flip the flag default back to `'v2'` and remove the config
+  key — the V2 DOM path is byte-identical to today.
+
+## Verification log (2026-11-19)
+
+- developer.chrome.com/docs/extensions/reference/api/identity — getAuthToken,
+  launchWebAuthFlow, `https://<app-id>.chromiumapp.org/*`, interactive flags.
+- MDN identity, launchWebAuthFlow, getRedirectURL pages — Firefox surface,
+  FF75/FF86 notes, interactive semantics.
+- learn.microsoft.com/.../extensions/developer-guide/api-support — Edge
+  identity row + Unsupported APIs table, quoted above.
+- brave.com/learn/using-chrome-extensions-in-brave — Web Store compatibility,
+  quoted above.
+- MDN browser-compat-data `webextensions/api/identity.json` — opera 60,
+  safari false, safari_ios mirror.
+- rfc-editor.org/rfc/rfc7636 — verifier rules + Appendix B vectors.
+- developers.google.com/identity/protocols/oauth2/web-server — token
+  endpoint, parameters, `client_secret` "Optional".
+- developers.google.com/identity/protocols/oauth2/scopes — verification
+  statement. Classroom scope classification: UNVERIFIED.
+- dev.opera.com — unreachable during verification (connect timeout).

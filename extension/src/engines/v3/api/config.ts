@@ -20,19 +20,32 @@
  * the registry falls back to the V1+V2 shadow pair and the popup shows the
  * option disabled.
  *
- * This module imports nothing — it only reads the chrome globals — so both
- * the engine registry and the popup entrypoint can depend on it without
- * dragging the v3 stack (or any browser abstraction) into their bundles.
+ * ADR-0010 adds ONE branch: on non-Chrome browsers the API assist configures
+ * ONLY when the manifest also carries a web client id (`oauth2.web_client_id`
+ * — owner prerequisite) AND the engineBase flag is ON AND the identity
+ * capability probe answers something other than 'none' (Safari and unknown
+ * hosts stay on the V2 DOM path). The shipped defaults — no web client id,
+ * flag 'v2' — keep every browser false, so flipping this on is a rollout
+ * decision, not a code surprise (docs/adr/0010-cross-browser-oauth-web-auth-flow.md).
+ *
+ * This module imports nothing from the v3 engine stack — only the pure
+ * engine-base flag and the pure capability probe — so both the engine
+ * registry and the popup entrypoint can depend on it without dragging the
+ * v3 stack (or any browser API call) into their bundles.
  *
  * Note the semantics: TRUE means CONFIGURED (capable), not consented. Consent
  * is the user's explicit Engine Mode selection (cqdV2Mode 'v3', #398); token
  * acquisition stays non-interactive and happens only on student-work views
  * while v3 is active.
  */
+import { getEngineBase } from '../../engine-base';
+import { probeIdentityCapability } from './capability';
 
 /** What the oauth2 manifest section looks like when present. */
 interface ManifestOauth2 {
   client_id?: string;
+  /** ADR-0010 owner prerequisite: the Web-application OAuth client id. */
+  web_client_id?: string;
 }
 
 interface ManifestWithOauth2 {
@@ -65,6 +78,16 @@ function isGoogleChromeBrand(): boolean {
   }
 }
 
+/** navigator.userAgentData brand names, plain strings for the probe. */
+function readBrandNames(): string[] {
+  try {
+    const uaData = (navigator as Navigator & { userAgentData?: UserAgentData })?.userAgentData;
+    return Array.isArray(uaData?.brands) ? uaData.brands.map((brand) => brand?.brand ?? '') : [];
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Whether this install has everything the API assist needs to run.
  * Never throws: a hostile/absent chrome surface reads as "not configured".
@@ -93,6 +116,26 @@ export function isApiConfigured(): boolean {
   const hasIdentityPermission = Array.isArray(manifest.permissions) &&
     manifest.permissions.includes('identity');
   if (!hasIdentityPermission) return false;
-  if (!hasClientId) return false;
-  return isGoogleChromeBrand();
+  if (isGoogleChromeBrand()) return hasClientId;
+
+  // ADR-0010 — non-Chrome browsers: the web-auth-flow path. Configured ONLY
+  // when a web client id is present AND the engineBase flag is ON AND the
+  // capability probe says this browser can reach a launchWebAuthFlow source
+  // (directly or through the background relay). Shipped defaults — no
+  // web_client_id in the manifest, flag 'v2' — keep every browser false.
+  const webClientId = manifest.oauth2?.web_client_id;
+  const hasWebClientId = typeof webClientId === 'string' && webClientId.trim().length > 0;
+  if (!hasWebClientId) return false;
+  if (getEngineBase() !== 'v3') return false;
+  const identity = chrome.identity as { launchWebAuthFlow?: unknown } | undefined;
+  const probe = probeIdentityCapability({
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+    apis: {
+      getAuthToken: chrome.identity?.getAuthToken,
+      launchWebAuthFlow: identity?.launchWebAuthFlow,
+    },
+    brands: readBrandNames(),
+    relayAvailable: typeof chrome.runtime?.sendMessage === 'function',
+  });
+  return probe.identity !== 'none';
 }
