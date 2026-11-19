@@ -9,9 +9,31 @@ import type {
 
 const CLASSROOM_API_BASE_URL = 'https://classroom.googleapis.com/v1';
 const DEFAULT_PAGE_SIZE = 200;
-/** csaa.5: hard cap of pages per list call (quota guard, not correctness). */
-const MAX_LIST_PAGES = 3;
+/**
+ * Safety cap of pages per list call (quota guard, not correctness): the loop
+ * normally ends when the API stops handing out nextPageToken. 20 pages ×
+ * 100 items covers any real course; the csaa.5 budget gate still fires
+ * before every HTTP call. (Audit 2026-11-18: the old cap of 3 silently cut
+ * large courses mid-pagination.)
+ */
+const MAX_LIST_PAGES = 20;
 const LIST_PAGE_SIZE = 100;
+
+/**
+ * HTTP 401 from the Classroom API: the token is dead. Thrown — never
+ * returned as an empty result — so callers can tell "auth failed" from
+ * "course is empty" and caches never hold that empty lie (audit
+ * 2026-11-18). CourseInventoryService resolves null (uncached), and the
+ * engine's refreshApiSnapshot warns without publishing a snapshot.
+ */
+export class ClassroomApiAuthError extends Error {
+  readonly status = 401;
+
+  constructor() {
+    super('[CQD Classroom] API token rejected (HTTP 401) — re-authentication needed');
+    this.name = 'ClassroomApiAuthError';
+  }
+}
 
 interface GoogleClassroomStudentSubmissionResponse {
   studentSubmissions?: GoogleClassroomSubmission[];
@@ -174,6 +196,7 @@ export class GoogleClassroomApiClient implements ClassroomApiClient {
         signal,
       });
       if (!response.ok) {
+        if (response.status === 401) throw new ClassroomApiAuthError();
         return submissions;
       }
 
@@ -197,8 +220,10 @@ export class GoogleClassroomApiClient implements ClassroomApiClient {
   /**
    * courseWork.list + courseWorkMaterials.list, materials embedded, driveFile
    * only (links/forms/youtube are not files), deduped by Drive id (first
-   * wins). Paginated with a hard page cap (csaa.5); any non-OK response
-   * yields the partial list — silent degradation per R7.
+   * wins). Paginates until the API stops handing out nextPageToken, bounded
+   * by the safety cap (csaa.5); any non-OK response except 401 yields the
+   * partial list — silent degradation per R7. A 401 throws
+   * ClassroomApiAuthError (an empty course must never mask a dead token).
    */
   async fetchCourseDriveFiles(
     courseId: string,
@@ -242,7 +267,10 @@ export class GoogleClassroomApiClient implements ClassroomApiClient {
           headers: { Authorization: `Bearer ${token}` },
           signal,
         });
-        if (!response.ok) return;
+        if (!response.ok) {
+          if (response.status === 401) throw new ClassroomApiAuthError();
+          return;
+        }
 
         const payload = await response.json() as GoogleClassroomMaterialListResponse;
         for (const item of payload[collectionKey] || []) collect(item?.materials);
