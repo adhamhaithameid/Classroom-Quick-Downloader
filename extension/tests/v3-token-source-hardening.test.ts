@@ -872,3 +872,174 @@ describe('WebAuthFlowTokenSource — review round 5', () => {
     });
   });
 });
+
+// Sixth fresh-eyes review (2026-11-19).
+describe('WebAuthFlowTokenSource — review round 6', () => {
+  it('finding 1: mutating deps.exchangeUrl after construction does not redirect the exchange', async () => {
+    const deps = {
+      ...makeDeps(),
+      exchangeUrl: 'https://proxy.example.test/exchange',
+      allowedExchangeOrigins: ['https://proxy.example.test'],
+    };
+    const source = new WebAuthFlowTokenSource(deps);
+    deps.exchangeUrl = 'https://evil.example.test/steal';
+    await expect(source.getToken(true)).resolves.toBe('at-1');
+    const calls = (deps.fetchImpl as ReturnType<typeof vi.fn>).mock.calls;
+    expect(calls).toHaveLength(1);
+    expect(calls[0][0]).toBe('https://proxy.example.test/exchange');
+  });
+
+  it('finding 1: mutating an unset exchangeUrl after construction still uses Google', async () => {
+    const deps = makeDeps() as ReturnType<typeof makeDeps> & { exchangeUrl?: string };
+    const source = new WebAuthFlowTokenSource(deps);
+    deps.exchangeUrl = 'https://evil.example.test/steal';
+    await expect(source.getToken(true)).resolves.toBe('at-1');
+    expect((deps.fetchImpl as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe(
+      'https://oauth2.googleapis.com/token',
+    );
+  });
+
+  describe('finding 2: Google origin requires the /token path', () => {
+    it.each([
+      'https://oauth2.googleapis.com/',
+      'https://oauth2.googleapis.com/evil',
+      'https://oauth2.googleapis.com/token/extra',
+      'https://oauth2.googleapis.com/tokens',
+    ])('rejects %s', async (url) => {
+      const deps = makeDeps({ log: vi.fn() });
+      const source = new WebAuthFlowTokenSource({ ...deps, exchangeUrl: url });
+      await expect(source.getToken(true)).resolves.toBeNull();
+      expect(deps.fetchImpl).not.toHaveBeenCalled();
+      expect(deps.launchWebAuthFlow).not.toHaveBeenCalled();
+    });
+
+    it('accepts /token with a query string; a proxy origin keeps any path', async () => {
+      const g = makeDeps();
+      await expect(
+        new WebAuthFlowTokenSource({ ...g, exchangeUrl: 'https://oauth2.googleapis.com/token?x=1' })
+          .getToken(true),
+      ).resolves.toBe('at-1');
+      const p = makeDeps();
+      await expect(
+        new WebAuthFlowTokenSource({
+          ...p,
+          exchangeUrl: 'https://proxy.example.test/any/path',
+          allowedExchangeOrigins: ['https://proxy.example.test'],
+        }).getToken(true),
+      ).resolves.toBe('at-1');
+    });
+  });
+
+  it('finding 3: a silent caller returns null at once while an interactive flow is in flight', async () => {
+    let launches = 0;
+    const deps = makeDeps({
+      launchWebAuthFlow: vi.fn(() => {
+        launches += 1;
+        return new Promise<string | undefined>(() => {});
+      }),
+    });
+    const source = new WebAuthFlowTokenSource(deps);
+    const click = source.getToken(true);
+    await vi.waitFor(() => expect(launches).toBe(1));
+    let silentSettled = false;
+    const silent = source.getToken(false).then((v) => {
+      silentSettled = true;
+      return v;
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(silentSettled).toBe(true);
+    await expect(silent).resolves.toBeNull();
+    expect(launches).toBe(1);
+    await vi.advanceTimersByTimeAsync(300_000);
+    await expect(click).resolves.toBeNull();
+  });
+
+  it('finding 3: a silent caller still shares a SILENT in-flight flow', async () => {
+    const deps = makeDeps();
+    const source = new WebAuthFlowTokenSource(deps);
+    const a = source.getToken(false);
+    const b = source.getToken(false);
+    await expect(a).resolves.toBe('at-1');
+    await expect(b).resolves.toBe('at-1');
+    expect(deps.launchWebAuthFlow).toHaveBeenCalledTimes(1);
+  });
+
+  describe('finding 5: the setup catch logs the error class only', () => {
+    it('logs error.name, never the message, once; cooldown kept', async () => {
+      const log = vi.fn();
+      const deps = {
+        ...makeDeps({ log }),
+        getRedirectUrl: () => {
+          throw new RangeError('secret-detail-xyz');
+        },
+      };
+      const source = new WebAuthFlowTokenSource(deps);
+      await expect(source.getToken(false)).resolves.toBeNull();
+      await expect(source.getToken(true)).resolves.toBeNull();
+      expect(log).toHaveBeenCalledTimes(1);
+      const line = String(log.mock.calls[0][0]);
+      expect(line).toContain('RangeError');
+      expect(line).not.toContain('secret-detail-xyz');
+    });
+
+    it('a hostile name (non-identifier) is not echoed; a non-Error throw logs the fixed line', async () => {
+      const log = vi.fn();
+      const evil = Object.assign(new Error('m'), { name: 'bad name\nwith tokens=abc' });
+      const deps = {
+        ...makeDeps({ log }),
+        getClientId: () => {
+          throw evil;
+        },
+      };
+      await new WebAuthFlowTokenSource(deps).getToken(true);
+      const line = String(log.mock.calls[0][0]);
+      expect(line).not.toContain('bad name');
+      expect(line).not.toContain('abc');
+      const log2 = vi.fn();
+      const deps2 = {
+        ...makeDeps({ log: log2 }),
+        getClientId: () => {
+          throw 'a string';
+        },
+      };
+      await new WebAuthFlowTokenSource(deps2).getToken(true);
+      expect(String(log2.mock.calls[0][0])).toMatch(/setup failed/);
+      expect(String(log2.mock.calls[0][0])).not.toContain('a string');
+    });
+  });
+
+  describe('finding 6: a throwing logger never rejects getToken', () => {
+    const boom = () => {
+      throw new Error('logger down');
+    };
+
+    it('no client id', async () => {
+      const deps = makeDeps({ log: boom, getClientId: () => null });
+      await expect(new WebAuthFlowTokenSource(deps).getToken(true)).resolves.toBeNull();
+    });
+
+    it('rejected exchange URL', async () => {
+      const deps = makeDeps({ log: boom });
+      const source = new WebAuthFlowTokenSource({ ...deps, exchangeUrl: 'http://x.test/' });
+      await expect(source.getToken(true)).resolves.toBeNull();
+    });
+
+    it('setup failure', async () => {
+      const deps = {
+        ...makeDeps({ log: boom }),
+        getRedirectUrl: () => {
+          throw new Error('x');
+        },
+      };
+      await expect(new WebAuthFlowTokenSource(deps).getToken(true)).resolves.toBeNull();
+    });
+
+    it('state mismatch', async () => {
+      const deps = makeDeps({
+        log: boom,
+        launchWebAuthFlow: vi.fn(async () => `${REDIRECT_URL}?state=wrong&code=c`),
+      });
+      await expect(new WebAuthFlowTokenSource(deps).getToken(true)).resolves.toBeNull();
+    });
+  });
+});

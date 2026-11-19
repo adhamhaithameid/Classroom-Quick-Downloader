@@ -202,6 +202,11 @@ export function isApiConfigured(): boolean {
       launchWebAuthFlow: identity?.launchWebAuthFlow,
     },
     brands: brandNames,
+    // NOT a handshake: sendMessage only says a runtime exists, not that a background
+    // listener answers. Safe today because this block is unreachable until the wired
+    // gate above is true (it returns false first), so the probe cannot over-promise
+    // yet. The rollout PR that flips the gate must replace this with a real
+    // background answer (ADR-0010 rollout checklist).
     relayAvailable: typeof chrome.runtime?.sendMessage === 'function',
   });
   return probe.identity !== 'none';

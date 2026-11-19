@@ -201,6 +201,20 @@ provider needs to interact with the user, the flow will just fail."
   until `NON_CHROME_TOKEN_SOURCE_WIRED` (v3/api/config.ts) is flipped to
   `true`. Flip it in the PR that wires `WebAuthFlowTokenSource` into
   engine-v3 and the background relay; its pinning test flips with it.
+- **Checklist (review round 6):** (1) `relayAvailable` in `isApiConfigured()` is
+  true for any context with `chrome.runtime.sendMessage`; that proves no
+  background listener answers. It is safe only while the wired gate is false,
+  because the probe is behind that gate and flag OFF never reaches it. The
+  rollout PR must replace it with a real answer from the background before it
+  flips the gate. (2) The default exchange (no `exchangeUrl`) posts no client
+  secret to Google. That is the recorded owner choice (see the secret finding
+  above): an installed-app client works as is, a Web client needs the Worker
+  proxy in `exchangeUrl`. (3) The exchange URL is validated once at
+  construction and stored; on Google's origin only the path `/token` passes; an
+  allowlisted proxy origin is checked by origin only. (4) A silent caller gets
+  null at once while a click's flow is in flight. (5) The launch gate keeps a
+  second window out only until its ceiling (launch timeout plus 60 s); it is
+  a bounded guarantee, not an absolute one.
 - **Checklist (review fix #9):** every JS context (background, content
   scripts, popup, options) must read the same persisted `engineBase` value
   from chrome.storage before the flag is enabled. `engine-base.ts` is

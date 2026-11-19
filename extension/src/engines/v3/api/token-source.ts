@@ -30,8 +30,15 @@
  *     (launchGateCeilingMs: the launch's own timeout + 60 s, always above the window
  *     timeout) so a launch that never settles cannot kill
  *     sign-in; a click may pass once a SILENT launch timed out. So a timed-out window
- *     that may still be open never gets a second window next to it; a new flow
- *     meanwhile resolves null,
+ *     that may still be open gets no second window next to it UNTIL THE CEILING
+ *     (bounded, not absolute: after the ceiling the gate reopens even if the first
+ *     window is still open, so a hung launch cannot kill sign-in for good); a new
+ *     flow before then resolves null,
+ *   - a silent caller never waits on an INTERACTIVE in-flight flow (up to 5 min):
+ *     it gets null at once; silent callers still share a silent flow,
+ *   - every log call is wrapped: a throwing logger never rejects getToken; a setup
+ *     failure logs the error CLASS name once (identifier-shaped only), never the
+ *     message or any value,
  *   - cooldown and cache expiry use now(): a backward clock step (now before the
  *     stamp) expires the cache and drops the cooldown,
  *   - setup (client id, PKCE, redirect URL) runs inside try: a throw is null plus
@@ -160,7 +167,11 @@ export interface WebAuthFlowDeps {
    * (ADR-0010) is injected here instead. The code, PKCE verifier, client id and
    * redirect URI are POSTed there, so the URL must be https, carry no userinfo
    * and have an origin in the allowlist (Google's token origin plus
-   * allowedExchangeOrigins). Anything else disables the source (null).
+   * allowedExchangeOrigins). Anything else disables the source (null). On
+   * Google's own origin the path must be exactly /token; an allowlisted proxy
+   * origin is checked by origin only (its path is the owner's choice). The
+   * validated URL is stored at construction: later changes to this object are
+   * ignored.
    */
   exchangeUrl?: string;
   /** Extra https origins the exchange URL may use (a Worker proxy; explicit). */
@@ -200,6 +211,10 @@ function isAllowedExchangeUrl(url: unknown, extraOrigins: readonly string[] | un
         // an unparsable allowlist entry allows nothing
       }
     }
+    // Google's origin serves many endpoints: only the token path may receive the code.
+    if (parsed.origin === new URL(GOOGLE_TOKEN_ENDPOINT).origin) {
+      return parsed.pathname === new URL(GOOGLE_TOKEN_ENDPOINT).pathname;
+    }
     return allowed.has(parsed.origin);
   } catch {
     return false;
@@ -229,6 +244,8 @@ export class WebAuthFlowTokenSource implements TokenSource {
   private missingClientIdLogged = false;
   private setupFailureLogged = false;
   private readonly exchangeUrlAllowed: boolean;
+  /** The URL validated in the constructor; the only one fetchImpl ever receives. */
+  private readonly exchangeUrl: string;
   private readonly deps: WebAuthFlowDeps;
 
   constructor(deps: WebAuthFlowDeps) {
@@ -237,6 +254,8 @@ export class WebAuthFlowTokenSource implements TokenSource {
     // the code, verifier and client id to an arbitrary host).
     this.exchangeUrlAllowed = deps.exchangeUrl === undefined ||
       isAllowedExchangeUrl(deps.exchangeUrl, deps.allowedExchangeOrigins);
+    // Copied now: mutating deps.exchangeUrl later cannot redirect the exchange.
+    this.exchangeUrl = this.exchangeUrlAllowed ? (deps.exchangeUrl ?? GOOGLE_TOKEN_ENDPOINT) : GOOGLE_TOKEN_ENDPOINT;
   }
 
   async getToken(interactive: boolean): Promise<string | null> {
@@ -250,8 +269,8 @@ export class WebAuthFlowTokenSource implements TokenSource {
     let clientId: string | null;
     try {
       clientId = this.deps.getClientId();
-    } catch {
-      this.logSetupFailure();
+    } catch (error) {
+      this.logSetupFailure(error);
       return null;
     }
     if (!clientId) {
@@ -278,7 +297,9 @@ export class WebAuthFlowTokenSource implements TokenSource {
       // Concurrent callers share the pending flow, unless the pending flow is
       // silent and this caller is a user click: that click must still get a
       // window, so it runs after the silent attempt settles.
-      if (!interactive || this.inflightInteractive) return this.inflight;
+      // A silent caller never waits on a click's flow (up to 5 min): null at once.
+      if (!interactive) return this.inflightInteractive ? null : this.inflight;
+      if (this.inflightInteractive) return this.inflight;
       const silent = this.inflight;
       return this.track(
         silent
@@ -324,15 +345,30 @@ export class WebAuthFlowTokenSource implements TokenSource {
     return pending;
   }
 
+  /** A throwing logger must never reject getToken (TokenSource never throws). */
   private log(message: string): void {
-    (this.deps.log ?? console.warn)(message);
+    try {
+      (this.deps.log ?? console.warn)(message);
+    } catch {
+      // logging is best-effort
+    }
   }
 
-  /** One fixed line per source, never the error text. */
-  private logSetupFailure(): void {
+  /**
+   * One fixed line per source. Adds the error CLASS name (identifier-shaped
+   * only) so a real bug leaves a trace; never the message or any value.
+   */
+  private logSetupFailure(error?: unknown): void {
     if (this.setupFailureLogged) return;
     this.setupFailureLogged = true;
-    this.log(SETUP_FAILED_LINE);
+    let name: string | null = null;
+    try {
+      const raw = (error as { name?: unknown } | null | undefined)?.name;
+      if (typeof raw === 'string' && /^[A-Za-z][A-Za-z0-9_]{0,39}$/.test(raw)) name = raw;
+    } catch {
+      // a hostile getter leaves the fixed line
+    }
+    this.log(name ? `${SETUP_FAILED_LINE} (${name})` : SETUP_FAILED_LINE);
   }
 
   private async runFlow(clientId: string, interactive: boolean): Promise<string | null> {
@@ -356,8 +392,8 @@ export class WebAuthFlowTokenSource implements TokenSource {
       authUrl.searchParams.set('state', state);
       authUrl.searchParams.set('code_challenge', pkce.challenge);
       authUrl.searchParams.set('code_challenge_method', 'S256');
-    } catch {
-      this.logSetupFailure();
+    } catch (error) {
+      this.logSetupFailure(error);
       return null;
     }
 
@@ -472,7 +508,7 @@ export class WebAuthFlowTokenSource implements TokenSource {
     signal: AbortSignal,
   ): Promise<{ token: string; lifetimeMs: number } | null> {
     try {
-      const response = await this.deps.fetchImpl(this.deps.exchangeUrl ?? GOOGLE_TOKEN_ENDPOINT, {
+      const response = await this.deps.fetchImpl(this.exchangeUrl, {
         signal,
         method: 'POST',
         body: new URLSearchParams({
