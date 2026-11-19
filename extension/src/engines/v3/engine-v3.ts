@@ -309,6 +309,16 @@ export class EngineV3 implements CQDEngine {
     if (getEngineBase() !== 'v3') return;
     if (!this.currentView || !isStudentWorkView(this.currentView)) return;
     if (!this.latestApiSnapshot) return;
+    // The snapshot is tied to a route, not to a post (9v3g, cheap partial).
+    // Re-resolve the route now: after an SPA move to another submission the
+    // cached snapshot belongs to the old one and must not add files here.
+    const route = resolveClassroomApiRouteContext(window.location.href);
+    if (
+      !route ||
+      route.studentSubmissionId !== this.latestApiSnapshot.context.studentSubmissionId
+    ) {
+      return;
+    }
 
     const posts = this.v2.getTrackedPosts();
     if (posts.length !== 1) return;

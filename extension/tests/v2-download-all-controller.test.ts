@@ -554,6 +554,41 @@ describe('CQD_RUN_DOWNLOAD_ALL shortcut (v3 mode parity)', () => {
     expect(getRunFor('post-1')).toBeUndefined();
   });
 
+  it('d2li: the collapsed-post bail shows a visible status on the group button, then resets', () => {
+    const { group } = makePost(0);
+    group.dataset.cqdGroupCount = '3';
+    setGroupApiFiles('post-1', [
+      { fileId: 'API_ONLY_0000000000001', url: 'https://drive.google.com/uc?export=download&id=API_ONLY_0000000000001', name: 'a.pdf', ext: 'pdf' },
+    ]);
+    expect(handleDownloadAllClickV2('post-1', group)).toBe(false);
+    expect(requested).toHaveLength(0);
+    expect(group.classList.contains('cqd-all-error')).toBe(true);
+    expect(group.querySelector('.cqd-download-all-main')?.textContent).toBe('Expand post');
+    expect(group.querySelector('.cqd-download-all-sub')?.textContent).toBe('to download all');
+    vi.advanceTimersByTime(GROUP_FEEDBACK_MS + 10);
+    expect(group.classList.contains('cqd-all-error')).toBe(false);
+    expect(group.querySelector('.cqd-download-all-main')?.textContent).toBe('Download all');
+    expect(group.querySelector('.cqd-download-all-sub')?.textContent).toBe('3 files');
+  });
+
+  it('d2li: an API file whose Drive id a dataid-/url- DOM button already carries is not requested twice', () => {
+    const { group, files } = makePost(2);
+    files[0].setAttribute('data-cqd-file-id', 'dataid-9-3');
+    files[0].dataset.cqdUrl = 'https://drive.usercontent.google.com/download?id=FILE_SHARED_0001&export=download&confirm=t';
+    files[1].setAttribute('data-cqd-file-id', 'url-https://example.com/other');
+    files[1].dataset.cqdUrl = 'https://drive.usercontent.google.com/download?id=FILE_OTHER_0002&export=download&confirm=t';
+    setGroupApiFiles('post-1', [
+      { fileId: 'drive-FILE_SHARED_0001', url: 'https://drive.google.com/uc?export=download&id=FILE_SHARED_0001', name: 'a.pdf', ext: 'pdf' },
+      { fileId: 'drive-FILE_OTHER_0002', url: 'https://drive.google.com/uc?export=download&id=FILE_OTHER_0002', name: 'b.pdf', ext: 'pdf' },
+      { fileId: 'drive-FILE_NEW_0003', url: 'https://drive.google.com/uc?export=download&id=FILE_NEW_0003', name: 'c.pdf', ext: 'pdf' },
+    ]);
+    handleDownloadAllClickV2('post-1', group);
+    vi.advanceTimersByTime(PER_FILE_STAGGER_MS * 5);
+    expect(requested.map((r) => r.file.fileId).sort()).toEqual(
+      ['dataid-9-3', 'drive-FILE_NEW_0003', 'url-https://example.com/other'].sort(),
+    );
+  });
+
   it('API-only post (no anchored files, no DOM buttons) still runs (details-page shape)', () => {
     const { group } = makePost(0);
     group.dataset.cqdGroupCount = '2';
@@ -624,6 +659,18 @@ describe('CQD_RUN_DOWNLOAD_ALL shortcut (v3 mode parity)', () => {
     setGroupApiFiles('post-1', [API_ONE]);
     handleDownloadAllClickV2('post-1', group);
     expect(requested).toHaveLength(2);
+  });
+
+  it('v2qe: a request the watchdog drops still settles its group run (no hang on Downloading)', () => {
+    const { group, files } = makePost(1);
+    handleDownloadAllClickV2('post-1', group);
+    expect(requested).toHaveLength(1);
+    expect(group.classList.contains('cqd-all-busy')).toBe(true);
+    // The background never answers: both watchdog stages fire.
+    vi.advanceTimersByTime(SETTLE_WATCHDOG_MS * 2 + 10);
+    expect(getButtonStateV2(files[0])).toBe('error');
+    expect(group.classList.contains('cqd-all-busy')).toBe(false);
+    expect(group.classList.contains('cqd-all-error')).toBe(true);
   });
 
   it('review final #1: a genuinely in-flight API request is still skipped by the next run', () => {

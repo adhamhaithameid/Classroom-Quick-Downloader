@@ -28,6 +28,7 @@
 
 import type { RequestId, AcquireOutcome } from '../../contracts/topics';
 import { engineRegistry } from '../../engines/engine-registry';
+import { driveFileKeys } from '../../engines/canonical-id';
 import { getButtonStateV2, setButtonStateV2 } from './button-state';
 import {
   handleSingleDownloadClickV2,
@@ -282,12 +283,18 @@ function startRun(postId: string, groupButton: HTMLButtonElement): boolean {
   // Enumerate the group's single-file buttons from the DOM (self-contained —
   // no engine coupling), deduped by canonical file id.
   const seen = new Set<string>();
+  const domDriveKeys = new Set<string>();
   const files: GroupFile[] = [];
   const apiFileIds = new Set<string>();
   for (const btn of root.querySelectorAll<HTMLButtonElement>('.cqd-download-btn')) {
     const fileId = btn.getAttribute('data-cqd-file-id') || '';
     if (!fileId || seen.has(fileId)) continue;
     seen.add(fileId);
+    // A dataid-/url- button still names a Drive file through its URL: keep
+    // that Drive key so the API twin of the same file is not run twice.
+    for (const key of driveFileKeys({ canonicalId: fileId, downloadUrl: btn.dataset.cqdUrl || '' })) {
+      domDriveKeys.add(key);
+    }
     files.push({
       fileId,
       button: btn,
@@ -314,12 +321,16 @@ function startRun(postId: string, groupButton: HTMLButtonElement): boolean {
   // anchored share; if it is > 0 a run of only the API files would be partial.
   if (apiList.length > 0 && files.length === 0) {
     const labelCount = Number(groupButton.dataset.cqdGroupCount);
-    if (Number.isFinite(labelCount) && labelCount - apiList.length > 0) return false;
+    if (Number.isFinite(labelCount) && labelCount - apiList.length > 0) {
+      showBailFeedback(groupButton);
+      return false;
+    }
   }
   // A request the watchdog dropped never settles: forget it so its file can run again.
   for (const rid of [...apiInFlight.keys()]) if (!isRequestInFlight(rid)) apiInFlight.delete(rid);
   for (const api of apiList) {
     if (!api.fileId || !api.url || seen.has(api.fileId)) continue;
+    if (driveFileKeys({ canonicalId: api.fileId, downloadUrl: api.url }).some((k) => domDriveKeys.has(k))) continue;
     if ([...apiInFlight.values()].includes(api.fileId)) continue;
     seen.add(api.fileId);
     apiFileIds.add(api.fileId);
@@ -562,6 +573,34 @@ function teardownRun(run: GroupRun): void {
   for (const off of run.hoverListeners) off();
   run.hoverListeners = [];
   resetGroupButtonVisual(run.groupButton);
+}
+
+const bailResetTimers = new WeakMap<HTMLButtonElement, ReturnType<typeof setTimeout>>();
+
+/**
+ * Collapsed post: the label counts anchored files that have no button yet, so
+ * a run would be partial. Say so on the group button instead of staying silent,
+ * then restore the idle visuals.
+ */
+function showBailFeedback(button: HTMLButtonElement): void {
+  const pendingReset = bailResetTimers.get(button);
+  if (pendingReset) clearTimeout(pendingReset);
+  button.classList.add('cqd-all-error');
+  const main = button.querySelector<HTMLElement>('.cqd-download-all-main');
+  const sub = button.querySelector<HTMLElement>('.cqd-download-all-sub');
+  if (main) main.textContent = 'Expand post';
+  if (sub) sub.textContent = 'to download all';
+  bailResetTimers.set(
+    button,
+    setTimeout(() => {
+      bailResetTimers.delete(button);
+      if (!isGroupBusyButton(button)) resetGroupButtonVisual(button);
+    }, GROUP_FEEDBACK_MS),
+  );
+}
+
+function isGroupBusyButton(button: HTMLButtonElement): boolean {
+  return [...runs.values()].some((run) => run.groupButton === button && !isRunSettled(run));
 }
 
 /** Restore the group button's idle visuals ("N files" sub-text). */

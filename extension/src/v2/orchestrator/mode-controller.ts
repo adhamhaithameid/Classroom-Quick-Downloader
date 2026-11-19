@@ -39,6 +39,7 @@
 
 import type { EngineMode } from '../../engines/types';
 import { engineRegistry } from '../../engines/engine-registry';
+import { loadEngineBase } from '../../engines/engine-base';
 import { isApiConfigured } from '../../engines/v3/api/config';
 import { decideRoute, type CandidateInput } from '../../engines/router/router-policy';
 import { ROUTER_STATS_STORAGE_KEY, type RouterStatsState } from '../../engines/router/router-stats';
@@ -114,6 +115,9 @@ export const DEFAULT_MODE: EngineMode = 'v2';
  * in restricted contexts (like if the extension is suspended).
  */
 export async function readMode(): Promise<EngineMode> {
+  // 82gr: the engineBase flag must be loaded before any gate reads it; every
+  // startup mode read (bootstrap, mode gate) passes through here first.
+  await loadEngineBase();
   try {
     // chrome.storage might not be available in all contexts
     // (e.g., in Vitest tests without a chrome mock)

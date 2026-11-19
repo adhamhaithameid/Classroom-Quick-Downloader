@@ -78,6 +78,7 @@ type Setup = {
   EngineV3: new () => import('../src/engines/v3/engine-v3').EngineV3;
   engineRegistry: import('../src/engines/engine-registry').EngineRegistry;
   fetchStudentSubmissions: Mock<ClassroomApiClient['fetchStudentSubmissions']>;
+  resolveClassroomApiRouteContext: Mock<() => ClassroomApiRouteContext>;
 };
 
 async function loadEngineWithApiMocks(config: {
@@ -136,7 +137,7 @@ async function loadEngineWithApiMocks(config: {
   engineRegistry.setMode('v3');
 
   const { EngineV3 } = await import('../src/engines/v3/engine-v3');
-  return { EngineV3, engineRegistry, fetchStudentSubmissions };
+  return { EngineV3, engineRegistry, fetchStudentSubmissions, resolveClassroomApiRouteContext };
 }
 
 /** Let the fullScan refresh chain (discover → publish → detector → reconcile)
@@ -339,6 +340,25 @@ describe('EngineV3 v3-base file wiring (flag engineBase)', () => {
     expect(post!.files).toHaveLength(2);
     expect(post!.files.some((f) => f.idSource === 'api-snapshot')).toBe(false);
     expect(engine.getLatestApiSnapshot()).toBeNull();
+  });
+
+  it('(9v3g) a snapshot for another submission is rejected at apply time (route moved on)', async () => {
+    const setup = await loadEngineWithApiMocks({ enableFlag: true });
+    seedStudentWorkPage(['post-1']);
+    // The snapshot is fetched for SUB_1; by apply time the route is SUB_2.
+    let calls = 0;
+    setup.resolveClassroomApiRouteContext.mockImplementation(() =>
+      ++calls === 1 ? CONTEXT : { ...CONTEXT, studentSubmissionId: 'SUB_2' },
+    );
+
+    engine = new setup.EngineV3();
+    await engine.init(ViewKind.STUDENT_WORK_TEACHER, new AbortController().signal);
+    await flushAsync();
+
+    expect(engine.getLatestApiSnapshot()?.context.studentSubmissionId).toBe('SUB_1');
+    const post = engine.getTrackedPosts().find((p) => p.id === 'post-1');
+    expect(post!.files).toHaveLength(2);
+    expect(post!.files.some((f) => f.idSource === 'api-snapshot')).toBe(false);
   });
 
   it('(b-list) snapshot with studentSubmissionId null: files unchanged', async () => {
