@@ -438,6 +438,45 @@ describe('EngineV3 phase 2: download-all over the API union', () => {
     expect(groupButtonOf('post-1')).toBeNull();
   });
 
+  it('(real browser) flag ON: the label still counts the union after the student-work sidecar stripped data-cqd-injected', async () => {
+    // Real-Chromium E2E gap (v3-base-flag-on (a2)): the student-work sidecar
+    // (cleanupStudentWorkFlags) removes data-cqd-injected from every element on
+    // each scan, so the V2 button is rendered with the marker, loses it, and the
+    // union (which lands after the API round trip) found no button to rewrite.
+    let release: (v: ReturnType<typeof makeSubmissions>) => void = () => {};
+    const gate = new Promise<ReturnType<typeof makeSubmissions>>((r) => {
+      release = r;
+    });
+    const setup = await loadEngineWithApiMocks({
+      enableFlag: true,
+      client: {
+        fetchStudentSubmissions: async () => gate,
+        fetchCourseDriveFiles: async () => [],
+      },
+    });
+    seedStudentWorkPage(['post-1']);
+
+    engine = new setup.EngineV3();
+    const initDone = engine.init(ViewKind.STUDENT_WORK_TEACHER, new AbortController().signal);
+    await flushAsync();
+
+    // DOM-only render happened: label says 2. Now the sidecar scan strips the marker.
+    const before = document.querySelector<HTMLElement>('[data-cqd-file-id="download-all:post-1"]');
+    expect(before?.getAttribute('data-cqd-group-count')).toBe('2');
+    for (const el of document.querySelectorAll('[data-cqd-injected]')) {
+      el.removeAttribute('data-cqd-injected');
+    }
+
+    release(makeSubmissions());
+    await initDone;
+    await flushAsync();
+
+    const groupBtn = document.querySelector<HTMLElement>('[data-cqd-file-id="download-all:post-1"]');
+    expect(groupBtn?.getAttribute('data-cqd-group-count')).toBe('3');
+    expect(groupBtn?.getAttribute('aria-label')).toBe('Download all 3 files');
+    expect(groupBtn?.querySelector('.cqd-download-all-sub')?.textContent).toBe('3 files');
+  });
+
   it('(run) flag ON: the run downloads DOM files AND the API-only file with its Drive id', async () => {
     const setup = await loadEngineWithApiMocks({ enableFlag: true });
     seedStudentWorkPage(['post-1']);

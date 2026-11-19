@@ -10,7 +10,7 @@
  *
  * (a) flag ON + API returns an API-only file: (a1) V2 buttons render, no error
  *     UI; (a2) Download All counts the union (2 DOM + 1 API-only = 3), phase 2
- *     commit 9ad86b5f. (a2) is test.fail(): NEEDS-DECISION, see the report.
+ *     commit 9ad86b5f. Fixed by matching on the file-id seam (the sidecar strips data-cqd-injected).
  * (b) flag ON + API returns 401: the DOM result is unchanged (count 2) and
  *     no alert, toast or error banner appears.
  * (c) flag OFF: the post DOM is structurally identical whether the API
@@ -320,17 +320,12 @@ test.describe("v3-base flag-on", () => {
     });
   });
 
-  // NEEDS-DECISION (product): with the flag ON and the API returning an
-  // API-only file, the engine reaches 'snapshot ready' with 1 tracked post and
-  // the API file in the snapshot, but the visible Download All label stays at
-  // the DOM count (2). The V2 count sync (syncDownloadAllCount) selects by
-  // [data-cqd-injected][data-cqd-file-id], and the rendered buttons in this
-  // view carry no data-cqd-injected attribute, so the label is never rewritten.
-  // test.fail() pins the gap: when the product is fixed this test starts
-  // passing, Playwright reports it as an unexpected pass, and the marker must
-  // be removed. See docs/session-logs/2026-11-19-e2e-flag-on.md.
+  // Root cause (fixed): the student-work sidecar strips data-cqd-injected from
+  // every element on each scan, so syncDownloadAllCount (which selected by
+  // [data-cqd-injected][data-cqd-file-id]) never found the button and the label
+  // stayed at the DOM count. The engine now matches by the file-id seam when
+  // API-only files exist. See docs/session-logs/2026-11-19-download-all-real-browser.md.
   test("(a2) flag ON + API-only file: Download All label counts the union (3)", async ({}, testInfo) => {
-    test.fail(true, "NEEDS-DECISION: visible Download All label is not rewritten in the student-work view (no data-cqd-injected on the button)");
     test.setTimeout(240_000);
     await withSession(builds.on, "ok", async (page) => {
       const capture = captureConsole(page);

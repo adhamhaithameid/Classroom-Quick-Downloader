@@ -1413,6 +1413,10 @@ export class EngineV2 implements CQDEngine {
             apiFiles.length,
           recipe.downloadAll.minFilesForDownloadAll,
           isGroupRunBusy(post.id),
+          // The student-work sidecar strips data-cqd-injected, so the union
+          // label is matched by the file-id seam. Flag OFF: apiFiles is [] and
+          // the selector is unchanged.
+          apiFiles.length > 0,
         );
         setGroupApiFiles(
           post.id,
