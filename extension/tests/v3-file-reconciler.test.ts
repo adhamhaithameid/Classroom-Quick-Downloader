@@ -24,6 +24,7 @@ import {
   MAX_RECONCILE_SNAPSHOT_AGE_MS,
   reconcileApiFiles,
 } from '../src/engines/v3/file-reconciler';
+import { sanitizeFileName } from '../src/core/name/sanitize';
 import { ViewKind } from '../src/engines/types';
 import type { FileNode, PostNode } from '../src/engines/types';
 import type { ClassroomApiSnapshot } from '../src/engines/v3/api/types';
@@ -272,5 +273,64 @@ describe('reconcileApiFiles (v3-base)', () => {
     // so engine-side dedup on canonicalId collapses them to one file.
     const [api] = reconcileApiFiles(makeSnapshot(), makePost(), NOW);
     expect(api.canonicalId).toBe(domFile('FILE_1').canonicalId);
+  });
+
+  // ---- review-fixes-union-2 (findings 4, 5, 6) ----
+
+  function snapshotWith(
+    attachments: Array<{ id: string; title: string; downloadUrl: string }>,
+  ): ClassroomApiSnapshot {
+    return makeSnapshot({
+      submissions: [
+        {
+          id: 'SUB_1',
+          attachments: attachments.map((a) => ({ ...a, source: 'driveFile' as const })),
+        },
+      ],
+    });
+  }
+
+  it('drops rows whose downloadUrl fails the download security gate (finding 4)', () => {
+    const snapshot = snapshotWith([
+      { id: 'EVIL_1', title: 'a.pdf', downloadUrl: 'https://evil.example.com/a.pdf' },
+      { id: 'HTTP_1', title: 'b.pdf', downloadUrl: 'http://drive.google.com/uc?id=HTTP_1' },
+      { id: 'JS_1', title: 'c.pdf', downloadUrl: 'javascript:alert(1)' },
+      { id: 'EMPTY_1', title: 'd.pdf', downloadUrl: '' },
+      {
+        id: 'GOOD_1',
+        title: 'e.pdf',
+        downloadUrl: 'https://drive.google.com/uc?export=download&id=GOOD_1',
+      },
+    ]);
+    const files = reconcileApiFiles(snapshot, makePost(), NOW);
+    expect(files.map((f) => f.canonicalId)).toEqual(['drive-GOOD_1']);
+  });
+
+  it('sanitizes the API title like a DOM name (finding 5)', () => {
+    const snapshot = snapshotWith([
+      {
+        id: 'FILE_9',
+        title: '../../etc/passwd.pdf',
+        downloadUrl: 'https://drive.google.com/uc?export=download&id=FILE_9',
+      },
+    ]);
+    const [file] = reconcileApiFiles(snapshot, makePost(), NOW);
+    expect(file.name).toBe(sanitizeFileName('../../etc/passwd.pdf'));
+    expect(file.name).not.toMatch(/[/\\]/);
+  });
+
+  it('an API id that already starts with drive- is still prefixed, never collides with a DOM id (finding 6)', () => {
+    // DOM file for Drive id X has canonicalId drive-X. An API attachment whose
+    // raw id is literally "drive-X" is a DIFFERENT Drive file (drive-drive-X).
+    const post = makePost([domFile('X1234567890')]);
+    const snapshot = snapshotWith([
+      {
+        id: 'drive-X1234567890',
+        title: 'other.pdf',
+        downloadUrl: 'https://drive.google.com/uc?export=download&id=drive-X1234567890',
+      },
+    ]);
+    const files = reconcileApiFiles(snapshot, post, NOW);
+    expect(files.map((f) => f.canonicalId)).toEqual(['drive-drive-X1234567890']);
   });
 });

@@ -535,4 +535,32 @@ describe('CQD_RUN_DOWNLOAD_ALL shortcut (v3 mode parity)', () => {
     vi.advanceTimersByTime(PER_FILE_STAGGER_MS * 3);
     expect(requested).toHaveLength(2);
   });
+
+  it('collapsed post: API files + anchored files but no DOM buttons → no partial run (finding 1)', () => {
+    // Collapsed accordion post: placement emits no single buttons, yet the
+    // label counts 2 anchored + 1 API = 3. A run of only the API file would
+    // download 1 of the 3 the label promises — bail instead.
+    const { group } = makePost(0);
+    group.dataset.cqdGroupCount = '3';
+    setGroupApiFiles('post-1', [
+      { fileId: 'API_ONLY_0000000000001', url: 'https://drive.google.com/uc?export=download&id=API_ONLY_0000000000001', name: 'a.pdf', ext: 'pdf' },
+    ]);
+    expect(handleRunDownloadAllRequest()).toBe(false);
+    handleDownloadAllClickV2('post-1', group);
+    vi.advanceTimersByTime(PER_FILE_STAGGER_MS * 3);
+    expect(requested).toHaveLength(0);
+    expect(getRunFor('post-1')).toBeUndefined();
+  });
+
+  it('API-only post (no anchored files, no DOM buttons) still runs (details-page shape)', () => {
+    const { group } = makePost(0);
+    group.dataset.cqdGroupCount = '2';
+    setGroupApiFiles('post-1', [
+      { fileId: 'API_A_00000000000000001', url: 'https://drive.google.com/uc?export=download&id=API_A_00000000000000001', name: 'a.pdf', ext: 'pdf' },
+      { fileId: 'API_B_00000000000000001', url: 'https://drive.google.com/uc?export=download&id=API_B_00000000000000001', name: 'b.pdf', ext: 'pdf' },
+    ]);
+    handleDownloadAllClickV2('post-1', group);
+    vi.advanceTimersByTime(PER_FILE_STAGGER_MS * 3);
+    expect(requested).toHaveLength(2);
+  });
 });

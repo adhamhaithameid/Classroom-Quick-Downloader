@@ -269,7 +269,16 @@ function startRun(postId: string, groupButton: HTMLButtonElement): boolean {
   // v3-base phase 2: API-only files join the run. They have no DOM button,
   // so each gets a DETACHED button as its state carrier (never inserted into
   // the page — no UI is created). Dedup by file id against the DOM set.
-  for (const api of apiFilesByPost.get(postId) ?? []) {
+  const apiList = apiFilesByPost.get(postId) ?? [];
+  // Count/run guard: a collapsed post emits NO single buttons, so the label's
+  // count (anchored + API) can exceed what this run could download. With API
+  // files but zero DOM buttons, the label count minus the API files is the
+  // anchored share; if it is > 0 a run of only the API files would be partial.
+  if (apiList.length > 0 && files.length === 0) {
+    const labelCount = Number(groupButton.dataset.cqdGroupCount);
+    if (Number.isFinite(labelCount) && labelCount - apiList.length > 0) return false;
+  }
+  for (const api of apiList) {
     if (!api.fileId || !api.url || seen.has(api.fileId)) continue;
     seen.add(api.fileId);
     files.push({

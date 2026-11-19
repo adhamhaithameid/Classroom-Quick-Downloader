@@ -46,19 +46,14 @@
 
 import type { ClassroomApiSnapshot } from './api/types';
 import type { FileNode, PostNode } from '../types';
+import { toCanonicalDriveId } from '../canonical-id';
+import { sanitizeFileName } from '../../core/name/sanitize';
+import { validateDownloadUrl } from '../../v2/decision/download-validator';
 
 /** A snapshot older than this is stale — mirrors api-detector.ts:93. */
 export const MAX_RECONCILE_SNAPSHOT_AGE_MS = 120_000;
 
-/**
- * Canonical file id — the SAME form engine-v2's extractFileNode gives a DOM
- * Drive anchor (`drive-<id>`). Idempotent: an id already in that form is
- * returned unchanged. API files use it so the engine's canonicalId dedup and
- * the download-all run's fileId dedup see one identity per Drive file.
- */
-export function toCanonicalDriveId(id: string): string {
-  return id.startsWith('drive-') ? id : `drive-${id}`;
-}
+export { toCanonicalDriveId };
 
 /** Lowercase extension from a Drive title ('' when the title has none) —
  *  same shape as engine-v2's ext scan (name-anchored, query-tolerant). */
@@ -100,14 +95,20 @@ export function reconcileApiFiles(
     // Scope: only driveFile rows reconcile — 'link'/'form' attachments are
     // not Drive downloads, so they cannot ride the download-all flow.
     if (attachment.source !== 'driveFile') continue;
-    // Idempotent union: compare on the canonical form (drive-<id>) only.
-    const canonicalId = toCanonicalDriveId(attachment.id);
+    // Security gate: the API URL reaches download:requested like a DOM URL,
+    // so it must pass the same validator (https + Google hosts); drop failures.
+    if (!validateDownloadUrl(attachment.downloadUrl).valid) continue;
+    // Idempotent union: compare on the canonical form (drive-<id>) only. The
+    // API side ALWAYS prefixes (an API id that already starts with 'drive-'
+    // is a different file than the DOM's drive-<id>); only the DOM-side ids
+    // above go through the idempotent toCanonicalDriveId.
+    const canonicalId = `drive-${attachment.id}`;
     if (tracked.has(canonicalId)) continue;
     tracked.add(canonicalId);
 
     fresh.push({
       canonicalId,
-      name: attachment.title,
+      name: sanitizeFileName(attachment.title),
       ext: extensionFromTitle(attachment.title),
       downloadUrl: attachment.downloadUrl,
       element: post.element,

@@ -211,7 +211,7 @@ describe('file-reconciler.ts killers', () => {
           id: 'S',
           state: 'TURNED_IN',
           attachments: [
-            { id: 'F', title: 'a.pdf', downloadUrl: 'u', source: 'driveFile' },
+            { id: 'F', title: 'a.pdf', downloadUrl: 'https://drive.google.com/uc?id=F&export=download', source: 'driveFile' },
           ],
         },
       ]) as ClassroomApiSnapshot['submissions'],
@@ -230,7 +230,7 @@ describe('file-reconciler.ts killers', () => {
         {
           id: null,
           state: 'TURNED_IN',
-          attachments: [{ id: 'F', title: 'a.pdf', downloadUrl: 'u', source: 'driveFile' }],
+          attachments: [{ id: 'F', title: 'a.pdf', downloadUrl: 'https://drive.google.com/uc?id=F&export=download', source: 'driveFile' }],
         },
       ],
     });
@@ -244,8 +244,8 @@ describe('file-reconciler.ts killers', () => {
           id: 'S',
           state: 'TURNED_IN',
           attachments: [
-            { id: 'F', title: 'a.pdf', downloadUrl: 'u', source: 'driveFile' },
-            { id: 'F', title: 'a.pdf', downloadUrl: 'u', source: 'driveFile' },
+            { id: 'F', title: 'a.pdf', downloadUrl: 'https://drive.google.com/uc?id=F&export=download', source: 'driveFile' },
+            { id: 'F', title: 'a.pdf', downloadUrl: 'https://drive.google.com/uc?id=F&export=download', source: 'driveFile' },
           ],
         },
       ],

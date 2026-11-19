@@ -693,3 +693,147 @@ describe('EngineV3 v3-base review fixes: union retention and canonical ids', () 
   });
 });
 
+
+describe('EngineV3 v3-base review fixes union-2: canonical compare, stale label, pruning', () => {
+  let engine: import('../src/engines/v3/engine-v3').EngineV3 | null = null;
+
+  beforeEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.resetModules();
+    document.body.innerHTML = '';
+    engine = null;
+    vi.stubGlobal(
+      'location',
+      new URL('https://classroom.google.com/c/C/a/A/submissions/SUB_1'),
+    );
+  });
+
+  afterEach(() => {
+    engine?.destroy();
+    engine = null;
+    vi.doUnmock('../src/v2/render/download-all-controller');
+  });
+
+  type V2Internals = {
+    postMap: Map<string, { files: Array<{ canonicalId: string; idSource: string }> }>;
+    discoverFiles(el: HTMLElement): unknown[];
+    applyExternalFiles(id: string, files: unknown[]): number;
+    fullScan(): void;
+    handleCorrection(item: unknown): boolean;
+  };
+  const v2Of = (e: unknown): V2Internals => (e as { v2: V2Internals }).v2;
+
+  const RAW = 'RAWDOMID0000000000PAD20';
+  const apiNode = (post: HTMLElement) => ({
+    canonicalId: `drive-${RAW}`,
+    name: 'raw.pdf',
+    ext: 'pdf',
+    downloadUrl: `https://drive.google.com/uc?export=download&id=${RAW}`,
+    element: post,
+    idSource: 'api-snapshot' as const,
+  });
+  const rawDomNode = (post: HTMLElement) => ({
+    canonicalId: RAW, // unprefixed: the form the review feared a DOM path could emit
+    name: 'raw.pdf',
+    ext: 'pdf',
+    downloadUrl: `https://drive.google.com/uc?export=download&id=${RAW}`,
+    element: post,
+    idSource: 'url-parse' as const,
+  });
+
+  it('(2 applyExternalFiles) an unprefixed DOM canonicalId blocks the drive-<id> API copy', async () => {
+    const setup = await loadEngineWithApiMocks({ enableFlag: true, context: LIST_CONTEXT });
+    seedStudentWorkPage(['post-1']);
+    engine = new setup.EngineV3();
+    await engine.init(ViewKind.STUDENT_WORK_TEACHER, new AbortController().signal);
+    const post = engine.getTrackedPosts()[0];
+    post.files.push(rawDomNode(post.element) as never);
+
+    expect(v2Of(engine).applyExternalFiles('post-1', [apiNode(post.element)])).toBe(0);
+    expect(post.files).toHaveLength(3);
+  });
+
+  it('(2 ingestPost re-scan) a DOM file with the unprefixed id replaces the kept API copy', async () => {
+    const setup = await loadEngineWithApiMocks({ enableFlag: true, context: LIST_CONTEXT });
+    seedStudentWorkPage(['post-1']);
+    engine = new setup.EngineV3();
+    await engine.init(ViewKind.STUDENT_WORK_TEACHER, new AbortController().signal);
+    const v2 = v2Of(engine);
+    const post = engine.getTrackedPosts()[0];
+    expect(v2.applyExternalFiles('post-1', [apiNode(post.element)])).toBe(1);
+
+    vi.spyOn(v2, 'discoverFiles').mockReturnValue([rawDomNode(post.element)]);
+    v2.fullScan();
+
+    const ids = engine.getTrackedPosts()[0].files.map((f) => f.canonicalId);
+    expect(ids).toEqual([RAW]);
+  });
+
+  it('(2 correction) the inject-button correction drops the API copy of an unprefixed DOM id', async () => {
+    const setup = await loadEngineWithApiMocks({ enableFlag: true, context: LIST_CONTEXT });
+    seedStudentWorkPage(['post-1']);
+    engine = new setup.EngineV3();
+    await engine.init(ViewKind.STUDENT_WORK_TEACHER, new AbortController().signal);
+    const v2 = v2Of(engine);
+    const post = engine.getTrackedPosts()[0];
+    v2.applyExternalFiles('post-1', [apiNode(post.element)]);
+
+    vi.spyOn(v2, 'discoverFiles').mockReturnValue([rawDomNode(post.element)]);
+    v2.handleCorrection({
+      id: 'c3', op: 'inject-button', priority: 'HIGH', postId: 'post-1',
+      element: post.element, reason: 'test',
+    });
+
+    expect(engine.getTrackedPosts()[0].files.map((f) => f.canonicalId)).toEqual([RAW]);
+  });
+
+  it('(3 stale label) after the post loses its API files the sidecar-stripped label follows the DOM count, then the button goes below threshold', async () => {
+    const setup = await loadEngineWithApiMocks({ enableFlag: true });
+    seedStudentWorkPage(['post-1']);
+    engine = new setup.EngineV3();
+    await engine.init(ViewKind.STUDENT_WORK_TEACHER, new AbortController().signal);
+    const v2 = v2Of(engine);
+    const btn = (): HTMLElement | null =>
+      document.querySelector<HTMLElement>('[data-cqd-file-id="download-all:post-1"]');
+    expect(btn()?.getAttribute('data-cqd-group-count')).toBe('3');
+
+    // Sidecar strips the marker; the post then loses its API file (e.g. the
+    // DOM found it, or a later snapshot no longer carries it).
+    for (const el of document.querySelectorAll('[data-cqd-injected]')) {
+      el.removeAttribute('data-cqd-injected');
+    }
+    const tracked = v2.postMap.get('post-1')!;
+    tracked.files = tracked.files.filter((f) => f.idSource !== 'api-snapshot');
+    v2.fullScan();
+    expect(btn()?.getAttribute('data-cqd-group-count')).toBe('2');
+
+    // One DOM anchor leaves: 1 file is below the threshold of 2 → removed.
+    document.querySelector('[data-stream-item-id="post-1"] a')!.remove();
+    for (const el of document.querySelectorAll('[data-cqd-injected]')) {
+      el.removeAttribute('data-cqd-injected');
+    }
+    v2.fullScan();
+    expect(btn()).toBeNull();
+  });
+
+  it('(7 prune) a post that leaves the page clears its API files from the group controller', async () => {
+    const setSpy = vi.fn();
+    vi.doMock('../src/v2/render/download-all-controller', async (orig) => {
+      const mod = await orig<typeof import('../src/v2/render/download-all-controller')>();
+      return { ...mod, setGroupApiFiles: setSpy };
+    });
+    const setup = await loadEngineWithApiMocks({ enableFlag: true });
+    seedStudentWorkPage(['post-1']);
+    engine = new setup.EngineV3();
+    await engine.init(ViewKind.STUDENT_WORK_TEACHER, new AbortController().signal);
+    expect(setSpy.mock.calls.some((c) => c[0] === 'post-1' && c[1].length === 1)).toBe(true);
+    setSpy.mockClear();
+
+    document.querySelector('[data-stream-item-id="post-1"]')!.remove();
+    v2Of(engine).fullScan();
+
+    expect(engine.getTrackedPosts()).toHaveLength(0);
+    expect(setSpy).toHaveBeenCalledWith('post-1', []);
+  });
+});

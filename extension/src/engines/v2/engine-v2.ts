@@ -82,6 +82,7 @@ import { resetDownloadAllController, isGroupRunBusy, setGroupApiFiles } from '..
 import { getRecipe } from '../../v2/decision/placement-recipes';
 import { resolveDownloadUrl } from '../../v2/decision/download-url';
 import { sanitizeFileName } from '../../core/name/sanitize';
+import { toCanonicalDriveId } from '../canonical-id';
 import { injectV2Styles, removeV2Styles } from '../../v2/render/button-styles';
 import { renderFlagBadge, removeAllV2Badges } from '../../v2/render/flag-renderer';
 import { removeFlagStyles } from '../../v2/render/flag-styles';
@@ -155,6 +156,8 @@ export class EngineV2 implements CQDEngine {
   // This is something V1 never did — it just queried the DOM every time
   // which is why V1 sometimes showed stale data for removed posts
   private postMap: Map<string, PostNode> = new Map();
+  /** v3-base: posts that ever carried API-only files (marker-free label match). */
+  private postsWithApiFiles: Set<string> = new Set();
   private elementToPostId: WeakMap<HTMLElement, string> = new WeakMap();
 
   // -- Scorers (created fresh on each init to reset failure counts) --
@@ -220,6 +223,7 @@ export class EngineV2 implements CQDEngine {
 
     // Clear previous state
     this.postMap.clear();
+    this.postsWithApiFiles.clear();
     this.flagDecisions.clear();
     this.placementDecisions = [];
     this.decisionTraces.clear();
@@ -277,6 +281,7 @@ export class EngineV2 implements CQDEngine {
 
     // Clear all state
     this.postMap.clear();
+    this.postsWithApiFiles.clear();
     this.flagDecisions.clear();
     this.placementDecisions = [];
     this.decisionTraces.clear();
@@ -489,6 +494,7 @@ export class EngineV2 implements CQDEngine {
       for (const [postId, post] of this.postMap.entries()) {
         if (!post.element.isConnected) {
           this.postMap.delete(postId);
+          this.dropApiFiles(postId);
           this.flagDecisions.delete(postId);
           this.decisionTraces.delete(postId);
         }
@@ -646,6 +652,7 @@ export class EngineV2 implements CQDEngine {
         for (const [pid, p] of this.postMap) {
           if (p.files.length === 0 && !pid.startsWith('details:')) {
             this.postMap.delete(pid);
+            this.dropApiFiles(pid);
             this.flagDecisions.delete(pid);
             this.decisionTraces.delete(pid);
           }
@@ -696,6 +703,7 @@ export class EngineV2 implements CQDEngine {
       if (keepDetailsAcrossEmptyScan && postId.startsWith('details:')) continue;
       if (!seenPostIds.has(postId) || !post.element.isConnected) {
         this.postMap.delete(postId);
+        this.dropApiFiles(postId);
         this.flagDecisions.delete(postId);
         this.decisionTraces.delete(postId);
       }
@@ -847,8 +855,11 @@ export class EngineV2 implements CQDEngine {
     // canonicalId: DOM wins, no double count). Flag OFF: kept is always [].
     const kept = splitApiFiles(post.files).apiFiles;
     const rediscovered = this.discoverFiles(postEl);
-    const known = new Set(rediscovered.map((f) => f.canonicalId));
-    post.files = [...rediscovered, ...kept.filter((f) => !known.has(f.canonicalId))];
+    const known = new Set(rediscovered.map((f) => toCanonicalDriveId(f.canonicalId)));
+    post.files = [
+      ...rediscovered,
+      ...kept.filter((f) => !known.has(toCanonicalDriveId(f.canonicalId))),
+    ];
 
     // DETECT FLAGS for this post
     post.flags = this.detectFlags(postEl, postId);
@@ -1179,8 +1190,11 @@ export class EngineV2 implements CQDEngine {
           // silently wipe them (label and run both shrink).
           const kept = splitApiFiles(post.files).apiFiles;
           const rediscovered = this.discoverFiles(post.element);
-          const known = new Set(rediscovered.map((f) => f.canonicalId));
-          post.files = [...rediscovered, ...kept.filter((f) => !known.has(f.canonicalId))];
+          const known = new Set(rediscovered.map((f) => toCanonicalDriveId(f.canonicalId)));
+          post.files = [
+            ...rediscovered,
+            ...kept.filter((f) => !known.has(toCanonicalDriveId(f.canonicalId))),
+          ];
           return true;
         }
 
@@ -1406,6 +1420,7 @@ export class EngineV2 implements CQDEngine {
         // set a group run downloads (setGroupApiFiles below). API-only files
         // are none when engineBase is OFF, so the count is unchanged there.
         const { anchored, apiFiles } = splitApiFiles(post.files);
+        if (apiFiles.length > 0) this.postsWithApiFiles.add(post.id);
         syncDownloadAllCount(
           post.element,
           post.id,
@@ -1416,7 +1431,9 @@ export class EngineV2 implements CQDEngine {
           // The student-work sidecar strips data-cqd-injected, so the union
           // label is matched by the file-id seam. Flag OFF: apiFiles is [] and
           // the selector is unchanged.
-          apiFiles.length > 0,
+          // A post that EVER carried API files keeps the marker-free match,
+          // so a later loss of them still finds the stripped button.
+          apiFiles.length > 0 || this.postsWithApiFiles.has(post.id),
         );
         setGroupApiFiles(
           post.id,
@@ -1446,6 +1463,12 @@ export class EngineV2 implements CQDEngine {
   // DATA ACCESSORS (CQDEngine interface)
   // ========================================================================
 
+  /** A post left the page: forget its API-only files everywhere. */
+  private dropApiFiles(postId: string): void {
+    this.postsWithApiFiles.delete(postId);
+    setGroupApiFiles(postId, []);
+  }
+
   getTrackedPosts(): PostNode[] {
     return Array.from(this.postMap.values());
   }
@@ -1473,11 +1496,12 @@ export class EngineV2 implements CQDEngine {
     const post = this.postMap.get(postId);
     if (!post) return 0;
 
-    const known = new Set(post.files.map((f) => f.canonicalId));
+    const known = new Set(post.files.map((f) => toCanonicalDriveId(f.canonicalId)));
     const added: FileNode[] = [];
     for (const file of files) {
-      if (known.has(file.canonicalId)) continue;
-      known.add(file.canonicalId);
+      const key = toCanonicalDriveId(file.canonicalId);
+      if (known.has(key)) continue;
+      known.add(key);
       added.push(file);
     }
     if (added.length === 0) return 0;
