@@ -31,6 +31,7 @@ import { engineRegistry } from '../../engines/engine-registry';
 import { getButtonStateV2, setButtonStateV2 } from './button-state';
 import {
   handleSingleDownloadClickV2,
+  isRequestInFlight,
   onSettled,
   setDownloadAllHandler,
   type DownloadRuntime,
@@ -167,6 +168,7 @@ export function uninstallDownloadAllController(): void {
  * settled listener removes each entry when its request ends.
  */
 export function resetDownloadAllController(): void {
+  lastClick = null;
   for (const run of runs.values()) teardownRun(run);
   runs.clear();
   apiFilesByPost.clear();
@@ -314,6 +316,8 @@ function startRun(postId: string, groupButton: HTMLButtonElement): boolean {
     const labelCount = Number(groupButton.dataset.cqdGroupCount);
     if (Number.isFinite(labelCount) && labelCount - apiList.length > 0) return false;
   }
+  // A request the watchdog dropped never settles: forget it so its file can run again.
+  for (const rid of [...apiInFlight.keys()]) if (!isRequestInFlight(rid)) apiInFlight.delete(rid);
   for (const api of apiList) {
     if (!api.fileId || !api.url || seen.has(api.fileId)) continue;
     if ([...apiInFlight.values()].includes(api.fileId)) continue;

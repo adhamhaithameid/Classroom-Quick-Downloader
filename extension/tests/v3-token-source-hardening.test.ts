@@ -930,7 +930,7 @@ describe('WebAuthFlowTokenSource — review round 6', () => {
     });
   });
 
-  it('finding 3: a silent caller returns null at once while an interactive flow is in flight', async () => {
+  it('finding 3: a silent caller waits for an interactive flow, capped at the silent timeout, then null', async () => {
     let launches = 0;
     const deps = makeDeps({
       launchWebAuthFlow: vi.fn(() => {
@@ -946,12 +946,53 @@ describe('WebAuthFlowTokenSource — review round 6', () => {
       silentSettled = true;
       return v;
     });
-    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(9_000);
+    expect(silentSettled).toBe(false);
+    await vi.advanceTimersByTimeAsync(1_500);
     expect(silentSettled).toBe(true);
     await expect(silent).resolves.toBeNull();
     expect(launches).toBe(1);
     await vi.advanceTimersByTimeAsync(300_000);
     await expect(click).resolves.toBeNull();
+  });
+
+  it('finding 3: a silent caller gets the token when the interactive flow finishes within the cap', async () => {
+    let finish: (url: string | undefined) => void = () => {};
+    const base = makeDeps();
+    let launches = 0;
+    const deps = makeDeps({
+      launchWebAuthFlow: vi.fn((details: { url: string; interactive: boolean }) => {
+        launches += 1;
+        return new Promise<string | undefined>((resolve) => {
+          finish = (u) => resolve(u);
+        }).then(() => base.launchWebAuthFlow(details));
+      }),
+    });
+    const source = new WebAuthFlowTokenSource(deps);
+    const click = source.getToken(true);
+    await vi.waitFor(() => expect(launches).toBe(1));
+    const silent = source.getToken(false);
+    await vi.advanceTimersByTimeAsync(3_000);
+    finish('x');
+    await expect(click).resolves.toBe('at-1');
+    await expect(silent).resolves.toBe('at-1');
+    expect(launches).toBe(1);
+  });
+
+  it('finding 4: a throwing injected clock never rejects getToken', async () => {
+    const log = vi.fn();
+    const deps = makeDeps({
+      log,
+      now: () => {
+        throw new Error('clock-boom');
+      },
+    });
+    const source = new WebAuthFlowTokenSource(deps);
+    await expect(source.getToken(true)).resolves.toBe('at-1');
+    await expect(source.getToken(false)).resolves.toBe('at-1');
+    const lines = log.mock.calls.map((c) => String(c[0]));
+    expect(lines.some((l) => l.includes('clock'))).toBe(true);
+    expect(lines.join('\n')).not.toContain('clock-boom');
   });
 
   it('finding 3: a silent caller still shares a SILENT in-flight flow', async () => {

@@ -145,6 +145,8 @@ export interface WebAuthFlowDeps {
   ): Promise<WebAuthFlowFetchResult>;
   /** Token-exchange timeout in ms (default 15s; injectable for tests). */
   fetchTimeoutMs?: number;
+  /** Max wait of a silent caller on an in-flight interactive flow (default 10s). */
+  silentWaitMs?: number;
   /** Cooldown after a failed silent re-auth in ms (default 60s). */
   silentRetryCooldownMs?: number;
   /**
@@ -242,6 +244,7 @@ export class WebAuthFlowTokenSource implements TokenSource {
   /** True when the open launch was silent and its window timeout elapsed. */
   private silentLaunchTimedOut = false;
   private missingClientIdLogged = false;
+  private clockFailureLogged = false;
   private setupFailureLogged = false;
   private readonly exchangeUrlAllowed: boolean;
   /** The URL validated in the constructor; the only one fetchImpl ever receives. */
@@ -282,7 +285,7 @@ export class WebAuthFlowTokenSource implements TokenSource {
       return null;
     }
 
-    const now = this.deps.now ?? (() => Date.now());
+    const now = (): number => this.nowMs();
     if (this.cached) {
       // now() < issuedAt: the clock stepped back, so the stamp is unreliable.
       if (this.cached.clientId === clientId && now() >= this.cached.issuedAt &&
@@ -297,8 +300,10 @@ export class WebAuthFlowTokenSource implements TokenSource {
       // Concurrent callers share the pending flow, unless the pending flow is
       // silent and this caller is a user click: that click must still get a
       // window, so it runs after the silent attempt settles.
-      // A silent caller never waits on a click's flow (up to 5 min): null at once.
-      if (!interactive) return this.inflightInteractive ? null : this.inflight;
+      // A silent caller waits on a click's flow only up to the silent launch
+      // timeout (the flow may run 5 min): the token if it lands in time, else
+      // null. It never starts a second window.
+      if (!interactive) return this.inflightInteractive ? this.waitCapped(this.inflight) : this.inflight;
       if (this.inflightInteractive) return this.inflight;
       const silent = this.inflight;
       return this.track(
@@ -343,6 +348,28 @@ export class WebAuthFlowTokenSource implements TokenSource {
     this.inflight = pending;
     this.inflightInteractive = interactive;
     return pending;
+  }
+
+  /** Race a shared flow against the silent wait cap; a rejection or timeout is null. */
+  private waitCapped(flow: Promise<string | null>): Promise<string | null> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const capped = new Promise<null>((resolve) => {
+      timer = setTimeout(() => resolve(null), this.deps.silentWaitMs ?? DEFAULT_SILENT_LAUNCH_TIMEOUT_MS);
+    });
+    return Promise.race([flow.catch(() => null), capped]).finally(() => clearTimeout(timer));
+  }
+
+  /** Injected clock, never throwing: falls back to Date.now with one fixed log line. */
+  private nowMs(): number {
+    try {
+      return (this.deps.now ?? Date.now)();
+    } catch {
+      if (!this.clockFailureLogged) {
+        this.clockFailureLogged = true;
+        this.log('[CQD Classroom] WebAuthFlow token source: clock read failed — using system time');
+      }
+      return Date.now();
+    }
   }
 
   /** A throwing logger must never reject getToken (TokenSource never throws). */
@@ -486,7 +513,7 @@ export class WebAuthFlowTokenSource implements TokenSource {
         exchangeTimedOut,
       ]);
       if (!exchanged) return null;
-      const now = this.deps.now ?? (() => Date.now());
+      const now = (): number => this.nowMs();
       this.cached = {
         token: exchanged.token,
         expiresAt: now() + exchanged.lifetimeMs - EXPIRY_SKEW_MS,

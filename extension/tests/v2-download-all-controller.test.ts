@@ -18,6 +18,7 @@ import {
   wireDownloadPath,
   ensurePostClickWiring,
   resetDownloadController,
+  SETTLE_WATCHDOG_MS,
   type DownloadRuntime,
 } from '../src/v2/render/download-controller';
 import {
@@ -609,5 +610,42 @@ describe('CQD_RUN_DOWNLOAD_ALL shortcut (v3 mode parity)', () => {
     vi.advanceTimersByTime(PER_FILE_STAGGER_MS * 3);
     expect(requested.map((r) => r.file.fileId)).not.toContain(API_ONE.fileId);
     expect(requested).toHaveLength(2); // DOM files only
+  });
+
+  it('review final #1: an API file whose request the watchdog dropped can be requested again', () => {
+    const { group } = makePost(0);
+    group.dataset.cqdGroupCount = '1';
+    setGroupApiFiles('post-1', [API_ONE]);
+    handleDownloadAllClickV2('post-1', group);
+    expect(requested).toHaveLength(1);
+    // The background never answers: both watchdog stages fire, nothing settles.
+    vi.advanceTimersByTime(SETTLE_WATCHDOG_MS * 3);
+    resetDownloadAllController();
+    setGroupApiFiles('post-1', [API_ONE]);
+    handleDownloadAllClickV2('post-1', group);
+    expect(requested).toHaveLength(2);
+  });
+
+  it('review final #1: a genuinely in-flight API request is still skipped by the next run', () => {
+    const { group } = makePost(0);
+    group.dataset.cqdGroupCount = '1';
+    setGroupApiFiles('post-1', [API_ONE]);
+    handleDownloadAllClickV2('post-1', group);
+    expect(requested).toHaveLength(1);
+    resetDownloadAllController();
+    setGroupApiFiles('post-1', [API_ONE]);
+    handleDownloadAllClickV2('post-1', group);
+    expect(requested).toHaveLength(1);
+  });
+
+  it('review final #3: reset drops the remembered click so it cannot taint a later run', () => {
+    const { group } = makePost(0);
+    group.dataset.cqdGroupCount = '1';
+    setGroupApiFiles('post-1', [API_ONE]);
+    group.click(); // untrusted click; no wired handler consumes it
+    resetDownloadAllController();
+    setGroupApiFiles('post-1', [API_ONE]);
+    handleDownloadAllClickV2('post-1', group); // direct call, no click event
+    expect(requested.map((r) => r.file.fileId)).toContain(API_ONE.fileId);
   });
 });

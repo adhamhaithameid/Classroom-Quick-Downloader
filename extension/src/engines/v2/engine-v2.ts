@@ -878,11 +878,15 @@ export class EngineV2 implements CQDEngine {
     // canonicalId: DOM wins, no double count). Flag OFF: kept is always [].
     const kept = splitApiFiles(post.files).apiFiles;
     const rediscovered = this.discoverFiles(postEl);
-    const known = new Set(rediscovered.flatMap((f) => driveFileKeys(f)));
-    post.files = [
-      ...rediscovered,
-      ...kept.filter((f) => !driveFileKeys(f).some((k) => known.has(k))),
-    ];
+    if (kept.length > 0) {
+      const known = new Set(rediscovered.flatMap((f) => driveFileKeys(f)));
+      post.files = [
+        ...rediscovered,
+        ...kept.filter((f) => !driveFileKeys(f).some((k) => known.has(k))),
+      ];
+    } else {
+      post.files = rediscovered;
+    }
 
     // DETECT FLAGS for this post
     post.flags = this.detectFlags(postEl, postId);
@@ -1213,11 +1217,15 @@ export class EngineV2 implements CQDEngine {
           // silently wipe them (label and run both shrink).
           const kept = splitApiFiles(post.files).apiFiles;
           const rediscovered = this.discoverFiles(post.element);
-          const known = new Set(rediscovered.flatMap((f) => driveFileKeys(f)));
-          post.files = [
-            ...rediscovered,
-            ...kept.filter((f) => !driveFileKeys(f).some((k) => known.has(k))),
-          ];
+          if (kept.length > 0) {
+            const known = new Set(rediscovered.flatMap((f) => driveFileKeys(f)));
+            post.files = [
+              ...rediscovered,
+              ...kept.filter((f) => !driveFileKeys(f).some((k) => known.has(k))),
+            ];
+          } else {
+            post.files = rediscovered;
+          }
           return true;
         }
 

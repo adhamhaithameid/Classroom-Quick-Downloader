@@ -84,7 +84,8 @@ describe('token-source.ts killers (round 5)', () => {
   // never stamped the cooldown). Round 5 finding 4 made setup failures resolve
   // null, so the rejection now comes from a late throw: now() while caching.
   it('a silent flow that throws rejects and starts the cooldown (mutant 292)', async () => {
-    let nowCalls = 0;
+    // Review final #4: an injected clock can no longer reject getToken, so the
+    // late throw is injected by making the private flow itself reject.
     const launch = vi.fn(async (details: { url: string }) => {
       const state = new URL(details.url).searchParams.get('state') ?? '';
       return `${REDIRECT}?state=${state}&code=c`;
@@ -99,17 +100,16 @@ describe('token-source.ts killers (round 5)', () => {
         json: async () => ({ access_token: 'tok', expires_in: 3600 }),
       }),
       randomBytes: (len) => new Uint8Array(len).fill(0xa5),
-      now: () => {
-        nowCalls += 1;
-        if (nowCalls === 1) throw new Error('clock unavailable');
-        return 0;
-      },
+      now: () => 0,
       silentRetryCooldownMs: 60_000,
       log: () => {},
     });
-    await expect(source.getToken(false)).rejects.toThrow('clock unavailable');
+    const runFlow = vi
+      .spyOn(source as unknown as { runFlow: () => Promise<string | null> }, 'runFlow')
+      .mockRejectedValueOnce(new Error('late throw'));
+    await expect(source.getToken(false)).rejects.toThrow('late throw');
     await expect(source.getToken(false)).resolves.toBeNull();
-    expect(launch).toHaveBeenCalledTimes(1);
+    expect(runFlow).toHaveBeenCalledTimes(1);
   });
 
   // mutant 338: `if (launchId !== this.launchSeq) return` -> false. A late settle
