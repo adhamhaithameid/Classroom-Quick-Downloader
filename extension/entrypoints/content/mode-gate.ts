@@ -9,8 +9,11 @@
  * not start. Every other mode lets V1 behave exactly as before:
  *   - 'legacy' → V1 renders (rollback mode)
  *   - 'shadow' → V1 renders, V2 compares silently
- *   - 'v3'     → the registry falls back to the V1+V2 shadow pair until
- *                the identity permission lands, so V1 keeps rendering
+ *   - 'v3'     → flag OFF: the registry falls back to the V1+V2 shadow
+ *                pair until the identity permission lands, so V1 keeps
+ *                rendering. Flag ON (engineBase='v3', engine-base.ts):
+ *                the fallback is V2-only and V3 renders through the V2
+ *                render layer, so the V1 stacks stay inert here too.
  *
  * The flow:
  * 1. A V1 entrypoint wraps its start/stop pair in gateV1Stack()
@@ -36,22 +39,35 @@ import {
   isValidMode,
   readMode,
 } from '../../src/v2/orchestrator/mode-controller';
+import { getEngineBase } from '../../src/engines/engine-base';
 import type { EngineMode } from '../../src/engines/types';
 
 export type { EngineMode };
 
 /**
+ * The registry-alignment rule for V1 suppression: 'v2' always suppresses
+ * (V2 runs alone there). 'v3' suppresses only when the engineBase flag is
+ * ON — the registry's 'v3' fallback is then V2-only and V3 renders through
+ * the V2 render layer, so the V1 stacks have no rendering job in 'v3'
+ * (this also fixes the double-UI defect in v3 mode). With the flag OFF
+ * this reduces to exactly the historical rule: mode === 'v2'.
+ */
+function suppressesV1(mode: EngineMode): boolean {
+  return mode === 'v2' || (mode === 'v3' && getEngineBase() === 'v3');
+}
+
+/**
  * True when the V1 self-starting stacks must stay inert (V2 renders).
  *
- * Suppression is exactly the registry's getActiveEngines() semantics for
- * 'v2' (the only mode where V2 runs alone): mode === 'v2'. Storage-empty
- * and invalid values fall back to DEFAULT_MODE.
+ * Suppression mirrors the registry's getActiveEngines() semantics via
+ * suppressesV1(): mode 'v2', plus mode 'v3' when engineBase is 'v3'.
+ * Storage-empty and invalid values fall back to DEFAULT_MODE.
  */
 export async function isV1Suppressed(): Promise<boolean> {
   try {
-    return (await readMode()) === 'v2';
+    return suppressesV1(await readMode());
   } catch {
-    return DEFAULT_MODE === 'v2';
+    return suppressesV1(DEFAULT_MODE);
   }
 }
 
@@ -62,7 +78,7 @@ export async function isV1Suppressed(): Promise<boolean> {
  */
 export function onEngineModeChange(cb: (suppressed: boolean) => void): () => void {
   const suppressedFrom = (mode: unknown): boolean =>
-    (isValidMode(mode) ? mode : DEFAULT_MODE) === 'v2';
+    suppressesV1(isValidMode(mode) ? mode : DEFAULT_MODE);
 
   const safeCb = (suppressed: boolean): void => {
     try {

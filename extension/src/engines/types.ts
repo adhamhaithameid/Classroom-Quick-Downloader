@@ -156,8 +156,10 @@ export interface FileNode {
   downloadUrl: string;
   /** The DOM element containing this file */
   element: HTMLElement;
-  /** How the file ID was derived */
-  idSource: 'data-drive-id' | 'url-parse' | 'data-id-combo' | 'url-hash';
+  /** How the file ID was derived. 'api-snapshot' marks the synthetic v3-base
+   * files (2026-11-18 design): no DOM anchor, they ride the post's
+   * download-all flow only. */
+  idSource: 'data-drive-id' | 'url-parse' | 'data-id-combo' | 'url-hash' | 'api-snapshot';
 }
 
 /**

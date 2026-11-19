@@ -33,6 +33,7 @@
  */
 
 import type { CQDEngine, EngineMode, ViewKind } from './types';
+import { getEngineBase } from './engine-base';
 import { isApiConfigured } from './v3/api/config';
 
 // ============================================================================
@@ -158,7 +159,8 @@ export class EngineRegistry {
    * - 'shadow' → [V1, V2]     — V1 renders, V2 runs silently
    * - 'v2'     → [V2]         — V2 takes over
    * - 'v3'     → [V3]         — V2 + API assist, ONLY when isApiConfigured();
-   *                               otherwise the [V1, V2] shadow fallback
+   *                               otherwise [V1, V2] shadow, or [V2] DOM when
+   *                               the engineBase flag is ON (engine-base.ts)
    *
    * The first engine in the array is the "primary" — it handles rendering.
    * The rest are "secondary" — they run for comparison but don't render.
@@ -181,6 +183,17 @@ export class EngineRegistry {
           // oauth2 client_id — see engines/v3/api/config.ts), so the user's
           // explicit 'v3' selection (consent, #398) activates the API engine.
           return this.getEnginesByNames(['engine-v3']);
+        }
+        if (getEngineBase() === 'v3') {
+          // engineBase flag ON (2026-11-18 v3-base design, target-design
+          // item 2): engine-v3 is the base engine, so the unconfigured
+          // fallback is pure V2 DOM — V3 renders through the V2 render
+          // layer and V1 has no job in this mode (the content mode gate
+          // suppresses the V1 stacks in 'v3' to match).
+          console.warn(
+            '[CQD Registry] Mode "v3" unavailable: manifest lacks identity permission or oauth2 client_id. Falling back to V2 DOM.'
+          );
+          return this.getEnginesByNames(['engine-v2']);
         }
         // V3 requires the `identity` permission (chrome.identity.getAuthToken)
         // AND an oauth2 client_id; without either the API engine cannot obtain

@@ -1396,6 +1396,67 @@ export class EngineV2 implements CQDEngine {
     return Array.from(this.postMap.values());
   }
 
+  /**
+   * v3-base (2026-11-18 design): merge files an EXTERNAL source (EngineV3's
+   * API reconciler) discovered into one tracked post, then re-render just
+   * that post through the same render seam the S11 targeted path uses.
+   *
+   * Union semantics (design "Ruled decision"): the API adds, never removes —
+   * files already tracked under the same canonicalId are skipped and DOM
+   * files are never dropped. Nothing added → return 0 with NO re-render.
+   *
+   * Synthetic API files (idSource 'api-snapshot', element === post.element)
+   * have no DOM anchor, so they are FILTERED OUT of the placement pass — a
+   * placement decision for one would hang a single-file button off the post
+   * root. They still join post.files, so the Download All count includes
+   * them (countSingleButtonEligibleFiles reads post.files; the fresh count
+   * lands on the button via syncDownloadAllCount in cleanupAndWirePosts).
+   *
+   * @returns How many files were actually added (0 = no-op).
+   */
+  applyExternalFiles(postId: string, files: FileNode[]): number {
+    if (!this.isActive) return 0;
+    const post = this.postMap.get(postId);
+    if (!post) return 0;
+
+    const known = new Set(post.files.map((f) => f.canonicalId));
+    const added: FileNode[] = [];
+    for (const file of files) {
+      if (known.has(file.canonicalId)) continue;
+      known.add(file.canonicalId);
+      added.push(file);
+    }
+    if (added.length === 0) return 0;
+
+    post.files.push(...added);
+
+    // PLAN — only files with their own DOM anchor feed the placement engine
+    // (same per-post planner fullScan/targetedScan use).
+    const anchoredFiles = post.files.filter((f) => f.idSource !== 'api-snapshot');
+    const freshDecisions = this.planPlacementForPost({ ...post, files: anchoredFiles });
+
+    // MERGE — drop this post's old decisions and any detached targets; keep
+    // every other live decision. Same filter shape as renderAffectedPosts;
+    // fullScan rebuilds this array wholesale instead.
+    const kept = this.placementDecisions.filter((d) => {
+      if (!d.targetElement.isConnected) return false;
+      return !post.element.contains(d.targetElement);
+    });
+    this.placementDecisions = [...kept, ...freshDecisions];
+
+    // RENDER buttons for the fresh decisions only (ungated, mirroring
+    // renderPlacedButtons), then scoped stale-button cleanup + Download All
+    // count sync + click wiring.
+    if (freshDecisions.length > 0) {
+      const fileMap = this.buildFileMap();
+      renderBatch(freshDecisions, fileMap, this.buildPostFilesMap());
+      this.recordRenderedButtons(freshDecisions);
+    }
+    this.cleanupAndWirePosts([post]);
+
+    return added.length;
+  }
+
   getPlacementDecisions(): PlacementDecision[] {
     return this.placementDecisions;
   }
