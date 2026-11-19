@@ -252,7 +252,12 @@ function cleanupStudentWorkFlags(root: ParentNode = document): void {
     '[data-cqd-v2-flag], [data-cqd-v2-flag-verdict], [data-cqd-v2-flag-click], [data-cqd-injected], [data-cqd-comments-processed], [data-cqd-edited-processed], [data-cqd-comment-count], [data-cqd-edit-diff], [data-cqd-edit-tooltip], [data-cqd-comments-processed], [data-cqd-edit-processed], [data-cqd-processed]',
   );
   for (const element of maybeFlagged) {
+    // V2 download buttons own the injected marker: stale cleanup, deep
+    // validation and the Download All count select them by it. Only strip
+    // the marker from the flag artifacts this sidecar cleans up.
+    const ownsMarker = element.matches('.cqd-download-btn, .cqd-download-all-btn');
     for (const attr of FLAG_ARTIFACT_ATTRS) {
+      if (attr === 'data-cqd-injected' && ownsMarker) continue;
       if (element.hasAttribute(attr)) {
         element.removeAttribute(attr);
       }

@@ -97,20 +97,27 @@ export function wireDownloadPath(
       clearSettleWatchdog(entry);
       applyOutcome(entry.button, outcome.status, outcome.detail);
     }
-    // Fan out to dependent controllers (Download All group machine).
-    for (const listener of settledListeners) {
-      try {
-        listener(requestId, outcome);
-      } catch (e) {
-        console.warn('[CQD V2 Download] settled listener failed:', e);
-      }
-    }
+    notifySettled(requestId, outcome);
   });
 
   return () => {
     off();
     busRef = null;
   };
+}
+
+/** Fan out one settled outcome to dependent controllers (Download All group machine). */
+function notifySettled(
+  requestId: RequestId,
+  outcome: PageTopicMap['download:settled']['outcome'],
+): void {
+  for (const listener of settledListeners) {
+    try {
+      listener(requestId, outcome);
+    } catch (e) {
+      console.warn('[CQD V2 Download] settled listener failed:', e);
+    }
+  }
 }
 
 /** Register a secondary settled listener (group controller). Returns off fn. */
@@ -284,6 +291,9 @@ function armSettleWatchdog(requestId: RequestId, button: HTMLButtonElement): Ret
     // Settle honestly: the pipeline never answered, say so on the button.
     setButtonStateV2(button, 'error', { message: SETTLE_WATCHDOG_MESSAGE });
     scheduleReset(button, 3000);
+    // Tell the dependent controllers too (Download All group machine), or
+    // the group run waits forever on a file that no longer has a request.
+    notifySettled(requestId, { status: 'timeout', detail: SETTLE_WATCHDOG_MESSAGE });
   }, SETTLE_WATCHDOG_MS);
 }
 
