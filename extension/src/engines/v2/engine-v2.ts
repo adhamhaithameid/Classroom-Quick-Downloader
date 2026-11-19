@@ -638,10 +638,10 @@ export class EngineV2 implements CQDEngine {
     ) {
       const covered = new Set<string>();
       for (const p of this.postMap.values()) {
-        for (const f of p.files) covered.add(f.canonicalId);
+        for (const f of p.files) for (const k of driveFileKeys(f)) covered.add(k);
       }
       const bodyFiles = this.discoverFiles(document.body);
-      const uncovered = bodyFiles.filter((f) => !covered.has(f.canonicalId));
+      const uncovered = bodyFiles.filter((f) => !driveFileKeys(f).some((k) => covered.has(k)));
       if (uncovered.length > 0) {
         // The synthetic post OWNS the details page ("the post is the entire
         // page content"). Drop the empty leftover SPA posts: their per-post
@@ -677,10 +677,10 @@ export class EngineV2 implements CQDEngine {
         // body scan never sees them); canonical ids make the covered/known
         // comparison match DOM drive-<id> files. Flag OFF: kept is [].
         const keptApi = splitApiFiles(post.files).apiFiles;
-        const uncoveredIds = new Set(uncovered.map((f) => f.canonicalId));
+        const uncoveredKeys = new Set(uncovered.flatMap((f) => driveFileKeys(f)));
         post.files = [
           ...uncovered,
-          ...keptApi.filter((f) => !uncoveredIds.has(f.canonicalId)),
+          ...keptApi.filter((f) => !driveFileKeys(f).some((k) => uncoveredKeys.has(k))),
         ];
         post.flags = this.detectFlags(document.body, detailsId);
         seenPostIds.add(detailsId);

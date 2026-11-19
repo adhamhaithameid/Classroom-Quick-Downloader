@@ -717,6 +717,49 @@ describe('EngineV3 v3-base review fixes: union retention and canonical ids', () 
     const ids = details!.files.map((f) => f.canonicalId);
     expect(new Set(ids).size).toBe(ids.length);
   });
+
+  it('(3 details, union-4 #2) a DOM open?id= anchor and the API twin of the same Drive file count once', async () => {
+    const setup = await loadEngineWithApiMocks({ enableFlag: true });
+    vi.stubGlobal('location', new URL('https://classroom.google.com/c/C/a/A/details'));
+    const seed = document.createElement('a');
+    seed.setAttribute('data-drive-id', 'DETAILSseedPad20Chars000');
+    seed.href = 'https://drive.google.com/file/d/DETAILSseedPad20Chars000/view';
+    seed.textContent = 'seed.pdf';
+    document.body.appendChild(seed);
+
+    engine = new setup.EngineV3();
+    await engine.init(ViewKind.ASSIGNMENT_DETAILS, new AbortController().signal);
+    const v2 = (engine as unknown as {
+      v2: { applyExternalFiles(id: string, files: unknown[]): number; fullScan(): void };
+    }).v2;
+    const detailsId = 'details:/c/C/a/A/details';
+    const TWIN = 'TWINPad20Chars0000000000';
+    expect(
+      v2.applyExternalFiles(detailsId, [
+        {
+          canonicalId: `drive-${TWIN}`,
+          name: 'twin.pdf',
+          ext: 'pdf',
+          downloadUrl: `https://drive.usercontent.google.com/download?id=${TWIN}&export=download&confirm=t`,
+          element: document.body,
+          idSource: 'api-snapshot' as const,
+        },
+      ]),
+    ).toBe(1);
+
+    // The same Drive file now shows up as a DOM anchor WITHOUT /d/<id> or
+    // data-drive-id, so its canonical id is url-… while its download URL
+    // names the Drive id.
+    const open = document.createElement('a');
+    open.href = `https://drive.google.com/open?id=${TWIN}`;
+    open.textContent = 'twin.pdf';
+    document.body.appendChild(open);
+    v2.fullScan();
+
+    const details = engine.getTrackedPosts().find((p) => p.id === detailsId)!;
+    const twins = details.files.filter((f) => f.downloadUrl.includes(TWIN) || f.canonicalId.includes(TWIN));
+    expect(twins).toHaveLength(1);
+  });
 });
 
 

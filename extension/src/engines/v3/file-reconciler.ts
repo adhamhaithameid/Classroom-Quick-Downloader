@@ -56,7 +56,7 @@ export const MAX_RECONCILE_SNAPSHOT_AGE_MS = 120_000;
 
 export { toCanonicalDriveId };
 
-/** Lowercase extension from a Drive title ('' when the title has none) —
+/** Lowercase extension from a Drive title or URL ('' when none) —
  *  same shape as engine-v2's ext scan (name-anchored, query-tolerant). */
 function extensionFromTitle(title: string): string {
   const match = /\.([a-zA-Z0-9]{1,10})(?:\?|$)/.exec(title);
@@ -92,9 +92,11 @@ export function reconcileApiFiles(
   // Keys include the Drive id named by each file's download URL, so a DOM
   // file canonicalized as url-…/dataid- still matches the same Drive file.
   const tracked = new Set(post.files.flatMap((file) => driveFileKeys(file)));
-  // Multi-account index: digits only (it is a query value from the page URL;
-  // a malformed one would trip the validator's '..'/'%25' rule and drop the file).
-  const authUser = /^\d+$/.test(snapshot.context.authUser ?? '') ? snapshot.context.authUser : null;
+  // Multi-account index: passed through like the DOM path (getPageAuthUser →
+  // resolveDownloadUrl), so a URL-safe non-numeric value (an account email)
+  // keeps its account. A malformed one (trips the validator's '..'/'%25' rule)
+  // is retried below without authuser instead of dropping the file.
+  const authUser = snapshot.context.authUser;
   const fresh: FileNode[] = [];
 
   for (const attachment of submission.attachments) {
@@ -113,15 +115,21 @@ export function reconcileApiFiles(
     // Same conversion the DOM path applies (engine-v2 extractFileNode →
     // resolveDownloadUrl), so native Docs/Sheets/Slides ids take the same
     // byte-serving endpoint as their DOM anchors. The API gives no mimeType.
-    const downloadUrl = toDownloadUrlFrom(attachment.downloadUrl, authUser);
+    let downloadUrl = toDownloadUrlFrom(attachment.downloadUrl, authUser);
+    if (!validateDownloadUrl(downloadUrl).valid && authUser) {
+      downloadUrl = toDownloadUrlFrom(attachment.downloadUrl, null);
+    }
     if (!validateDownloadUrl(downloadUrl).valid) continue;
     tracked.add(canonicalId);
 
     fresh.push({
       canonicalId,
-      // '...' or '/' sanitize to '' — fall back like the DOM path (engine-v2).
+      // '...' or '/' sanitize to '' — fall back to Untitled. (The DOM path
+      // yields '' there; aligning it would change flag-OFF output, and the
+      // Untitled fallback is pinned by union-3 #1.)
       name: sanitizeFileName(attachment.title) || 'Untitled',
-      ext: extensionFromTitle(attachment.title),
+      // DOM scan reads the name, or the href when the name is empty.
+      ext: extensionFromTitle(attachment.title || attachment.downloadUrl),
       downloadUrl,
       element: post.element,
       idSource: 'api-snapshot',

@@ -24,6 +24,7 @@ import {
   MAX_RECONCILE_SNAPSHOT_AGE_MS,
   reconcileApiFiles,
 } from '../src/engines/v3/file-reconciler';
+import { driveFileKeys } from '../src/engines/canonical-id';
 import { sanitizeFileName } from '../src/core/name/sanitize';
 import { ViewKind } from '../src/engines/types';
 import type { FileNode, PostNode } from '../src/engines/types';
@@ -396,5 +397,86 @@ describe('reconcileApiFiles (v3-base)', () => {
     expect(bad[0].downloadUrl).toBe(
       'https://drive.usercontent.google.com/download?id=FILE_1&export=download&confirm=t',
     );
+  });
+});
+
+
+describe('review-fixes-union-4 (reconciler + canonical keys)', () => {
+  const keysOf = (downloadUrl: string): string[] => driveFileKeys({ canonicalId: 'url-z', downloadUrl });
+
+  it('#1 a non-Drive google.com URL with an id= query yields NO Drive key', () => {
+    for (const url of [
+      'https://sites.google.com/view/x?id=N',
+      'https://www.google.com/search?id=N',
+      'https://docs.google.com/forms/d/e/N/viewform?id=N',
+      'https://classroom.google.com/c/C/a/A?id=N',
+      'https://drive.google.com/drive/folders/N?id=N',
+    ]) {
+      expect(keysOf(url)).toEqual(['drive-url-z']);
+    }
+  });
+
+  it('#1 each URL shape toDownloadUrlFrom trusts yields its Drive key', () => {
+    for (const url of [
+      'https://drive.google.com/file/d/N/view',
+      'https://drive.google.com/u/1/file/d/N/view',
+      'https://drive.google.com/open?id=N',
+      'https://drive.google.com/uc?export=download&id=N',
+      'https://drive.usercontent.google.com/download?id=N&export=download',
+      'https://docs.google.com/document/d/N/edit',
+      'https://docs.google.com/spreadsheets/d/N/edit',
+      'https://classroom.google.com/drive?resourceId=N',
+      'https://classroom.google.com/drive?fileId=N',
+    ]) {
+      expect(keysOf(url)).toEqual(['drive-url-z', 'drive-N']);
+    }
+  });
+
+  it('#1 a DOM file on a non-Drive google.com link does not suppress the API file with that id', () => {
+    const foreign: FileNode = {
+      canonicalId: 'url-https://sites.google.com/view/x?id=FILE_1',
+      name: 'x',
+      ext: '',
+      downloadUrl: 'https://sites.google.com/view/x?id=FILE_1',
+      element: document.createElement('a'),
+      idSource: 'url-hash',
+    };
+    expect(reconcileApiFiles(makeSnapshot(), makePost([foreign]), NOW)).toHaveLength(1);
+  });
+
+  it('#3 a non-numeric but URL-safe authuser (an account email) is carried like the DOM path does', () => {
+    const snap = makeSnapshot();
+    snap.context.authUser = 'me@example.com';
+    const [file] = reconcileApiFiles(snap, makePost(), NOW);
+    expect(file.downloadUrl).toBe(
+      'https://drive.usercontent.google.com/download?id=FILE_1&export=download&confirm=t&authuser=me%40example.com',
+    );
+  });
+
+  it('#4 an empty title takes the extension from the attachment URL, like the DOM name-or-href scan', () => {
+    const snapshot = makeSnapshot({
+      submissions: [
+        {
+          id: 'SUB_1',
+          attachments: [
+            {
+              id: 'FILE_9',
+              title: '',
+              downloadUrl: 'https://drive.google.com/uc?id=FILE_9&name=a.PDF',
+              source: 'driveFile',
+            },
+            {
+              id: 'FILE_8',
+              title: 'Shared archive',
+              downloadUrl: 'https://drive.google.com/uc?id=FILE_8&name=a.pdf',
+              source: 'driveFile',
+            },
+          ],
+        },
+      ],
+    });
+    const files = reconcileApiFiles(snapshot, makePost(), NOW);
+    // Title present but extensionless → '' exactly like the DOM path (name wins over href).
+    expect(files.map((f) => f.ext)).toEqual(['pdf', '']);
   });
 });

@@ -34,20 +34,20 @@ describe('canonical-id.ts killers (round 4)', () => {
     ]);
   });
 
-  // mutant 5: (\.)google.com requires a dot, so the bare host google.com failed
-  it('the bare google.com host is a Google host (mutant 5)', () => {
+  // union-4 #1: the generic google.com host test is gone; only the exact Drive
+  // hosts count, so the bare google.com host is NOT a Drive host.
+  it('the bare google.com host is not a Drive host (union-4 #1)', () => {
     expect(driveFileKeys({ canonicalId: 'x', downloadUrl: 'https://google.com/file/d/ID2/view' })).toEqual([
       'drive-x',
-      'drive-ID2',
     ]);
   });
 
   // mutant 4: no $ anchor, so google.com.evil.com matched
   it('a host that only starts with google.com or ends with it without a dot is not trusted (mutant 4)', () => {
-    expect(driveFileKeys({ canonicalId: 'x', downloadUrl: 'https://google.com.evil.com/file/d/ID3/view' })).toEqual([
+    expect(driveFileKeys({ canonicalId: 'x', downloadUrl: 'https://drive.google.com.evil.com/file/d/ID3/view' })).toEqual([
       'drive-x',
     ]);
-    expect(driveFileKeys({ canonicalId: 'x', downloadUrl: 'https://notgoogle.com/file/d/ID3/view' })).toEqual([
+    expect(driveFileKeys({ canonicalId: 'x', downloadUrl: 'https://notdrive.google.com/file/d/ID3/view' })).toEqual([
       'drive-x',
     ]);
   });
@@ -263,10 +263,14 @@ describe('file-reconciler.ts killers (round 4)', () => {
 
   const URL_OK = 'https://drive.google.com/uc?id=F&export=download';
 
-  // mutant 480: /^\d+/ (no end anchor) accepted '1x'
-  it('an authuser that is not all digits is dropped (mutant 480)', () => {
-    const [file] = reconcileApiFiles(snapshot('1x', URL_OK), post(), NOW);
-    expect(file.downloadUrl).not.toContain('authuser');
+  // union-4 #3: the digits filter is gone (mutant 480 no longer exists); the
+  // DOM path passes the raw value, so a URL-safe value is carried and only a
+  // value that breaks the validator is retried without authuser.
+  it('a URL-safe non-numeric authuser is carried; a validator-breaking one is dropped (union-4 #3)', () => {
+    const [kept] = reconcileApiFiles(snapshot('1x', URL_OK), post(), NOW);
+    expect(new URL(kept.downloadUrl).searchParams.get('authuser')).toBe('1x');
+    const [dropped] = reconcileApiFiles(snapshot('a..b', URL_OK), post(), NOW);
+    expect(dropped.downloadUrl).not.toContain('authuser');
   });
 
   // mutant 481: /^\d$/ accepted only one digit
