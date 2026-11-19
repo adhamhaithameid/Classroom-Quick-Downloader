@@ -368,3 +368,134 @@ describe('EngineV3 v3-base file wiring (flag engineBase)', () => {
     }
   });
 });
+
+/** One-anchor student-work post: DOM alone is BELOW the group threshold (2). */
+function seedSingleFilePost(id: string): void {
+  const post = document.createElement('article');
+  post.setAttribute('data-stream-item-id', id);
+  const driveId = `DOM${id}AaaaaPad20Chars00000`;
+  const anchor = document.createElement('a');
+  anchor.setAttribute('data-drive-id', driveId);
+  anchor.href = `https://drive.google.com/file/d/${driveId}/view`;
+  anchor.textContent = `${driveId}.pdf`;
+  post.appendChild(anchor);
+  document.body.appendChild(post);
+}
+
+function groupButtonOf(id: string): HTMLButtonElement | null {
+  return document.querySelector<HTMLButtonElement>(
+    `[data-stream-item-id="${id}"] [data-cqd-injected][data-cqd-file-id="download-all:${id}"]`,
+  );
+}
+
+describe('EngineV3 phase 2: download-all over the API union', () => {
+  let engine: import('../src/engines/v3/engine-v3').EngineV3 | null = null;
+
+  beforeEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.resetModules();
+    document.body.innerHTML = '';
+    engine = null;
+    vi.stubGlobal(
+      'location',
+      new URL('https://classroom.google.com/c/C/a/A/submissions/SUB_1'),
+    );
+  });
+
+  afterEach(() => {
+    engine?.destroy();
+    engine = null;
+    vi.useRealTimers();
+  });
+
+  it('(threshold) flag ON: 1 DOM file + 1 API file clears the group threshold, label says 2 files', async () => {
+    const setup = await loadEngineWithApiMocks({ enableFlag: true });
+    seedSingleFilePost('post-1');
+
+    engine = new setup.EngineV3();
+    await engine.init(ViewKind.STUDENT_WORK_TEACHER, new AbortController().signal);
+    await flushAsync();
+
+    const groupBtn = groupButtonOf('post-1');
+    expect(groupBtn).not.toBeNull();
+    expect(groupBtn!.getAttribute('data-cqd-group-count')).toBe('2');
+    expect(groupBtn!.querySelector('.cqd-download-all-sub')?.textContent).toBe('2 files');
+    // Still no floating single button for the anchor-less API file.
+    expect(
+      document.querySelectorAll('[data-stream-item-id="post-1"] [data-cqd-injected].cqd-download-btn'),
+    ).toHaveLength(1);
+  });
+
+  it('(threshold, flag OFF) 1 DOM file shows no group button (byte-identical pin)', async () => {
+    const setup = await loadEngineWithApiMocks();
+    seedSingleFilePost('post-1');
+
+    engine = new setup.EngineV3();
+    await engine.init(ViewKind.STUDENT_WORK_TEACHER, new AbortController().signal);
+    await flushAsync();
+
+    expect(groupButtonOf('post-1')).toBeNull();
+  });
+
+  it('(run) flag ON: the run downloads DOM files AND the API-only file with its Drive id', async () => {
+    const setup = await loadEngineWithApiMocks({ enableFlag: true });
+    seedStudentWorkPage(['post-1']);
+
+    engine = new setup.EngineV3();
+    await engine.init(ViewKind.STUDENT_WORK_TEACHER, new AbortController().signal);
+    await flushAsync();
+
+    const { createEventBus } = await import('../src/bus/event-bus');
+    const { wireDownloadPath } = await import('../src/v2/render/download-controller');
+    const { installDownloadAllController, PER_FILE_STAGGER_MS } = await import(
+      '../src/v2/render/download-all-controller'
+    );
+    const bus = createEventBus<import('../src/contracts/topics').PageTopicMap>();
+    const requests: Array<{ fileId: string; url: string }> = [];
+    bus.subscribe('download:requested', (p) => requests.push({ fileId: p.file.fileId, url: p.file.url }));
+    wireDownloadPath(bus, { sendMessage: vi.fn() });
+    installDownloadAllController({ sendMessage: vi.fn() });
+
+    const groupBtn = groupButtonOf('post-1');
+    expect(groupBtn!.getAttribute('data-cqd-group-count')).toBe('3');
+
+    vi.useFakeTimers();
+    groupBtn!.click();
+    vi.advanceTimersByTime(PER_FILE_STAGGER_MS * 3);
+
+    // Label said 3, the run does 3: nothing overstated.
+    expect(requests).toHaveLength(3);
+    const api = requests.find((r) => r.fileId === 'APIFILEccccPad20Chars0000');
+    expect(api).toBeDefined();
+    expect(api!.url).toBe(API_ATTACHMENT.downloadUrl);
+  });
+
+  it('(correction) flag ON: the inject-button correction keeps the union and the count', async () => {
+    const setup = await loadEngineWithApiMocks({ enableFlag: true });
+    seedStudentWorkPage(['post-1']);
+
+    engine = new setup.EngineV3();
+    await engine.init(ViewKind.STUDENT_WORK_TEACHER, new AbortController().signal);
+    await flushAsync();
+
+    const postEl = document.querySelector<HTMLElement>('[data-stream-item-id="post-1"]')!;
+    const v2 = (engine as unknown as {
+      v2: { handleCorrection(item: unknown): boolean };
+    }).v2;
+    expect(
+      v2.handleCorrection({
+        id: 'c1',
+        op: 'inject-button',
+        priority: 'HIGH',
+        postId: 'post-1',
+        element: postEl,
+        reason: 'test',
+      }),
+    ).toBe(true);
+
+    const post = engine.getTrackedPosts().find((p) => p.id === 'post-1');
+    expect(post!.files).toHaveLength(3);
+    expect(post!.files.some((f) => f.idSource === 'api-snapshot')).toBe(true);
+  });
+});

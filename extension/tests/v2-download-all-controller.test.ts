@@ -27,6 +27,7 @@ import {
   handleRunDownloadAllRequest,
   runDownloadAllForActiveMode,
   getRunFor,
+  setGroupApiFiles,
   PER_FILE_STAGGER_MS,
   GROUP_FEEDBACK_MS,
   GROUP_CANCELLED_RESET_MS,
@@ -495,5 +496,43 @@ describe('CQD_RUN_DOWNLOAD_ALL shortcut (v3 mode parity)', () => {
     engineRegistry.setMode('v3');
 
     expect(runDownloadAllForActiveMode()).toBe(false);
+  });
+  it('API-only files join the run through the same publish path (v3-base phase 2)', () => {
+    const { group } = makePost(2);
+    setGroupApiFiles('post-1', [
+      {
+        fileId: 'API_DRIVE_ID_0000000001',
+        url: 'https://drive.google.com/uc?export=download&id=API_DRIVE_ID_0000000001',
+        name: 'hidden.pdf',
+        ext: 'pdf',
+      },
+    ]);
+    handleDownloadAllClickV2('post-1', group);
+    vi.advanceTimersByTime(PER_FILE_STAGGER_MS * 3);
+
+    expect(requested).toHaveLength(3);
+    expect(requested[2]!.file.fileId).toBe('API_DRIVE_ID_0000000001');
+    expect(requested[2]!.file.url).toContain('API_DRIVE_ID_0000000001');
+    expect(requested[2]!.file.ext).toBe('pdf');
+    // No DOM node joined the page for it.
+    expect(document.querySelectorAll('.cqd-download-btn')).toHaveLength(2);
+  });
+
+  it('API files already covered by a DOM button are not requested twice', () => {
+    const { group } = makePost(2);
+    setGroupApiFiles('post-1', [
+      { fileId: 'drive-file-0', url: 'https://x/dup', name: 'f0.pdf', ext: 'pdf' },
+    ]);
+    handleDownloadAllClickV2('post-1', group);
+    vi.advanceTimersByTime(PER_FILE_STAGGER_MS * 3);
+    expect(requested).toHaveLength(2);
+  });
+
+  it('with no API files the run is exactly the DOM buttons (flag OFF pin)', () => {
+    const { group } = makePost(2);
+    setGroupApiFiles('post-1', []);
+    handleDownloadAllClickV2('post-1', group);
+    vi.advanceTimersByTime(PER_FILE_STAGGER_MS * 3);
+    expect(requested).toHaveLength(2);
   });
 });

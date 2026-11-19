@@ -75,6 +75,36 @@ interface GroupRun {
 }
 
 const runs = new Map<string, GroupRun>();
+
+/**
+ * A file that joins a group run WITHOUT a DOM button (v3-base phase 2): the
+ * API union's API-only files have no page anchor, so no single-file button
+ * exists for them. The engine hands them over per post; the run downloads
+ * them through the same publish path as every DOM button.
+ */
+export interface GroupApiFile {
+  /** Drive file id (the pipeline's fileId). */
+  fileId: string;
+  url: string;
+  name: string;
+  ext: string;
+}
+
+/** postId -> API-only files. Empty/absent = DOM buttons only (flag OFF). */
+const apiFilesByPost = new Map<string, GroupApiFile[]>();
+
+/**
+ * Record the API-only files a post's group run must include. An empty list
+ * clears the post's entry. Called by the engine's render seam after every
+ * scan so the run set always equals the set the label counts.
+ */
+export function setGroupApiFiles(postId: string, files: GroupApiFile[]): void {
+  if (files.length === 0) {
+    apiFilesByPost.delete(postId);
+    return;
+  }
+  apiFilesByPost.set(postId, files);
+}
 const decoratedButtons = new WeakSet<HTMLButtonElement>();
 
 /** Minimal runtime surface, injectable for tests. */
@@ -104,12 +134,14 @@ export function uninstallDownloadAllController(): void {
   offSettled = null;
   for (const run of runs.values()) teardownRun(run);
   runs.clear();
+  apiFilesByPost.clear();
 }
 
 /** Test/destroy hook: drop every run (buttons die with the page anyway). */
 export function resetDownloadAllController(): void {
   for (const run of runs.values()) teardownRun(run);
   runs.clear();
+  apiFilesByPost.clear();
 }
 
 // ============================================================================
@@ -230,6 +262,22 @@ function startRun(postId: string, groupButton: HTMLButtonElement): boolean {
       url: btn.dataset.cqdUrl || '',
       name: btn.dataset.cqdName || '',
       ext: btn.dataset.cqdExt || '',
+      state: 'pending',
+      requestId: null,
+    });
+  }
+  // v3-base phase 2: API-only files join the run. They have no DOM button,
+  // so each gets a DETACHED button as its state carrier (never inserted into
+  // the page — no UI is created). Dedup by file id against the DOM set.
+  for (const api of apiFilesByPost.get(postId) ?? []) {
+    if (!api.fileId || !api.url || seen.has(api.fileId)) continue;
+    seen.add(api.fileId);
+    files.push({
+      fileId: api.fileId,
+      button: document.createElement('button'),
+      url: api.url,
+      name: api.name,
+      ext: api.ext,
       state: 'pending',
       requestId: null,
     });

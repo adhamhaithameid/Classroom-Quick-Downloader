@@ -78,7 +78,7 @@ import { runComparison, installCompareGlobals } from '../../compare/compare-runn
 import type { ScannedPost, ScannedFile } from '../../v2/model/dom-scanner';
 import { renderBatch, removeStaleButtons, removeAllV2Buttons, syncDownloadAllCount } from '../../v2/render/button-renderer';
 import { ensurePostClickWiring, resetDownloadController } from '../../v2/render/download-controller';
-import { resetDownloadAllController, isGroupRunBusy } from '../../v2/render/download-all-controller';
+import { resetDownloadAllController, isGroupRunBusy, setGroupApiFiles } from '../../v2/render/download-all-controller';
 import { getRecipe } from '../../v2/decision/placement-recipes';
 import { resolveDownloadUrl } from '../../v2/decision/download-url';
 import { sanitizeFileName } from '../../core/name/sanitize';
@@ -109,6 +109,17 @@ import type { PerformanceSummary, TimingPercentiles } from '../../v2/telemetry/p
  * exactly the cases where a full page scan is the efficient move anyway.
  */
 export const TARGETED_SCAN_MAX_POSTS = 8;
+
+/**
+ * Split a post's files into DOM-anchored files and the synthetic API-only
+ * files (idSource 'api-snapshot', v3-base). Flag OFF: apiFiles is always [].
+ */
+function splitApiFiles(files: FileNode[]): { anchored: FileNode[]; apiFiles: FileNode[] } {
+  const anchored: FileNode[] = [];
+  const apiFiles: FileNode[] = [];
+  for (const f of files) (f.idSource === 'api-snapshot' ? apiFiles : anchored).push(f);
+  return { anchored, apiFiles };
+}
 
 /**
  * Pure FileNode → ScannedFile projection — one shared mapping for every
@@ -1149,7 +1160,13 @@ export class EngineV2 implements CQDEngine {
           // Re-run file discovery for this post
           const post = this.postMap.get(item.postId);
           if (!post) return false;
-          post.files = this.discoverFiles(post.element);
+          // v3-base: the API union has no DOM anchor, so re-discovery cannot
+          // see it — carry the synthetic files over or the correction would
+          // silently wipe them (label and run both shrink).
+          const kept = splitApiFiles(post.files).apiFiles;
+          const rediscovered = this.discoverFiles(post.element);
+          const known = new Set(rediscovered.map((f) => f.canonicalId));
+          post.files = [...rediscovered, ...kept.filter((f) => !known.has(f.canonicalId))];
           return true;
         }
 
@@ -1229,14 +1246,19 @@ export class EngineV2 implements CQDEngine {
   private planPlacementForPost(post: PostNode): PlacementDecision[] {
     if (!this.currentView) return [];
 
+    // v3-base: synthetic API files have no DOM anchor, so they never feed the
+    // single-button planner (a decision for one would hang a button off the
+    // post root). They only raise the group threshold/label (extra count).
+    const { anchored, apiFiles } = splitApiFiles(post.files);
+
     // Convert PostNode → ScannedPost for the placement engine
     // The placement engine uses ScannedPost/ScannedFile types from dom-scanner
     // which are structurally compatible with PostNode/FileNode
     const scannedPost: ScannedPost = {
       id: post.id,
       element: post.element,
-      fingerprint: `${post.id}-${post.files.length}-${post.lastScannedAt}`,
-      files: post.files.map(toScannedFile),
+      fingerprint: `${post.id}-${anchored.length}-${post.lastScannedAt}`,
+      files: anchored.map(toScannedFile),
       isExpanded: true, // Default to expanded — accordion check done by recipe
       isConnected: post.element.isConnected,
     };
@@ -1249,7 +1271,7 @@ export class EngineV2 implements CQDEngine {
     }
 
     // Compute placement decisions for this post
-    return computePlacement(scannedPost, this.currentView);
+    return computePlacement(scannedPost, this.currentView, apiFiles.length);
   }
 
   /**
@@ -1366,12 +1388,26 @@ export class EngineV2 implements CQDEngine {
       // fresh decision. Never creates a button — the no-duplicates
       // guarantee holds.
       if (recipe) {
+        // v3-base: label = single-button set + API-only files — exactly the
+        // set a group run downloads (setGroupApiFiles below). API-only files
+        // are none when engineBase is OFF, so the count is unchanged there.
+        const { anchored, apiFiles } = splitApiFiles(post.files);
         syncDownloadAllCount(
           post.element,
           post.id,
-          countSingleButtonEligibleFiles(post, recipe),
+          countSingleButtonEligibleFiles({ element: post.element, files: anchored }, recipe) +
+            apiFiles.length,
           recipe.downloadAll.minFilesForDownloadAll,
           isGroupRunBusy(post.id),
+        );
+        setGroupApiFiles(
+          post.id,
+          apiFiles.map((f) => ({
+            fileId: f.canonicalId,
+            url: f.downloadUrl,
+            name: f.name,
+            ext: f.ext,
+          })),
         );
       }
     }
@@ -1430,10 +1466,9 @@ export class EngineV2 implements CQDEngine {
 
     post.files.push(...added);
 
-    // PLAN — only files with their own DOM anchor feed the placement engine
-    // (same per-post planner fullScan/targetedScan use).
-    const anchoredFiles = post.files.filter((f) => f.idSource !== 'api-snapshot');
-    const freshDecisions = this.planPlacementForPost({ ...post, files: anchoredFiles });
+    // PLAN — the per-post planner (same one fullScan/targetedScan use) feeds
+    // only anchored files to placement and counts API files toward the group.
+    const freshDecisions = this.planPlacementForPost(post);
 
     // MERGE — drop this post's old decisions and any detached targets; keep
     // every other live decision. Same filter shape as renderAffectedPosts;

@@ -122,11 +122,15 @@ function safeCssEscape(value: string): string {
  *
  * @param post - The scanned post with its files
  * @param viewKind - Current page type (determines which recipe to use)
+ * @param extraDownloadableCount - Files that join the group run WITHOUT a DOM
+ *   anchor (v3-base API-only files). They add to the group threshold and the
+ *   "N files" label but never get a single-file button. Default 0 = unchanged.
  * @returns Array of PlacementDecisions for the renderer
  */
 export function computePlacement(
   post: ScannedPost,
   viewKind: ViewKind,
+  extraDownloadableCount: number = 0,
 ): PlacementDecision[] {
   const recipe = getRecipe(viewKind);
   const decisions: PlacementDecision[] = [];
@@ -190,7 +194,8 @@ export function computePlacement(
   // button. The collapse gate stays exempt (bug 2.1): the header-mounted
   // group button is visible on folded classwork items and expanding re-runs
   // placement.
-  const attachmentCount = countSingleButtonEligibleFiles(post, recipe);
+  const attachmentCount =
+    countSingleButtonEligibleFiles(post, recipe) + extraDownloadableCount;
   if (attachmentCount >= recipe.downloadAll.minFilesForDownloadAll) {
     const downloadAllId = `download-all:${post.id}`;
 
