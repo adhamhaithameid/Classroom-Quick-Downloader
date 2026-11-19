@@ -163,6 +163,7 @@ describe('isPlainChromeUserAgent — other Chromium forks (review round 3, findi
     ['SamsungBrowser/', 'SamsungBrowser/26.0'],
     ['YaBrowser/', 'YaBrowser/24.12.0'],
     ['Whale/', 'Whale/3.28.0.0'],
+    ['Vivaldi/', 'Vivaldi/6.9.3447.54'],
   ])('%s is not plain Chrome', (_name, token) => {
     const ua = CHROME_UA.replace('Chrome/131.0.0.0', `Chrome/131.0.0.0 ${token}`);
     expect(isPlainChromeUserAgent(ua)).toBe(false);

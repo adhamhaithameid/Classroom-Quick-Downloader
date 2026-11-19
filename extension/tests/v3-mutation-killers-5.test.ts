@@ -81,28 +81,35 @@ describe('token-source.ts killers (round 5)', () => {
   }
 
   // mutant 292: the silent-flow rejection handler -> {} (swallowed the error,
-  // never stamped the cooldown)
+  // never stamped the cooldown). Round 5 finding 4 made setup failures resolve
+  // null, so the rejection now comes from a late throw: now() while caching.
   it('a silent flow that throws rejects and starts the cooldown (mutant 292)', async () => {
-    const randomBytes = vi.fn((): Uint8Array => {
-      throw new Error('entropy unavailable');
+    let nowCalls = 0;
+    const launch = vi.fn(async (details: { url: string }) => {
+      const state = new URL(details.url).searchParams.get('state') ?? '';
+      return `${REDIRECT}?state=${state}&code=c`;
     });
-    const launch = vi.fn();
     const source = new WebAuthFlowTokenSource({
       getClientId: () => 'cid',
       getRedirectUrl: () => REDIRECT,
       launchWebAuthFlow: launch,
-      fetchImpl: async () => {
-        throw new Error('must not be reached');
+      fetchImpl: async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ access_token: 'tok', expires_in: 3600 }),
+      }),
+      randomBytes: (len) => new Uint8Array(len).fill(0xa5),
+      now: () => {
+        nowCalls += 1;
+        if (nowCalls === 1) throw new Error('clock unavailable');
+        return 0;
       },
-      randomBytes,
-      now: () => 0,
       silentRetryCooldownMs: 60_000,
       log: () => {},
     });
-    await expect(source.getToken(false)).rejects.toThrow('entropy unavailable');
+    await expect(source.getToken(false)).rejects.toThrow('clock unavailable');
     await expect(source.getToken(false)).resolves.toBeNull();
-    expect(randomBytes).toHaveBeenCalledTimes(1);
-    expect(launch).not.toHaveBeenCalled();
+    expect(launch).toHaveBeenCalledTimes(1);
   });
 
   // mutant 338: `if (launchId !== this.launchSeq) return` -> false. A late settle

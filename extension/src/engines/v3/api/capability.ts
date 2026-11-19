@@ -76,14 +76,15 @@ export function isGoogleChromeBrand(brands: readonly string[]): boolean {
  * Used by config.ts ONLY when userAgentData is absent; present-but-empty or
  * present-without-Google-Chrome brands never reach it. Chromium forks all ship
  * userAgentData, so this stays safe for Brave, Edge and Opera (their UA markers
- * are also rejected here), plus HeadlessChrome, SamsungBrowser, YaBrowser and
- * Whale. Brave sends NO UA token: without userAgentData brands it cannot be told
+ * are also rejected here), plus HeadlessChrome, SamsungBrowser, YaBrowser, Whale
+ * and Vivaldi (Arc sends no UA token, so it cannot be named here). Brave sends
+ * NO UA token: without userAgentData brands it cannot be told
  * apart from Chrome, which is why this fallback is for contexts with no
  * userAgentData at all (ADR-0010).
  */
 export function isPlainChromeUserAgent(ua: string): boolean {
   return typeof ua === 'string' && /Chrome\/\d/.test(ua) &&
-    !/Edg[A-Za-z]*\/|OPR\/|Opera[\s/]|Brave\/|Chromium\/|Firefox\/|HeadlessChrome\/|SamsungBrowser\/|YaBrowser\/|Whale\//.test(ua);
+    !/Edg[A-Za-z]*\/|OPR\/|Opera[\s/]|Brave\/|Chromium\/|Firefox\/|HeadlessChrome\/|SamsungBrowser\/|YaBrowser\/|Whale\/|Vivaldi\//.test(ua);
 }
 
 export function probeIdentityCapability(input: IdentityCapabilityInput): IdentityCapabilityResult {

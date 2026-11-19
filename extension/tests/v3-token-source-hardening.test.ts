@@ -621,6 +621,7 @@ describe('WebAuthFlowTokenSource — review round 4', () => {
     const source = new WebAuthFlowTokenSource({
       ...deps,
       exchangeUrl: 'https://exchange.example.test/oauth/token',
+      allowedExchangeOrigins: ['https://exchange.example.test'],
     });
     await expect(source.getToken(true)).resolves.toBe('at-1');
     expect(deps.fetchImpl).toHaveBeenCalledTimes(1);
@@ -698,5 +699,176 @@ describe('WebAuthFlowTokenSource — review round 4', () => {
     });
     await expect(new WebAuthFlowTokenSource(deps).getToken(true)).resolves.toBeNull();
     expect(deps.fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
+// Fifth fresh-eyes review (2026-11-19).
+describe('WebAuthFlowTokenSource — review round 5', () => {
+  const hang = () => new Promise<string | undefined>(() => {});
+
+  it('finding 2: an INTERACTIVE launch that never settles keeps the gate shut past its 5 min window', async () => {
+    let calls = 0;
+    let now = T0;
+    const deps = makeDeps({
+      now: () => now,
+      launchWebAuthFlow: vi.fn(async (details: { url: string; interactive: boolean }) => {
+        calls += 1;
+        if (calls === 1) return hang();
+        return redirectEchoingState(details.url, { code: 'c' });
+      }),
+    });
+    const source = new WebAuthFlowTokenSource(deps);
+    const first = source.getToken(true);
+    await vi.waitFor(() => expect(calls).toBe(1));
+    await vi.advanceTimersByTimeAsync(300_000); // the interactive window timeout
+    await expect(first).resolves.toBeNull();
+    // The window may still be open: a click right after must not open a second one.
+    await expect(source.getToken(true)).resolves.toBeNull();
+    expect(calls).toBe(1);
+    await vi.advanceTimersByTimeAsync(59_000);
+    await expect(source.getToken(true)).resolves.toBeNull();
+    expect(calls).toBe(1);
+    // Dead-button guarantee: the ceiling still releases the gate.
+    await vi.advanceTimersByTimeAsync(2_000);
+    await expect(source.getToken(true)).resolves.toBe('at-1');
+    expect(calls).toBe(2);
+  });
+
+  it('finding 2: a SILENT launch that never settles releases the gate shortly after its 10 s window', async () => {
+    let calls = 0;
+    let now = T0;
+    const deps = makeDeps({
+      now: () => now,
+      launchWebAuthFlow: vi.fn(async (details: { url: string; interactive: boolean }) => {
+        calls += 1;
+        if (calls === 1) return hang();
+        return redirectEchoingState(details.url, { code: 'c' });
+      }),
+    });
+    // A short cooldown so the gate, not the cooldown, decides below.
+    const source = new WebAuthFlowTokenSource({ ...deps, silentRetryCooldownMs: 1_000 });
+    const first = source.getToken(false);
+    await vi.waitFor(() => expect(calls).toBe(1));
+    await vi.advanceTimersByTimeAsync(10_000);
+    await expect(first).resolves.toBeNull();
+    now = T0 + 65_000;
+    await vi.advanceTimersByTimeAsync(55_000); // 65 s total: gate (70 s) still shut
+    await expect(source.getToken(false)).resolves.toBeNull();
+    expect(calls).toBe(1);
+    now = T0 + 71_000;
+    await vi.advanceTimersByTimeAsync(6_000); // 71 s: gate released
+    await expect(source.getToken(false)).resolves.toBe('at-1');
+    expect(calls).toBe(2);
+  });
+
+  describe('finding 3: exchange URL allowlist', () => {
+    const rejected = [
+      'http://oauth2.googleapis.com/token',
+      'https://evil.example.test/token',
+      'https://user:pw@oauth2.googleapis.com/token',
+      'https://oauth2.googleapis.com.evil.test/token',
+      'javascript:alert(1)',
+      'not a url',
+      '',
+    ];
+
+    it('default URL and an explicitly allowlisted proxy are accepted', async () => {
+      const ok = makeDeps();
+      await expect(new WebAuthFlowTokenSource(ok).getToken(true)).resolves.toBe('at-1');
+      const proxy = makeDeps();
+      await expect(
+        new WebAuthFlowTokenSource({
+          ...proxy,
+          exchangeUrl: 'https://proxy.example.test/exchange',
+          allowedExchangeOrigins: ['https://proxy.example.test'],
+        }).getToken(true),
+      ).resolves.toBe('at-1');
+      expect((proxy.fetchImpl as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe(
+        'https://proxy.example.test/exchange',
+      );
+    });
+
+    it('an explicit Google token URL is accepted without an allowlist entry', async () => {
+      const deps = makeDeps();
+      await expect(
+        new WebAuthFlowTokenSource({ ...deps, exchangeUrl: 'https://oauth2.googleapis.com/token' })
+          .getToken(true),
+      ).resolves.toBe('at-1');
+    });
+
+    it.each(rejected)('rejects %j: null, one fixed log line, no launch, no exchange', async (url) => {
+      const log = vi.fn();
+      const deps = makeDeps({ log });
+      const source = new WebAuthFlowTokenSource({ ...deps, exchangeUrl: url });
+      await expect(source.getToken(true)).resolves.toBeNull();
+      await expect(source.getToken(false)).resolves.toBeNull();
+      expect(deps.launchWebAuthFlow).not.toHaveBeenCalled();
+      expect(deps.fetchImpl).not.toHaveBeenCalled();
+      expect(log).toHaveBeenCalledTimes(1);
+      expect(String(log.mock.calls[0][0])).toMatch(/exchange URL/);
+      if (url.length > 3) expect(String(log.mock.calls[0][0])).not.toContain(url);
+    });
+
+    it('a non-allowlisted proxy stays rejected, and an http extra origin is ignored', async () => {
+      const deps = makeDeps({ log: vi.fn() });
+      const source = new WebAuthFlowTokenSource({
+        ...deps,
+        exchangeUrl: 'http://proxy.example.test/exchange',
+        allowedExchangeOrigins: ['http://proxy.example.test'],
+      });
+      await expect(source.getToken(true)).resolves.toBeNull();
+      expect(deps.fetchImpl).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('finding 4: throwing setup deps never reject getToken', () => {
+    it('getClientId throwing: null, one fixed line', async () => {
+      const log = vi.fn();
+      const deps = makeDeps({
+        log,
+        getClientId: () => {
+          throw new Error('boom-secret');
+        },
+      });
+      const source = new WebAuthFlowTokenSource(deps);
+      await expect(source.getToken(true)).resolves.toBeNull();
+      await expect(source.getToken(false)).resolves.toBeNull();
+      expect(log).toHaveBeenCalledTimes(1);
+      expect(String(log.mock.calls[0][0])).not.toContain('boom-secret');
+    });
+
+    it('getRedirectUrl throwing: interactive and silent both resolve null, no launch', async () => {
+      const log = vi.fn();
+      const deps = {
+        ...makeDeps({ log }),
+        getRedirectUrl: () => {
+          throw new Error('no identity');
+        },
+      };
+      const source = new WebAuthFlowTokenSource(deps);
+      await expect(source.getToken(true)).resolves.toBeNull();
+      await expect(source.getToken(false)).resolves.toBeNull();
+      expect(deps.launchWebAuthFlow).not.toHaveBeenCalled();
+      expect(log).toHaveBeenCalledWith(expect.stringMatching(/setup failed/));
+    });
+
+    it('randomBytes throwing: null, and the silent failure starts the normal cooldown', async () => {
+      let now = T0;
+      let draws = 0;
+      const deps = {
+        ...makeDeps({ now: () => now }),
+        randomBytes: () => {
+          draws += 1;
+          throw new Error('no entropy');
+        },
+      };
+      const source = new WebAuthFlowTokenSource(deps);
+      await expect(source.getToken(false)).resolves.toBeNull();
+      await expect(source.getToken(false)).resolves.toBeNull();
+      expect(draws).toBe(1); // second silent call hit the cooldown, not the setup
+      await expect(source.getToken(true)).resolves.toBeNull(); // click still tries
+      expect(draws).toBe(2);
+      expect(deps.launchWebAuthFlow).not.toHaveBeenCalled();
+    });
   });
 });

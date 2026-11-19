@@ -31,7 +31,8 @@
  * hosts stay on the V2 DOM path) AND NON_CHROME_TOKEN_SOURCE_WIRED is true.
  * getAuthToken counts ONLY on an explicit 'Google Chrome' userAgentData brand
  * (one shared test, capability.ts); a context with no userAgentData at all
- * falls back to a plain Chrome UA so real Chrome never regresses. The shipped defaults — no web client id,
+ * falls back to a plain Chrome UA so real Chrome never regresses; present but
+ * empty or missing brands do not. The shipped defaults — no web client id,
  * flag 'v2', token source unwired — keep every non-Chrome browser false, so flipping this on is a rollout
  * decision, not a code surprise (docs/adr/0010-cross-browser-oauth-web-auth-flow.md).
  *
@@ -85,14 +86,16 @@ function readBrandNames(): string[] {
 }
 
 /**
- * True when the context offers no usable brand list: no navigator.userAgentData
- * object, no `brands` array, or an empty one. None of those says anything about
- * the browser, so they all take the plain-Chrome UA fallback.
+ * True ONLY when the context has no navigator.userAgentData object at all. A
+ * present object with empty or missing brands is NOT unavailable: the browser
+ * answered, and a non-Google Chromium fork could be answering with a plain
+ * Chrome UA (round 5, finding 1). No source shows real Google Chrome returning
+ * empty brands; Chrome 90+ lists 'Google Chrome' (plus a GREASE brand).
  */
 function userAgentBrandsUnavailable(): boolean {
   try {
     const uaData = (navigator as Navigator & { userAgentData?: UserAgentData })?.userAgentData;
-    return !Array.isArray(uaData?.brands) || uaData.brands.length === 0;
+    return uaData === undefined || uaData === null;
   } catch {
     return false;
   }
@@ -100,9 +103,9 @@ function userAgentBrandsUnavailable(): boolean {
 
 /**
  * Google Chrome test for this context. Explicit brands decide when present.
- * Only a context with NO usable brands (no userAgentData, no brands array or an
- * empty one: Chrome older than 90, an insecure context) falls back to a plain Chrome UA, so a real Google Chrome keeps its
- * pre-ADR-0010 answer there. MDN: WorkerNavigator.userAgentData exists in Web
+ * Only a context with NO navigator.userAgentData object (Chrome older than 90,
+ * an insecure context) falls back to a plain Chrome UA, so a real Google Chrome
+ * keeps its pre-ADR-0010 answer there. Empty or missing brands do not. MDN: WorkerNavigator.userAgentData exists in Web
  * Workers on secure contexts, and extension pages are secure contexts, so the
  * MV3 background normally carries brands (extension service worker itself:
  * UNVERIFIED by an explicit Chrome statement).
@@ -124,8 +127,13 @@ export const NON_CHROME_TOKEN_SOURCE_WIRED = false;
 
 let nonChromeTokenSourceWired: boolean = NON_CHROME_TOKEN_SOURCE_WIRED;
 
-/** Test seam: open the non-Chrome gate (module-scoped, like engineBase). */
+/**
+ * TEST-ONLY seam: open the non-Chrome gate (module-scoped, like engineBase).
+ * A no-op unless import.meta.env.MODE is 'test', so shipped code cannot flip
+ * the rollout gate; the real rollout changes NON_CHROME_TOKEN_SOURCE_WIRED.
+ */
 export function setNonChromeTokenSourceWired(wired: boolean): void {
+  if (import.meta.env.MODE !== 'test') return;
   nonChromeTokenSourceWired = wired;
 }
 

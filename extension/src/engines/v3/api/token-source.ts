@@ -27,12 +27,17 @@
  *     waits for it (worst case 10 s launch + 15 s exchange before its window),
  *   - launchWebAuthFlow has no cancel: a LAUNCH GATE stays closed until the
  *     underlying launch promise settles (not the race), capped at a ceiling
- *     (launchGateCeilingMs, 2 min) so a launch that never settles cannot kill
+ *     (launchGateCeilingMs: the launch's own timeout + 60 s, always above the window
+ *     timeout) so a launch that never settles cannot kill
  *     sign-in; a click may pass once a SILENT launch timed out. So a timed-out window
  *     that may still be open never gets a second window next to it; a new flow
  *     meanwhile resolves null,
  *   - cooldown and cache expiry use now(): a backward clock step (now before the
  *     stamp) expires the cache and drops the cooldown,
+ *   - setup (client id, PKCE, redirect URL) runs inside try: a throw is null plus
+ *     one fixed log line, never a rejection,
+ *   - exchangeUrl must be https, without userinfo, on Google's origin or an origin
+ *     passed in allowedExchangeOrigins; otherwise getToken is null (one log line),
  *   - the code exchange URL is injectable (exchangeUrl): a Web client needs its
  *     secret at Google's endpoint, so a Worker exchange proxy plugs in there,
  *   - the returned redirect must match getRedirectUrl() by origin and path; a malformed or
@@ -142,7 +147,9 @@ export interface WebAuthFlowDeps {
   launchTimeoutMs?: number;
   /**
    * Longest time the launch gate stays closed for a launch that never settles
-   * (default 2 min; injectable for tests). After it the gate opens so a hung
+   * (injectable for tests). Default: that launch's own window timeout plus 60 s
+   * (70 s silent, 6 min interactive), so the gate never reopens while the
+   * window may still be inside its timeout. After it the gate opens so a hung
    * launchWebAuthFlow cannot kill the sign-in button until the context reloads.
    */
   launchGateCeilingMs?: number;
@@ -150,9 +157,14 @@ export interface WebAuthFlowDeps {
    * Where the authorization code is exchanged. Default: Google's token
    * endpoint. A Web application client needs its client secret there, and a
    * secret must never ship in an extension, so a Worker-side exchange proxy
-   * (ADR-0010) is injected here instead.
+   * (ADR-0010) is injected here instead. The code, PKCE verifier, client id and
+   * redirect URI are POSTed there, so the URL must be https, carry no userinfo
+   * and have an origin in the allowlist (Google's token origin plus
+   * allowedExchangeOrigins). Anything else disables the source (null).
    */
   exchangeUrl?: string;
+  /** Extra https origins the exchange URL may use (a Worker proxy; explicit). */
+  allowedExchangeOrigins?: readonly string[];
   randomBytes?: (n: number) => Uint8Array;
   now?: () => number;
   log?: (message: string) => void;
@@ -165,7 +177,34 @@ const DEFAULT_FETCH_TIMEOUT_MS = 15_000;
 const DEFAULT_SILENT_RETRY_COOLDOWN_MS = 60_000;
 const DEFAULT_SILENT_LAUNCH_TIMEOUT_MS = 10_000;
 const DEFAULT_INTERACTIVE_LAUNCH_TIMEOUT_MS = 300_000;
-const DEFAULT_LAUNCH_GATE_CEILING_MS = 120_000;
+/** Added to a launch's own window timeout: the gate outlives the window. */
+const LAUNCH_GATE_MARGIN_MS = 60_000;
+const SETUP_FAILED_LINE = '[CQD Classroom] WebAuthFlow setup failed — sign-in skipped';
+const BAD_EXCHANGE_URL_LINE =
+  '[CQD Classroom] WebAuthFlow exchange URL rejected (https and allowlisted origin required) — API assist stays off';
+
+/** True for an https URL without userinfo whose origin is Google's or allowlisted. */
+function isAllowedExchangeUrl(url: unknown, extraOrigins: readonly string[] | undefined): boolean {
+  if (typeof url !== 'string') return false;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return false;
+    const allowed = new Set([new URL(GOOGLE_TOKEN_ENDPOINT).origin]);
+    for (const extra of extraOrigins ?? []) {
+      try {
+        const origin = new URL(extra);
+        if (origin.protocol === 'https:' && !origin.username && !origin.password) {
+          allowed.add(origin.origin);
+        }
+      } catch {
+        // an unparsable allowlist entry allows nothing
+      }
+    }
+    return allowed.has(parsed.origin);
+  } catch {
+    return false;
+  }
+}
 
 interface CachedToken {
   token: string;
@@ -188,14 +227,33 @@ export class WebAuthFlowTokenSource implements TokenSource {
   /** True when the open launch was silent and its window timeout elapsed. */
   private silentLaunchTimedOut = false;
   private missingClientIdLogged = false;
+  private setupFailureLogged = false;
+  private readonly exchangeUrlAllowed: boolean;
   private readonly deps: WebAuthFlowDeps;
 
   constructor(deps: WebAuthFlowDeps) {
     this.deps = deps;
+    // Validated once, here: a rejected URL never reaches fetch (it would carry
+    // the code, verifier and client id to an arbitrary host).
+    this.exchangeUrlAllowed = deps.exchangeUrl === undefined ||
+      isAllowedExchangeUrl(deps.exchangeUrl, deps.allowedExchangeOrigins);
   }
 
   async getToken(interactive: boolean): Promise<string | null> {
-    const clientId = this.deps.getClientId();
+    if (!this.exchangeUrlAllowed) {
+      if (!this.setupFailureLogged) {
+        this.setupFailureLogged = true;
+        this.log(BAD_EXCHANGE_URL_LINE);
+      }
+      return null;
+    }
+    let clientId: string | null;
+    try {
+      clientId = this.deps.getClientId();
+    } catch {
+      this.logSetupFailure();
+      return null;
+    }
     if (!clientId) {
       // Exactly one line per source, however many callers ask.
       if (!this.missingClientIdLogged) {
@@ -270,20 +328,38 @@ export class WebAuthFlowTokenSource implements TokenSource {
     (this.deps.log ?? console.warn)(message);
   }
 
-  private async runFlow(clientId: string, interactive: boolean): Promise<string | null> {
-    const randomBytes = this.deps.randomBytes ?? defaultRandomBytes;
-    const { verifier, challenge } = await createPkcePair(randomBytes);
-    const state = base64url(randomBytes(16));
-    const redirectUri = this.deps.getRedirectUrl();
+  /** One fixed line per source, never the error text. */
+  private logSetupFailure(): void {
+    if (this.setupFailureLogged) return;
+    this.setupFailureLogged = true;
+    this.log(SETUP_FAILED_LINE);
+  }
 
-    const authUrl = new URL(GOOGLE_AUTH_ENDPOINT);
-    authUrl.searchParams.set('response_type', 'code');
-    authUrl.searchParams.set('client_id', clientId);
-    authUrl.searchParams.set('redirect_uri', redirectUri);
-    authUrl.searchParams.set('scope', WEB_AUTH_SCOPES.join(' '));
-    authUrl.searchParams.set('state', state);
-    authUrl.searchParams.set('code_challenge', challenge);
-    authUrl.searchParams.set('code_challenge_method', 'S256');
+  private async runFlow(clientId: string, interactive: boolean): Promise<string | null> {
+    // Setup can throw (entropy, identity API): TokenSource never throws, so a
+    // failure is null. A silent null starts the normal cooldown in getToken.
+    let verifier: string;
+    let state: string;
+    let redirectUri: string;
+    let authUrl: URL;
+    try {
+      const randomBytes = this.deps.randomBytes ?? defaultRandomBytes;
+      const pkce = await createPkcePair(randomBytes);
+      verifier = pkce.verifier;
+      state = base64url(randomBytes(16));
+      redirectUri = this.deps.getRedirectUrl();
+      authUrl = new URL(GOOGLE_AUTH_ENDPOINT);
+      authUrl.searchParams.set('response_type', 'code');
+      authUrl.searchParams.set('client_id', clientId);
+      authUrl.searchParams.set('redirect_uri', redirectUri);
+      authUrl.searchParams.set('scope', WEB_AUTH_SCOPES.join(' '));
+      authUrl.searchParams.set('state', state);
+      authUrl.searchParams.set('code_challenge', pkce.challenge);
+      authUrl.searchParams.set('code_challenge_method', 'S256');
+    } catch {
+      this.logSetupFailure();
+      return null;
+    }
 
     // An idle auth window must not pin the in-flight slot forever: race the
     // launch against a timeout (a timed-out flow resolves null).
@@ -316,7 +392,7 @@ export class WebAuthFlowTokenSource implements TokenSource {
     };
     gateTimer = setTimeout(
       release,
-      this.deps.launchGateCeilingMs ?? DEFAULT_LAUNCH_GATE_CEILING_MS,
+      this.deps.launchGateCeilingMs ?? launchTimeoutMs + LAUNCH_GATE_MARGIN_MS,
     );
     launched.then(release, release);
     let launchTimer: ReturnType<typeof setTimeout> | undefined;

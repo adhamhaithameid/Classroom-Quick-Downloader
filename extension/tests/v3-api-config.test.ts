@@ -175,18 +175,24 @@ describe('isApiConfigured (S13 consent gate)', () => {
       expect(isApiConfigured()).toBe(false);
     });
 
-    // Review round 4, finding 6: empty or missing brands carry no information,
-    // so they behave like an absent userAgentData (plain-Chrome UA fallback).
-    it('treats empty or missing brands like no userAgentData (flag ON)', () => {
+    // Review round 5, finding 1 (supersedes round 4, finding 6): only a context
+    // with NO userAgentData object takes the UA fallback. Present-but-empty or
+    // brand-less data is a browser answering "no Google Chrome brand": a non-Google
+    // Chromium fork with a plain Chrome UA must not pass as Google Chrome.
+    it('empty or missing brands do NOT take the plain-UA fallback (flag ON)', () => {
       setEngineBase('v3');
       for (const uaData of [{ brands: [] }, {}]) {
         stubBackground(CHROME_UA, uaData);
-        expect(isApiConfigured()).toBe(true);
-        for (const marker of ['Edg/131.0.2903.86', 'OPR/115.0.0.0', 'Brave/1.70']) {
-          stubBackground(`${CHROME_UA} ${marker}`, uaData);
-          expect(isApiConfigured()).toBe(false);
-        }
+        expect(isApiConfigured()).toBe(false);
       }
+    });
+
+    it('only an absent userAgentData takes the plain-UA fallback (flag ON)', () => {
+      setEngineBase('v3');
+      stubBackground(CHROME_UA);
+      expect(isApiConfigured()).toBe(true);
+      stubBackground(`${CHROME_UA} Vivaldi/6.9.3447.54`);
+      expect(isApiConfigured()).toBe(false);
     });
 
     it('flag OFF ignores empty brands: client id alone decides (finding 6)', () => {
@@ -328,6 +334,21 @@ describe('isApiConfigured (S13 consent gate)', () => {
     afterEach(() => {
       setEngineBase('v2'); // never leak the flag into other tests
       setNonChromeTokenSourceWired(false);
+    });
+
+    it('the wiring seam is a no-op outside the test build (review round 5, finding 5)', () => {
+      setNonChromeTokenSourceWired(false);
+      vi.stubEnv('MODE', 'production');
+      try {
+        setNonChromeTokenSourceWired(true);
+        stubNonChrome(EDGE_UA, webManifest('test-web-client.apps.googleusercontent.com'), {
+          sendMessage: true,
+        });
+        setEngineBase('v3');
+        expect(isApiConfigured()).toBe(false);
+      } finally {
+        vi.unstubAllEnvs();
+      }
     });
 
     it('ships with NO non-Chrome token source wired: configured stays false (review #4)', () => {

@@ -221,9 +221,13 @@ provider needs to interact with the user, the flow will just fail."
   so real Google Chrome keeps its pre-ADR answer there. Brave sends no UA token:
   without `userAgentData` brands it cannot be told apart from Chrome, so the
   fallback exists only for contexts with no `userAgentData` object at all (all
-  Chromium forks that ship brands are told apart by the explicit brand rule). Round 4 (finding 6, flag ON only): empty or missing brands carry no
-  information, so they take the same UA fallback. A non-empty brand list without
-  `'Google Chrome'` stays false. Flag OFF logic is unchanged.
+  Chromium forks that ship brands are told apart by the explicit brand rule). Round 5 (finding 1, supersedes round 4's empty-brands rule, flag ON only):
+  the fallback applies ONLY when `navigator.userAgentData` is undefined. An
+  object with empty or missing `brands` stays false, because a non-Google Chromium
+  fork could answer that way with a plain Chrome UA; no source shows real Google
+  Chrome returning empty brands (Chrome 90+ lists `'Google Chrome'`). The fallback
+  list also rejects `Vivaldi/` (UNVERIFIED that current Vivaldi builds still send
+  it; older ones did). Arc sends no UA token, so it cannot be named. Flag OFF logic is unchanged.
   MDN: "`WorkerNavigator.userAgentData` ... only available in Web Workers" and
   in secure contexts, so the MV3 background normally has brands; that the
   extension service worker specifically exposes them is UNVERIFIED by an explicit
@@ -248,7 +252,9 @@ provider needs to interact with the user, the flow will just fail."
   5 min interactive; the silent value is short because a queued click waits for
   the silent flow: worst case 10 s launch + 15 s exchange). `launchWebAuthFlow`
   has no cancel, so a launch gate stays closed until the underlying launch
-  settles, capped at a 2 min ceiling (`launchGateCeilingMs`) so a launch that
+  settles, capped at a ceiling (`launchGateCeilingMs`; default: that launch's own timeout
+  plus 60 s, so 70 s silent and 6 min interactive, always above the window timeout
+  and never reopening beside a window that may still be open) so a launch that
   never settles cannot disable sign-in for good; while it is closed a new flow
   resolves null (no second window), except that a click may open a window once
   a silent launch timed out. Cooldown and cache expiry survive a backward clock
@@ -257,6 +263,14 @@ provider needs to interact with the user, the flow will just fail."
   cannot hang the flow; late results are not cached). An error redirect resolves
   null even without `state`; a state mismatch on a success redirect resolves
   null too (logged once, no value in the line). The cached token is keyed by client id.
+- **Exchange URL and setup (review round 5):** `exchangeUrl` must be https, carry
+  no userinfo and use Google's token origin or an origin passed in
+  `allowedExchangeOrigins` (a Worker proxy, explicit). The code, PKCE verifier,
+  client id and redirect URI are POSTed there, so anything else makes `getToken`
+  resolve null with one fixed log line and no launch. Client id, PKCE, redirect
+  URL and auth URL setup run inside try: a throw is null plus one fixed line, never
+  a rejection; a silent null starts the normal cooldown. `setNonChromeTokenSourceWired`
+  is test-only and a no-op unless `import.meta.env.MODE` is `'test'`.
 - **Rollback:** flip the flag default back to `'v2'`, remove the config key and any `exchangeUrl` wiring — the V2 DOM path is byte-identical to today.
 
 ## Verification log (2026-11-19)
