@@ -36,7 +36,6 @@ describe('capability.ts killers (round 2)', () => {
   it.each([
     ['Edg/ desktop (mutants 59,60,61)', `${CHROME_UA} Edg/131.0.0.0`],
     ['EdgA/ Android (mutants 62)', `${CHROME_UA} EdgA/131.0.0.0`],
-    ['EdgiOS/ iOS (mutants 61)', `${CHROME_UA} EdgiOS/131.0.0.0`],
     ['OPR/ (Opera Chromium)', `${CHROME_UA} OPR/110.0.0.0`],
     ['Opera/ legacy slash (mutant 63)', `${CHROME_UA} Opera/9.80`],
     ['Opera <space> legacy (mutant 64)', `${CHROME_UA} Opera 12.16`],
@@ -48,6 +47,16 @@ describe('capability.ts killers (round 2)', () => {
       relayAvailable: true,
     });
     expect(r.identity).toBe('webAuthFlow');
+  });
+
+  it('EdgiOS/ iOS is none even next to a Google Chrome brand (review round 2, finding 6; was mutant 61)', () => {
+    const r = probeIdentityCapability({
+      userAgent: `${CHROME_UA} EdgiOS/131.0.0.0`,
+      apis: chromeApis,
+      brands: ['Google Chrome'],
+      relayAvailable: true,
+    });
+    expect(r.identity).toBe('none');
   });
 
   it('Edge without any Chrome/ token still reaches webAuthFlow via its own branch (mutants 59,60)', () => {

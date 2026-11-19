@@ -16,9 +16,12 @@
  *   - a missing web client id resolves null and logs exactly one line,
  *   - concurrent callers share ONE in-flight flow (one auth window),
  *   - an expired cached token triggers exactly ONE silent re-auth per
- *     cooldown window (never a prompt — interactive acquisition stays the
- *     caller's, via a user click); a failed silent attempt is not retried
- *     until the cooldown passes,
+ *     cooldown window for a non-interactive caller; a failed silent attempt is
+ *     not retried until the cooldown passes. An INTERACTIVE caller (a user
+ *     click) bypasses the cooldown and always opens the auth window; if a
+ *     silent flow is pending it runs after that flow settles,
+ *   - the auth window itself is raced against a timeout (30 s silent, 5 min
+ *     interactive): an idle window resolves null and frees the in-flight slot,
  *   - the returned redirect must start with getRedirectUrl(); a malformed or
  *     foreign redirect resolves null, a state mismatch still rejects,
  *   - the code exchange aborts after a fixed timeout and resolves null,
@@ -115,6 +118,11 @@ export interface WebAuthFlowDeps {
   fetchTimeoutMs?: number;
   /** Cooldown after a failed silent re-auth in ms (default 60s). */
   silentRetryCooldownMs?: number;
+  /**
+   * Auth-window timeout in ms. Default 30s for a silent flow, 5 min for an
+   * interactive one (injectable for tests). Separate from fetchTimeoutMs.
+   */
+  launchTimeoutMs?: number;
   randomBytes?: (n: number) => Uint8Array;
   now?: () => number;
   log?: (message: string) => void;
@@ -125,6 +133,8 @@ const EXPIRY_SKEW_MS = 60_000;
 const DEFAULT_LIFETIME_MS = 3600_000;
 const DEFAULT_FETCH_TIMEOUT_MS = 15_000;
 const DEFAULT_SILENT_RETRY_COOLDOWN_MS = 60_000;
+const DEFAULT_SILENT_LAUNCH_TIMEOUT_MS = 30_000;
+const DEFAULT_INTERACTIVE_LAUNCH_TIMEOUT_MS = 300_000;
 
 interface CachedToken {
   token: string;
@@ -134,7 +144,12 @@ interface CachedToken {
 export class WebAuthFlowTokenSource implements TokenSource {
   private cached: CachedToken | null = null;
   private inflight: Promise<string | null> | null = null;
+  /** Whether the pending flow may show an auth window (user click). */
+  private inflightInteractive = false;
   private lastSilentFailureAt: number | null = null;
+  /** True once a token was obtained: later silent re-auth is cooldown-gated. */
+  private hadSession = false;
+  private missingClientIdLogged = false;
   private readonly deps: WebAuthFlowDeps;
 
   constructor(deps: WebAuthFlowDeps) {
@@ -144,19 +159,40 @@ export class WebAuthFlowTokenSource implements TokenSource {
   async getToken(interactive: boolean): Promise<string | null> {
     const clientId = this.deps.getClientId();
     if (!clientId) {
-      this.log('[CQD Classroom] WebAuthFlow token source: no web client id configured — API assist stays off');
+      // Exactly one line per source, however many callers ask.
+      if (!this.missingClientIdLogged) {
+        this.missingClientIdLogged = true;
+        this.log('[CQD Classroom] WebAuthFlow token source: no web client id configured — API assist stays off');
+      }
       return null;
     }
 
     const now = this.deps.now ?? (() => Date.now());
     if (this.cached && this.cached.expiresAt > now()) return this.cached.token;
-    // One window at a time: concurrent callers share the pending flow.
-    if (this.inflight) return this.inflight;
+    // An expired token is useless: drop it from memory.
+    this.cached = null;
 
-    if (!this.cached) return this.track(this.runFlow(clientId, interactive));
+    if (this.inflight) {
+      // Concurrent callers share the pending flow, unless the pending flow is
+      // silent and this caller is a user click: that click must still get a
+      // window, so it runs after the silent attempt settles.
+      if (!interactive || this.inflightInteractive) return this.inflight;
+      const silent = this.inflight;
+      return this.track(
+        silent
+          .catch(() => null)
+          .then((token) => token ?? this.runFlow(clientId, true)),
+        true,
+      );
+    }
+
+    // A user click always gets its window: no cooldown, no silent downgrade.
+    if (interactive) return this.track(this.runFlow(clientId, true), true);
+
+    if (!this.hadSession) return this.track(this.runFlow(clientId, false), false);
 
     // Expired: ONE silent re-auth per cooldown window. Never an interactive
-    // prompt from a token request — consent escalation is a user click's job.
+    // prompt from a non-interactive request — consent escalation is a click's job.
     const cooldown = this.deps.silentRetryCooldownMs ?? DEFAULT_SILENT_RETRY_COOLDOWN_MS;
     if (this.lastSilentFailureAt !== null && now() - this.lastSilentFailureAt < cooldown) {
       return null;
@@ -171,15 +207,16 @@ export class WebAuthFlowTokenSource implements TokenSource {
         throw error;
       },
     );
-    return this.track(silent);
+    return this.track(silent, false);
   }
 
   /** Remember the pending flow until it settles (success, null or throw). */
-  private track(flow: Promise<string | null>): Promise<string | null> {
+  private track(flow: Promise<string | null>, interactive: boolean): Promise<string | null> {
     const pending = flow.finally(() => {
       if (this.inflight === pending) this.inflight = null;
     });
     this.inflight = pending;
+    this.inflightInteractive = interactive;
     return pending;
   }
 
@@ -202,11 +239,24 @@ export class WebAuthFlowTokenSource implements TokenSource {
     authUrl.searchParams.set('code_challenge', challenge);
     authUrl.searchParams.set('code_challenge_method', 'S256');
 
+    // An idle auth window must not pin the in-flight slot forever: race the
+    // launch against a timeout (a timed-out flow resolves null).
+    const launchTimeoutMs = this.deps.launchTimeoutMs ??
+      (interactive ? DEFAULT_INTERACTIVE_LAUNCH_TIMEOUT_MS : DEFAULT_SILENT_LAUNCH_TIMEOUT_MS);
+    let launchTimer: ReturnType<typeof setTimeout> | undefined;
+    const timedOut = new Promise<undefined>((resolve) => {
+      launchTimer = setTimeout(() => resolve(undefined), launchTimeoutMs);
+    });
     let redirect: string | undefined;
     try {
-      redirect = await this.deps.launchWebAuthFlow({ url: authUrl.toString(), interactive });
+      redirect = await Promise.race([
+        this.deps.launchWebAuthFlow({ url: authUrl.toString(), interactive }),
+        timedOut,
+      ]);
     } catch {
       return null; // flow aborted (Firefox cancel path)
+    } finally {
+      clearTimeout(launchTimer);
     }
     if (!redirect) return null; // user closed the auth window
 
@@ -251,6 +301,7 @@ export class WebAuthFlowTokenSource implements TokenSource {
         : DEFAULT_LIFETIME_MS;
       const now = this.deps.now ?? (() => Date.now());
       this.cached = { token: accessToken, expiresAt: now() + lifetime - EXPIRY_SKEW_MS };
+      this.hadSession = true;
       return accessToken;
     } catch {
       return null; // network failure or timeout — the fallback matrix covers it

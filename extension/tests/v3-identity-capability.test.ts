@@ -114,6 +114,17 @@ describe('probeIdentityCapability', () => {
     });
   });
 
+  it('classifies Edge iOS (EdgiOS/) as none: a WebKit shell with no extension identity (review round 2, finding 6)', () => {
+    const edgeIos =
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) EdgiOS/131.0.2903.86 Version/17.0 Mobile/15E148 Safari/604.1';
+    expect(probeIdentityCapability({ userAgent: edgeIos, apis: bothApis })).toEqual({
+      identity: 'none',
+    });
+    expect(
+      probeIdentityCapability({ userAgent: edgeIos, apis: bothApis, relayAvailable: true }),
+    ).toEqual({ identity: 'none' });
+  });
+
   it('reports none on Safari (macOS and iOS) even with an API surface stubbed in', () => {
     for (const ua of [SAFARI_UA, `${SAFARI_UA} Mobile/15E148`]) {
       expect(probeIdentityCapability({ userAgent: ua, apis: bothApis })).toEqual({

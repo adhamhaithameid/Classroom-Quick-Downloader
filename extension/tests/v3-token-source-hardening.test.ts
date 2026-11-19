@@ -346,12 +346,12 @@ describe('WebAuthFlowTokenSource — review fixes', () => {
     const source = new WebAuthFlowTokenSource(deps);
     await expect(source.getToken(false)).resolves.toBe('at-1');
     now = T0 + 3600_000 + 1;
-    await expect(source.getToken(true)).resolves.toBeNull(); // silent attempt #1
-    await expect(source.getToken(true)).resolves.toBeNull(); // cooldown: no flow
+    await expect(source.getToken(false)).resolves.toBeNull(); // silent attempt #1
+    await expect(source.getToken(false)).resolves.toBeNull(); // cooldown: no flow
     await expect(source.getToken(false)).resolves.toBeNull(); // cooldown: no flow
     expect(deps.launchWebAuthFlow).toHaveBeenCalledTimes(2); // first login + ONE silent
     now += 60_001; // cooldown over -> one more silent attempt is allowed
-    await expect(source.getToken(true)).resolves.toBeNull();
+    await expect(source.getToken(false)).resolves.toBeNull();
     expect(deps.launchWebAuthFlow).toHaveBeenCalledTimes(3);
   });
 
@@ -412,5 +412,146 @@ describe('WebAuthFlowTokenSource — review fixes', () => {
     await expect(source.getToken(true)).resolves.toBe('fast');
     await vi.advanceTimersByTimeAsync(40);
     expect(sawSignal?.aborted).toBe(false);
+  });
+});
+
+// Fresh-eyes review round 2 (2026-11-19): interactivity, cooldown, in-flight
+// slots, launch timeout, one-line log.
+describe('WebAuthFlowTokenSource — review round 2', () => {
+  const launchCalls = (deps: ReturnType<typeof makeDeps>) =>
+    (deps.launchWebAuthFlow as ReturnType<typeof vi.fn>).mock.calls.map(
+      (call) => call[0] as { url: string; interactive: boolean },
+    );
+
+  it('finding 1: after expiry a user click (interactive) opens the auth window', async () => {
+    let now = T0;
+    const deps = makeDeps({ now: () => now });
+    const source = new WebAuthFlowTokenSource(deps);
+    await expect(source.getToken(false)).resolves.toBe('at-1');
+    now = T0 + 3600_000 + 1;
+    await expect(source.getToken(true)).resolves.toBe('at-2');
+    expect(launchCalls(deps)[1].interactive).toBe(true);
+  });
+
+  it('finding 1: one failed silent attempt does not disable a later user click', async () => {
+    let now = T0;
+    let calls = 0;
+    const deps = makeDeps({
+      now: () => now,
+      launchWebAuthFlow: vi.fn(async (details: { url: string; interactive: boolean }) => {
+        calls += 1;
+        // login ok, silent re-auth fails, the interactive click succeeds
+        return calls === 2 ? '' : redirectEchoingState(details.url, { code: 'c' });
+      }),
+    });
+    const source = new WebAuthFlowTokenSource(deps);
+    await expect(source.getToken(false)).resolves.toBe('at-1');
+    now = T0 + 3600_000 + 1;
+    await expect(source.getToken(false)).resolves.toBeNull(); // silent fails
+    await expect(source.getToken(true)).resolves.toBe('at-2'); // click recovers
+    // ...and the recovered token is served from cache afterwards.
+    await expect(source.getToken(false)).resolves.toBe('at-2');
+    expect(calls).toBe(3);
+  });
+
+  it('finding 2: the cooldown never blocks an interactive caller', async () => {
+    let now = T0;
+    let calls = 0;
+    const deps = makeDeps({
+      now: () => now,
+      launchWebAuthFlow: vi.fn(async (details: { url: string; interactive: boolean }) => {
+        calls += 1;
+        return calls === 2 ? '' : redirectEchoingState(details.url, { code: 'c' });
+      }),
+    });
+    const source = new WebAuthFlowTokenSource(deps);
+    await source.getToken(false);
+    now = T0 + 3600_000 + 1;
+    await expect(source.getToken(false)).resolves.toBeNull(); // starts cooldown
+    now += 1_000; // well inside the 60 s cooldown
+    await expect(source.getToken(true)).resolves.toBe('at-2');
+    expect(launchCalls(deps)[2].interactive).toBe(true);
+  });
+
+  it('finding 3: an interactive call during a silent flow still opens a window', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const deps = makeDeps({
+      launchWebAuthFlow: vi.fn(async (details: { url: string; interactive: boolean }) => {
+        if (!details.interactive) {
+          await gate;
+          return ''; // the silent flow fails
+        }
+        return redirectEchoingState(details.url, { code: 'c' });
+      }),
+    });
+    const source = new WebAuthFlowTokenSource(deps);
+    const silent = source.getToken(false);
+    await vi.waitFor(() => expect(deps.launchWebAuthFlow).toHaveBeenCalledTimes(1));
+    const click = source.getToken(true);
+    release();
+    await expect(silent).resolves.toBeNull();
+    await expect(click).resolves.toBe('at-1');
+    expect(launchCalls(deps).map((c) => c.interactive)).toEqual([false, true]);
+  });
+
+  it('finding 3: concurrent interactive callers still share ONE window', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const deps = makeDeps({
+      launchWebAuthFlow: vi.fn(async (details: { url: string; interactive: boolean }) => {
+        if (!details.interactive) {
+          await gate;
+          return '';
+        }
+        return redirectEchoingState(details.url, { code: 'c' });
+      }),
+    });
+    const source = new WebAuthFlowTokenSource(deps);
+    const silent = source.getToken(false);
+    await vi.waitFor(() => expect(deps.launchWebAuthFlow).toHaveBeenCalledTimes(1));
+    const a = source.getToken(true);
+    const b = source.getToken(true);
+    release();
+    await silent;
+    await expect(Promise.all([a, b])).resolves.toEqual(['at-1', 'at-1']);
+    expect(launchCalls(deps).filter((c) => c.interactive)).toHaveLength(1);
+  });
+
+  it('finding 4: a hung auth window times out and frees the in-flight slot', async () => {
+    let calls = 0;
+    const deps = makeDeps({
+      launchWebAuthFlow: vi.fn(async (details: { url: string; interactive: boolean }) => {
+        calls += 1;
+        if (calls === 1) return new Promise<string>(() => {}); // idle window, never settles
+        return redirectEchoingState(details.url, { code: 'c' });
+      }),
+    });
+    const source = new WebAuthFlowTokenSource({ ...deps, launchTimeoutMs: 50 });
+    const first = source.getToken(true);
+    await vi.waitFor(() => expect(calls).toBe(1));
+    await vi.advanceTimersByTimeAsync(60);
+    await expect(first).resolves.toBeNull();
+    await expect(source.getToken(true)).resolves.toBe('at-1'); // not the hung promise
+  });
+
+  it('finding 4: a fast flow leaves no live launch timer behind', async () => {
+    const deps = makeDeps();
+    const source = new WebAuthFlowTokenSource({ ...deps, launchTimeoutMs: 50 });
+    await expect(source.getToken(true)).resolves.toBe('at-1');
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('finding 5: the missing client id is logged ONCE across many calls', async () => {
+    const log = vi.fn();
+    const source = new WebAuthFlowTokenSource(makeDeps({ getClientId: () => null, log }));
+    await source.getToken(true);
+    await source.getToken(false);
+    await source.getToken(true);
+    expect(log).toHaveBeenCalledTimes(1);
   });
 });

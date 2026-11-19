@@ -99,12 +99,13 @@ Firefox-user deadline forces this work — cost, not urgency, decides.
 | Browser | Identity API available | Redirect URL form | Token storage | Refresh path | Store policy risk |
 |---|---|---|---|---|---|
 | Chrome | `getAuthToken` (existing relay) | `https://<app-id>.chromiumapp.org/*` (chrome.dev docs) | Chrome's token cache | Chrome-managed | none — unchanged path |
-| Edge | `launchWebAuthFlow` (`getAuthToken` unsupported — MS docs) | `https://<id>.chromiumapp.org/` | memory only (scaffold) | none — one silent re-auth | low — documented alternate API |
+| Edge (desktop `Edg/`, Android `EdgA/`) | `launchWebAuthFlow` (`getAuthToken` unsupported — MS docs) | `https://<id>.chromiumapp.org/` | memory only (scaffold) | none — one silent re-auth | low — documented alternate API |
 | Brave | Chromium surface; specifics UNVERIFIED | `https://<id>.chromiumapp.org/` | memory only (scaffold) | none — one silent re-auth | UNVERIFIED review posture |
 | Opera | `launchWebAuthFlow` since 60 (MDN BCD) | `https://<id>.chromiumapp.org/` | memory only (scaffold) | none — one silent re-auth | low |
 | Firefox | `launchWebAuthFlow` + `getRedirectURL` only (MDN) | `getRedirectURL()` output — "fixed domain ... derived from the add-on's ID" (MDN); literal `https://<app-id>.extensions.allizom.org/` pattern UNVERIFIED | memory only (scaffold) | none — one silent re-auth | medium — AMO review scrutiny; keep flow user-initiated and telemetry-free |
 | Safari (macOS) | none — identity API `false` (MDN BCD) | n/a | n/a | n/a | none — feature absent by probe |
 | Safari (iOS) | none — mirrors desktop `false` | n/a | n/a | n/a | none — feature absent by probe |
+| Edge (iOS, `EdgiOS/`) | none — WebKit shell, no extension host (decision, review round 2 finding 6) | n/a | n/a | n/a | none — feature absent by probe |
 | Chrome on Android | not an extension host (UNVERIFIED official line) | n/a | n/a | n/a | none — feature absent |
 
 Firefox notes: since Firefox 75 the redirect must be the `getRedirectURL()`
@@ -177,7 +178,29 @@ provider needs to interact with the user, the flow will just fail."
   Tradeoff: a real Chrome without `userAgentData` (Chrome older than 90, or
   an insecure context) is classed webAuthFlow, not getAuthToken. That is the
   safe direction: it never calls a function Brave, Edge or a fork cannot
-  answer. Edge tokens match `Edg[A-Za-z]*/` (desktop, EdgA, EdgiOS).
+  answer. Edge tokens match `Edg(?:A)?/` (desktop, Android); `EdgiOS/` is answered
+  `'none'` explicitly before the Edge branch.
+- **No-userAgentData fallback (review round 2, finding 7):** `isApiConfigured()`
+  keeps the explicit-brand rule. Only a context with NO `navigator.userAgentData`
+  object (Chrome older than 90, an insecure context) falls back to a plain
+  Chrome UA (`isPlainChromeUserAgent`: `Chrome/` and no Edg, OPR, Opera, Brave,
+  Chromium or Firefox marker), so real Google Chrome keeps its pre-ADR answer
+  there. Present-but-empty or present-without-Google-Chrome brands stay false.
+  MDN: "`WorkerNavigator.userAgentData` ... only available in Web Workers" and
+  in secure contexts, so the MV3 background normally has brands; that the
+  extension service worker specifically exposes them is UNVERIFIED by an explicit
+  Chrome statement.
+- **Behavior change for Brave, Edge, Opera (flag OFF, mode `'v3'`):** the base
+  returned `configured` whenever `chrome.identity.getAuthToken` existed. These
+  brands expose the function but cannot answer it, so `isApiConfigured()` is now
+  false there and the registry (engine-registry.ts `case 'v3'`) falls back to the
+  V2 DOM engine instead of an engine that can never fetch. Google Chrome is
+  unchanged.
+- **Token source behavior (review round 2):** an interactive request (user
+  click) bypasses the silent-retry cooldown and always opens the auth window,
+  also after expiry; a silent flow in flight does not swallow the click (the
+  click runs after it). The auth window is raced against a timeout (30 s
+  silent, 5 min interactive) so an idle window cannot pin the in-flight slot.
 - **Rollback:** flip the flag default back to `'v2'` and remove the config
   key — the V2 DOM path is byte-identical to today.
 

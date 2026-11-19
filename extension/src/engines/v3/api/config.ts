@@ -26,7 +26,8 @@
  * capability probe answers something other than 'none' (Safari and unknown
  * hosts stay on the V2 DOM path) AND NON_CHROME_TOKEN_SOURCE_WIRED is true.
  * getAuthToken counts ONLY on an explicit 'Google Chrome' userAgentData brand
- * (one shared test, capability.ts). The shipped defaults — no web client id,
+ * (one shared test, capability.ts); a context with no userAgentData at all
+ * falls back to a plain Chrome UA so real Chrome never regresses. The shipped defaults — no web client id,
  * flag 'v2', token source unwired — keep every non-Chrome browser false, so flipping this on is a rollout
  * decision, not a code surprise (docs/adr/0010-cross-browser-oauth-web-auth-flow.md).
  *
@@ -41,7 +42,11 @@
  * while v3 is active.
  */
 import { getEngineBase } from '../../engine-base';
-import { isGoogleChromeBrand, probeIdentityCapability } from './capability';
+import {
+  isGoogleChromeBrand,
+  isPlainChromeUserAgent,
+  probeIdentityCapability,
+} from './capability';
 
 /** What the oauth2 manifest section looks like when present. */
 interface ManifestOauth2 {
@@ -73,6 +78,30 @@ function readBrandNames(): string[] {
   } catch {
     return [];
   }
+}
+
+/** True only when the context has no navigator.userAgentData object at all. */
+function userAgentDataAbsent(): boolean {
+  try {
+    return (navigator as Navigator & { userAgentData?: UserAgentData })?.userAgentData == null;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Google Chrome test for this context. Explicit brands decide when present.
+ * Only a context with NO userAgentData (Chrome older than 90, an insecure
+ * context) falls back to a plain Chrome UA, so a real Google Chrome keeps its
+ * pre-ADR-0010 answer there. MDN: WorkerNavigator.userAgentData exists in Web
+ * Workers on secure contexts, and extension pages are secure contexts, so the
+ * MV3 background normally carries brands (extension service worker itself:
+ * UNVERIFIED by an explicit Chrome statement).
+ */
+function isGoogleChromeContext(brandNames: readonly string[]): boolean {
+  if (isGoogleChromeBrand(brandNames)) return true;
+  if (!userAgentDataAbsent()) return false;
+  return typeof navigator !== 'undefined' && isPlainChromeUserAgent(navigator.userAgent);
 }
 
 /**
@@ -113,7 +142,8 @@ export function isApiConfigured(): boolean {
   // on an explicit Google Chrome brand. Edge/Brave/Opera expose the function
   // yet never answer it, so they fall through to the web gate below.
   const brandNames = readBrandNames();
-  if (typeof chrome.identity?.getAuthToken === 'function' && isGoogleChromeBrand(brandNames)) {
+  const isGoogleChrome = isGoogleChromeContext(brandNames);
+  if (typeof chrome.identity?.getAuthToken === 'function' && isGoogleChrome) {
     return hasClientId;
   }
 
@@ -124,7 +154,7 @@ export function isApiConfigured(): boolean {
   const hasIdentityPermission = Array.isArray(manifest.permissions) &&
     manifest.permissions.includes('identity');
   if (!hasIdentityPermission) return false;
-  if (isGoogleChromeBrand(brandNames)) return hasClientId;
+  if (isGoogleChrome) return hasClientId;
 
   // ADR-0010 — non-Chrome browsers: the web-auth-flow path. Configured ONLY
   // when a web client id is present AND the engineBase flag is ON AND the

@@ -20,7 +20,9 @@
  *                    contexts where only the background relay can reach the
  *                    API (content scripts — the csaa.7 stand-in).
  *   'none'         — Safari (MDN browser-compat-data: identity API false on
- *                    macOS and iOS), non-extension hosts (Chrome on Android),
+ *                    macOS and iOS), Edge iOS (EdgiOS/: a WebKit shell with no
+ *                    extension host; Edge Android EdgA/ is Chromium and stays
+ *                    webAuthFlow), non-extension hosts (Chrome on Android),
  *                    and anything unrecognizable. The engine stays on the V2
  *                    DOM path with no error shown.
  *
@@ -68,6 +70,19 @@ export function isGoogleChromeBrand(brands: readonly string[]): boolean {
   return Array.isArray(brands) && brands.includes('Google Chrome');
 }
 
+/**
+ * Fallback for a context with NO navigator.userAgentData object at all (Chrome
+ * older than 90, an insecure context): a Chrome UA with no other brand marker.
+ * Used by config.ts ONLY when userAgentData is absent; present-but-empty or
+ * present-without-Google-Chrome brands never reach it. Chromium forks all ship
+ * userAgentData, so this stays safe for Brave, Edge and Opera (their UA markers
+ * are also rejected here).
+ */
+export function isPlainChromeUserAgent(ua: string): boolean {
+  return typeof ua === 'string' && /Chrome\/\d/.test(ua) &&
+    !/Edg[A-Za-z]*\/|OPR\/|Opera[\s/]|Brave\/|Chromium\/|Firefox\//.test(ua);
+}
+
 export function probeIdentityCapability(input: IdentityCapabilityInput): IdentityCapabilityResult {
   const ua = typeof input.userAgent === 'string' ? input.userAgent : '';
   if (ua.trim().length === 0) return { identity: 'none' };
@@ -79,13 +94,17 @@ export function probeIdentityCapability(input: IdentityCapabilityInput): Identit
   const brands = Array.isArray(input.brands) ? input.brands : [];
   const webFlowReachable = hasWebAuthFlow || relay;
 
+  // Edge iOS (EdgiOS/) is a WebKit shell: no extension host, no identity API.
+  // Decided before the Edge branch so the answer is explicit, not incidental.
+  if (/EdgiOS\//.test(ua)) return { identity: 'none' };
+
   // Safari hosts no identity API at all (MDN BCD: safari false, iOS mirror).
   if (isSafari(ua)) return { identity: 'none' };
 
   // Chromium brands without Google sign-in, plus Firefox: webAuthFlow or
   // nothing. Edge is pinned by Microsoft's supported-APIs table; the token
-  // covers desktop (Edg/), Android (EdgA/) and iOS (EdgiOS/) builds.
-  if (/Edg[A-Za-z]*\//.test(ua) || /OPR\/|Opera[\s/]/.test(ua) || brands.includes('Brave') ||
+  // covers desktop (Edg/) and Android (EdgA/) builds. EdgiOS/ left above.
+  if (/Edg(?:A)?\//.test(ua) || /OPR\/|Opera[\s/]/.test(ua) || brands.includes('Brave') ||
     /Brave\//.test(ua) || isFirefox(ua)) {
     return { identity: webFlowReachable ? 'webAuthFlow' : 'none' };
   }

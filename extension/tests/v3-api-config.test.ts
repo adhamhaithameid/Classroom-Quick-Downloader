@@ -134,6 +134,45 @@ describe('isApiConfigured (S13 consent gate)', () => {
     }
   });
 
+  // Review round 2, finding 7: a context without navigator.userAgentData at all
+  // (Chrome older than 90, an insecure context) but with a plain Chrome UA is
+  // real Google Chrome on every shipped build, so the base behavior holds.
+  describe('Google Chrome without userAgentData (review round 2, finding 7)', () => {
+    const CHROME_UA =
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+    const stubBackground = (userAgent: string, userAgentData?: unknown) => {
+      vi.stubGlobal('navigator', { userAgent, userAgentData });
+      stubChrome({
+        identity: { getAuthToken: () => {} },
+        runtime: {
+          getManifest: () => ({
+            permissions: ['identity'],
+            oauth2: { client_id: 'cqd-extension.apps.googleusercontent.com' },
+          }),
+        },
+      });
+    };
+
+    it('stays true on a plain Chrome UA with no userAgentData', () => {
+      stubBackground(CHROME_UA);
+      expect(isApiConfigured()).toBe(true);
+    });
+
+    it('stays false on Edge, Opera and Brave UAs with no userAgentData', () => {
+      for (const marker of ['Edg/131.0.2903.86', 'OPR/115.0.0.0', 'Brave/1.70']) {
+        stubBackground(`${CHROME_UA} ${marker}`);
+        expect(isApiConfigured()).toBe(false);
+      }
+    });
+
+    it('stays false when userAgentData EXISTS but lists no Google Chrome brand', () => {
+      stubBackground(CHROME_UA, { brands: [] });
+      expect(isApiConfigured()).toBe(false);
+      stubBackground(CHROME_UA, { brands: [{ brand: 'Chromium' }] });
+      expect(isApiConfigured()).toBe(false);
+    });
+  });
+
   it('is false on an unbranded host that exposes getAuthToken (no userAgentData)', () => {
     vi.stubGlobal('navigator', {});
     stubChrome({

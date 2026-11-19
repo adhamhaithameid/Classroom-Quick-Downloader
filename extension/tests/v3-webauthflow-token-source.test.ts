@@ -215,7 +215,7 @@ describe('WebAuthFlowTokenSource', () => {
     await expect(source.getToken(false)).resolves.toBe('at-1');
 
     now = T0 + 3600_000 + 1; // past the 3600s expiry
-    await expect(source.getToken(true)).resolves.toBe('at-2');
+    await expect(source.getToken(false)).resolves.toBe('at-2');
     expect(deps.launchWebAuthFlow).toHaveBeenCalledTimes(2);
     const secondCall = vi.mocked(deps.launchWebAuthFlow).mock.calls[1][0];
     expect(secondCall.interactive).toBe(false); // silent, never a prompt
@@ -235,7 +235,7 @@ describe('WebAuthFlowTokenSource', () => {
     const source = new WebAuthFlowTokenSource(deps);
     await expect(source.getToken(false)).resolves.toBe('at-1');
     now = T0 + 3600_000 + 1;
-    await expect(source.getToken(true)).resolves.toBeNull();
+    await expect(source.getToken(false)).resolves.toBeNull();
     expect(calls[1]?.interactive).toBe(false);
     expect(calls).toHaveLength(2); // no interactive escalation loop
   });
