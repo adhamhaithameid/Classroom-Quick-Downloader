@@ -154,12 +154,13 @@ describe('WebAuthFlowTokenSource', () => {
     expect(deps.fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it('rejects when the returned state does not match the flow state', async () => {
+  it('resolves null when the returned state does not match the flow state', async () => {
     const deps = makeDeps({
       launchWebAuthFlow: vi.fn(async () => `${REDIRECT_URL}?state=tampered&code=auth-code-1`),
     });
     const source = new WebAuthFlowTokenSource(deps);
-    await expect(source.getToken(false)).rejects.toThrow(/state/i);
+    await expect(source.getToken(false)).resolves.toBeNull();
+    expect(deps.fetchImpl).not.toHaveBeenCalled();
   });
 
   it('returns null on user cancel (empty, undefined, and aborted flows)', async () => {
@@ -371,11 +372,12 @@ describe('WebAuthFlowTokenSource — review round 3', () => {
     expect(deps.fetchImpl).not.toHaveBeenCalled();
   });
 
-  it('finding 6: a SUCCESS redirect with a wrong state still rejects', async () => {
+  it('finding 6: a SUCCESS redirect with a wrong state is still refused (null)', async () => {
     const deps = makeDeps({
       launchWebAuthFlow: vi.fn(async () => `${REDIRECT_URL}?code=c&state=wrong`),
     });
-    await expect(new WebAuthFlowTokenSource(deps).getToken(false)).rejects.toThrow(/state/i);
+    await expect(new WebAuthFlowTokenSource(deps).getToken(false)).resolves.toBeNull();
+    expect(deps.fetchImpl).not.toHaveBeenCalled();
   });
 
   it('finding 7: the cached token is keyed by client id', async () => {

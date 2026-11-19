@@ -84,10 +84,15 @@ function readBrandNames(): string[] {
   }
 }
 
-/** True only when the context has no navigator.userAgentData object at all. */
-function userAgentDataAbsent(): boolean {
+/**
+ * True when the context offers no usable brand list: no navigator.userAgentData
+ * object, no `brands` array, or an empty one. None of those says anything about
+ * the browser, so they all take the plain-Chrome UA fallback.
+ */
+function userAgentBrandsUnavailable(): boolean {
   try {
-    return (navigator as Navigator & { userAgentData?: UserAgentData })?.userAgentData == null;
+    const uaData = (navigator as Navigator & { userAgentData?: UserAgentData })?.userAgentData;
+    return !Array.isArray(uaData?.brands) || uaData.brands.length === 0;
   } catch {
     return false;
   }
@@ -95,8 +100,8 @@ function userAgentDataAbsent(): boolean {
 
 /**
  * Google Chrome test for this context. Explicit brands decide when present.
- * Only a context with NO userAgentData (Chrome older than 90, an insecure
- * context) falls back to a plain Chrome UA, so a real Google Chrome keeps its
+ * Only a context with NO usable brands (no userAgentData, no brands array or an
+ * empty one: Chrome older than 90, an insecure context) falls back to a plain Chrome UA, so a real Google Chrome keeps its
  * pre-ADR-0010 answer there. MDN: WorkerNavigator.userAgentData exists in Web
  * Workers on secure contexts, and extension pages are secure contexts, so the
  * MV3 background normally carries brands (extension service worker itself:
@@ -104,7 +109,7 @@ function userAgentDataAbsent(): boolean {
  */
 function isGoogleChromeContext(brandNames: readonly string[]): boolean {
   if (isGoogleChromeBrand(brandNames)) return true;
-  if (!userAgentDataAbsent()) return false;
+  if (!userAgentBrandsUnavailable()) return false;
   return typeof navigator !== 'undefined' && isPlainChromeUserAgent(navigator.userAgent);
 }
 

@@ -374,12 +374,13 @@ describe('WebAuthFlowTokenSource — review fixes', () => {
     expect(deps.fetchImpl).not.toHaveBeenCalled();
   });
 
-  it('a state mismatch on the expected redirect still rejects (review #7)', async () => {
+  it('a state mismatch on the expected redirect is refused with null (review #7)', async () => {
     const deps = makeDeps({
       launchWebAuthFlow: vi.fn(async () => `${REDIRECT_URL}?state=forged&code=c`),
     });
     const source = new WebAuthFlowTokenSource(deps);
-    await expect(source.getToken(true)).rejects.toThrow(/state mismatch/);
+    await expect(source.getToken(true)).resolves.toBeNull();
+    expect(deps.fetchImpl).not.toHaveBeenCalled();
   });
 
   it('aborts a hung token exchange after the timeout and resolves null (review #8)', async () => {
@@ -560,5 +561,142 @@ describe('WebAuthFlowTokenSource — review round 2', () => {
     await source.getToken(false);
     await source.getToken(true);
     expect(log).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Fourth fresh-eyes review (2026-11-19): launch gate ceiling, exchange URL,
+// no-throw state mismatch, clock jumps, strict redirect comparison.
+describe('WebAuthFlowTokenSource — review round 4', () => {
+  it('finding 1: a never-settling launch frees the gate at the ceiling', async () => {
+    let calls = 0;
+    const deps = makeDeps({
+      launchWebAuthFlow: vi.fn(async (details: { url: string; interactive: boolean }) => {
+        calls += 1;
+        if (calls === 1) return new Promise<string | undefined>(() => {});
+        return redirectEchoingState(details.url, { code: 'c' });
+      }),
+    });
+    const source = new WebAuthFlowTokenSource({
+      ...deps,
+      launchTimeoutMs: 50,
+      launchGateCeilingMs: 1_000,
+    });
+    const first = source.getToken(true);
+    await vi.waitFor(() => expect(calls).toBe(1));
+    await vi.advanceTimersByTimeAsync(60);
+    await expect(first).resolves.toBeNull();
+    // Still inside the ceiling: the old window may be open, no second one.
+    await expect(source.getToken(true)).resolves.toBeNull();
+    expect(calls).toBe(1);
+    await vi.advanceTimersByTimeAsync(1_000);
+    await expect(source.getToken(true)).resolves.toBe('at-1');
+    expect(calls).toBe(2);
+  });
+
+  it('finding 1: a click may open a window once a SILENT launch timed out', async () => {
+    let calls = 0;
+    const deps = makeDeps({
+      launchWebAuthFlow: vi.fn(async (details: { url: string; interactive: boolean }) => {
+        calls += 1;
+        if (calls === 1) return new Promise<string | undefined>(() => {});
+        return redirectEchoingState(details.url, { code: 'c' });
+      }),
+    });
+    const source = new WebAuthFlowTokenSource({
+      ...deps,
+      launchTimeoutMs: 50,
+      launchGateCeilingMs: 600_000,
+    });
+    const silent = source.getToken(false);
+    await vi.waitFor(() => expect(calls).toBe(1));
+    await vi.advanceTimersByTimeAsync(60);
+    await expect(silent).resolves.toBeNull();
+    await expect(source.getToken(false)).resolves.toBeNull(); // silent stays gated
+    await expect(source.getToken(true)).resolves.toBe('at-1'); // the click gets a window
+    expect(calls).toBe(2);
+  });
+
+  it('finding 2: the code exchange goes to an injected exchange URL', async () => {
+    const deps = makeDeps();
+    const source = new WebAuthFlowTokenSource({
+      ...deps,
+      exchangeUrl: 'https://exchange.example.test/oauth/token',
+    });
+    await expect(source.getToken(true)).resolves.toBe('at-1');
+    expect(deps.fetchImpl).toHaveBeenCalledTimes(1);
+    expect((deps.fetchImpl as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe(
+      'https://exchange.example.test/oauth/token',
+    );
+  });
+
+  it('finding 2: the exchange URL defaults to the Google token endpoint', async () => {
+    const deps = makeDeps();
+    await new WebAuthFlowTokenSource(deps).getToken(true);
+    expect((deps.fetchImpl as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe(
+      'https://oauth2.googleapis.com/token',
+    );
+  });
+
+  it('finding 3: a state mismatch resolves null, logs one fixed line, no exchange', async () => {
+    const log = vi.fn();
+    const deps = makeDeps({
+      log,
+      launchWebAuthFlow: vi.fn(async () => `${REDIRECT_URL}?state=forged-value&code=c`),
+    });
+    await expect(new WebAuthFlowTokenSource(deps).getToken(true)).resolves.toBeNull();
+    expect(deps.fetchImpl).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledTimes(1);
+    const line = String(log.mock.calls[0][0]);
+    expect(line).toMatch(/state mismatch/);
+    expect(line).not.toContain('forged-value');
+    expect(line).not.toContain(REDIRECT_URL);
+  });
+
+  it('finding 4: a backward clock jump expires the cached token', async () => {
+    let now = T0;
+    const deps = makeDeps({ now: () => now });
+    const source = new WebAuthFlowTokenSource(deps);
+    await expect(source.getToken(true)).resolves.toBe('at-1');
+    now = T0 - 5_000; // clock stepped back: the stamp is in the future
+    await expect(source.getToken(true)).resolves.toBe('at-2');
+  });
+
+  it('finding 4: a backward clock jump does not keep the silent cooldown', async () => {
+    let now = T0;
+    let calls = 0;
+    const deps = makeDeps({
+      now: () => now,
+      launchWebAuthFlow: vi.fn(async () => {
+        calls += 1;
+        return undefined;
+      }),
+    });
+    const source = new WebAuthFlowTokenSource(deps);
+    await expect(source.getToken(false)).resolves.toBeNull(); // starts cooldown
+    now = T0 - 3_600_000; // one hour back
+    await expect(source.getToken(false)).resolves.toBeNull();
+    expect(calls).toBe(2); // the cooldown was reset, one more silent attempt ran
+  });
+
+  it('finding 5: a prefix-extended foreign redirect resolves null', async () => {
+    const deps = makeDeps({
+      launchWebAuthFlow: vi.fn(async (details: { url: string; interactive: boolean }) => {
+        const state = new URL(details.url).searchParams.get('state') ?? '';
+        return `https://hardening-id.chromiumapp.org.evil.test/?state=${state}&code=c`;
+      }),
+    });
+    await expect(new WebAuthFlowTokenSource(deps).getToken(true)).resolves.toBeNull();
+    expect(deps.fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('finding 5: a different path on the same origin resolves null', async () => {
+    const deps = makeDeps({
+      launchWebAuthFlow: vi.fn(async (details: { url: string; interactive: boolean }) => {
+        const state = new URL(details.url).searchParams.get('state') ?? '';
+        return `https://hardening-id.chromiumapp.org/other?state=${state}&code=c`;
+      }),
+    });
+    await expect(new WebAuthFlowTokenSource(deps).getToken(true)).resolves.toBeNull();
+    expect(deps.fetchImpl).not.toHaveBeenCalled();
   });
 });

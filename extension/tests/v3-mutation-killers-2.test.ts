@@ -188,12 +188,12 @@ describe('token-source.ts killers (round 2)', () => {
     expect(launch).toHaveBeenCalledTimes(3);
   });
 
-  it('a silent re-auth that THROWS rejects the caller and starts the cooldown (mutants 238 / 169)', async () => {
+  it('a silent re-auth with a state mismatch resolves null and starts the cooldown (mutants 238 / 169)', async () => {
     const { source, clock, outcome, launch } = harness();
     await source.getToken(true);
     clock.t = 2000;
     outcome.mode = 'badState';
-    await expect(source.getToken(false)).rejects.toThrow(/state mismatch/);
+    expect(await source.getToken(false)).toBeNull();
     expect(launch).toHaveBeenCalledTimes(2);
     clock.t = 3000; // inside the cooldown of the thrown attempt
     outcome.mode = 'ok';

@@ -171,10 +171,28 @@ describe('isApiConfigured (S13 consent gate)', () => {
 
     it('stays false when userAgentData EXISTS but lists no Google Chrome brand (flag ON)', () => {
       setEngineBase('v3');
-      stubBackground(CHROME_UA, { brands: [] });
-      expect(isApiConfigured()).toBe(false);
       stubBackground(CHROME_UA, { brands: [{ brand: 'Chromium' }] });
       expect(isApiConfigured()).toBe(false);
+    });
+
+    // Review round 4, finding 6: empty or missing brands carry no information,
+    // so they behave like an absent userAgentData (plain-Chrome UA fallback).
+    it('treats empty or missing brands like no userAgentData (flag ON)', () => {
+      setEngineBase('v3');
+      for (const uaData of [{ brands: [] }, {}]) {
+        stubBackground(CHROME_UA, uaData);
+        expect(isApiConfigured()).toBe(true);
+        for (const marker of ['Edg/131.0.2903.86', 'OPR/115.0.0.0', 'Brave/1.70']) {
+          stubBackground(`${CHROME_UA} ${marker}`, uaData);
+          expect(isApiConfigured()).toBe(false);
+        }
+      }
+    });
+
+    it('flag OFF ignores empty brands: client id alone decides (finding 6)', () => {
+      setEngineBase('v2');
+      stubBackground(`${CHROME_UA} Edg/131.0.2903.86`, { brands: [] });
+      expect(isApiConfigured()).toBe(true);
     });
   });
 

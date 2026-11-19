@@ -10,10 +10,13 @@
 ## Decision
 
 We will add a `browser.identity.launchWebAuthFlow` token source (Authorization
-Code + PKCE S256, no client secret, token in memory only) behind the existing
+Code + PKCE S256, no client secret in the extension, token in memory only)
+behind the existing
 `engineBase` flag, so Edge, Brave, Opera, and Firefox users can get the same
 API assist as Chrome, while Safari and non-extension hosts stay on the V2 DOM
-engine with no error shown.
+engine with no error shown. The code exchange needs a secret-free path, which
+Google documents only for installed-app clients (see Flow); until the owner
+picks one, the exchange endpoint is injectable and nothing ships ON.
 
 ## Context
 
@@ -56,34 +59,57 @@ Firefox-user deadline forces this work — cost, not urgency, decides.
 
 ## Options considered
 
-1. **launchWebAuthFlow + a Web application OAuth client (chosen).** One
-   extra owner-maintained client; PKCE covers the missing secret. Works on
-   every Chromium fork plus Firefox per the facts above.
+1. **launchWebAuthFlow with a secret-free exchange (chosen).** One extra
+   owner-maintained client. The exchange runs in one of two ways, the owner
+   decides: (a) a client type that Google lets exchange a code with PKCE alone
+   (installed-app family; the redirect-URI fit for the `chromiumapp.org` and
+   Firefox redirects is UNVERIFIED), or (b) a Web application client with a
+   Worker-side exchange proxy that holds the secret (see option 3). The
+   extension calls whichever endpoint `exchangeUrl` names. Works on every
+   Chromium fork plus Firefox per the facts above.
 2. **getAuthToken everywhere.** Rejected: Edge documents it unsupported;
    Firefox does not implement it; Chromium forks without Google sign-in
    cannot answer it. The current `isGoogleChromeBrand()` gate stays correct.
-3. **Worker-side OAuth proxy.** Rejected: it moves token custody to the
-   Worker and makes a local-only feature server-dependent, against the
-   severed-backend posture (ADR-0009 world). Revisit only with Pro-tier
-   licensing, which already needs server token custody.
+3. **Worker-side exchange proxy.** Review round 4 reopened this: a Web
+   application client REQUIRES its secret at the token endpoint (see Flow),
+   and a secret cannot live in an extension. A proxy that only forwards the
+   code exchange (`exchangeUrl`) keeps the secret in the Worker and the access
+   token in extension memory; the Worker never stores it. Cost: the feature
+   depends on the Worker for sign-in, against the severed-backend posture
+   (ADR-0009 world). Taken only if option 1(a) is not possible.
 4. **No-auth DOM-only fallback (status quo).** Kept as the live default and
    as the landing state whenever the capability probe answers `'none'`.
    This is the decision if the owner declines the second client.
 
 ## Flow (chosen option)
 
-- Client type: a Google Cloud **Web application** OAuth client, separate
-  from the current Chrome-extension client. `getRedirectURL()` output feeds
-  its *Authorized redirect URIs* — no wildcards.
-- Authorization Code + PKCE S256. PKCE is mandatory, not optional: "A client
-  secret cannot live in an extension. Google lists `client_secret` as
-  "Optional" in the token request, which makes a secret-less exchange
-  possible." Source: developers.google.com "OAuth 2.0 for Web Server
-  Applications", token-request parameter table.
-- `state`: random per flow, compared on return; a mismatch rejects the flow.
-- Token exchange: one `fetch` to `https://oauth2.googleapis.com/token` with
-  `code`, `client_id`, `redirect_uri`, `grant_type=authorization_code`,
-  `code_verifier` (same source as above).
+- Client type: a Google Cloud OAuth client separate from the current
+  Chrome-extension client. `getRedirectURL()` output feeds its *Authorized
+  redirect URIs* — no wildcards. Which client type: see the secret finding.
+- **Secret finding (review round 4, VERIFIED 2026-11-19, correcting an earlier
+  wrong citation).** The earlier text cited the Web Server page for
+  `client_secret` being "Optional". That is wrong. The "Optional" line is on
+  the installed-app page, "OAuth 2.0 for iOS & Desktop Apps"
+  (developers.google.com/identity/protocols/oauth2/native-app), token request
+  table: "`client_secret` | **Optional** The client secret obtained from the
+  Cloud Console Clients page." The Web Server page
+  (developers.google.com/identity/protocols/oauth2/web-server) lists the same
+  field without "Optional": "`client_secret` | The client secret that you
+  obtain from the Cloud Console Clients page". So a Web application client
+  must send its secret, and a PKCE-only exchange is documented for
+  installed-app clients only. The code scaffold sends no secret; against a Web
+  client Google would reject the exchange. Source read through the Context7
+  mirror of the Google pages (the live pages are script-rendered).
+- Authorization Code + PKCE S256, always. Exchange endpoint: `exchangeUrl`,
+  default `https://oauth2.googleapis.com/token`. With a PKCE-only client type
+  the default works as is. With a Web client the owner points `exchangeUrl`
+  at a Worker proxy that adds the secret and forwards the request.
+- `state`: random per flow, compared on return; a mismatch refuses the flow
+  and `getToken` resolves null (it never throws) with one fixed log line.
+- Token exchange: one `fetch` to `exchangeUrl` (default Google's token
+  endpoint) with `code`, `client_id`, `redirect_uri`,
+  `grant_type=authorization_code`, `code_verifier`. A proxy must forward the
+  same fields, add the secret, and return Google's JSON unchanged.
 - Scopes: the three read-only classroom scopes the manifest already declares
   plus `openid`. No write scopes, ever.
 - Token lifetime: access token in memory with its expiry; ONE silent
@@ -119,8 +145,12 @@ provider needs to interact with the user, the flow will just fail."
 
 ## What the OWNER must provide
 
-1. An OAuth **Web application** client_id (second client, same Google Cloud
-   project, same consent screen; Classroom API enabled).
+1. A second OAuth client in the same Google Cloud project (same consent
+   screen; Classroom API enabled), in ONE of two forms: (a) a client type that
+   accepts a PKCE-only exchange, or (b) a **Web application** client plus a
+   Worker exchange proxy that holds the secret. Pick (a) if Google accepts the
+   `chromiumapp.org` and Firefox redirect URIs for that type (UNVERIFIED),
+   else (b). If neither is acceptable, the decision is option 4 (DOM only).
 2. Authorized redirect URIs per browser: the exact `getRedirectURL()` output
    for every shipped build (Chrome id, Edge id, Firefox AMO id + QA-companion
    id). A new extension id = new redirect URI = re-verification.
@@ -141,8 +171,11 @@ provider needs to interact with the user, the flow will just fail."
 - PKCE S256 always; the verifier is 43–128 base64url characters and the
   challenge is `BASE64URL-ENCODE(SHA256(ASCII(code_verifier)))` (RFC 7636;
   test vectors pinned from its Appendix B).
-- `state` random per flow; mismatch rejects before any token use.
-- No client secret in the package, ever. Nothing secret ships in-repo.
+- `state` random per flow; a mismatch resolves null before any token use.
+- No client secret in the package, ever. Nothing secret ships in-repo. With a
+  Web client the secret lives only in the Worker proxy's secret store.
+- The returned redirect must equal the redirect URI by origin and path
+  (parsed with `URL`), not by string prefix.
 - The access token lives in memory for the session; `storage.local` and
   `storage.sync` never receive tokens (test-pinned). No refresh token exists.
 - Least scope: three classroom read-only scopes + `openid`. Revocation
@@ -156,7 +189,7 @@ provider needs to interact with the user, the flow will just fail."
 - **Step 0 (this worktree, flag OFF):** scaffold landed — `TokenSource`
   seam, `WebAuthFlowTokenSource`, capability probe, `isApiConfigured()` web
   branch. Zero shipped behavior change anywhere.
-- **Step 1 (owner):** mint the web client, register redirect URIs, confirm
+- **Step 1 (owner):** choose (a) or (b) above, mint the client (and deploy the proxy for (b)), register redirect URIs, confirm
   scope verification status, publish the privacy policy.
 - **Step 2 (owner PR):** add the web-client-id config to the manifest
   (NEEDS-OWNER above). Gate still false until the flag flips.
@@ -188,7 +221,9 @@ provider needs to interact with the user, the flow will just fail."
   so real Google Chrome keeps its pre-ADR answer there. Brave sends no UA token:
   without `userAgentData` brands it cannot be told apart from Chrome, so the
   fallback exists only for contexts with no `userAgentData` object at all (all
-  Chromium forks that ship brands are told apart by the explicit brand rule). Present-but-empty or present-without-Google-Chrome brands stay false.
+  Chromium forks that ship brands are told apart by the explicit brand rule). Round 4 (finding 6, flag ON only): empty or missing brands carry no
+  information, so they take the same UA fallback. A non-empty brand list without
+  `'Google Chrome'` stays false. Flag OFF logic is unchanged.
   MDN: "`WorkerNavigator.userAgentData` ... only available in Web Workers" and
   in secure contexts, so the MV3 background normally has brands; that the
   extension service worker specifically exposes them is UNVERIFIED by an explicit
@@ -213,13 +248,16 @@ provider needs to interact with the user, the flow will just fail."
   5 min interactive; the silent value is short because a queued click waits for
   the silent flow: worst case 10 s launch + 15 s exchange). `launchWebAuthFlow`
   has no cancel, so a launch gate stays closed until the underlying launch
-  settles; while it is closed a new flow resolves null (no second window). The
+  settles, capped at a 2 min ceiling (`launchGateCeilingMs`) so a launch that
+  never settles cannot disable sign-in for good; while it is closed a new flow
+  resolves null (no second window), except that a click may open a window once
+  a silent launch timed out. Cooldown and cache expiry survive a backward clock
+  step (now before the stamp drops the cooldown and expires the cache). The
   token exchange is raced against a timer (a fetch that ignores its abort signal
   cannot hang the flow; late results are not cached). An error redirect resolves
-  null even without `state`; a state mismatch on a success redirect still
-  rejects. The cached token is keyed by client id.
-- **Rollback:** flip the flag default back to `'v2'` and remove the config
-  key — the V2 DOM path is byte-identical to today.
+  null even without `state`; a state mismatch on a success redirect resolves
+  null too (logged once, no value in the line). The cached token is keyed by client id.
+- **Rollback:** flip the flag default back to `'v2'`, remove the config key and any `exchangeUrl` wiring — the V2 DOM path is byte-identical to today.
 
 ## Verification log (2026-11-19)
 
@@ -235,7 +273,10 @@ provider needs to interact with the user, the flow will just fail."
   safari false, safari_ios mirror.
 - rfc-editor.org/rfc/rfc7636 — verifier rules + Appendix B vectors.
 - developers.google.com/identity/protocols/oauth2/web-server — token
-  endpoint, parameters, `client_secret` "Optional".
+  request: `client_secret` listed without "Optional" (required for Web clients).
+- developers.google.com/identity/protocols/oauth2/native-app — token request:
+  `client_secret` marked "Optional" (installed-app clients only). Both read
+  through the Context7 mirror 2026-11-19.
 - developers.google.com/identity/protocols/oauth2/scopes — verification
   statement. Classroom scope classification: UNVERIFIED.
 - dev.opera.com — unreachable during verification (connect timeout).

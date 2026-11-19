@@ -11,7 +11,8 @@
  *
  * Contract pinned by tests/v3-webauthflow-token-source.test.ts:
  *   - Authorization Code + PKCE S256 (RFC 7636; Appendix B vectors tested),
- *   - `state` random per flow and compared on return — a mismatch REJECTS,
+ *   - `state` random per flow and compared on return: a mismatch resolves null
+ *     and logs one fixed line (no returned value in it),
  *   - user cancel / denial / exchange failure resolve null (never throw),
  *   - a missing web client id resolves null and logs exactly one line,
  *   - concurrent callers share ONE in-flight flow (one auth window),
@@ -25,12 +26,18 @@
  *     The silent default is short because a click queued behind a silent flow
  *     waits for it (worst case 10 s launch + 15 s exchange before its window),
  *   - launchWebAuthFlow has no cancel: a LAUNCH GATE stays closed until the
- *     underlying launch promise settles (not the race), so a timed-out window
+ *     underlying launch promise settles (not the race), capped at a ceiling
+ *     (launchGateCeilingMs, 2 min) so a launch that never settles cannot kill
+ *     sign-in; a click may pass once a SILENT launch timed out. So a timed-out window
  *     that may still be open never gets a second window next to it; a new flow
  *     meanwhile resolves null,
- *   - the returned redirect must start with getRedirectUrl(); a malformed or
+ *   - cooldown and cache expiry use now(): a backward clock step (now before the
+ *     stamp) expires the cache and drops the cooldown,
+ *   - the code exchange URL is injectable (exchangeUrl): a Web client needs its
+ *     secret at Google's endpoint, so a Worker exchange proxy plugs in there,
+ *   - the returned redirect must match getRedirectUrl() by origin and path; a malformed or
  *     foreign redirect resolves null; an error redirect (denial) resolves null
- *     even without state; a state mismatch on a success redirect rejects,
+ *     even without state; a state mismatch on a success redirect resolves null,
  *   - the code exchange is raced against a timer (abort + resolve null), so a
  *     fetch that ignores its signal cannot hang the flow; a late result is
  *     never cached,
@@ -133,6 +140,19 @@ export interface WebAuthFlowDeps {
    * interactive one (injectable for tests). Separate from fetchTimeoutMs.
    */
   launchTimeoutMs?: number;
+  /**
+   * Longest time the launch gate stays closed for a launch that never settles
+   * (default 2 min; injectable for tests). After it the gate opens so a hung
+   * launchWebAuthFlow cannot kill the sign-in button until the context reloads.
+   */
+  launchGateCeilingMs?: number;
+  /**
+   * Where the authorization code is exchanged. Default: Google's token
+   * endpoint. A Web application client needs its client secret there, and a
+   * secret must never ship in an extension, so a Worker-side exchange proxy
+   * (ADR-0010) is injected here instead.
+   */
+  exchangeUrl?: string;
   randomBytes?: (n: number) => Uint8Array;
   now?: () => number;
   log?: (message: string) => void;
@@ -145,10 +165,13 @@ const DEFAULT_FETCH_TIMEOUT_MS = 15_000;
 const DEFAULT_SILENT_RETRY_COOLDOWN_MS = 60_000;
 const DEFAULT_SILENT_LAUNCH_TIMEOUT_MS = 10_000;
 const DEFAULT_INTERACTIVE_LAUNCH_TIMEOUT_MS = 300_000;
+const DEFAULT_LAUNCH_GATE_CEILING_MS = 120_000;
 
 interface CachedToken {
   token: string;
   expiresAt: number;
+  /** now() when the token was cached; now() < issuedAt means a backward clock jump. */
+  issuedAt: number;
   /** The client id the token was issued for. */
   clientId: string;
 }
@@ -161,6 +184,9 @@ export class WebAuthFlowTokenSource implements TokenSource {
   private lastSilentFailureAt: number | null = null;
   /** True while a launchWebAuthFlow call may still have its window open. */
   private launchOpen = false;
+  private launchSeq = 0;
+  /** True when the open launch was silent and its window timeout elapsed. */
+  private silentLaunchTimedOut = false;
   private missingClientIdLogged = false;
   private readonly deps: WebAuthFlowDeps;
 
@@ -181,7 +207,9 @@ export class WebAuthFlowTokenSource implements TokenSource {
 
     const now = this.deps.now ?? (() => Date.now());
     if (this.cached) {
-      if (this.cached.clientId === clientId && this.cached.expiresAt > now()) {
+      // now() < issuedAt: the clock stepped back, so the stamp is unreliable.
+      if (this.cached.clientId === clientId && now() >= this.cached.issuedAt &&
+        this.cached.expiresAt > now()) {
         return this.cached.token;
       }
       // Expired, or issued for another client id: useless, drop it from memory.
@@ -209,8 +237,11 @@ export class WebAuthFlowTokenSource implements TokenSource {
     // an interactive prompt from a non-interactive request — consent escalation
     // is a click's job.
     const cooldown = this.deps.silentRetryCooldownMs ?? DEFAULT_SILENT_RETRY_COOLDOWN_MS;
-    if (this.lastSilentFailureAt !== null && now() - this.lastSilentFailureAt < cooldown) {
-      return null;
+    if (this.lastSilentFailureAt !== null) {
+      const elapsed = now() - this.lastSilentFailureAt;
+      // elapsed < 0: the clock stepped back; drop the stamp instead of blocking.
+      if (elapsed < 0) this.lastSilentFailureAt = null;
+      else if (elapsed < cooldown) return null;
     }
     const silent = this.runFlow(clientId, false).then(
       (token) => {
@@ -260,7 +291,8 @@ export class WebAuthFlowTokenSource implements TokenSource {
       (interactive ? DEFAULT_INTERACTIVE_LAUNCH_TIMEOUT_MS : DEFAULT_SILENT_LAUNCH_TIMEOUT_MS);
     // launchWebAuthFlow has no cancel: while an earlier launch has not settled
     // its window may still be open, so no second window is opened next to it.
-    if (this.launchOpen) return null;
+    // A click may pass once a SILENT launch (invisible by contract) timed out.
+    if (this.launchOpen && !(interactive && this.silentLaunchTimedOut)) return null;
     let launched: Promise<string | undefined>;
     try {
       launched = Promise.resolve(
@@ -270,13 +302,29 @@ export class WebAuthFlowTokenSource implements TokenSource {
       return null;
     }
     this.launchOpen = true;
+    this.silentLaunchTimedOut = false;
+    // The gate follows the launch promise, capped at a ceiling so a launch
+    // that never settles cannot close it for good.
+    let gateTimer: ReturnType<typeof setTimeout> | undefined;
+    const launchId = ++this.launchSeq;
     const release = () => {
+      clearTimeout(gateTimer);
+      // A late settle of an older launch must not reopen a newer launch's gate.
+      if (launchId !== this.launchSeq) return;
       this.launchOpen = false;
+      this.silentLaunchTimedOut = false;
     };
+    gateTimer = setTimeout(
+      release,
+      this.deps.launchGateCeilingMs ?? DEFAULT_LAUNCH_GATE_CEILING_MS,
+    );
     launched.then(release, release);
     let launchTimer: ReturnType<typeof setTimeout> | undefined;
     const timedOut = new Promise<undefined>((resolve) => {
-      launchTimer = setTimeout(() => resolve(undefined), launchTimeoutMs);
+      launchTimer = setTimeout(() => {
+        if (!interactive && this.launchOpen) this.silentLaunchTimedOut = true;
+        resolve(undefined);
+      }, launchTimeoutMs);
     });
     let redirect: string | undefined;
     try {
@@ -292,15 +340,20 @@ export class WebAuthFlowTokenSource implements TokenSource {
     // anything unparsable) is a failed flow, never an exception.
     let returned: URL;
     try {
-      if (!redirect.startsWith(redirectUri)) return null;
       returned = new URL(redirect);
+      const expected = new URL(redirectUri);
+      if (returned.origin !== expected.origin || returned.pathname !== expected.pathname) {
+        return null;
+      }
     } catch {
       return null;
     }
     // A denial may carry no state: check the error first (it resolves null).
     if (returned.searchParams.get('error')) return null;
     if (returned.searchParams.get('state') !== state) {
-      throw new Error('[CQD Classroom] WebAuthFlow state mismatch — flow rejected as possible CSRF');
+      // Never throw (TokenSource contract) and never log the returned values.
+      this.log('[CQD Classroom] WebAuthFlow state mismatch — flow rejected as possible CSRF');
+      return null;
     }
     const code = returned.searchParams.get('code');
     if (!code) return null;
@@ -325,6 +378,7 @@ export class WebAuthFlowTokenSource implements TokenSource {
       this.cached = {
         token: exchanged.token,
         expiresAt: now() + exchanged.lifetimeMs - EXPIRY_SKEW_MS,
+        issuedAt: now(),
         clientId,
       };
       return exchanged.token;
@@ -342,7 +396,7 @@ export class WebAuthFlowTokenSource implements TokenSource {
     signal: AbortSignal,
   ): Promise<{ token: string; lifetimeMs: number } | null> {
     try {
-      const response = await this.deps.fetchImpl(GOOGLE_TOKEN_ENDPOINT, {
+      const response = await this.deps.fetchImpl(this.deps.exchangeUrl ?? GOOGLE_TOKEN_ENDPOINT, {
         signal,
         method: 'POST',
         body: new URLSearchParams({
