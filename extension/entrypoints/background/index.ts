@@ -38,6 +38,7 @@ import { createIconAnimationController } from './icon-animation';
 import { createUpdateDotController, ensureUpdateCheckAlarm } from './update-dot';
 import { createIconUpdaters, isClassroomUrl, setActionIcon, GRAY_ICON_PATHS } from './icon-manager';
 import { extractDriveFileId } from './auth-utils';
+import { loadEngineBase } from '../../src/engines/engine-base';
 import { composeSuggestedFilename, getFilenameExt, buildUrlWithAuthUser } from './url-helpers';
 import { sanitizeFileName } from '../../src/core/name/sanitize';
 import { applyNamingTemplate, getNamingTemplateSync, startNameTemplateWatcher } from './name-template';
@@ -158,6 +159,8 @@ function isStudentWorkResolvePublishMessage(value: unknown): value is StudentWor
 }
 
 export default defineBackground(() => {
+  // 82gr: load the persisted engineBase flag first (never rejects).
+  void loadEngineBase();
   // Initialize analytics alarms
   ensureAnalyticsAlarm();
   // Levels + confetti must start from the real history, not from zero: a

@@ -531,4 +531,25 @@ describe('student_work_sidecar rides the shared page DomPort (S10 3b)', () => {
     expect(createStudentWorkButton).toHaveBeenCalledTimes(1);
     expect(vi.getTimerCount()).toBe(0);
   });
+
+  it('co2e: a scan keeps data-cqd-injected on V2 buttons and still strips it from flag artifacts', async () => {
+    const { start } = await loadSidecar();
+    const v2Button = document.createElement('button');
+    v2Button.className = 'cqd-download-btn';
+    v2Button.setAttribute('data-cqd-file-id', 'drive-F1');
+    v2Button.setAttribute('data-cqd-injected', 'true');
+    const v2All = document.createElement('button');
+    v2All.className = 'cqd-download-all-btn';
+    v2All.setAttribute('data-cqd-file-id', 'download-all:sub-1');
+    v2All.setAttribute('data-cqd-injected', 'true');
+    const flagged = document.createElement('div');
+    flagged.setAttribute('data-cqd-injected', 'true');
+    document.body.append(v2Button, v2All, flagged);
+
+    start(); // runs a scan on a student-work route
+
+    expect(v2Button.getAttribute('data-cqd-injected')).toBe('true');
+    expect(v2All.getAttribute('data-cqd-injected')).toBe('true');
+    expect(flagged.hasAttribute('data-cqd-injected')).toBe(false);
+  });
 });

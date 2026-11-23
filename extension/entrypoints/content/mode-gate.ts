@@ -39,7 +39,11 @@ import {
   isValidMode,
   readMode,
 } from '../../src/v2/orchestrator/mode-controller';
-import { getEngineBase } from '../../src/engines/engine-base';
+import {
+  ENGINE_BASE_STORAGE_KEY,
+  applyStoredEngineBase,
+  getEngineBase,
+} from '../../src/engines/engine-base';
 import type { EngineMode } from '../../src/engines/types';
 
 export type { EngineMode };
@@ -91,7 +95,10 @@ export function onEngineModeChange(cb: (suppressed: boolean) => void): () => voi
   if (typeof chrome !== 'undefined' && chrome?.storage?.local?.get) {
     try {
       // Callback style: resolves synchronously in tests, async in production.
-      chrome.storage.local.get(MODE_STORAGE_KEY, (result: Record<string, unknown>) => {
+      // 82gr: the engineBase flag rides the same read, applied BEFORE the
+      // suppression math so the gate never decides on a stale OFF.
+      chrome.storage.local.get([MODE_STORAGE_KEY, ENGINE_BASE_STORAGE_KEY], (result: Record<string, unknown>) => {
+        applyStoredEngineBase(result?.[ENGINE_BASE_STORAGE_KEY]);
         safeCb(suppressedFrom(result?.[MODE_STORAGE_KEY]));
       });
     } catch (e) {
