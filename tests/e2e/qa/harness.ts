@@ -447,13 +447,26 @@ export async function launchQaContext(
           };
         });
         console.log(`[qa-console:bg-probe] view: ${JSON.stringify(view)}`);
-        // Direct injection attempt on the classroom tab.
+        // Direct injection attempt on the classroom tab. MV3 removed
+        // tabs.executeScript; scripting.executeScript is the replacement,
+        // so try it first and fall back for an mv2 build.
         const inject = await bg.evaluate(async () => {
           const tabs = await browser.tabs.query({ url: "https://classroom.google.com/*" });
           if (tabs.length === 0) return { error: "no classroom tab visible to the api" };
-          const api = (globalThis as { browser?: { tabs: { executeScript: (id: number, details: { code: string }) => Promise<unknown[]> } } }).browser;
+          const api = (globalThis as {
+            browser?: {
+              tabs: { executeScript: (id: number, details: { code: string }) => Promise<unknown[]> };
+              scripting?: { executeScript: (details: { target: { tabId: number }; code: string }) => Promise<unknown[]> };
+            };
+          }).browser;
+          const code = "document.documentElement.dataset.cqdFxInjected = 'yes'";
+          const tabId = tabs[0].id;
           try {
-            await api.tabs.executeScript(tabs[0].id, { code: "document.documentElement.dataset.cqdFxInjected = 'yes'" });
+            if (api?.scripting?.executeScript) {
+              await api.scripting.executeScript({ target: { tabId }, code });
+            } else {
+              await api!.tabs.executeScript(tabId, { code });
+            }
             return { ok: true, tabUrl: tabs[0].url?.slice(0, 70) };
           } catch (e) {
             return { error: String(e).slice(0, 300), tabUrl: tabs[0].url?.slice(0, 70) };

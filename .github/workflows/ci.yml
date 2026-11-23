@@ -197,11 +197,12 @@ jobs:
           sudo apt-get install -y xvfb
           xvfb-run -a pnpm run test:e2e:headed-security
 
-      # Signed Firefox leg (S11 T3): AMO-sign the firefox-mv2 zip, then run
-      # the qa journeys against the signed xpi (it survives Playwright's
-      # bundled Firefox, unlike the unsigned sideload). Only runs when both
-      # secrets exist; QA_SIGNED_XPI is scoped to this step so the config
-      # gains the qa-firefox-signed project only here.
+      # Signed Firefox leg (S11 T3): AMO-sign the firefox-mv3 zip, then run
+      # the qa journeys against the signed xpi. The QA target is MV3 since
+      # 2026-11-15: bundled Firefox 157 deletes sideloaded MV2 add-ons even
+      # when AMO-signed (beads w5r6/779s). Only runs when both secrets
+      # exist; QA_SIGNED_XPI is scoped to this step so the config gains the
+      # qa-firefox-signed project only here.
       - name: Sign extension (AMO) + signed Firefox QA leg
         # continue-on-error: Mozilla-side review/signing state can queue
         # unlisted versions beyond this job's control (tracked as bead
@@ -239,7 +240,7 @@ jobs:
           # reused version number wedges the sign flow on server-side state
           # (the "1.8.0" registered earlier exposes no signed file). Unique
           # version = the create flow always completes fresh.
-          FIREFOX_GECKO_ID=$AMO_ADDON_ID FIREFOX_VERSION="1.8.0qa$GITHUB_RUN_NUMBER" pnpm -C extension firefox
+          FIREFOX_GECKO_ID=$AMO_ADDON_ID FIREFOX_VERSION="1.8.0qa$GITHUB_RUN_NUMBER" pnpm -C extension firefox:mv3
           pnpm -C extension sign:extension
           # w5r6: stream the extension's console into the run log so the
           # Firefox injection failure is diagnosable from CI artifacts.

@@ -30,7 +30,7 @@ import { createHash } from "node:crypto";
 const REPO_ROOT = path.resolve(__dirname, "../..");
 const EXTENSION_DIR = path.join(REPO_ROOT, "extension");
 const OUTPUT_DIR = path.join(EXTENSION_DIR, ".output/chrome-mv3");
-const FIREFOX_OUTPUT_DIR = path.join(EXTENSION_DIR, ".output/firefox-mv2");
+const FIREFOX_OUTPUT_DIR = path.join(EXTENSION_DIR, ".output/firefox-mv3");
 const FIREFOX_PROFILE_DIR = path.join(REPO_ROOT, "tests/e2e/.firefox-profile");
 const FIREFOX_GECKO_ID = "classroom-quick-downloader@adhamhaitham.dev";
 const BUILD_STAMP_PATH = path.join(REPO_ROOT, "tests/e2e/.build-stamp");
@@ -201,8 +201,8 @@ function ensureFirefoxProfile(): void {
       : [];
   let firefoxZips = listFirefoxZips();
   if (!fs.existsSync(manifestPath) || firefoxZips.length === 0) {
-    console.log("\n🔨 Building extension for Firefox (MV2)...");
-    runExtensionScript("firefox"); // wxt build -b firefox && wxt zip -b firefox
+    console.log("\n🔨 Building extension for Firefox (MV3)...");
+    runExtensionScript("firefox:mv3"); // wxt build -b firefox --mv3 && wxt zip -b firefox --mv3
     // Re-scan after the build: the pre-build scan is empty on fresh runners.
     firefoxZips = listFirefoxZips();
   }
@@ -212,17 +212,17 @@ function ensureFirefoxProfile(): void {
     .map((f) => path.join(outputDir, f))
     .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0];
   if (!sourceZip) {
-    throw new Error("Firefox zip not found in extension/.output — run pnpm -C extension run firefox first.");
+    throw new Error("Firefox zip not found in extension/.output — run pnpm -C extension run firefox:mv3 first.");
   }
 
   fs.mkdirSync(extensionsDir, { recursive: true });
   fs.copyFileSync(sourceZip, path.join(extensionsDir, `${FIREFOX_GECKO_ID}.xpi`));
 
   writeFirefoxUserPrefs();
-  console.log("✅ Firefox profile prepared with the MV2 extension\n");
+  console.log("✅ Firefox profile prepared with the MV3 extension\n");
 }
 
-/** user.js prefs: allow the unsigned MV2 build at startup, every start. */
+/** user.js prefs: allow the unsigned MV3 build at startup, every start. */
 function writeFirefoxUserPrefs(): void {
   const userJs = [
     'user_pref("xpinstall.signatures.required", false);',

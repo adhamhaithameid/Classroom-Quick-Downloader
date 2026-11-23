@@ -35,6 +35,7 @@
     "postinstall": "wxt prepare",
     "edge": "wxt build -b edge && wxt zip -b edge",
     "firefox": "wxt build -b firefox && wxt zip -b firefox",
+    "firefox:mv3": "wxt build -b firefox --mv3 && wxt zip -b firefox --mv3",
     "sign:extension": "node tools/sign-extension.mjs",
     "chrome": "wxt build -b chrome && wxt zip -b chrome",
     "safari": "node -e \"console.error('Safari support is temporarily disabled.'); process.exit(1)\"",
